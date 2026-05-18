@@ -2861,3 +2861,31 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-05-15 14:52:42 | powershell -Command "Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id \$_.OwningProcess -Force -ErrorAction SilentlyContinue }" 2>&1 | head -3
 - 2026-05-15 15:07:18 | nslookup tactics.today-tactics.co.kr 8.8.8.8 2>&1 | tail -8
 - 2026-05-15 15:12:28 | gh --version 2>&1 | head -2 && gh auth status 2>&1 | head -5
+- 2026-05-15 15:15:12 | tail -20 "C:\Users\ehban\AppData\Local\Temp\claude\C--Users-ehban-OneDrive-------today-tatics\bcc887f1-80b6-4372-b9a5-52493da0302d\tasks\bgqbg5m5h.output" 2>&1
+- 2026-05-15 15:15:52 | curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=3" | python -c " / import sys, json / d = json.loads(sys.stdin.read()) / for r in d.get('workflow_runs', [])[:3]: /     print(f\"#{r['id']} {r['name'][:30]} | event={r['event']} | status={r['status']} | conclusion={r['conclusion']} | head_sha={r['head_sha'][:7]}\") /     print(f\"  url: {r['html_url']}\") / " 2>&1
+- 2026-05-15 15:16:02 | curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs/25903453504/jobs" | python -c " / import sys, json / d = json.loads(sys.stdin.read()) / for j in d.get('jobs', []): /     print(f\"job: {j['name']}, conclusion: {j['conclusion']}\") /     for s in j.get('steps', []): /         print(f\"  step: {s['name']:30} | {s['status']:10} | {s['conclusion']}\") / " 2>&1
+- 2026-05-15 15:16:14 | curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs/25903453504/jobs" | python -c " / import sys, json / d = json.loads(sys.stdin.read()) / for j in d.get('jobs', []): /     print('job_id:', j['id']) / " && curl -sL "https://api.github.com/repos/bbang-bbang/today_tactics/actions/jobs/72401478921/logs" 2>&1 | tail -30
+- 2026-05-15 15:20:14 | until curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=1" | python -c " / import sys, json / d = json.loads(sys.stdin.read()) / r = d['workflow_runs'][0] if d.get('workflow_runs') else None / if r and r['head_sha'].startswith('7766e6e') and r['status'] == 'completed': /     print(f\"DONE conclusion={r['conclusion']} id={r['id']}\") /     sys.exit(0) / sys.exit(1) / " 2>/dev/null; do sleep 10; done
+- 2026-05-15 15:20:23 | curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs/25903628867/jobs" | python -c " / import sys, json / d = json.loads(sys.stdin.read()) / for j in d.get('jobs', []): /     print(f\"job: {j['name']}, conclusion: {j['conclusion']}\") /     for s in j.get('steps', []): /         print(f\"  step: {s['name']:35} | {s['status']:10} | {s['conclusion']}\") / "
+- 2026-05-15 15:25:52 | until curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=1" | python -c " / import sys, json / d = json.loads(sys.stdin.read()) / r = d['workflow_runs'][0] / if r['head_sha'].startswith('61db8f3') and r['status'] == 'completed': /     print(f\"DONE conclusion={r['conclusion']} id={r['id']}\") /     sys.exit(0) / sys.exit(1) / " 2>/dev/null; do sleep 10; done
+- 2026-05-15 15:27:43 | until curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=1" | python -c " / import sys, json / d = json.loads(sys.stdin.read()) / r = d['workflow_runs'][0] / if r['head_sha'].startswith('c73f086') and r['status'] == 'completed': /     print(f\"DONE conclusion={r['conclusion']} id={r['id']}\") /     sys.exit(0) / sys.exit(1) / " 2>/dev/null; do sleep 10; done
+- 2026-05-15 15:27:50 | curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs/25903873970/jobs" | python -c " / import sys, json / d = json.loads(sys.stdin.read()) / for j in d.get('jobs', []): /     print(f\"job: {j['name']}, conclusion: {j['conclusion']}\") /     for s in j.get('steps', []): /         print(f\"  step: {s['name']:35} | {s['conclusion']}\") / "
+- 2026-05-15 15:28:40 | curl -s -o /dev/null -w "repo public: %{http_code}\n" "https://github.com/bbang-bbang/today_tactics" && curl -s "https://api.github.com/repos/bbang-bbang/today_tactics" | python -c "import sys,json;d=json.loads(sys.stdin.read());print('private:',d.get('private'),'visibility:',d.get('visibility'))"
+- 2026-05-15 15:30:01 | until curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=1" | python -c " / import sys, json / d = json.loads(sys.stdin.read()) / r = d['workflow_runs'][0] / if r['head_sha'].startswith('2ab592d') and r['status'] == 'completed': /     print(f\"DONE conclusion={r['conclusion']} id={r['id']}\") /     sys.exit(0) / sys.exit(1) / " 2>/dev/null; do sleep 10; done
+- 2026-05-19 00:53:47 | tail -100 "C:\Users\BANGEU~1\AppData\Local\Temp\claude\C--Users-BangEunHo-OneDrive-------today-tatics\43f7ec0e-2e59-4b15-a6d3-91a18fe0bcb4\tasks\bbj1v9vs5.output" 2>/dev/null || Get-Content "C:\Users\BANGEU~1\AppData\Local\Temp\claude\C--Users-BangEunHo-OneDrive-------today-tatics\43f7ec0e-2e59-4b15-a6d3-91a18fe0bcb4\tasks\bbj1v9vs5.output" -Tail 100
+
+---
+
+## 2026-05-19 | 경기 데이터 증분 업데이트 (5/14~5/17)
+
+### 변경 내용
+- `update_data.py --days 14` 실행 (STEP 0~16 전원 OK, 총 1,128초)
+- DB 최신 경기: 2026-05-13 → **2026-05-17** (충남아산 1:3 수원FC 신규)
+- K2 충남아산 경기 1건 신규 추가 (총 완료 경기 2,562 → 2,563개)
+- K1 5/14~5/18 경기 없음 (해당 기간 K1 라운드 미배정)
+- STEP 15 formation 갱신: 187경기 처리 / 173경기 갱신
+- STEP 16 K리그 포털 라인업: ok=14 신규
+
+### 배포
+- data/*.json 커밋 + push → GitHub Actions 자동 git pull
+- players.db SCP 직접 전송 (deploy.sh)
