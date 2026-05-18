@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-05-19 | 경기 예측 버그 수정 + 성능 최적화 2종 + 데이터 업데이트 + 배포
+
+### 진단
+- 경기 예측 패널에서 다른 경기를 클릭해도 전술판·H2H 영역이 충남아산 vs 수원FC로 고정
+  - 원인: MutationObserver 체인이 라인업 데이터 존재 시에만 fhud-name을 갱신
+  - 해결: 라인업 유무와 무관하게 경기 카드 클릭 즉시 `fhud-name-a/b` DOM 강제 업데이트
+
+### 데이터 업데이트
+- `update_data.py --days 14` 전체 STEP 0~16 완료
+- DB: 2026-05-13 → 2026-05-17 기준 (K2 충남아산 1:3 수원FC 신규 추가)
+
+### ① 예측 패널 경기 전환 버그 수정 (`prediction.js`)
+- 경기 카드 클릭 이벤트에서 `loadPrediction()` 호출 직후 `fhud-name-a/b` 즉시 갱신
+- 기존: `matchLineupLoaded` 이벤트 → `applyMatchLineup()` → fhud-name 변경 (라인업 없으면 트리거 안 됨)
+- 수정: 클릭 시 항상 `kit(homeId).short` → `fhud-name-a/b.textContent` 즉시 할당
+
+### ② 서버 캐시 워밍업 병렬화 (`main.py`)
+- `_warm_cache()`: 직렬 for 루프 → 8개 URL을 병렬 threading.Thread로 동시 호출
+- K1/K2 백테스트 + 스케줄/라운드 + 시즌 시뮬 — 총 대기 시간 = max(개별) 로 단축
+- sleep(3) → sleep(2) 로 축소
+
+### ③ 클라이언트 세션 캐시 (`prediction.js`)
+- `_predCache`, `_lineupCache`, `_extrasCache`, `_retroCache` 딕셔너리 추가
+- `_cachedFetch(cache, key, fetchFn)` 헬퍼 함수 추가
+- `loadPrediction()` 내 4개 fetch (match-prediction / predicted-lineup ×2 / match-extras / match-retrospective) → 전부 `_cachedFetch` 적용
+- 동일 경기 재클릭 시 네트워크 0회, 즉시 렌더링
+
+### 배포
+- 커밋: `5ee8db0` (예측 버그), `b9d41a9` (성능 최적화)
+- 가비아 서버 `git stash && git pull && systemctl restart` 완료 (health=200 확인)
+
+---
+
 ## 2026-05-13 | 전술판 라인업 포지션 버그 3종 + 포메이션 기준값 테이블 추가
 
 ### 진단
@@ -2897,3 +2930,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-05-19 01:08:36 | JOB_ID=$(curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs/26045213222/jobs" | python3 -c "import sys,json;d=json.loads(sys.stdin.read());print(d['jobs'][0]['id'])") && echo "job_id: $JOB_ID" && curl -sL "https://api.github.com/repos/bbang-bbang/today_tactics/actions/jobs/$JOB_ID/logs" 2>&1 | tail -30
 - 2026-05-19 01:15:15 | find /mnt/c/Users/BangEunHo -name "today-project.pem" 2>/dev/null; find /mnt/c/Users/BangEunHo -name "*.pem" 2>/dev/null | head -10
 - 2026-05-19 01:20:29 | sleep 20 && curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=1" | python3 -c " / import sys, json / d = json.loads(sys.stdin.read()) / r = d['workflow_runs'][0] / print(f\"run #{r['run_number']} | sha={r['head_sha'][:7]} | status={r['status']} | conclusion={r['conclusion']}\")"
+- 2026-05-19 02:03:55 | rm -f "/mnt/c/Users/BangEunHo/AppData/Local/Temp/tt_deploy.pem"
