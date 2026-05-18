@@ -29,4 +29,4 @@ jobs:
               -o StrictHostKeyChecking=no \
               -o ConnectTimeout=15 \
               "$SSH_USER@$SSH_HOST" \
-              "cd /opt/today_tactics && git pull && sudo -n systemctl restart today_tactics && sleep 3 && curl -sf -o /dev/null -w 'health=%{http_code}\n' http://127.0.0.1:5000/"
+              "cd /opt/today_tactics && git stash && git pull && sudo -n systemctl restart today_tactics && sleep 3 && curl -sf -o /dev/null -w 'health=%{http_code}\n' http://127.0.0.1:5000/"
