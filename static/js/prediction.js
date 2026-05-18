@@ -325,6 +325,15 @@
                     window.history.replaceState(null, "", u);
                 } catch (_) {}
                 loadPrediction(homeId, awayId, gameDate, isFinished);
+                // 라인업 유무와 무관하게 fhud-name 즉시 업데이트
+                // → MutationObserver(info.js) 트리거 → H2H / 전술판 팀명 동기화
+                const hTeam = kit(homeId), aTeam = kit(awayId);
+                if (hTeam && aTeam) {
+                    const nameA = document.getElementById("fhud-name-a");
+                    const nameB = document.getElementById("fhud-name-b");
+                    if (nameA) nameA.textContent = hTeam.short || hTeam.name;
+                    if (nameB) nameB.textContent = aTeam.short || aTeam.name;
+                }
                 // 메인 전술판 자동 적용은 finished 매치만
                 if (isFinished && gameDate) {
                     fetch(`/api/match-lineup?date=${encodeURIComponent(gameDate)}&home_slug=${encodeURIComponent(homeId)}&away_slug=${encodeURIComponent(awayId)}`)
