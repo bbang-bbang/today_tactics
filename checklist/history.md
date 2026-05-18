@@ -2887,5 +2887,13 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - STEP 16 K리그 포털 라인업: ok=14 신규
 
 ### 배포
-- data/*.json 커밋 + push → GitHub Actions 자동 git pull
-- players.db SCP 직접 전송 (deploy.sh)
+- `git push` (커밋 `b431843`) → 서버 `git stash && git pull` Fast-forward 완료
+- `players.db` SCP 직접 전송 (`today-project.pem` / `rocky@1.201.126.200`)
+- `sudo systemctl restart today_tactics` → health=200 확인
+- deploy.yml `git stash` 추가 커밋 (`c1e6fbd`) — 서버 uncommitted 변경으로 pull abort 방지
+- 2026-05-19 01:07:55 | sleep 8 && curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=3" | python3 -c " / import sys, json / d = json.loads(sys.stdin.read()) / for r in d.get('workflow_runs', [])[:3]: /     print(f\"#{r['run_number']} {r['name']} | {r['event']} | status={r['status']} | conclusion={r['conclusion']} | sha={r['head_sha'][:7]}\") / "
+- 2026-05-19 01:08:07 | curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=1" | python3 -c " / import sys, json / d = json.loads(sys.stdin.read()) / r = d['workflow_runs'][0] / print('run_id:', r['id']) / print('conclusion:', r['conclusion']) / " && RUN_ID=$(curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=1" | python3 -c "import sys,json;d=json.loads(sys.stdin.read());print(d['workflow_runs'][0]['id'])") && curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs/$RUN_ID/jobs" | python3 -c " / import sys, json / d = json.loads(sys.stdin.read()) / for j in d.get('jobs', []): /     print(f\"job: {j['name']}, conclusion: {j['conclusion']}\") /     for s in j.get('steps', []): /         print(f\"  step: {s['name']:40} | {s['status']:10} | {s['conclusion']}\") / "
+- 2026-05-19 01:08:17 | curl -sL "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs/26045213222/logs" -o /tmp/actions_log.zip 2>&1; echo "exit: $?"
+- 2026-05-19 01:08:36 | JOB_ID=$(curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs/26045213222/jobs" | python3 -c "import sys,json;d=json.loads(sys.stdin.read());print(d['jobs'][0]['id'])") && echo "job_id: $JOB_ID" && curl -sL "https://api.github.com/repos/bbang-bbang/today_tactics/actions/jobs/$JOB_ID/logs" 2>&1 | tail -30
+- 2026-05-19 01:15:15 | find /mnt/c/Users/BangEunHo -name "today-project.pem" 2>/dev/null; find /mnt/c/Users/BangEunHo -name "*.pem" 2>/dev/null | head -10
+- 2026-05-19 01:20:29 | sleep 20 && curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=1" | python3 -c " / import sys, json / d = json.loads(sys.stdin.read()) / r = d['workflow_runs'][0] / print(f\"run #{r['run_number']} | sha={r['head_sha'][:7]} | status={r['status']} | conclusion={r['conclusion']}\")"
