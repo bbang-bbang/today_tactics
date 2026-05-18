@@ -7007,8 +7007,9 @@ def trigger_update():
 def _warm_cache():
     """서버 시작 시 백그라운드로 무거운 API 미리 호출 — 첫 사용자 대기 시간 제거.
     K1/K2 백테스트 + 스케줄/라운드 + 시즌 시뮬 + 라운드 예측 — 워밍업 후 영구 빠름.
+    모든 URL을 병렬 스레드로 동시 호출 → 총 대기 시간 = max(개별 시간).
     """
-    import urllib.request
+    import urllib.request, time as _t
     warm_urls = [
         "http://127.0.0.1:5000/api/prediction-backtest?league=k1&year=2026",
         "http://127.0.0.1:5000/api/prediction-backtest?league=k2&year=2026",
@@ -7019,13 +7020,17 @@ def _warm_cache():
         "http://127.0.0.1:5000/api/season-simulation?league=k1&n=500",
         "http://127.0.0.1:5000/api/season-simulation?league=k2&n=500",
     ]
-    import time as _t
-    _t.sleep(3)  # 서버 listen 대기
-    for u in warm_urls:
+    _t.sleep(2)  # 서버 listen 대기 (3→2초)
+    def _fetch(u):
         try:
             urllib.request.urlopen(u, timeout=120).read()
         except Exception:
             pass
+    threads = [threading.Thread(target=_fetch, args=(u,), daemon=True) for u in warm_urls]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=120)
 
 
 # 서버 부팅 후 자동 워밍업 (production gunicorn에서도 동작)

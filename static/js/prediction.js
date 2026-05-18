@@ -398,6 +398,18 @@
     });
 
 
+    // ── 클라이언트 세션 캐시 (페이지 새로고침 전까지 유지) ──────
+    const _predCache   = {};  // "homeId|awayId"      → prediction data
+    const _lineupCache = {};  // "teamId"             → predicted-lineup data
+    const _extrasCache = {};  // "date|homeId|awayId" → match-extras data
+    const _retroCache  = {};  // "date|homeId|awayId" → match-retrospective data
+
+    function _cachedFetch(cache, key, fetchFn) {
+        if (key in cache) return Promise.resolve(cache[key]);
+        return fetchFn().then(d => { cache[key] = d; return d; })
+                        .catch(() => { cache[key] = null; return null; });
+    }
+
     // 백테스트 정확도 — 리그별 캐시
     let _backtestCache = {};
     function loadBacktest(league) {
@@ -529,23 +541,28 @@
         report.innerHTML = `<div class="pred-loading">분석 중...</div>`;
         const league = _inferLeague(homeId, awayId);
         // 전술 보기 + 사후 분석은 종료된 과거 경기에서만
+        const extrasKey = `${gameDate}|${homeId}|${awayId}`;
+        const retroKey  = `${gameDate}|${homeId}|${awayId}`;
         const extrasFetch = (isFinished && gameDate)
-            ? fetch(`/api/match-extras?date=${encodeURIComponent(gameDate)}&home_slug=${encodeURIComponent(homeId)}&away_slug=${encodeURIComponent(awayId)}`)
-                .then(r => r.json())
-                .catch(() => null)
+            ? _cachedFetch(_extrasCache, extrasKey, () =>
+                fetch(`/api/match-extras?date=${encodeURIComponent(gameDate)}&home_slug=${encodeURIComponent(homeId)}&away_slug=${encodeURIComponent(awayId)}`)
+                    .then(r => r.json()).catch(() => null))
             : Promise.resolve(null);
         const retroFetch = (isFinished && gameDate)
-            ? fetch(`/api/match-retrospective?date=${encodeURIComponent(gameDate)}&home_slug=${encodeURIComponent(homeId)}&away_slug=${encodeURIComponent(awayId)}`)
-                .then(r => r.ok ? r.json() : null)
-                .catch(() => null)
+            ? _cachedFetch(_retroCache, retroKey, () =>
+                fetch(`/api/match-retrospective?date=${encodeURIComponent(gameDate)}&home_slug=${encodeURIComponent(homeId)}&away_slug=${encodeURIComponent(awayId)}`)
+                    .then(r => r.ok ? r.json() : null).catch(() => null))
             : Promise.resolve(null);
         Promise.all([
-            fetch(`/api/match-prediction?homeTeam=${homeId}&awayTeam=${awayId}`)
-                .then(r => { if (!r.ok) throw new Error(`prediction ${r.status}`); return r.json(); })
-                .catch(e => { console.error("[예측 API 실패]", e); return null; }),
+            _cachedFetch(_predCache, `${homeId}|${awayId}`, () =>
+                fetch(`/api/match-prediction?homeTeam=${homeId}&awayTeam=${awayId}`)
+                    .then(r => { if (!r.ok) throw new Error(`prediction ${r.status}`); return r.json(); })
+                    .catch(e => { console.error("[예측 API 실패]", e); return null; })),
             loadBacktest(league),
-            fetch(`/api/predicted-lineup?teamId=${homeId}`).then(r => r.json()).catch(() => null),
-            fetch(`/api/predicted-lineup?teamId=${awayId}`).then(r => r.json()).catch(() => null),
+            _cachedFetch(_lineupCache, homeId, () =>
+                fetch(`/api/predicted-lineup?teamId=${homeId}`).then(r => r.json()).catch(() => null)),
+            _cachedFetch(_lineupCache, awayId, () =>
+                fetch(`/api/predicted-lineup?teamId=${awayId}`).then(r => r.json()).catch(() => null)),
             extrasFetch,
             retroFetch,
         ])
