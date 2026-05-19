@@ -1107,8 +1107,10 @@
                 ${timingBarsHtml(away.goal_timing, away.name)}
             </div>
             ${setpieceCardHtml(home, away)}
-            ${styleCardHtml(home, away)}
-            ${cardsCardHtml(home, away)}
+            <div class="pred-style-cards-grid">
+                ${styleCardHtml(home, away)}
+                ${cardsCardHtml(home, away)}
+            </div>
             ${(hLineup && hLineup.ready) || (aLineup && aLineup.ready) ? `
             <div class="pred-extras-row pred-lineup-row">
                 ${lineupCardHtml(hLineup, home.name, "pred-lineup-home")}

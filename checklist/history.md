@@ -4,6 +4,44 @@
 
 ---
 
+## 2026-05-20 | 전체 화면 레이아웃 구조 개선 — 세로 배치 → 그리드 레이아웃
+
+### 작업 배경
+- 모든 화면(팀분석·선수분석·선수리포트·팀비교·인사이트·예측)이 세로 단일열로만 구성되어 공간 활용 부족
+- 사용자 요청: "구조적으로 세로 구성에서 변경, 모든 화면"
+
+### 변경 내역
+
+#### style.css (v38→v39)
+- `.an-panel-grid` — 팀분석 탭 2-col 그리드 (차트 58% | 테이블 42%), align-items: start
+- `.an-weather-grid` + `.an-weather-block` — 날씨 탭 3-col 그리드 (기온|습도|풍속)
+- `.pa-bottom-grid` — 선수분석 모달 하단 2-col (활동량 | 월별)
+- `.pr-bottom-grid` — 선수리포트 하단 2-col (상대팀 | 활동량)
+- `#insights-grid` — display:block → CSS grid 2-col, 명시적 grid-row/column으로 TOP퍼포머 span
+- `.tc-rank-matches-grid` — 팀비교 순위+H2H 2-col
+- `.pred-style-cards-grid` — 예측 스타일+카드 2-col
+- 모바일 breakpoint: `#ins-panel-top/xg/cards { grid-column:auto; grid-row:auto; }` reset 추가
+
+#### templates/index.html
+- 팀분석 `vs` 탭: `.an-panel-grid`로 차트·테이블 감쌈
+- 팀분석 `ha` 탭: `.an-panel-grid`로 차트·테이블 감쌈
+- 팀분석 `weather` 탭: `.an-weather-grid` + `.an-weather-block` 3-col 구조로 교체
+- 팀비교: rank-panel + matches-panel → `.tc-rank-matches-grid`로 감쌈
+- JS 버전 업: analytics v2, team_compare v7, prediction v47, player_analytics v2, player_report v4, insights v7
+
+#### player_analytics.js
+- `pa-activity-wrap` + `pa-monthly-wrap` → `pa-bottom-grid` 안으로 이동 (2-col 나란히)
+- 활동량 차트 높이 180px→160px, 월별 차트 높이 200px→180px (공간 맞춤)
+
+#### player_report.js
+- `pr-vs-card` + `pr-activity-card` → `pr-bottom-grid` 안으로 이동 (2-col 나란히)
+- 최근폼 테이블은 아래에 full-width 유지
+
+#### prediction.js
+- `styleCardHtml` + `cardsCardHtml` → `pred-style-cards-grid` div로 감쌈
+
+---
+
 ## 2026-05-19 | 경기 예측 버그 수정 + 성능 최적화 2종 + 데이터 업데이트 + 배포
 
 ### 진단
@@ -2968,3 +3006,6 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-05-19 14:02:55 | git log --format='%h %s' -5; echo ---; git diff crawlers/crawl_lineups.py crawlers/sync_results_to_events.py
 - 2026-05-19 14:04:26 | git stash push -m "auto-log during rebase" -- checklist/history.md && git pull --rebase origin main 2>&1 | tail -10
 - 2026-05-19 14:04:36 | grep -n "^<<<\|^===\|^>>>" checklist/history.md | head -20
+- 2026-05-20 01:03:58 | sleep 3 && curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/
+- 2026-05-20 01:05:45 | sleep 4 && curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/
+

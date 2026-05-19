@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=38">
+    <link rel="stylesheet" href="/static/css/style.css?v=39">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -593,9 +593,11 @@
 
             <!-- 상대팀별 -->
             <div id="analytics-panel-vs" class="analytics-panel">
-                <div class="chart-wrap"><canvas id="chart-vs"></canvas></div>
-                <div class="analytics-table-wrap">
-                    <table id="table-vs" class="analytics-table"></table>
+                <div class="an-panel-grid">
+                    <div class="chart-wrap"><canvas id="chart-vs"></canvas></div>
+                    <div class="analytics-table-wrap">
+                        <table id="table-vs" class="analytics-table"></table>
+                    </div>
                 </div>
             </div>
 
@@ -606,20 +608,30 @@
 
             <!-- 홈/어웨이 -->
             <div id="analytics-panel-ha" class="analytics-panel hidden">
-                <div class="chart-wrap" style="height:240px"><canvas id="chart-ha"></canvas></div>
-                <div class="analytics-table-wrap">
-                    <table id="table-ha" class="analytics-table"></table>
+                <div class="an-panel-grid">
+                    <div class="chart-wrap" style="height:240px"><canvas id="chart-ha"></canvas></div>
+                    <div class="analytics-table-wrap">
+                        <table id="table-ha" class="analytics-table"></table>
+                    </div>
                 </div>
             </div>
 
             <!-- 날씨 -->
             <div id="analytics-panel-weather" class="analytics-panel hidden">
-                <p class="analytics-section-label">🌡 기온별 승률</p>
-                <div class="chart-wrap chart-wrap-sm"><canvas id="chart-temp"></canvas></div>
-                <p class="analytics-section-label">💧 습도별 승률</p>
-                <div class="chart-wrap chart-wrap-sm"><canvas id="chart-hum"></canvas></div>
-                <p class="analytics-section-label">💨 풍속별 승률 (m/s)</p>
-                <div class="chart-wrap chart-wrap-sm"><canvas id="chart-wind"></canvas></div>
+                <div class="an-weather-grid">
+                    <div class="an-weather-block">
+                        <p class="analytics-section-label">🌡 기온별 승률</p>
+                        <div class="chart-wrap"><canvas id="chart-temp"></canvas></div>
+                    </div>
+                    <div class="an-weather-block">
+                        <p class="analytics-section-label">💧 습도별 승률</p>
+                        <div class="chart-wrap"><canvas id="chart-hum"></canvas></div>
+                    </div>
+                    <div class="an-weather-block">
+                        <p class="analytics-section-label">💨 풍속별 승률 (m/s)</p>
+                        <div class="chart-wrap"><canvas id="chart-wind"></canvas></div>
+                    </div>
+                </div>
             </div>
             <!-- 골 타이밍 -->
             <div id="analytics-panel-goal-timing" class="analytics-panel hidden">
@@ -716,23 +728,25 @@
                     <div class="tc-bars" id="tc-bars"></div>
                 </div>
 
-                <!-- 리그 순위 비교 (7개 고급 지표) -->
-                <div class="tc-panel tc-rank-panel">
-                    <div class="tc-rank-header">
-                        <p class="tc-panel-label" style="margin:0">🏆 리그 순위 비교</p>
-                        <span id="tc-rank-scope" class="tc-rank-scope"></span>
+                <!-- 리그 순위 비교 + H2H 맞대결 2-col -->
+                <div class="tc-rank-matches-grid">
+                    <div class="tc-panel tc-rank-panel">
+                        <div class="tc-rank-header">
+                            <p class="tc-panel-label" style="margin:0">🏆 리그 순위 비교</p>
+                            <span id="tc-rank-scope" class="tc-rank-scope"></span>
+                        </div>
+                        <div id="tc-rank-rows" class="tc-rank-rows"></div>
+                        <p class="tc-hint">※ 샘플 경기수 5 미만은 순위 집계 제외 (회색)</p>
                     </div>
-                    <div id="tc-rank-rows" class="tc-rank-rows"></div>
-                    <p class="tc-hint">※ 샘플 경기수 5 미만은 순위 집계 제외 (회색)</p>
-                </div>
 
-                <!-- 경기별 맞대결 기록 -->
-                <div class="tc-panel tc-matches-panel">
-                    <div class="tc-matches-header">
-                        <p class="tc-panel-label" style="margin:0">📅 H2H 맞대결 기록</p>
-                        <span id="tc-matches-count" class="tc-matches-count"></span>
+                    <!-- 경기별 맞대결 기록 -->
+                    <div class="tc-panel tc-matches-panel">
+                        <div class="tc-matches-header">
+                            <p class="tc-panel-label" style="margin:0">📅 H2H 맞대결 기록</p>
+                            <span id="tc-matches-count" class="tc-matches-count"></span>
+                        </div>
+                        <div id="tc-matches-list" class="tc-matches-list"></div>
                     </div>
-                    <div id="tc-matches-list" class="tc-matches-list"></div>
                 </div>
             </div>
 
@@ -745,9 +759,9 @@
     <script src="/static/js/info.js?v=7"></script>
     <script src="/static/js/k2heatmap.js?v=1"></script>
     <script src="/static/js/banner_stats.js?v=2"></script>
-    <script src="/static/js/analytics.js?v=1"></script>
-    <script src="/static/js/team_compare.js?v=6"></script>
-    <script src="/static/js/prediction.js?v=46"></script>
+    <script src="/static/js/analytics.js?v=2"></script>
+    <script src="/static/js/team_compare.js?v=7"></script>
+    <script src="/static/js/prediction.js?v=47"></script>
 
     <!-- 선수 분석 모달 -->
     <div id="player-analytics-modal" class="pa-modal hidden">
@@ -788,9 +802,9 @@
         </div>
     </div>
 
-    <script src="/static/js/player_analytics.js?v=1"></script>
-    <script src="/static/js/player_report.js?v=3"></script>
-    <script src="/static/js/insights.js?v=6"></script>
+    <script src="/static/js/player_analytics.js?v=2"></script>
+    <script src="/static/js/player_report.js?v=4"></script>
+    <script src="/static/js/insights.js?v=7"></script>
 
     <!-- 온보딩 오버레이 -->
     <div id="onboarding-overlay" class="ob-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Today Tactics 소개">

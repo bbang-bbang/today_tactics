@@ -4293,6 +4293,17 @@ body {
 }
 
 /* 휴식일 + 심판 정보 카드 */
+/* 스타일 + 카드 2-col 그리드 */
+.pred-style-cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.pred-style-cards-grid:empty { display: none; }
+@media (max-width: 700px) {
+    .pred-style-cards-grid { grid-template-columns: 1fr; }
+}
+
 /* 세트피스 매치업 카드 */
 .pred-setpiece {
     background: rgba(18,29,54,0.7);
@@ -5426,14 +5437,30 @@ body.pr-expanded-lock {
     line-height: 1.4;
 }
 #insights-grid {
-    display: block;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 16px;
+    align-items: start;
+}
+#ins-panel-top {
+    grid-column: 1;
+    grid-row: 1 / 3;
+}
+#ins-panel-xg {
+    grid-column: 2;
+    grid-row: 1;
+}
+#ins-panel-cards {
+    grid-column: 2;
+    grid-row: 2;
 }
 .ins-block {
     background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.07);
     border-radius: 10px;
     padding: 18px 20px;
-    margin-bottom: 16px;
+    margin-bottom: 0;
 }
 .ins-block-title {
     font-size: 0.95rem;
@@ -6179,6 +6206,15 @@ body.pr-expanded-lock {
     background: #f2f5fa;
     border: 1px solid var(--tc-border-soft);
     letter-spacing: 0.3px;
+}
+.tc-rank-matches-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+}
+@media (max-width: 760px) {
+    .tc-rank-matches-grid { grid-template-columns: 1fr; }
 }
 .tc-rank-rows {
     display: flex;
@@ -7245,6 +7281,7 @@ body.pr-expanded-lock {
 
     /* 인사이트 그리드 — 1열로 */
     #insights-grid { grid-template-columns: 1fr !important; gap: 12px; }
+    #ins-panel-top, #ins-panel-xg, #ins-panel-cards { grid-column: auto; grid-row: auto; }
 }
 
 @media (max-width: 480px) {
@@ -7365,4 +7402,74 @@ body.pr-expanded-lock {
     .season-sim-bar { gap: 6px; padding: 6px 12px; font-size: 10px; flex-direction: column; align-items: flex-start; }
     .ssb-league { gap: 6px; font-size: 10px; }
     .ssb-divider { display: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   레이아웃 그리드 — Analytics · PlayerAnalytics · PlayerReport
+══════════════════════════════════════════════════════════════ */
+
+/* Analytics 패널 2-col (차트 | 테이블) */
+.an-panel-grid {
+    display: grid;
+    grid-template-columns: 58% 1fr;
+    gap: 16px;
+    align-items: start;
+}
+.an-panel-grid .chart-wrap { height: 300px; }
+.an-panel-grid .analytics-table-wrap {
+    max-height: 340px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+/* Analytics 날씨 3-col */
+.an-weather-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+.an-weather-block {
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 14px 12px;
+}
+.an-weather-block .analytics-section-label {
+    margin: 0 0 8px;
+    font-size: 11px;
+    color: #9aafcc;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+.an-weather-block .chart-wrap { height: 180px; }
+@media (max-width: 760px) {
+    .an-panel-grid { grid-template-columns: 1fr; }
+    .an-weather-grid { grid-template-columns: 1fr; }
+}
+
+/* Player analytics 하단 2-col (활동량 | 월별) */
+.pa-bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+.pa-bottom-grid .pa-activity-wrap,
+.pa-bottom-grid .pa-monthly-wrap {
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 16px;
+    min-width: 0;
+}
+@media (max-width: 680px) {
+    .pa-bottom-grid { grid-template-columns: 1fr; }
+}
+
+/* Player report 하단 2-col (상대팀 | 활동량) */
+.pr-bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+@media (max-width: 700px) {
+    .pr-bottom-grid { grid-template-columns: 1fr; }
 }

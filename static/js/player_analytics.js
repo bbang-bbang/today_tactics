@@ -128,22 +128,24 @@
             </table>
         </div>
 
-        <!-- 활동량 지수 -->
-        <div class="pa-activity-wrap">
-            <div class="pa-section-title">활동량 지수 <span class="pa-sub">(90분 환산 · 리그 내 백분위)</span></div>
-            ${activity && activity.values && Object.keys(activity.values).length ? `
-            <div class="pa-activity-score-row">
-                <span class="pa-activity-score-label">종합 활동량 점수</span>
-                <span class="pa-activity-score-val">${activity.score}<span class="pa-activity-score-unit">/100</span></span>
+        <div class="pa-bottom-grid">
+            <!-- 활동량 지수 -->
+            <div class="pa-activity-wrap">
+                <div class="pa-section-title">활동량 지수 <span class="pa-sub">(90분 환산 · 리그 내 백분위)</span></div>
+                ${activity && activity.values && Object.keys(activity.values).length ? `
+                <div class="pa-activity-score-row">
+                    <span class="pa-activity-score-label">종합 활동량 점수</span>
+                    <span class="pa-activity-score-val">${activity.score}<span class="pa-activity-score-unit">/100</span></span>
+                </div>
+                <div style="position:relative;height:160px"><canvas id="chart-pa-activity"></canvas></div>
+                ` : `<div class="pa-empty">활동량 데이터 없음 (경기 수 부족)</div>`}
             </div>
-            <div style="position:relative;height:180px"><canvas id="chart-pa-activity"></canvas></div>
-            ` : `<div class="pa-empty">활동량 데이터 없음 (경기 수 부족)</div>`}
-        </div>
 
-        <!-- 월별 차트 -->
-        <div class="pa-monthly-wrap">
-            <div class="pa-section-title">월별 공격 포인트 & 평점</div>
-            <div style="position:relative;height:200px"><canvas id="chart-pa-monthly"></canvas></div>
+            <!-- 월별 차트 -->
+            <div class="pa-monthly-wrap">
+                <div class="pa-section-title">월별 공격 포인트 & 평점</div>
+                <div style="position:relative;height:180px"><canvas id="chart-pa-monthly"></canvas></div>
+            </div>
         </div>
         `;
 

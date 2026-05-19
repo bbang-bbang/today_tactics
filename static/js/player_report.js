@@ -112,21 +112,23 @@
             </div>
         </div>
 
-        <!-- 상대팀별 성적 (나중에 JS로 채움) -->
-        <div class="pr-card pr-vs-card" id="pr-vs-teams-card">
-            <div class="pr-section-title">상대팀별 성적 <span class="pr-pos-tag">평점 기준 · 높을수록 좋은 상대</span></div>
-            <div class="pr-loading" style="padding:12px">불러오는 중...</div>
-        </div>
-
-        <!-- 활동량 지수 -->
-        <div class="pr-card pr-activity-card">
-            <div class="pr-section-title">
-                활동량 지수 <span class="pr-pos-tag">90분 환산 · 리그 전체 대비</span>
-                ${activity.score != null ? `<span class="pr-activity-score">${activity.score}<small>/100</small></span>` : ""}
+        <div class="pr-bottom-grid">
+            <!-- 상대팀별 성적 (나중에 JS로 채움) -->
+            <div class="pr-card pr-vs-card" id="pr-vs-teams-card">
+                <div class="pr-section-title">상대팀별 성적 <span class="pr-pos-tag">평점 기준 · 높을수록 좋은 상대</span></div>
+                <div class="pr-loading" style="padding:12px">불러오는 중...</div>
             </div>
-            ${activity.values && Object.keys(activity.values).length
-                ? `<div style="position:relative;height:150px"><canvas id="pr-activity-canvas"></canvas></div>`
-                : `<div class="pr-loading" style="padding:12px">경기 수 부족</div>`}
+
+            <!-- 활동량 지수 -->
+            <div class="pr-card pr-activity-card">
+                <div class="pr-section-title">
+                    활동량 지수 <span class="pr-pos-tag">90분 환산 · 리그 전체 대비</span>
+                    ${activity.score != null ? `<span class="pr-activity-score">${activity.score}<small>/100</small></span>` : ""}
+                </div>
+                ${activity.values && Object.keys(activity.values).length
+                    ? `<div style="position:relative;height:150px"><canvas id="pr-activity-canvas"></canvas></div>`
+                    : `<div class="pr-loading" style="padding:12px">경기 수 부족</div>`}
+            </div>
         </div>
 
         <!-- 최근 폼 -->
