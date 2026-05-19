@@ -4,6 +4,8 @@ kleague_results_2026.json → events 테이블 동기화
 - SofaScore 크롤러로 수집되지 않은 최신 경기 결과를 events 테이블에 삽입
 - ID 범위: 90000000~91000000 (SofaScore 실제 ID와 충돌 없음)
 - INSERT OR IGNORE: 기존 SofaScore 데이터 덮어쓰지 않음
+- score backfill: 기존 row가 있고 home_score가 NULL이면 결과 score만 UPDATE
+  (SofaScore가 예정 매치 row를 score NULL로 미리 만들어둔 케이스를 채우기 위함)
 """
 
 import json
@@ -104,6 +106,7 @@ def main():
     cur  = conn.cursor()
 
     inserted = 0
+    updated  = 0
     skipped  = 0
     for g in sorted(games, key=lambda x: x["date"]):
         hm = SLUG_META[g["home"]]
@@ -112,13 +115,22 @@ def main():
         ts  = date_to_ts(g["date"])
         eid = synthetic_id(g["date"], g["home"], g["away"])
 
-        # 이미 같은 날짜 + 팀 조합 있으면 스킵
+        # 이미 같은 날짜 + 팀 조합이 있으면 score 보강만 시도, 없으면 INSERT
         cur.execute(
-            "SELECT id FROM events WHERE home_team_id=? AND away_team_id=? AND date_ts BETWEEN ? AND ?",
+            "SELECT id, home_score FROM events WHERE home_team_id=? AND away_team_id=? AND date_ts BETWEEN ? AND ?",
             (hm[0], am[0], ts - 43200, ts + 43200)
         )
-        if cur.fetchone():
-            skipped += 1
+        row = cur.fetchone()
+        if row:
+            existing_eid, existing_score = row
+            if existing_score is None:
+                cur.execute(
+                    "UPDATE events SET home_score=?, away_score=? WHERE id=?",
+                    (g["home_score"], g["away_score"], existing_eid)
+                )
+                updated += 1
+            else:
+                skipped += 1
             continue
 
         cur.execute("""
@@ -132,7 +144,7 @@ def main():
     conn.commit()
     conn.close()
 
-    log(f"삽입: {inserted}경기 / 중복 스킵: {skipped}경기 / 전체: {len(games)}경기")
+    log(f"삽입: {inserted}경기 / score 백필: {updated}경기 / 중복 스킵: {skipped}경기 / 전체: {len(games)}경기")
 
 if __name__ == "__main__":
     main()

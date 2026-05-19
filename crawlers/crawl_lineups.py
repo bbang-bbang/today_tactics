@@ -138,11 +138,14 @@ def target_events(conn, force=False, event_id=None, days=None):
                        FROM events WHERE id = ?""", (event_id,))
         return cur.fetchall()
 
+    # 경기 결과(score)가 들어왔거나 이미 경기 시작 시각이 지난 매치를 대상으로 한다.
+    # score만 보면 sync_results_to_events.py가 score를 채우기 전까지 라인업이 영영 안 들어오는
+    # 사고가 발생한다(2026-05-19 5/16~17 14경기 누락 사건). date_ts 조건을 OR로 묶어 자가복구.
     where = [
         "tournament_id IN ({})".format(",".join("?" * len(TARGET_TOURNAMENTS))),
-        "home_score IS NOT NULL",
+        "(home_score IS NOT NULL OR date_ts <= ?)",
     ]
-    params = list(TARGET_TOURNAMENTS)
+    params = list(TARGET_TOURNAMENTS) + [int(time.time())]
     if days is not None:
         cutoff = int(time.time()) - days * 86400
         where.append("date_ts >= ?")
