@@ -18,23 +18,34 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          echo "key_lines=$(wc -l < ~/.ssh/deploy_key)"
-          echo "key_head=$(head -1 ~/.ssh/deploy_key)"
-          echo "key_tail=$(tail -1 ~/.ssh/deploy_key)"
+          KEY_LINES=$(wc -l < ~/.ssh/deploy_key)
+          KEY_HEAD=$(head -1 ~/.ssh/deploy_key)
+          KEY_TAIL=$(tail -1 ~/.ssh/deploy_key)
+          echo "## SSH Key 진단" >> $GITHUB_STEP_SUMMARY
+          echo "- key_lines: $KEY_LINES" >> $GITHUB_STEP_SUMMARY
+          echo "- key_head: $KEY_HEAD" >> $GITHUB_STEP_SUMMARY
+          echo "- key_tail: $KEY_TAIL" >> $GITHUB_STEP_SUMMARY
 
       - name: Deploy
         env:
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
         run: |
-          set -x
-          echo "SSH_USER=$SSH_USER"
-          echo "SSH_HOST=${SSH_HOST:0:8}..."
-          # 연결 테스트 (verbose)
-          ssh -i ~/.ssh/deploy_key \
+          echo "## 연결 진단" >> $GITHUB_STEP_SUMMARY
+          echo "- SSH_USER empty: $([ -z "$SSH_USER" ] && echo YES || echo NO)" >> $GITHUB_STEP_SUMMARY
+          echo "- SSH_HOST empty: $([ -z "$SSH_HOST" ] && echo YES || echo NO)" >> $GITHUB_STEP_SUMMARY
+
+          SSH_OUTPUT=$(ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
               -o ConnectTimeout=15 \
               -v \
               "$SSH_USER@$SSH_HOST" \
-              "echo 'SSH_OK' && whoami && cd /opt/today_tactics && git stash && git pull && sudo -n systemctl restart today_tactics && sleep 3 && curl -sf -o /dev/null -w 'health=%{http_code}\n' http://127.0.0.1:5000/" \
-              2>&1
+              "echo SSH_OK && whoami && cd /opt/today_tactics && git stash && git pull && sudo -n systemctl restart today_tactics && sleep 3 && curl -sf -o /dev/null -w 'health=%{http_code}' http://127.0.0.1:5000/" \
+              2>&1) && SSH_EXIT=0 || SSH_EXIT=$?
+
+          echo "- SSH exit code: $SSH_EXIT" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$SSH_OUTPUT" | tail -30 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          exit $SSH_EXIT
