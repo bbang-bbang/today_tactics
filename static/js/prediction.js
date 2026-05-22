@@ -289,9 +289,9 @@
                 </div>
                 <div class="kmc-mid">${centerContent}</div>
                 <div class="kmc-side kmc-away${favs.has(g.away_id) ? " kmc-side-fav" : ""}" style="background:linear-gradient(225deg,${ac.p}55 0%,${ac.p}22 100%)">
-                    <span class="kmc-name">${g.away_short}</span>
-                    ${awayEmb}
                     <button class="kmc-fav-btn" data-team="${g.away_id}" title="${favs.has(g.away_id) ? "즐겨찾기 해제" : "즐겨찾기"}" type="button">${favs.has(g.away_id) ? "★" : "☆"}</button>
+                    ${awayEmb}
+                    <span class="kmc-name">${g.away_short}</span>
                 </div>
             </div>`;
         }).join("");
@@ -369,10 +369,16 @@
                 }
             } catch (_) {}
             if (!target) {
-                const finishedCards = list.querySelectorAll(".kmc.kmc-done");
-                target = finishedCards.length
-                    ? finishedCards[finishedCards.length - 1]
-                    : list.querySelector(".kmc");
+                // 즐겨찾기 매치 우선 → 없으면 최신 완료 매치 → 그것도 없으면 첫 카드
+                const favFinished = list.querySelectorAll(".kmc.kmc-done.kmc-fav");
+                if (favFinished.length) {
+                    target = favFinished[favFinished.length - 1];
+                } else {
+                    const finishedCards = list.querySelectorAll(".kmc.kmc-done");
+                    target = finishedCards.length
+                        ? finishedCards[finishedCards.length - 1]
+                        : list.querySelector(".kmc");
+                }
             }
             if (target) {
                 requestAnimationFrame(() => target.click());

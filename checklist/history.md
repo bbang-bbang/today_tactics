@@ -3009,3 +3009,6 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-05-20 01:03:58 | sleep 3 && curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/
 - 2026-05-20 01:05:45 | sleep 4 && curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/
 
+- 2026-05-21 12:49:23 | git restore static/css/style.css && git reset --hard 1544c26 && echo "---" && git log --oneline -3 && echo "---" && git status --short
+- 2026-05-22 12:09:37 | git status --short && echo "---" && git diff --stat static/js/prediction.js
+- 2026-05-22 12:09:57 | git diff checklist/history.md | head -60
