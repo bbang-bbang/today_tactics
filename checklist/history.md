@@ -2959,14 +2959,14 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 
 ### 배포
 - `git push` (커밋 `b431843`) → 서버 `git stash && git pull` Fast-forward 완료
-- `players.db` SCP 직접 전송 (`today-project.pem` / `rocky@1.201.126.200`)
+- `players.db` SCP 직접 전송 (`<KEY_FILE>` / `rocky@<GABIA_IP>`)
 - `sudo systemctl restart today_tactics` → health=200 확인
 - deploy.yml `git stash` 추가 커밋 (`c1e6fbd`) — 서버 uncommitted 변경으로 pull abort 방지
 - 2026-05-19 01:07:55 | sleep 8 && curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=3" | python3 -c " / import sys, json / d = json.loads(sys.stdin.read()) / for r in d.get('workflow_runs', [])[:3]: /     print(f\"#{r['run_number']} {r['name']} | {r['event']} | status={r['status']} | conclusion={r['conclusion']} | sha={r['head_sha'][:7]}\") / "
 - 2026-05-19 01:08:07 | curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=1" | python3 -c " / import sys, json / d = json.loads(sys.stdin.read()) / r = d['workflow_runs'][0] / print('run_id:', r['id']) / print('conclusion:', r['conclusion']) / " && RUN_ID=$(curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=1" | python3 -c "import sys,json;d=json.loads(sys.stdin.read());print(d['workflow_runs'][0]['id'])") && curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs/$RUN_ID/jobs" | python3 -c " / import sys, json / d = json.loads(sys.stdin.read()) / for j in d.get('jobs', []): /     print(f\"job: {j['name']}, conclusion: {j['conclusion']}\") /     for s in j.get('steps', []): /         print(f\"  step: {s['name']:40} | {s['status']:10} | {s['conclusion']}\") / "
 - 2026-05-19 01:08:17 | curl -sL "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs/26045213222/logs" -o /tmp/actions_log.zip 2>&1; echo "exit: $?"
 - 2026-05-19 01:08:36 | JOB_ID=$(curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs/26045213222/jobs" | python3 -c "import sys,json;d=json.loads(sys.stdin.read());print(d['jobs'][0]['id'])") && echo "job_id: $JOB_ID" && curl -sL "https://api.github.com/repos/bbang-bbang/today_tactics/actions/jobs/$JOB_ID/logs" 2>&1 | tail -30
-- 2026-05-19 01:15:15 | find /mnt/c/Users/BangEunHo -name "today-project.pem" 2>/dev/null; find /mnt/c/Users/BangEunHo -name "*.pem" 2>/dev/null | head -10
+- 2026-05-19 01:15:15 | find /mnt/c/Users/BangEunHo -name "<KEY_FILE>" 2>/dev/null; find /mnt/c/Users/BangEunHo -name "*.pem" 2>/dev/null | head -10
 - 2026-05-19 01:20:29 | sleep 20 && curl -s "https://api.github.com/repos/bbang-bbang/today_tactics/actions/runs?per_page=1" | python3 -c " / import sys, json / d = json.loads(sys.stdin.read()) / r = d['workflow_runs'][0] / print(f\"run #{r['run_number']} | sha={r['head_sha'][:7]} | status={r['status']} | conclusion={r['conclusion']}\")"
 - 2026-05-19 02:03:55 | rm -f "/mnt/c/Users/BangEunHo/AppData/Local/Temp/tt_deploy.pem"
 - 2026-05-19 12:26:38 | git log -1 --stat
@@ -3015,3 +3015,6 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-05-22 12:10:28 | git add static/js/prediction.js checklist/history.md && git status --short
 - 2026-05-22 12:10:55 | git push origin main 2>&1 | tail -10
 - 2026-05-22 12:11:00 | gh run list --branch main --limit 1 2>&1 | head -5
+- 2026-05-22 12:30:39 | git add static/js/prediction.js checklist/history.md && git status --short
+- 2026-05-22 12:36:21 | cat "C:/Users/ehban/.ssh/config" 2>/dev/null | head -30
+- 2026-05-22 12:37:29 | git status --short && echo "---" && git diff --stat checklist/backlog.md checklist/history.md
