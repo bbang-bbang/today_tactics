@@ -44,14 +44,8 @@ GitHub Actions 워크플로우 `.github/workflows/deploy.yml` 추가. push to ma
 
 ---
 
-### [ ] players row 누락 1,200명+ 백필
-**왜**: mps에는 player_id가 있지만 `players` 테이블에 해당 id row 자체가 없는 케이스 12,498 mps row(약 1,200명+). 인사이트/카드 순위에서 이름 빈 값으로 표시. 예: pid=1046525 (인천 해 FC).
-**무엇**: 누락 player_id 목록 추출 → `crawl_sofascore.py` player API로 개별 fetch → players 테이블 INSERT.
-```bash
-# 누락 ID 추출
-sqlite3 players.db "SELECT DISTINCT m.player_id FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id WHERE p.id IS NULL"
-```
-**비용**: 30분~1h (Playwright 안정성 변수)
+### [x] ~~players row 누락 1,200명+ 백필~~ — 2026-05-22 확인 시점 이미 해결
+2026-05-22 재검증 시 `mps.player_id ∉ players.id` 누락 **0건**. mps unique player_id 1,717개 모두 players(1,734개)에 존재. 백로그 예시 pid=1046525도 정상("Byeon Jun-soo", 변준수). 사이 시점에 데이터 수집 흐름 보강 또는 백필이 진행된 것으로 추정. 별도 작업 불필요.
 
 ---
 
