@@ -256,7 +256,14 @@
 
 
         const favs = _loadFavorites();
-        list.innerHTML = rndData.games.map(g => {
+        // 즐겨찾기 매치 최상단 정렬 (그룹 내부 date+time 순서 유지 — sort는 ES2019+ stable)
+        const sortedGames = [...rndData.games].sort((a, b) => {
+            const aFav = favs.has(a.home_id) || favs.has(a.away_id);
+            const bFav = favs.has(b.home_id) || favs.has(b.away_id);
+            if (aFav === bFav) return 0;
+            return aFav ? -1 : 1;
+        });
+        list.innerHTML = sortedGames.map(g => {
             const finished  = g.finished;
             const canPredict = !finished && g.home_id && g.away_id && g.home_id !== "null" && g.away_id !== "null";
             const hc = tc(g.home_id), ac = tc(g.away_id);

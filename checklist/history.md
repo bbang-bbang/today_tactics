@@ -3012,3 +3012,6 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-05-21 12:49:23 | git restore static/css/style.css && git reset --hard 1544c26 && echo "---" && git log --oneline -3 && echo "---" && git status --short
 - 2026-05-22 12:09:37 | git status --short && echo "---" && git diff --stat static/js/prediction.js
 - 2026-05-22 12:09:57 | git diff checklist/history.md | head -60
+- 2026-05-22 12:10:28 | git add static/js/prediction.js checklist/history.md && git status --short
+- 2026-05-22 12:10:55 | git push origin main 2>&1 | tail -10
+- 2026-05-22 12:11:00 | gh run list --branch main --limit 1 2>&1 | head -5
