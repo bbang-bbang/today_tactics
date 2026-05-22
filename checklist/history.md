@@ -3018,3 +3018,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-05-22 12:30:39 | git add static/js/prediction.js checklist/history.md && git status --short
 - 2026-05-22 12:36:21 | cat "C:/Users/ehban/.ssh/config" 2>/dev/null | head -30
 - 2026-05-22 12:37:29 | git status --short && echo "---" && git diff --stat checklist/backlog.md checklist/history.md
+- 2026-05-22 12:47:45 | git diff static/js/prediction.js static/css/style.css 2>&1

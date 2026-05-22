@@ -3674,6 +3674,7 @@ body {
     margin-bottom: 10px;
 }
 .ksb-round-btn {
+    position: relative;
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.08);
     color: #5a7a8a;
@@ -3691,6 +3692,18 @@ body {
 .ksb-round-btn.active { background: rgba(78,164,248,0.18); border-color: rgba(78,164,248,0.5); color: #4ea4f8; font-weight: 700; }
 .ksb-round-done { font-size: 0.6rem; color: #3a5060; }
 .ksb-round-btn.active .ksb-round-done { color: #4a7a9a; }
+/* 즐겨찾기 매치 보유 라운드 — 우상단 ★ 인디케이터 */
+.ksb-round-btn.ksb-round-fav::after {
+    content: "★";
+    position: absolute;
+    top: -3px;
+    right: -2px;
+    font-size: 9px;
+    line-height: 1;
+    color: #fbbf24;
+    text-shadow: 0 0 2px rgba(0,0,0,0.5);
+    pointer-events: none;
+}
 
 /* 경기 목록 — 카드형 그리드 */
 .ksb-list {

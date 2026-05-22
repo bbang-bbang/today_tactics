@@ -263,6 +263,16 @@
             if (aFav === bFav) return 0;
             return aFav ? -1 : 1;
         });
+        // 라운드 탭에 ★ 인디케이터 갱신 (해당 라운드에 즐겨찾기 매치 있을 때)
+        const tabContainer = document.getElementById(`${league}-round-tabs`);
+        if (tabContainer) {
+            tabContainer.querySelectorAll(".ksb-round-btn").forEach(btn => {
+                const rnd = parseInt(btn.dataset.round, 10);
+                const round = rounds.find(r => r.round === rnd);
+                const hasFav = !!(round && round.games.some(g => favs.has(g.home_id) || favs.has(g.away_id)));
+                btn.classList.toggle("ksb-round-fav", hasFav);
+            });
+        }
         list.innerHTML = sortedGames.map(g => {
             const finished  = g.finished;
             const canPredict = !finished && g.home_id && g.away_id && g.home_id !== "null" && g.away_id !== "null";
