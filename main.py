@@ -6517,26 +6517,25 @@ _UPDATE_STATUS = {
 
 
 def _run_update_pipeline(triggered_by="scheduler"):
-    """update_results_2026.py → sync_results_to_events.py 순차 실행"""
+    """full update_data.py 실행 — score뿐 아니라 lineup/mps/heatmap/avg_pos/shotmap 전부 수집.
+    (이전엔 update_results + sync 2개만 돌려 score만 갱신 → 전술 데이터가 자동 수집 안 됐음)"""
     if _UPDATE_STATUS["running"]:
         return {"ok": False, "msg": "이미 실행 중"}
     _UPDATE_STATUS["running"] = True
     _UPDATE_STATUS["last_run"] = datetime.now(_KST).strftime("%Y-%m-%d %H:%M KST")
     try:
-        scripts = [
-            os.path.join(BASE_DIR, "crawlers", "update_results_2026.py"),
-            os.path.join(BASE_DIR, "crawlers", "sync_results_to_events.py"),
-        ]
+        # SofaScore 수집 STEP은 playwright 필요 → 반드시 venv python (시스템 python엔 없음)
+        venv_py = os.path.join(BASE_DIR, "venv", "bin", "python")
+        py = venv_py if os.path.exists(venv_py) else "python"
         output_lines = []
-        for script in scripts:
-            r = subprocess.run(
-                ["python", script],
-                capture_output=True, text=True, encoding="utf-8", errors="replace",
-                timeout=180, cwd=BASE_DIR,
-            )
-            output_lines.append(r.stdout.strip())
-            if r.returncode != 0:
-                raise RuntimeError(r.stderr[:300] or f"{script} 실패")
+        r = subprocess.run(
+            [py, os.path.join(BASE_DIR, "update_data.py")],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=1800, cwd=BASE_DIR,   # full 파이프라인 ~17분, 여유 30분
+        )
+        output_lines.append(r.stdout.strip())
+        if r.returncode != 0:
+            raise RuntimeError(r.stderr[:300] or "update_data.py 실패")
 
         # 추가 경기 수 파싱 (sync 스크립트 출력에서)
         added = 0
