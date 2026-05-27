@@ -2052,7 +2052,10 @@ def _predict_core(cur, home_ss, away_ss, tid_filter, as_of_ts, year_str,
         decay = _DECAY_LAMBDA
     coefs = _league_coefs(tid_filter)
     shrinkage_k = coefs.get("shrinkage_k", 0)
-    _lavg_key = f"league_avg:{tid_filter}:{year_str}"
+    # as_of_ts 포함 필수: 키에 없으면 rolling backtest가 첫 매치의 league_avg를 전 매치에 재사용하고,
+    # 실시간 호출(as_of=now, 전 시즌 데이터)이 캐시를 오염시켜 과거 매치 예측에 look-ahead 유입.
+    # (_all_team_def는 이미 as_of_ts 포함 — 동일 패턴으로 통일)
+    _lavg_key = f"league_avg:{tid_filter}:{year_str}:{as_of_ts}"
     league_avg = _pcache_get(_lavg_key)
     if league_avg is None:
         cur.execute("""
