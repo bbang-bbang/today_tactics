@@ -2819,9 +2819,10 @@ def get_match_prediction():
                    COUNT(DISTINCT m.event_id)                                                    AS games
             FROM match_player_stats m JOIN events e ON m.event_id=e.id
             WHERE e.tournament_id=? AND e.home_score IS NOT NULL
+              AND m.team_id IN (SELECT id FROM teams WHERE tournament_id=?)   -- 정규 리그 팀만 (분모 정확)
               AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime'))=? AND e.id < 50000000
             GROUP BY m.team_id
-        """, (tid_filter, now_year))
+        """, (tid_filter, tid_filter, now_year))
         rows = [r for r in cur.fetchall() if (r[6] or 0) >= 3]   # 표본 3경기 이상만
         metrics = {"long_ball_pct": 1, "cross_pct": 2, "duel_pct": 3, "aerial_pct": 4, "dribble_pct": 5}
         ranks = {}   # team_id → {metric: {rank, total}}
