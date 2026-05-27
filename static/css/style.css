@@ -3738,7 +3738,7 @@ body {
     background: linear-gradient(180deg, rgba(126,207,255,0.06), transparent);
 }
 .kmc-upcoming { border-color: rgba(78,164,248,0.25); }
-.kmc-done     { opacity: 0.75; }
+.kmc-done     { opacity: 0.92; }   /* 결과 카드 가독성 — 0.75는 과하게 흐렸음 (가장 많이 보는 카드) */
 .kmc-done:hover { opacity: 1; }
 
 .kmc-side {
@@ -3760,7 +3760,7 @@ body {
     filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
 }
 .kmc-name {
-    font-size: 0.72rem;
+    font-size: 0.8rem;          /* 0.72→0.8 (12.8px, 최소 가독 크기 충족) */
     font-weight: 700;
     color: var(--text-primary);
     text-align: center;
@@ -3775,10 +3775,10 @@ body {
     justify-content: center;
     gap: 3px;
     padding: 8px 4px;
-    background: rgba(255,255,255,0.02);
+    background: rgba(255,255,255,0.05);   /* 0.02→0.05 스코어 컬럼 초점 분리 강화 */
 }
 .kmc-score {
-    font-size: 1rem;
+    font-size: 1.2rem;          /* 1→1.2 카드 핵심 초점 강조 */
     font-weight: 900;
     color: var(--text-primary);
     letter-spacing: 1px;
@@ -3790,13 +3790,13 @@ body {
     color: #4ea4f8;
 }
 .kmc-meta {
-    font-size: 0.62rem;
-    color: var(--text-muted);
+    font-size: 0.7rem;          /* 0.62→0.7 날짜 가독성 */
+    color: var(--text-secondary);   /* muted→secondary 대비 ↑ */
 }
 .kmc-tag {
-    font-size: 0.6rem;
+    font-size: 0.66rem;         /* 0.6→0.66 라벨 가독성 */
     font-weight: 700;
-    padding: 2px 6px;
+    padding: 2px 7px;
     border-radius: 10px;
     letter-spacing: 0.3px;
     margin-top: 2px;
