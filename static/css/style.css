@@ -4563,6 +4563,24 @@ body {
 }
 .ts-home .ts-team-name { color: #7eb8ff; }
 .ts-away .ts-team-name { color: #c79ef8; }
+/* 리그 대비 상위 능력 배지 (동일지표 맞대결 대체) */
+.ts-strength {
+    display: flex; align-items: center; gap: 7px;
+    padding: 5px 8px; margin-bottom: 5px;
+    background: rgba(255,255,255,0.03); border-radius: 6px;
+    border-left: 2px solid rgba(255,255,255,0.12);
+}
+.ts-strength:last-child { margin-bottom: 0; }
+.ts-strength-top { background: rgba(123,237,159,0.10); border-left-color: #7bed9f; }
+.ts-st-ic  { font-size: 0.85rem; flex-shrink: 0; }
+.ts-st-lbl { font-size: 0.74rem; color: #c8d8f0; font-weight: 600; flex: 1; white-space: nowrap; }
+.ts-st-rank {
+    font-size: 0.66rem; font-weight: 700; color: #8ab0d8;
+    background: rgba(138,176,216,0.12); padding: 1px 7px; border-radius: 8px; white-space: nowrap;
+}
+.ts-strength-top .ts-st-rank { color: #7bed9f; background: rgba(123,237,159,0.16); }
+.ts-st-val { font-size: 0.72rem; color: #e8f2ff; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+.ts-strength-none { font-size: 0.7rem; color: #8aa0bb; font-style: italic; padding: 6px 4px; }
 .ts-section {
     margin-bottom: 10px;
 }

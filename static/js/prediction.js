@@ -944,35 +944,48 @@
         if (a.dribble_pct !== null && a.dribble_pct >= 55 && a.dribble_pg >= 8)
             insights.push(`💨 ${away.name} 돌파 강세 (성공률 ${a.dribble_pct}%, 경기당 ${a.dribble_pg}회)`);
 
-        const fmtPct = v => v !== null ? v + "%" : "—";
-        const fmtPg  = v => v !== null ? v       : "—";
-        const bar = (pct, cls) => `
-            <div class="ts-bar">
-                <div class="ts-bar-fill ${cls}" style="width:${Math.min(100, pct || 0)}%"></div>
-                <span class="ts-bar-val">${fmtPct(pct)}</span>
-            </div>`;
-        const teamCol = (name, s, cls) => `
-            <div class="ts-team ${cls}">
+        // 각 팀의 "리그 대비 상위 능력" 표시 (동일지표 맞대결 X)
+        const META = {
+            long_ball_pct: { icon: "📡", label: "롱볼 정확도" },
+            cross_pct:     { icon: "🎯", label: "크로스 정확도" },
+            duel_pct:      { icon: "⚔",  label: "듀얼 승률" },
+            aerial_pct:    { icon: "🦅", label: "공중볼 승률" },
+            dribble_pct:   { icon: "💨", label: "드리블 성공률" },
+        };
+        const strengths = (s) => {
+            const r = s.ranks || {};
+            const items = [];
+            for (const [key, meta] of Object.entries(META)) {
+                const rk = r[key];
+                if (!rk || s[key] == null) continue;
+                if (rk.rank <= Math.ceil(rk.total / 2)) {   // 리그 상위 절반만 = "상위 능력"
+                    items.push({ ...meta, value: s[key], rank: rk.rank, total: rk.total });
+                }
+            }
+            items.sort((x, y) => x.rank - y.rank);
+            return items;
+        };
+        const teamCol = (name, s, cls) => {
+            const items = strengths(s);
+            const body = items.length
+                ? items.map(it => {
+                    const topTier = it.rank <= Math.ceil(it.total / 3);
+                    return `<div class="ts-strength${topTier ? " ts-strength-top" : ""}">
+                        <span class="ts-st-ic">${it.icon}</span>
+                        <span class="ts-st-lbl">${it.label}</span>
+                        <span class="ts-st-rank">리그 ${it.rank}/${it.total}위</span>
+                        <span class="ts-st-val">${it.value}%</span>
+                    </div>`;
+                  }).join("")
+                : `<div class="ts-strength-none">리그 상위 능력 없음</div>`;
+            return `<div class="ts-team ${cls}">
                 <div class="ts-team-name">${name}</div>
-                <div class="ts-section">
-                    <div class="ts-section-lbl">📡 빌드업</div>
-                    <div class="ts-row"><span class="ts-row-lbl">롱볼 정확도</span>${bar(s.long_ball_pct, "ts-build")}</div>
-                    <div class="ts-row-sub">경기당 ${fmtPg(s.long_ball_pg)}회 · 크로스 ${fmtPct(s.cross_pct)} (${fmtPg(s.cross_pg)}회)</div>
-                </div>
-                <div class="ts-section">
-                    <div class="ts-section-lbl">⚔ 경합</div>
-                    <div class="ts-row"><span class="ts-row-lbl">듀얼 승률</span>${bar(s.duel_pct, "ts-duel")}</div>
-                    <div class="ts-row"><span class="ts-row-lbl">공중볼 승률</span>${bar(s.aerial_pct, "ts-aerial")}</div>
-                </div>
-                <div class="ts-section">
-                    <div class="ts-section-lbl">💨 돌파</div>
-                    <div class="ts-row"><span class="ts-row-lbl">드리블 성공률</span>${bar(s.dribble_pct, "ts-dribble")}</div>
-                    <div class="ts-row-sub">경기당 ${fmtPg(s.dribble_pg)}회 시도</div>
-                </div>
+                ${body}
             </div>`;
+        };
         return `
         <div class="pred-style">
-            <div class="ts-title">⚔ 팀 스타일 매치업</div>
+            <div class="ts-title">⚔ 팀 스타일 — 리그 대비 강점</div>
             <div class="ts-grid">
                 ${teamCol(home.name, h, "ts-home")}
                 ${teamCol(away.name, a, "ts-away")}

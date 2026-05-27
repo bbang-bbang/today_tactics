@@ -2806,8 +2806,36 @@ def get_match_prediction():
             "dribble_pg":    round(dr_t/games, 1)    if games else None,
         }
 
+    # ── 팀 스타일 리그 순위 (타팀 대비 상위 능력 표시용) ──
+    # 같은 지표 맞대결이 아니라, 각 팀이 리그에서 상위인 능력을 식별.
+    def _style_league_ranks():
+        cur.execute("""
+            SELECT m.team_id,
+                   SUM(m.accurate_long_balls)*1.0/NULLIF(SUM(m.total_long_balls),0)              AS lb,
+                   SUM(m.accurate_crosses)*1.0/NULLIF(SUM(m.total_crosses),0)                    AS cr,
+                   SUM(m.duel_won)*1.0/NULLIF(SUM(m.duel_won)+SUM(m.duel_lost),0)                AS du,
+                   SUM(m.aerial_won)*1.0/NULLIF(SUM(m.aerial_won)+SUM(m.aerial_lost),0)          AS ae,
+                   SUM(m.successful_dribbles)*1.0/NULLIF(SUM(m.attempted_dribbles),0)            AS dr,
+                   COUNT(DISTINCT m.event_id)                                                    AS games
+            FROM match_player_stats m JOIN events e ON m.event_id=e.id
+            WHERE e.tournament_id=? AND e.home_score IS NOT NULL
+              AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime'))=? AND e.id < 50000000
+            GROUP BY m.team_id
+        """, (tid_filter, now_year))
+        rows = [r for r in cur.fetchall() if (r[6] or 0) >= 3]   # 표본 3경기 이상만
+        metrics = {"long_ball_pct": 1, "cross_pct": 2, "duel_pct": 3, "aerial_pct": 4, "dribble_pct": 5}
+        ranks = {}   # team_id → {metric: {rank, total}}
+        for mkey, idx in metrics.items():
+            ordered = sorted([r for r in rows if r[idx] is not None], key=lambda r: r[idx], reverse=True)
+            for pos, r in enumerate(ordered, 1):
+                ranks.setdefault(r[0], {})[mkey] = {"rank": pos, "total": len(ordered)}
+        return ranks
+
+    _style_ranks = _style_league_ranks()
     home_style = style_analysis(hid)
+    home_style["ranks"] = _style_ranks.get(hid, {})
     away_style = style_analysis(aid)
+    away_style["ranks"] = _style_ranks.get(aid, {})
 
     # 휴식일 (현재 시각 기준 직전 경기로부터 일수)
     import time as _time
