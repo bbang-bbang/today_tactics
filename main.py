@@ -2668,28 +2668,24 @@ def get_match_prediction():
     def goal_timing(ss_id):
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='goal_events'")
         if not cur.fetchone():
-            return {"for": [0, 0], "against": [0, 0]}
-        # 전반(1-45+) vs 후반(46-90+)
-        cur.execute("""
-            SELECT SUM(CASE WHEN (g.minute + COALESCE(g.added_time,0)) <= 45 THEN 1 ELSE 0 END),
-                   SUM(CASE WHEN (g.minute + COALESCE(g.added_time,0)) > 45 THEN 1 ELSE 0 END)
-            FROM goal_events g JOIN events e ON g.event_id=e.id
-            WHERE e.tournament_id=? AND g.team_id=?
-              AND (e.home_team_id=? OR e.away_team_id=?)
-        """, (tid_filter, ss_id, ss_id, ss_id))
-        _f = cur.fetchone()
-        cur.execute("""
-            SELECT SUM(CASE WHEN (g.minute + COALESCE(g.added_time,0)) <= 45 THEN 1 ELSE 0 END),
-                   SUM(CASE WHEN (g.minute + COALESCE(g.added_time,0)) > 45 THEN 1 ELSE 0 END)
-            FROM goal_events g JOIN events e ON g.event_id=e.id
-            WHERE e.tournament_id=? AND g.team_id!=?
-              AND (e.home_team_id=? OR e.away_team_id=?)
-        """, (tid_filter, ss_id, ss_id, ss_id))
-        _a = cur.fetchone()
-        return {
-            "for":     [int(_f[0] or 0), int(_f[1] or 0)] if _f else [0, 0],
-            "against": [int(_a[0] or 0), int(_a[1] or 0)] if _a else [0, 0],
-        }
+            return {"for": [0]*6, "against": [0]*6, "buckets": 6}
+        # 15분 구간 6버킷: 0-15·16-30·31-45·46-60·61-75·76-90+ (added time는 45/90 경계 흡수)
+        def _buckets(own):
+            op = "=" if own else "!="
+            cur.execute(f"""
+                SELECT MIN(5, MAX(0, (g.minute - 1) / 15)) AS bk, COUNT(*)
+                FROM goal_events g JOIN events e ON g.event_id=e.id
+                WHERE e.tournament_id=? AND g.team_id {op} ?
+                  AND (e.home_team_id=? OR e.away_team_id=?)
+                  AND g.minute IS NOT NULL
+                GROUP BY bk
+            """, (tid_filter, ss_id, ss_id, ss_id))
+            arr = [0]*6
+            for bk, cnt in cur.fetchall():
+                if bk is not None and 0 <= int(bk) <= 5:
+                    arr[int(bk)] = int(cnt)
+            return arr
+        return {"for": _buckets(True), "against": _buckets(False), "buckets": 6}
 
     home_timing = goal_timing(hid)
     away_timing = goal_timing(aid)

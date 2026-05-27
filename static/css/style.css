@@ -4662,35 +4662,36 @@ body {
     padding: 10px 14px;
 }
 .ptm-head {
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     color: #8ab0d8;
     text-align: center;
     margin-bottom: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
     font-weight: 700;
 }
-.ptm-row {
-    display: grid;
-    grid-template-columns: 70px 1fr 28px;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-    font-size: 0.68rem;
+.ptm-sub { color: #6a8aa8; font-size: 0.6rem; font-weight: 400; margin-left: 4px; }
+/* 골 타이밍 15분 구간 히트맵 */
+.ptm-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 0.7rem; font-variant-numeric: tabular-nums;
 }
-.ptm-lbl { color: #6a8aa8; font-size: 0.62rem; }
-.ptm-bar {
-    display: inline-block;
-    height: 8px;
-    border-radius: 4px;
-    min-width: 2px;
+.ptm-table th {
+    color: #8aa0bb; font-weight: 600; font-size: 0.62rem;
+    padding: 2px 0 4px; text-align: center;
 }
-.ptm-v {
-    color: #e8f2ff;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
+.ptm-corner { width: 38px; }
+.ptm-tot, .ptm-totv { width: 26px; }
+.ptm-rlbl {
+    width: 38px; text-align: left; font-size: 0.66rem; font-weight: 700;
+    padding-right: 4px; white-space: nowrap;
 }
+.ptm-rlbl-f { color: #7eb8ff; }
+.ptm-rlbl-a { color: #ff9a9a; }
+.ptm-cell {
+    text-align: center; padding: 5px 0; font-weight: 600;
+    color: #e8f2ff; border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.04);
+}
+.ptm-totv { text-align: center; color: #c8d8f0; font-weight: 800; padding-left: 4px; }
 
 /* 예상 스코어 λ 라벨 강조 */
 .pse-label { font-size: 0.68rem; color: #6a8aa8; }

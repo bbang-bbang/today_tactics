@@ -994,19 +994,34 @@
         </div>`;
     }
 
-    // ── 골 타이밍 바 (전·후반) ──────────────────────────────
+    // ── 골 타이밍 (15분 구간 히트맵) ──────────────────────────
     function timingBarsHtml(timing, label) {
         if (!timing) return "";
-        const tf = timing["for"]     || [0, 0];
-        const ta = timing["against"] || [0, 0];
-        const maxVal = Math.max(...tf, ...ta, 1);
-        const bar = (v, c) => `<span class="ptm-bar" style="width:${(v/maxVal*100).toFixed(0)}%;background:${c}" title="${v}골"></span>`;
+        const tf = timing["for"] || [], ta = timing["against"] || [];
+        // 6버킷(15분) 기대. 구형 2버킷 데이터면 전/후반만이라도 방어 표시.
+        const LABELS = (tf.length > 2 || ta.length > 2)
+            ? ["0-15", "16-30", "31-45", "46-60", "61-75", "76-90"]
+            : ["전반", "후반"];
+        const cols = LABELS.length;
+        const maxF = Math.max(1, ...tf), maxA = Math.max(1, ...ta);
+        const cell = (v, max, type) => {
+            const op = v ? (0.18 + 0.60 * (v / max)) : 0;
+            const bg = type === "f" ? `rgba(78,164,248,${op.toFixed(2)})` : `rgba(248,113,113,${op.toFixed(2)})`;
+            return `<td class="ptm-cell" style="background:${bg}">${v || "·"}</td>`;
+        };
+        const sum = arr => arr.reduce((s, v) => s + (v || 0), 0);
+        const hdr = LABELS.map(l => `<th>${l}</th>`).join("");
+        const fRow = Array.from({length: cols}, (_, i) => cell(tf[i] || 0, maxF, "f")).join("");
+        const aRow = Array.from({length: cols}, (_, i) => cell(ta[i] || 0, maxA, "a")).join("");
         return `<div class="pred-timing">
-            <div class="ptm-head">${label} 골 타이밍</div>
-            <div class="ptm-row"><span class="ptm-lbl">전반 득점</span>${bar(tf[0], "#4ea4f8")}<span class="ptm-v">${tf[0]}</span></div>
-            <div class="ptm-row"><span class="ptm-lbl">후반 득점</span>${bar(tf[1], "#4ea4f8")}<span class="ptm-v">${tf[1]}</span></div>
-            <div class="ptm-row"><span class="ptm-lbl">전반 실점</span>${bar(ta[0], "#f87171")}<span class="ptm-v">${ta[0]}</span></div>
-            <div class="ptm-row"><span class="ptm-lbl">후반 실점</span>${bar(ta[1], "#f87171")}<span class="ptm-v">${ta[1]}</span></div>
+            <div class="ptm-head">${label} 골 타이밍 <span class="ptm-sub">15분 구간 · 색 진할수록 多</span></div>
+            <table class="ptm-table">
+                <thead><tr><th class="ptm-corner"></th>${hdr}<th class="ptm-tot">계</th></tr></thead>
+                <tbody>
+                    <tr><td class="ptm-rlbl ptm-rlbl-f">득점</td>${fRow}<td class="ptm-totv">${sum(tf)}</td></tr>
+                    <tr><td class="ptm-rlbl ptm-rlbl-a">실점</td>${aRow}<td class="ptm-totv">${sum(ta)}</td></tr>
+                </tbody>
+            </table>
         </div>`;
     }
 
