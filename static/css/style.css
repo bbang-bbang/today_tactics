@@ -4955,23 +4955,23 @@ body {
     margin-bottom: 6px; padding-bottom: 4px;
     border-bottom: 1px solid rgba(255,255,255,0.05);
 }
-.ins-card-table { font-size: 0.72rem; }
+.ins-card-table { font-size: 0.76rem; }   /* 0.72→0.76 (12px↑) */
 
 /* xG 효율 리더보드 — 카드 패널과 동일 톤, accent만 보라 */
 .ins-xg-mode-tab {
     background: none; border: 1px solid transparent;
-    color: #667; font-size: 0.78rem; font-weight: 600;
+    color: #8890a8; font-size: 0.78rem; font-weight: 600;   /* #667→#8890a8 비활성 탭 가독성 */
     padding: 4px 12px; border-radius: 5px; cursor: pointer;
     transition: all 0.15s;
 }
-.ins-xg-mode-tab:hover { color: #aac; }
+.ins-xg-mode-tab:hover { color: #c8d2e8; }
 .ins-xg-mode-tab.active {
     background: rgba(184,126,248,0.14);
     color: #c79ef8;
     border-color: rgba(184,126,248,0.35);
 }
 .ins-xg-league-tab {
-    background: none; border: none; color: #6a8aa8;
+    background: none; border: none; color: #8aa0bb;   /* #6a8aa8→#8aa0bb 가독성 */
     font-size: 0.72rem; font-weight: 600;
     padding: 3px 10px; border-radius: 4px; cursor: pointer;
     letter-spacing: 0.02em; transition: all 0.15s;
@@ -4988,12 +4988,12 @@ body {
     border: 1px solid rgba(255,255,255,0.06);
     border-radius: 6px; padding: 3px;
 }
-#ins-panel-xg .ins-table { font-size: 0.72rem; }
-#ins-panel-xg .ins-team-cell { color: #8ab0d8; font-size: 0.7rem; }
-#ins-panel-xg .ins-sub { color: #6a8aa8; font-size: 0.65rem; font-weight: 400; }
+#ins-panel-xg .ins-table { font-size: 0.76rem; }   /* 0.72→0.76 */
+#ins-panel-xg .ins-team-cell { color: #9ec2e8; font-size: 0.74rem; }   /* 대비·크기 ↑ */
+#ins-panel-xg .ins-sub { color: #93acc6; font-size: 0.68rem; font-weight: 400; }   /* sub 가독성 #6a8aa8→#93acc6 */
 .ins-card-table tbody td.ins-neg { color: #f87171; font-weight: 700; }
 .ins-card-foot {
-    color: #5a7a8a; font-size: 0.62rem; margin-top: 6px; text-align: center;
+    color: #7e98ad; font-size: 0.66rem; margin-top: 6px; text-align: center;   /* 푸터 대비·크기 ↑ */
     font-style: italic;
 }
 @media (max-width: 768px) {
