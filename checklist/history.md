@@ -3019,3 +3019,10 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-05-22 12:36:21 | cat "C:/Users/ehban/.ssh/config" 2>/dev/null | head -30
 - 2026-05-22 12:37:29 | git status --short && echo "---" && git diff --stat checklist/backlog.md checklist/history.md
 - 2026-05-22 12:47:45 | git diff static/js/prediction.js static/css/style.css 2>&1
+- 2026-05-26 12:48:16 | tail -50 "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/f8a512de-84da-42fc-8283-5afcea3ab301/tasks/baz79jy0k.output" 2>&1
+- 2026-05-26 12:48:21 | ls -la "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/f8a512de-84da-42fc-8283-5afcea3ab301/tasks/" 2>&1 | tail -10
+- 2026-05-26 12:54:37 | tail -80 "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/f8a512de-84da-42fc-8283-5afcea3ab301/tasks/baz79jy0k.output"
+- 2026-05-26 12:58:06 | ls -la "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/f8a512de-84da-42fc-8283-5afcea3ab301/tasks/bazovdl8k.output" 2>&1 && echo "---" && tail -10 "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/f8a512de-84da-42fc-8283-5afcea3ab301/tasks/bazovdl8k.output"
+- 2026-05-27 08:48:00 | tail -40 "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/f8a512de-84da-42fc-8283-5afcea3ab301/tasks/bazovdl8k.output"
+- 2026-05-27 08:55:15 | cat "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/f8a512de-84da-42fc-8283-5afcea3ab301/tasks/b2ynmwlln.output"
+- 2026-05-27 09:05:15 | cat "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/f8a512de-84da-42fc-8283-5afcea3ab301/tasks/bvw7h1ohn.output" 2>&1

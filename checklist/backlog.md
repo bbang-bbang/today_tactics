@@ -36,11 +36,8 @@ GitHub Actions 워크플로우 `.github/workflows/deploy.yml` 추가. push to ma
 
 ---
 
-### [ ] mps.player_name NULL 73% — 데이터 수집 단계 결손
-**왜**: `match_player_stats.player_name` 67K row 중 49K(73%)가 NULL. 5/8 fallback으로 영문 이름 표시는 즉시 해결됐지만 근본 원인은 수집 코드.
-**무엇**: `crawlers/crawl_sofascore.py` / `crawl_match_stats.py` 점검 — SofaScore 응답 파싱 시 player.name이 어디서 빠지는지 추적.
-**비용**: 1~2h
-**효과**: 한국 선수 영문 이름 의존 해소, 한글 표시 일관성
+### [x] ~~mps.player_name NULL 73% — 데이터 수집 단계 결손~~ — 2026-05-27 완료
+`crawlers/fetch_player_names.py` (SofaScore `/api/v1/player/{id}`) 가비아 실행으로 백필 완료. NULL 51,064 → 0, 68,982건 이름 채움. 1,575 고유 player_id 처리(SSH reset로 2회 분할 실행, 스크립트가 `WHERE player_name IS NULL`로 self-resume). 영문명 저장 + 한글은 players.name_ko JOIN(고유 1,726 중 1,551 커버, 나머지는 외국인). venv python 필수(`./venv/bin/python`). 근본 원인(crawl 단계 결손)은 미해결이나 fetch_player_names 정기 실행으로 보강 가능.
 
 ---
 
