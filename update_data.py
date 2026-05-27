@@ -124,6 +124,8 @@ def main():
             [PYTHON, str(CRAWLERS/"fill_formation_from_kleague.py")]),
         (16, "K리그 포털 스케줄 + 라인업 (현재 시즌)",
             [PYTHON, str(CRAWLERS/"crawl_kleague_lineup.py"), "all", "--years", "2026"]),
+        (17, "events.round 백필 (K리그 roundId → 백테스트 per_round)",
+            [PYTHON, str(CRAWLERS/"backfill_rounds.py")]),
     ]
 
     # STEP 0~2 실패 시 후속 의미 없음 → fail_ok=False (기본).
