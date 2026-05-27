@@ -40,7 +40,7 @@ jobs:
               -o ConnectTimeout=15 \
               -v \
               "$SSH_USER@$SSH_HOST" \
-              "echo SSH_OK && whoami && cd /opt/today_tactics && git stash && git pull && sudo -n systemctl restart today_tactics && sleep 3 && curl -sf -o /dev/null -w 'health=%{http_code}' http://127.0.0.1:5000/" \
+              "echo SSH_OK && whoami && cd /opt/today_tactics && git fetch origin main && git reset --hard origin/main && sudo -n systemctl restart today_tactics && sleep 3 && curl -sf -o /dev/null -w 'health=%{http_code}' http://127.0.0.1:5000/" \
               2>&1) && SSH_EXIT=0 || SSH_EXIT=$?
 
           echo "- SSH exit code: $SSH_EXIT" >> $GITHUB_STEP_SUMMARY
