@@ -31,6 +31,8 @@ Thumbs.db
 # SSH keys
 *.pem
 *.key
+ci_deploy_key
+ci_deploy_key.pub
 .update_secret_local.txt
 
 # 로컬 임시 로그/결과
