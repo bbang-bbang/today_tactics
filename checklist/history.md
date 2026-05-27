@@ -3026,3 +3026,44 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-05-27 08:48:00 | tail -40 "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/f8a512de-84da-42fc-8283-5afcea3ab301/tasks/bazovdl8k.output"
 - 2026-05-27 08:55:15 | cat "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/f8a512de-84da-42fc-8283-5afcea3ab301/tasks/b2ynmwlln.output"
 - 2026-05-27 09:05:15 | cat "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/f8a512de-84da-42fc-8283-5afcea3ab301/tasks/bvw7h1ohn.output" 2>&1
+
+═══════════════════════════════════════════════════════════════
+## 2026-05-27 세션 요약 (32 commit: ca8e89e → 3920607)
+═══════════════════════════════════════════════════════════════
+
+### 즐겨찾기 워크플로
+- 매치 카드 별 위치 통일(HOME/AWAY 둘 다 상단) + 즐겨찾기 매치 우선 자동선택
+- 즐겨찾기 매치 라운드 리스트 최상단 정렬 + 라운드 탭 ★ 인디케이터
+
+### 데이터 정합성 (P4)
+- synthetic 슈퍼컵 event(90333089) 영구 제외 — sync_results_to_events.py에 EXCLUDED set
+- mps.player_name NULL 51,064 → 0 (fetch_player_names.py 가비아 실행)
+- players row 누락 = 재검증상 이미 해결
+- 5/22~26 신규 매치 데이터 결손 복구 (score·avg_pos·shotmap·heatmap)
+- 5/25까지 2026 K1/K2 전 데이터 타입 100% 검증
+
+### 자동화 근본 수정
+- 야간 자동 업데이터(_run_update_pipeline)가 score만 채우던 것 → full update_data.py(전술 데이터 포함)
+- events.round 백필을 update_data STEP 17로 편입 (백테스트 per_round R9 끊김 재발 방지)
+
+### 예측 모델 강화 (검증 기반, RED)
+- K1 draw_boost 0.04→0.19 (무승부 calibration 정상화, 0→29 예측)
+- K2 SOS(use_sos) 활성화 (전반기 +6%p, 후반 무해 — 전·후반 분할 검증)
+- league_avg 캐시 키 as_of_ts 누락 버그 → look-ahead 누수 차단 (백테스트 결정적)
+- 홈/원정 분리 레이팅 = 오프라인 검증 결과 악화로 기각
+- 사전 예측 스코어가 픽(승/무/패)과 일치하도록 top_score_by_outcome 도입
+- decay/shrinkage 스윕 = 이미 최적 확인, 변경 없음
+- 결과: K1 50→51.1%, K2 47.5→51.5%
+
+### CI/배포 (P7)
+- CI 자동배포 고장 진단·복구 (SSH_USER/HOST 빈 시크릿 + 키 손상) → 전용 ed25519 키 + API로 시크릿 3종 설정
+- deploy 견고화 (git reset --hard origin/main)
+- CI키 forced-command + restrict 하드닝 (유출돼도 배포만 가능) + 정체불명 4096키 제거
+
+### UI/UX
+- 가독성 수술 4종 (매치카드·예측패널·인사이트·순위표 — 다크 테마 유지, 핀포인트 대비/크기)
+- 첫 접속 무선택 (URL 공유 링크만 자동선택) + 예정 매치 클릭 시 이전 전술판 잔류 제거
+- 공 추가 버튼 토글 (두 번 누르면 제거)
+- 팀 스타일 매치업 → 리그 대비 상위 능력(N/17위 배지)
+- 골 타이밍 전/후반 → 15분 구간 6버킷 히트맵
+- 시즌 시뮬 표시 경기수 → 라운드(R13/34 · 21R 남음)
