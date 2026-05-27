@@ -1673,7 +1673,7 @@
             return `
                 <div class="ssb-league">
                     <span class="ssb-name">${d.league}</span>
-                    <span class="ssb-sub">${d.pending_games}경기 남음 · ${d.n_simulations}회 시뮬</span>
+                    <span class="ssb-sub" title="${d.n_teams}팀 · ${d.n_simulations}회 시뮬">${d.finished_games}/${d.finished_games + d.pending_games}경기 (${d.pending_games} 남음)</span>
                     <span class="ssb-champ" title="우승 확률 ${champ.win_pct}%">🏆 ${champ.name} ${champ.win_pct}%</span>
                     <span class="ssb-divider">·</span>
                     <span class="ssb-afc" title="AFC/승격권 TOP ${afcCount}">
