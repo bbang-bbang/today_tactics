@@ -1229,7 +1229,12 @@
 
     // ── Toolbar actions ───────────────────────────────────
     document.getElementById("btn-add-ball").addEventListener("click", () => {
-        state.balls.push({ id: state.nextId++, x: 0.5, y: 0.5 });
+        // 토글: 공 있으면 제거(마지막 1개), 없으면 중앙에 추가 → 두 번 누르면 사라짐
+        if (state.balls.length) {
+            state.balls.pop();
+        } else {
+            state.balls.push({ id: state.nextId++, x: 0.5, y: 0.5 });
+        }
         render();
     });
 
