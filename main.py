@@ -1928,6 +1928,15 @@ def _matrix_outcomes(matrix, draw_boost=0.0):
     draw_p += max(0.0, draw_boost)
     total = home_p + draw_p + away_p or 1
     scores.sort(key=lambda s: s["prob"], reverse=True)
+    # 결과별(홈승/무/원정승) 최빈 스코어 — 예측 결과와 스코어 일치용
+    # (전체 최빈 스코어는 대개 1-0이라 '무 예측인데 스코어는 1-0' 모순이 생김)
+    by_outcome = {"home": None, "draw": None, "away": None}
+    for s in scores:  # prob 내림차순
+        key = "home" if s["home"] > s["away"] else "draw" if s["home"] == s["away"] else "away"
+        if by_outcome[key] is None:
+            by_outcome[key] = {"home": s["home"], "away": s["away"], "pct": round(s["prob"] * 100, 1)}
+        if all(by_outcome.values()):
+            break
     return {
         "home": round(home_p / total * 100),
         "draw": round(draw_p / total * 100),
@@ -1936,6 +1945,7 @@ def _matrix_outcomes(matrix, draw_boost=0.0):
             {"home": s["home"], "away": s["away"], "pct": round(s["prob"] * 100, 1)}
             for s in scores[:5]
         ],
+        "top_score_by_outcome": by_outcome,
     }
 
 
@@ -2165,6 +2175,7 @@ def _predict_core(cur, home_ss, away_ss, tid_filter, as_of_ts, year_str,
         "pred_draw":  outcomes["draw"],
         "pred_away":  outcomes["away"],
         "top_scores": outcomes["top_scores"],
+        "top_score_by_outcome": outcomes["top_score_by_outcome"],
         "h_games":    h["games"],
         "a_games":    a["games"],
         "league_avg": league_avg,
@@ -5142,11 +5153,16 @@ def round_predictions():
             matches.append(m); continue
 
         top = pred.get("top_scores") or []
+        _p = {"home": pred["pred_home"], "draw": pred["pred_draw"], "away": pred["pred_away"]}
+        pred_outcome = max(_p, key=_p.get)
+        tsbo = pred.get("top_score_by_outcome") or {}
         m["pred"] = {
             "home_pct":  pred["pred_home"],
             "draw_pct":  pred["pred_draw"],
             "away_pct":  pred["pred_away"],
-            "top_score": top[0] if top else None,
+            "pred_outcome": pred_outcome,
+            # 예측 결과(승/무/패)와 일치하는 최빈 스코어 (전체 최빈은 대개 1-0이라 모순 생김)
+            "top_score": tsbo.get(pred_outcome) or (top[0] if top else None),
             "lam_home":  round(pred["lam_home"], 2),
             "lam_away":  round(pred["lam_away"], 2),
         }
@@ -5155,11 +5171,8 @@ def round_predictions():
             try:
                 hs, ag = int(g["home_score"]), int(g["away_score"])
                 actual = "home" if hs > ag else "away" if ag > hs else "draw"
-                p = {"home": pred["pred_home"], "draw": pred["pred_draw"], "away": pred["pred_away"]}
-                pred_outcome = max(p, key=p.get)
-                m["pred"]["actual"]       = actual
-                m["pred"]["pred_outcome"] = pred_outcome
-                m["pred"]["hit"]          = (pred_outcome == actual)
+                m["pred"]["actual"] = actual
+                m["pred"]["hit"]    = (pred_outcome == actual)
                 if pred_outcome == actual:
                     n_hit += 1
             except (TypeError, ValueError):
