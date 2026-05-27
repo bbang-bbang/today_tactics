@@ -69,6 +69,13 @@ def synthetic_id(date_str, home_slug, away_slug):
         h = (h * 31 + ord(c)) & 0xFFFFFF
     return 90000000 + h % 1000000
 
+# 영구 제외 — SofaScore에 매치 페이지가 없어 전술 데이터(lineup/avg_pos/shotmap) 수집 불가한
+# 매치. synthetic event로 생성되면 사용자가 클릭 시 "결과만 있고 전술 카드 없음" 혼란.
+# 삭제해도 sync가 K리그 JSON에서 재생성하므로 여기서 영구 차단한다.
+EXCLUDED_SYNTHETIC_IDS = {
+    90333089,  # 2026-02-21 Jeonbuk vs Daejeon — 슈퍼컵 추정, SofaScore 페이지 없음
+}
+
 def main():
     with open(RESULTS_FILE, encoding="utf-8") as f:
         all_results = json.load(f)
@@ -114,6 +121,11 @@ def main():
         tid = hm[1]  # tournament_id (K1=410, K2=777)
         ts  = date_to_ts(g["date"])
         eid = synthetic_id(g["date"], g["home"], g["away"])
+
+        # 영구 제외 매치는 생성/보강 모두 스킵 (재생성 방지)
+        if eid in EXCLUDED_SYNTHETIC_IDS:
+            skipped += 1
+            continue
 
         # 이미 같은 날짜 + 팀 조합이 있으면 score 보강만 시도, 없으면 INSERT
         cur.execute(
