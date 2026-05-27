@@ -3827,13 +3827,13 @@ body {
     border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 .rpp-title { font-weight: 700; color: #c8d8f0; font-size: 0.78rem; }
-.rpp-cutoff { color: #5a7a8a; font-size: 0.65rem; margin-left: auto; }
+.rpp-cutoff { color: #7e98ad; font-size: 0.7rem; margin-left: auto; }   /* 대비·크기 ↑ */
 
 .rpp-table {
-    width: 100%; border-collapse: collapse; font-size: 0.7rem;
+    width: 100%; border-collapse: collapse; font-size: 0.76rem;   /* 0.7→0.76 (12px↑) */
 }
 .rpp-table thead th {
-    color: #5a7a8a; font-weight: 600; padding: 4px 6px;
+    color: #8aa0bb; font-weight: 600; padding: 4px 6px;   /* 헤더 대비 ↑ (#5a7a8a→#8aa0bb) */
     text-align: center; border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 .rpp-table thead th:first-child { text-align: left; }
@@ -3848,9 +3848,9 @@ body {
 .rpp-mu > * { display: inline-block; vertical-align: middle; }
 .rpp-h { color: #4ea4f8; width: 56px; text-align: right; }
 .rpp-a { color: #b87ef8; width: 56px; text-align: left; }
-.rpp-vs { color: #5a7a8a; font-size: 0.6rem; width: 22px; text-align: center; }
+.rpp-vs { color: #7e98ad; font-size: 0.66rem; width: 22px; text-align: center; }
 
-.rpp-pct { color: #6a8aa8; font-variant-numeric: tabular-nums; }
+.rpp-pct { color: #a3bcd6; font-variant-numeric: tabular-nums; }   /* 예측 % 가독성 — #6a8aa8→#a3bcd6 */
 .rpp-pick { color: #facc15; font-weight: 900; }
 
 .rpp-ts { color: #c8d8f0; font-weight: 600; font-variant-numeric: tabular-nums; }
