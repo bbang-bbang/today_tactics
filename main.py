@@ -1834,7 +1834,7 @@ _POISSON_MAX_GOALS = 5  # 스코어 매트릭스 최대 (0~5골)
 _LEAGUE_CONSTANTS = {
     410: {"home_adv": 0.98, "away_adj": 1.02, "draw_boost": 0.19, "dc_rho": 0.10, "shrinkage_k": 3},  # K1: 2026-05-27 draw_boost 0.04→0.19 (calibration 정상화). 이전 0.04는 무승부를 한 번도 argmax로 안 잡음(예측 0 vs 실제 27/90=30%). 오프라인 스윕(analysis/predict_param_sweep.py)으로 base rate 매칭값 채택 — 예측 무승부 0→29(≈실제27), 1X2 50.0→51.1%, brier flat. in-sample 최대 hit(52.2%)은 노이즈로 판단해 안 좇음. home_adv/away_adj는 2026-05-12 미세보정 backfire(-1.3%p) 후 유지.
 
-    777: {"home_adv": 0.96, "away_adj": 0.90, "draw_boost": 0.18, "dc_rho": 0.10, "shrinkage_k": 0},  # K2: draw boost ↑↑ + Dixon-Coles ρ 도입 (실제 draw 31%인데 12% 예측)
+    777: {"home_adv": 0.96, "away_adj": 0.90, "draw_boost": 0.18, "dc_rho": 0.10, "shrinkage_k": 0, "use_sos": True},  # K2: draw boost ↑↑ + Dixon-Coles ρ. 2026-05-27 use_sos 활성화 — 오프라인 검증상 전반기 +6%p·후반 무해·brier flat (전·후반 분할 검증). K1은 use_sos 미설정(SOS가 hit 악화).
 }
 _DEFAULT_LEAGUE_CONSTANTS = {"home_adv": 1.00, "away_adj": 0.90, "draw_boost": 0.10, "dc_rho": 0.0, "shrinkage_k": 0}
 
@@ -2128,6 +2128,9 @@ def _predict_core(cur, home_ss, away_ss, tid_filter, as_of_ts, year_str,
 
     # ── 상대 강도(SOS) 보정 ──
     # 양 팀 모두 6경기 이상 + 클램핑(0.88~1.12)으로 노이즈 억제
+    # 리그별 use_sos 코프로도 켤 수 있음 (K2: 2026-05-27 검증 — 전반기 +6%p, 후반기 무해, brier flat.
+    #   K1은 off 유지 — 균형 리그라 SOS 과보정으로 hit -1.1%p 악화).
+    apply_sos = apply_sos or coefs.get("use_sos", False)
     sos_home = sos_away = 1.0
     if apply_sos and h["games"] >= 6 and a["games"] >= 6:
         team_def = _all_team_def(cur, tid_filter, year_str, as_of_ts)
