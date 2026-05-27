@@ -1683,10 +1683,15 @@
             const afcCount = d.league === "K1" ? 4 : 2;
             const top = d.teams.slice(0, 3);
             const bot = d.teams.slice(-2);
+            // 경기 수 → 라운드 환산 (라운드당 = 팀수/2, 홀수팀이면 1팀 휴식)
+            const perRound = Math.max(1, Math.floor(d.n_teams / 2));
+            const totalR = Math.round((d.finished_games + d.pending_games) / perRound);
+            const curR   = Math.round(d.finished_games / perRound);
+            const remainR = Math.max(0, totalR - curR);
             return `
                 <div class="ssb-league">
                     <span class="ssb-name">${d.league}</span>
-                    <span class="ssb-sub" title="${d.n_teams}팀 · ${d.n_simulations}회 시뮬">${d.finished_games}/${d.finished_games + d.pending_games}경기 (${d.pending_games} 남음)</span>
+                    <span class="ssb-sub" title="${d.n_teams}팀 · ${d.pending_games}경기 · ${d.n_simulations}회 시뮬">R${curR}/${totalR} · ${remainR}R 남음</span>
                     <span class="ssb-champ" title="우승 확률 ${champ.win_pct}%">🏆 ${champ.name} ${champ.win_pct}%</span>
                     <span class="ssb-divider">·</span>
                     <span class="ssb-afc" title="AFC/승격권 TOP ${afcCount}">
