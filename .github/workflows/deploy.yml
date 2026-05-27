@@ -48,10 +48,4 @@ jobs:
           echo "$SSH_OUTPUT" | tail -30 >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-          # stdout 진단 (로그에서 직접 원인 파악용 — 임시)
-          echo "===== SSH DIAG (stdout) ====="
-          echo "SSH_USER_empty=$([ -z "$SSH_USER" ] && echo YES || echo NO) SSH_HOST_empty=$([ -z "$SSH_HOST" ] && echo YES || echo NO) exit=$SSH_EXIT"
-          echo "$SSH_OUTPUT" | grep -iE 'debug1:|Permission denied|publickey|denied|Connection|refused|timed out|No route|Host key|SSH_OK|health=|Load key|invalid format' | tail -25
-          echo "===== END DIAG ====="
-
           exit $SSH_EXIT
