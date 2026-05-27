@@ -359,9 +359,15 @@
                             if (homeId !== _lastHome || awayId !== _lastAway) return;
                             if (data && data.ready) {
                                 document.dispatchEvent(new CustomEvent("matchLineupLoaded", { detail: data }));
+                            } else {
+                                // 라인업 없는 완료 매치 — 이전 전술판 잔류 제거
+                                document.dispatchEvent(new CustomEvent("matchLineupCleared", { detail: { home: homeId, away: awayId } }));
                             }
                         })
                         .catch(() => {});
+                } else {
+                    // 예정(미완료) 매치 — 이전에 적용된 전술판이 남지 않도록 새 매치 팀으로 리셋
+                    document.dispatchEvent(new CustomEvent("matchLineupCleared", { detail: { home: homeId, away: awayId } }));
                 }
             });
         });
@@ -385,18 +391,8 @@
                     }
                 }
             } catch (_) {}
-            if (!target) {
-                // 즐겨찾기 매치 우선 → 없으면 최신 완료 매치 → 그것도 없으면 첫 카드
-                const favFinished = list.querySelectorAll(".kmc.kmc-done.kmc-fav");
-                if (favFinished.length) {
-                    target = favFinished[favFinished.length - 1];
-                } else {
-                    const finishedCards = list.querySelectorAll(".kmc.kmc-done");
-                    target = finishedCards.length
-                        ? finishedCards[finishedCards.length - 1]
-                        : list.querySelector(".kmc");
-                }
-            }
+            // 첫 접속 시 자동선택 없음 — URL 공유 링크(?home=&away=)로 들어온 경우만 해당 매치 선택.
+            // (이전엔 즐겨찾기/최신/첫카드를 자동 클릭했으나, 빈 화면으로 시작하는 게 사용자 의도)
             if (target) {
                 requestAnimationFrame(() => target.click());
             }

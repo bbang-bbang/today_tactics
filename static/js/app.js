@@ -2213,6 +2213,17 @@
         showToast(`${e.detail.home.short} vs ${e.detail.away.short} (${e.detail.date}) 전술판 적용`);
     });
 
+    // 예정 매치/라인업 없는 매치 클릭 — 이전 전술판 잔류 제거 (새 매치 팀 + 기본 포메이션)
+    document.addEventListener("matchLineupCleared", (e) => {
+        const d = e.detail || {};
+        const tA = state.teams.find(t => t.id === d.home);
+        const tB = state.teams.find(t => t.id === d.away);
+        if (tA) state.teamA = tA;
+        if (tB) state.teamB = tB;
+        state.lines = []; state.animations = []; state.balls = [];
+        loadFormation("4-4-2");   // 선수 비우고 기본 포메이션 (render 포함)
+    });
+
     // ── Team selection ────────────────────────────────────
     const teamModal = document.getElementById("team-modal");
     const teamModalTitle = document.getElementById("team-modal-title");
