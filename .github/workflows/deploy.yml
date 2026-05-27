@@ -35,12 +35,14 @@ jobs:
           echo "- SSH_USER empty: $([ -z "$SSH_USER" ] && echo YES || echo NO)" >> $GITHUB_STEP_SUMMARY
           echo "- SSH_HOST empty: $([ -z "$SSH_HOST" ] && echo YES || echo NO)" >> $GITHUB_STEP_SUMMARY
 
+          # P7 하드닝: 배포키는 가비아 authorized_keys에서 forced command(command="...ci_deploy.sh",restrict)로
+          # 잠겨있음. 아래 보내는 명령은 무시되고 ci_deploy.sh(fetch+reset+restart+health)만 실행됨.
+          # 즉 이 키가 유출돼도 임의 명령 불가 — 배포 트리거만 가능.
           SSH_OUTPUT=$(ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
               -o ConnectTimeout=15 \
-              -v \
               "$SSH_USER@$SSH_HOST" \
-              "echo SSH_OK && whoami && cd /opt/today_tactics && git fetch origin main && git reset --hard origin/main && sudo -n systemctl restart today_tactics && sleep 3 && curl -sf -o /dev/null -w 'health=%{http_code}' http://127.0.0.1:5000/" \
+              "ci-deploy" \
               2>&1) && SSH_EXIT=0 || SSH_EXIT=$?
 
           echo "- SSH exit code: $SSH_EXIT" >> $GITHUB_STEP_SUMMARY
