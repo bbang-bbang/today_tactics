@@ -18,26 +18,16 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          KEY_LINES=$(wc -l < ~/.ssh/deploy_key)
-          KEY_HEAD=$(head -1 ~/.ssh/deploy_key)
-          KEY_TAIL=$(tail -1 ~/.ssh/deploy_key)
-          echo "## SSH Key 진단" >> $GITHUB_STEP_SUMMARY
-          echo "- key_lines: $KEY_LINES" >> $GITHUB_STEP_SUMMARY
-          echo "- key_head: $KEY_HEAD" >> $GITHUB_STEP_SUMMARY
-          echo "- key_tail: $KEY_TAIL" >> $GITHUB_STEP_SUMMARY
 
       - name: Deploy
         env:
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
         run: |
-          echo "## 연결 진단" >> $GITHUB_STEP_SUMMARY
-          echo "- SSH_USER empty: $([ -z "$SSH_USER" ] && echo YES || echo NO)" >> $GITHUB_STEP_SUMMARY
-          echo "- SSH_HOST empty: $([ -z "$SSH_HOST" ] && echo YES || echo NO)" >> $GITHUB_STEP_SUMMARY
-
-          # P7 하드닝: 배포키는 가비아 authorized_keys에서 forced command(command="...ci_deploy.sh",restrict)로
-          # 잠겨있음. 아래 보내는 명령은 무시되고 ci_deploy.sh(fetch+reset+restart+health)만 실행됨.
-          # 즉 이 키가 유출돼도 임의 명령 불가 — 배포 트리거만 가능.
+          # P7 하드닝: 배포키는 가비아 authorized_keys에서 forced command
+          # (command="/bin/bash /opt/today_tactics/deploy/ci_deploy.sh",restrict)로 잠겨있음.
+          # 아래 보내는 "ci-deploy"는 무시되고 ci_deploy.sh(fetch+reset+restart+health)만 실행.
+          # 키 유출 시에도 임의 명령 불가 — 배포 트리거만 가능. 배포 로직 변경은 ci_deploy.sh에서.
           SSH_OUTPUT=$(ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
               -o ConnectTimeout=15 \
@@ -45,9 +35,9 @@ jobs:
               "ci-deploy" \
               2>&1) && SSH_EXIT=0 || SSH_EXIT=$?
 
-          echo "- SSH exit code: $SSH_EXIT" >> $GITHUB_STEP_SUMMARY
+          echo "## 배포 결과 (exit $SSH_EXIT)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "$SSH_OUTPUT" | tail -30 >> $GITHUB_STEP_SUMMARY
+          echo "$SSH_OUTPUT" | tail -20 >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
           exit $SSH_EXIT
