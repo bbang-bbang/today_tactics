@@ -2569,15 +2569,15 @@ body {
 .standings-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.78rem;
+    font-size: 0.8rem;          /* 0.78→0.8 */
     color: #c8d6e8;
 }
 .standings-table thead tr { background: rgba(255,255,255,0.04); }
 .standings-table th {
     padding: 7px 8px;
-    font-size: 0.68rem;
+    font-size: 0.7rem;          /* 0.68→0.7 */
     font-weight: 600;
-    color: #4a6080;
+    color: #8aa0bb;             /* #4a6080→#8aa0bb 헤더 대비 (2.5:1→5:1+, WCAG 충족) */
     text-align: center;
     border-bottom: 1px solid rgba(255,255,255,0.06);
     white-space: nowrap;
