@@ -4291,6 +4291,8 @@ body {
     font-size: 0.65rem;
 }
 .lu-name { color: #e8f2ff; font-weight: 500; }
+.lu-name.scorer-link { cursor: pointer; }
+.lu-name.scorer-link:hover { color: #4ea4f8; text-decoration: underline; }
 .lu-rating {
     text-align: right;
     color: #facc15;
@@ -5560,6 +5562,18 @@ body.pr-expanded-lock {
   cursor: pointer; font-size: 0.9rem; transition: all 0.15s;
 }
 .drawer-close:hover { border-color: #f87171; color: #f87171; }
+.drawer-full-btn {
+    background: rgba(78,164,248,0.12);
+    border: 1px solid rgba(78,164,248,0.35);
+    color: #4ea4f8;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+.drawer-full-btn:hover { background: rgba(78,164,248,0.25); }
 
 .drawer-body { padding: 20px 24px 40px; }
 .drawer-section-title { font-size: 0.88rem; font-weight: 700; color: #7ecfff; margin-bottom: 10px; }
@@ -7476,6 +7490,15 @@ body.pr-expanded-lock {
 @media (max-width: 760px) {
     .an-panel-grid { grid-template-columns: 1fr; }
     .an-weather-grid { grid-template-columns: 1fr; }
+}
+
+/* 경기별 트렌드 */
+.pa-trend-wrap {
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
 }
 
 /* Player analytics 하단 2-col (활동량 | 월별) */

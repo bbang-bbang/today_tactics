@@ -7,6 +7,7 @@
 
     let radarChart = null;
     let monthChart = null;
+    let trendChart = null;
     let currentPlayerId = null;
 
     // ── 모달 열기/닫기 ──────────────────────────────────────────
@@ -41,7 +42,7 @@
     // ── 렌더링 ───────────────────────────────────────────────────
     function render(d, playerId, activeYear) {
         destroyCharts();
-        const { info, available_years, season_summary, monthly, recent_form, radar, activity } = d;
+        const { info, available_years, season_summary, monthly, recent_form, radar, activity, trend } = d;
         const leagueLabel = d.league === "K1" ? "K리그1" : "K리그2";
 
         const posLabel = { "G": "GK", "D": "DF", "M": "MF", "F": "FW" }[info.position] || info.position;
@@ -128,6 +129,14 @@
             </table>
         </div>
 
+        <!-- 경기별 트렌드 -->
+        <div class="pa-trend-wrap">
+            <div class="pa-section-title">경기별 트렌드 <span class="pa-sub">(${(trend||[]).length}경기 · 시간순)</span></div>
+            ${(trend||[]).length >= 3
+                ? `<div style="position:relative;height:230px"><canvas id="chart-pa-trend"></canvas></div>`
+                : `<div class="pa-empty">데이터 부족 (최소 3경기)</div>`}
+        </div>
+
         <div class="pa-bottom-grid">
             <!-- 활동량 지수 -->
             <div class="pa-activity-wrap">
@@ -161,6 +170,7 @@
         renderRadar(radar);
         renderActivity(activity);
         renderMonthly(monthly);
+        renderTrend(trend || [], info.position);
     }
 
     // ── 레이더 차트 ──────────────────────────────────────────────
@@ -349,9 +359,155 @@
         });
     }
 
+    // ── 경기별 트렌드 차트 ──────────────────────────────────────
+    function renderTrend(trend, position) {
+        const ctx = document.getElementById("chart-pa-trend");
+        if (!ctx || !trend || trend.length < 3) return;
+
+        const pos = ["G","D","M","F"].includes(position) ? position : "F";
+
+        // 포지션별 바 데이터 설정
+        const BAR_CFG = {
+            G: { label: "세이브",   data: trend.map(g => g.saves), color: "rgba(167,139,250,0.75)" },
+            D: { label: "수비액션", data: trend.map(g => g.def),   color: "rgba(78,164,248,0.70)" },
+            M: { label: "키패스",   data: trend.map(g => g.kp),    color: "rgba(52,211,153,0.70)" },
+            F: { label: "G+A",      data: trend.map(g => g.goals + g.assists), color: "rgba(251,191,36,0.75)" },
+        };
+        // FW는 골/도움 스택
+        const isFW = pos === "F";
+        const barCfg = BAR_CFG[pos];
+
+        const ratings = trend.map(g => g.rating);
+        const ptColors = trend.map(g =>
+            g.result === "W" ? "#22c55e" :
+            g.result === "L" ? "#ef4444" : "#9ca3af"
+        );
+
+        // X축 레이블: 연도 경계는 "'YY M/D", 나머지는 M/D, 경기 많으면 간격 조정
+        const step = trend.length > 20 ? Math.ceil(trend.length / 15) : 1;
+        const yearBoundaries = new Set();
+        const labels = trend.map((g, i) => {
+            const isNewYear = i === 0 || g.year !== trend[i - 1].year;
+            if (isNewYear && i > 0) yearBoundaries.add(i);
+            if (i % step !== 0) return "";
+            return isNewYear && i > 0 ? `'${String(g.year).slice(2)} ${g.date}` : g.date;
+        });
+
+        const datasets = [];
+        if (isFW) {
+            datasets.push({
+                type: "bar", label: "골",
+                data: trend.map(g => g.goals),
+                backgroundColor: "rgba(251,191,36,0.85)",
+                borderRadius: 3, yAxisID: "yBar", stack: "s", barPercentage: 0.6,
+            });
+            datasets.push({
+                type: "bar", label: "도움",
+                data: trend.map(g => g.assists),
+                backgroundColor: "rgba(78,164,248,0.65)",
+                borderRadius: 3, yAxisID: "yBar", stack: "s", barPercentage: 0.6,
+            });
+        } else {
+            datasets.push({
+                type: "bar", label: barCfg.label,
+                data: barCfg.data,
+                backgroundColor: barCfg.color,
+                borderRadius: 3, yAxisID: "yBar", barPercentage: 0.55,
+            });
+        }
+        datasets.push({
+            type: "line", label: "평점",
+            data: ratings,
+            borderColor: "rgba(251,191,36,0.95)",
+            backgroundColor: "transparent",
+            pointBackgroundColor: ptColors,
+            pointBorderColor: ptColors,
+            pointRadius: 5, pointHoverRadius: 7,
+            tension: 0.3, yAxisID: "yRating",
+            spanGaps: true, borderWidth: 2.5,
+        });
+
+        // yBar 최대값 (정수 상한, 최소 3)
+        const barMax = Math.max(3, ...datasets.filter(d => d.yAxisID === "yBar")
+            .flatMap(d => d.data).filter(v => v != null));
+
+        // 연도 경계 수직선 플러그인
+        const yearDividerPlugin = {
+            id: "yearDivider",
+            afterDraw(chart) {
+                if (!yearBoundaries.size) return;
+                const { ctx, scales: { x, yBar } } = chart;
+                const top    = yBar.top;
+                const bottom = yBar.bottom;
+                ctx.save();
+                ctx.strokeStyle = "rgba(255,255,255,0.25)";
+                ctx.lineWidth   = 1.5;
+                ctx.setLineDash([4, 3]);
+                yearBoundaries.forEach(idx => {
+                    const xPos = x.getPixelForValue(idx);
+                    ctx.beginPath();
+                    ctx.moveTo(xPos, top - 4);
+                    ctx.lineTo(xPos, bottom);
+                    ctx.stroke();
+                    // 연도 레이블
+                    ctx.fillStyle = "rgba(200,216,240,0.6)";
+                    ctx.font = "bold 10px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.fillText(`${trend[idx].year}`, xPos, top - 8);
+                });
+                ctx.restore();
+            }
+        };
+
+        trendChart = new Chart(ctx, {
+            data: { labels, datasets },
+            plugins: [yearDividerPlugin],
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    legend: {
+                        labels: { color: "#aac", font: { size: 11 }, boxWidth: 12, padding: 12 }
+                    },
+                    tooltip: {
+                        backgroundColor: "rgba(10,15,30,0.92)",
+                        titleColor: "#c8d8f0", bodyColor: "#c8d8f0",
+                        padding: 10,
+                        callbacks: {
+                            title: (items) => {
+                                const g = trend[items[0].dataIndex];
+                                const badge = g.result === "W" ? "●" : g.result === "L" ? "●" : "●";
+                                return `${g.date} vs ${g.opp}  ${g.score}  ${g.result}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: "#778", font: { size: 10 }, maxRotation: 0, autoSkip: false },
+                        grid: { color: "rgba(255,255,255,0.04)" }
+                    },
+                    yBar: {
+                        position: "left", min: 0, max: barMax + 1,
+                        ticks: { color: "#aac", stepSize: 1, font: { size: 11 } },
+                        grid: { color: "rgba(255,255,255,0.05)" },
+                        title: { display: true, text: barCfg.label, color: "#aac", font: { size: 10 } }
+                    },
+                    yRating: {
+                        position: "right", min: 5, max: 10,
+                        ticks: { color: "#fbbf24", font: { size: 11 } },
+                        grid: { display: false },
+                        title: { display: true, text: "평점", color: "#fbbf24", font: { size: 10 } }
+                    },
+                }
+            }
+        });
+    }
+
     function destroyCharts() {
         if (radarChart)    { radarChart.destroy();    radarChart    = null; }
         if (activityChart) { activityChart.destroy(); activityChart = null; }
         if (monthChart)    { monthChart.destroy();    monthChart    = null; }
+        if (trendChart)    { trendChart.destroy();    trendChart    = null; }
     }
 })();

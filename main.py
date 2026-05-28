@@ -3779,6 +3779,45 @@ def get_player_analytics():
             vals = [v[axis] for v in all_activity.values()]
             league_avg_act[axis] = round(sum(vals) / len(vals), 1) if vals else 0
 
+    # 경기별 트렌드 (시간 오름차순)
+    cur.execute(f"""
+        SELECT e.date_ts,
+               CASE WHEN mps.is_home=1 THEN e.away_team_id ELSE e.home_team_id END opp_id,
+               mps.goals, mps.assists, mps.rating, mps.is_home,
+               e.home_score, e.away_score,
+               mps.shots_on_target, mps.key_passes,
+               mps.tackles + mps.interceptions, mps.saves
+        FROM match_player_stats mps JOIN events e ON mps.event_id=e.id
+        WHERE mps.player_id=? AND e.tournament_id=? AND e.date_ts IS NOT NULL
+              AND mps.minutes_played > 0 {year_clause}
+        ORDER BY e.date_ts ASC
+    """, (player_id, tournament_id) + yp)
+    trend = []
+    for r in cur.fetchall():
+        d = _dt.datetime.utcfromtimestamp(r[0])
+        opp_name = _ko_name_by_ss_id(str(r[1])) or str(r[1])
+        hs, aws, is_home = r[6], r[7], r[5]
+        if hs is not None and aws is not None:
+            my_s, opp_s = (hs, aws) if is_home else (aws, hs)
+            res = "W" if my_s > opp_s else ("D" if my_s == opp_s else "L")
+            score = f"{my_s}-{opp_s}"
+        else:
+            res = "?"; score = "?"
+        trend.append({
+            "date":    f"{d.month}/{d.day}",
+            "year":    d.year,
+            "opp":     opp_name,
+            "result":  res,
+            "score":   score,
+            "rating":  round(r[4], 2) if r[4] else None,
+            "goals":   r[2] or 0,
+            "assists": r[3] or 0,
+            "sot":     r[8] or 0,
+            "kp":      r[9] or 0,
+            "def":     r[10] or 0,
+            "saves":   r[11] or 0,
+        })
+
     # 전체 집계 (헤더용)
     cur.execute(f"""
         SELECT COUNT(*), SUM(mps.goals), SUM(mps.assists), AVG(mps.rating), SUM(mps.minutes_played),
@@ -3816,6 +3855,7 @@ def get_player_analytics():
             "percentiles":  activity_percentiles,
             "league_avg":   league_avg_act,
         },
+        "trend": trend,
     })
 
 

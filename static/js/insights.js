@@ -917,6 +917,13 @@
     }
     document.getElementById("drawer-close")?.addEventListener("click", closeDrawer);
     document.getElementById("player-drawer-overlay")?.addEventListener("click", closeDrawer);
+    document.getElementById("drawer-full-analysis")?.addEventListener("click", () => {
+        if (!currentDrawerPlayerId) return;
+        closeDrawer();
+        document.dispatchEvent(new CustomEvent("playerSelected", {
+            detail: { playerId: currentDrawerPlayerId }
+        }));
+    });
   }
 
   // 드로어 열기 (외부에서 호출)

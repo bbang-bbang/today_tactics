@@ -623,10 +623,11 @@
         const grouped = { G: [], D: [], M: [], F: [], "?": [] };
         for (const s of d.starters) (grouped[s.position] || grouped["?"]).push(s);
         const renderRow = (s) => {
+            const pidAttr = s.player_id ? ` scorer-link" data-player-id="${s.player_id}` : ``;
             return `<div class="lu-player">
                 <span class="lu-pos" style="background:${POS_COLORS[s.position] || "#666"}33;color:${POS_COLORS[s.position] || "#aaa"}">${POS_LABEL[s.position] || "?"}</span>
                 <span class="lu-num">#${s.shirt_number || "-"}</span>
-                <span class="lu-name">${s.name}</span>
+                <span class="lu-name${pidAttr}">${s.name}</span>
                 ${s.rating ? `<span class="lu-rating">${s.rating}</span>` : ""}
             </div>`;
         };

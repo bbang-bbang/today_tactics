@@ -3067,3 +3067,38 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 팀 스타일 매치업 → 리그 대비 상위 능력(N/17위 배지)
 - 골 타이밍 전/후반 → 15분 구간 6버킷 히트맵
 - 시즌 시뮬 표시 경기수 → 라운드(R13/34 · 21R 남음)
+- 2026-05-28 22:41:30 | sleep 15 && tail -30 "C:\Users\BANGEU~1\AppData\Local\Temp\claude\C--Users-BangEunHo-OneDrive-------today-tatics\a691193d-e719-435c-880f-507cb726360e\tasks\bn29bc372.output" 2>&1
+- 2026-05-28 22:41:34 | tail -5 "C:\Users\BANGEU~1\AppData\Local\Temp\claude\C--Users-BangEunHo-OneDrive-------today-tatics\a691193d-e719-435c-880f-507cb726360e\tasks\bn29bc372.output" 2>&1
+- 2026-05-28 22:52:21 | tail -5 "C:\Users\BANGEU~1\AppData\Local\Temp\claude\C--Users-BangEunHo-OneDrive-------today-tatics\a691193d-e719-435c-880f-507cb726360e\tasks\bn29bc372.output" 2>&1
+- 2026-05-28 22:52:26 | tail -40 "C:\Users\BANGEU~1\AppData\Local\Temp\claude\C--Users-BangEunHo-OneDrive-------today-tatics\a691193d-e719-435c-880f-507cb726360e\tasks\bn29bc372.output" 2>&1
+- 2026-05-28 23:03:56 | tail -60 "C:\Users\BANGEU~1\AppData\Local\Temp\claude\C--Users-BangEunHo-OneDrive-------today-tatics\a691193d-e719-435c-880f-507cb726360e\tasks\bn29bc372.output" 2>&1
+
+## 2026-05-28 | 경기 데이터 증분 수집 (K1 R11 05-17, K2 R15 05-23~25)
+
+### 수집 전 현황
+- K1 마지막 완전 수집: 05-13 (R10)
+- K2 마지막 완전 수집: 05-10 (R14)
+- 미수집 확인: K1 05-17 6경기(TBD) + K2 05-17 4경기(TBD) + K2 05-23~25 7경기(TBD) = 약 17경기
+
+### 변경 내용
+- `update_data.py` 실행 (STEP 1~16 전원 OK, 총 1,660초)
+  - STEP 6 히트맵: 22경기 × 879건 수집
+  - STEP 14 avg_pos+shotmap: 22경기 완료
+  - STEP 15 formation 갱신: 194경기 처리
+  - STEP 16 K리그 포털 라인업: ok=8 신규
+  - STEP 17 (backfill_rounds): DB locked 실패 → 별도 재실행
+- `backfill_rounds.py` 단독 재실행
+  - K1: 30경기 업데이트 (R1~R15), 매칭 실패 1건
+  - K2: 48경기 업데이트 (R1~R15)
+  - 총 210개 이벤트 round 채움
+
+### 수집 후 현황
+- K1 R11 05-17 6경기: LU/MPS/HEAT/AVG/SHOT/ROUND 전부 OK
+- K2 R15 05-17~25 11경기: 전부 OK
+- 잔여 미처리: `15403876` (Suwon FC vs Chungnam Asan FC 05-17, TBD) — SofaScore 중복 더미 경기로 추정, 실경기는 `15404021`로 수집 완료
+- 2026-05-28 23:16:47 | ping -c 3 1.255.51.8 2>&1 || echo "ping failed"
+- 2026-05-28 23:16:53 | curl -sk --max-time 10 http://1.255.51.8/ -o /dev/null -w "HTTP %{http_code}\n" 2>&1 || echo "curl failed"
+- 2026-05-28 23:21:47 | ls -la /mnt/c/Users/BangEunHo/qkddmsgh.pem 2>&1 || ls -la ~/qkddmsgh.pem 2>&1
+- 2026-05-28 23:24:16 | find /c/Users/BangEunHo -name "*.pem" -o -name "id_rsa" -o -name "id_ed25519" 2>/dev/null | grep -v ".git"
+- 2026-05-29 00:25:59 | curl -s "http://localhost:5000/" -o /dev/null -w "%{http_code}" 2>&1
+- 2026-05-29 00:36:11 | tail -5 "C:\Users\BANGEU~1\AppData\Local\Temp\claude\C--Users-BangEunHo-OneDrive-------today-tatics\a691193d-e719-435c-880f-507cb726360e\tasks\bx20oba7w.output" 2>&1
