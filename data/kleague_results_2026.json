@@ -1299,6 +1299,13 @@
   ],
   "gimhae": [
     {
+      "date": "2026-05-23",
+      "home": false,
+      "opponent": "jeonnam",
+      "score": "0-1",
+      "result": "W"
+    },
+    {
       "date": "2026-05-17",
       "home": true,
       "opponent": "daegu",
@@ -1377,6 +1384,13 @@
     }
   ],
   "ansan": [
+    {
+      "date": "2026-05-24",
+      "home": false,
+      "opponent": "daegu",
+      "score": "3-0",
+      "result": "L"
+    },
     {
       "date": "2026-05-16",
       "home": true,
@@ -1464,6 +1478,13 @@
   ],
   "suwon": [
     {
+      "date": "2026-05-25",
+      "home": true,
+      "opponent": "cheonan",
+      "score": "3-2",
+      "result": "W"
+    },
+    {
       "date": "2026-05-09",
       "home": true,
       "opponent": "daegu",
@@ -1542,6 +1563,13 @@
     }
   ],
   "seouland": [
+    {
+      "date": "2026-05-24",
+      "home": true,
+      "opponent": "seongnam",
+      "score": "3-1",
+      "result": "W"
+    },
     {
       "date": "2026-05-16",
       "home": true,
@@ -1629,6 +1657,13 @@
   ],
   "yongin": [
     {
+      "date": "2026-05-24",
+      "home": true,
+      "opponent": "asan",
+      "score": "0-0",
+      "result": "D"
+    },
+    {
       "date": "2026-05-16",
       "home": false,
       "opponent": "seouland",
@@ -1707,6 +1742,13 @@
     }
   ],
   "cheonan": [
+    {
+      "date": "2026-05-25",
+      "home": false,
+      "opponent": "suwon",
+      "score": "3-2",
+      "result": "L"
+    },
     {
       "date": "2026-05-16",
       "home": true,
@@ -1787,6 +1829,13 @@
   ],
   "daegu": [
     {
+      "date": "2026-05-24",
+      "home": true,
+      "opponent": "ansan",
+      "score": "3-0",
+      "result": "W"
+    },
+    {
       "date": "2026-05-17",
       "home": false,
       "opponent": "gimhae",
@@ -1865,6 +1914,13 @@
     }
   ],
   "hwaseong": [
+    {
+      "date": "2026-05-23",
+      "home": false,
+      "opponent": "cheongju",
+      "score": "2-3",
+      "result": "W"
+    },
     {
       "date": "2026-05-17",
       "home": true,
@@ -1952,6 +2008,13 @@
   ],
   "cheongju": [
     {
+      "date": "2026-05-23",
+      "home": true,
+      "opponent": "hwaseong",
+      "score": "2-3",
+      "result": "L"
+    },
+    {
       "date": "2026-05-16",
       "home": false,
       "opponent": "jeonnam",
@@ -2038,6 +2101,13 @@
   ],
   "suwon_fc": [
     {
+      "date": "2026-05-23",
+      "home": false,
+      "opponent": "gyeongnam",
+      "score": "3-2",
+      "result": "L"
+    },
+    {
       "date": "2026-05-17",
       "home": false,
       "opponent": "asan",
@@ -2116,6 +2186,13 @@
     }
   ],
   "gyeongnam": [
+    {
+      "date": "2026-05-23",
+      "home": true,
+      "opponent": "suwon_fc",
+      "score": "3-2",
+      "result": "W"
+    },
     {
       "date": "2026-05-17",
       "home": false,
@@ -2196,6 +2273,13 @@
   ],
   "jeonnam": [
     {
+      "date": "2026-05-23",
+      "home": true,
+      "opponent": "gimhae",
+      "score": "0-1",
+      "result": "L"
+    },
+    {
       "date": "2026-05-16",
       "home": true,
       "opponent": "cheongju",
@@ -2275,6 +2359,13 @@
   ],
   "asan": [
     {
+      "date": "2026-05-24",
+      "home": false,
+      "opponent": "yongin",
+      "score": "0-0",
+      "result": "D"
+    },
+    {
       "date": "2026-05-17",
       "home": true,
       "opponent": "suwon_fc",
@@ -2353,6 +2444,13 @@
     }
   ],
   "paju": [
+    {
+      "date": "2026-05-25",
+      "home": true,
+      "opponent": "gimpo",
+      "score": "0-1",
+      "result": "L"
+    },
     {
       "date": "2026-05-16",
       "home": false,
@@ -2519,6 +2617,13 @@
   ],
   "seongnam": [
     {
+      "date": "2026-05-24",
+      "home": false,
+      "opponent": "seouland",
+      "score": "3-1",
+      "result": "L"
+    },
+    {
       "date": "2026-05-17",
       "home": true,
       "opponent": "gyeongnam",
@@ -2597,6 +2702,13 @@
     }
   ],
   "gimpo": [
+    {
+      "date": "2026-05-25",
+      "home": false,
+      "opponent": "paju",
+      "score": "0-1",
+      "result": "W"
+    },
     {
       "date": "2026-05-16",
       "home": false,
