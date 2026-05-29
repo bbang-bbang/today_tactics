@@ -3096,9 +3096,146 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - K1 R11 05-17 6경기: LU/MPS/HEAT/AVG/SHOT/ROUND 전부 OK
 - K2 R15 05-17~25 11경기: 전부 OK
 - 잔여 미처리: `15403876` (Suwon FC vs Chungnam Asan FC 05-17, TBD) — SofaScore 중복 더미 경기로 추정, 실경기는 `15404021`로 수집 완료
-- 2026-05-28 23:16:47 | ping -c 3 1.255.51.8 2>&1 || echo "ping failed"
-- 2026-05-28 23:16:53 | curl -sk --max-time 10 http://1.255.51.8/ -o /dev/null -w "HTTP %{http_code}\n" 2>&1 || echo "curl failed"
+- 2026-05-28 23:16:47 | ping -c 3 <GABIA_OLD_IP> 2>&1 || echo "ping failed"
+- 2026-05-28 23:16:53 | curl -sk --max-time 10 http://<GABIA_OLD_IP>/ -o /dev/null -w "HTTP %{http_code}\n" 2>&1 || echo "curl failed"
 - 2026-05-28 23:21:47 | ls -la /mnt/c/Users/BangEunHo/qkddmsgh.pem 2>&1 || ls -la ~/qkddmsgh.pem 2>&1
 - 2026-05-28 23:24:16 | find /c/Users/BangEunHo -name "*.pem" -o -name "id_rsa" -o -name "id_ed25519" 2>/dev/null | grep -v ".git"
 - 2026-05-29 00:25:59 | curl -s "http://localhost:5000/" -o /dev/null -w "%{http_code}" 2>&1
 - 2026-05-29 00:36:11 | tail -5 "C:\Users\BANGEU~1\AppData\Local\Temp\claude\C--Users-BangEunHo-OneDrive-------today-tatics\a691193d-e719-435c-880f-507cb726360e\tasks\bx20oba7w.output" 2>&1
+
+## 2026-05-29 | 선수 분석 경기별 트렌드 차트 + 진입점 확장
+
+### 변경 내용
+- `main.py` `/api/player-analytics` — `trend` 필드 추가 (경기별 시계열, year 포함)
+- `player_analytics.js` — 경기별 트렌드 차트 신규 (pa-trend-wrap 섹션)
+  - 포지션별 바: FW=G+A 스택(노랑/파랑), MF=키패스(초록), DF=수비액션(파랑), GK=세이브(보라)
+  - 평점 꺾은선 (포인트 색 = 승초록/무회/패빨강)
+  - 연도 경계 수직 점선 구분선 + X축 연도 레이블 ('YY M/D 형식)
+- 선수 분석 진입점 3곳으로 확장:
+  - 예측 패널 득점자 목록 (기존 유지)
+  - 예측 패널 예상 라인업 선수명 클릭 (lu-name.scorer-link 추가)
+  - 인사이트 드로어 상단 "전체 분석 →" 버튼 → playerSelected 이벤트
+- `style.css` — pa-trend-wrap, lu-name.scorer-link hover, drawer-full-btn 추가
+- 서버 mps.player_name NULL 51,063 → 0 재복구 (로컬 DB 덮어쓰기로 재발, fetch_player_names.py 서버 재실행)
+
+### 배포
+- commit `b00899e` → git push → CI 자동배포 완료
+- 서비스 active / health=200 확인
+
+## 2026-05-29 | 가비아 서버 DB 동기화 + SSH 설정 정비
+
+### 문제
+- SSH config의 서버 IP가 `<GABIA_OLD_IP>`(구 IP)로 되어 있어 연결 불가
+- 실제 운영 서버 IP: `<GABIA_IP>`, 키 파일: `./<PROD_KEY>`, 유저: `rocky`
+- Bash 환경에서 네트워크 불가 → PowerShell 경유 필요
+
+### 조치
+- `<PROD_KEY>` 키 파일 위치 확인 (`today_tatics/<PROD_KEY>`)
+- PowerShell로 SCP + SSH 연결 방식으로 전환
+- `players.db` SCP 전송 (K1 R11/K2 R15 신규 데이터 포함)
+- `sudo systemctl restart today_tactics` → active / health=200
+- 단, 로컬 DB 덮어쓰기로 서버의 mps.player_name NULL 51,063건 재발
+  → `fetch_player_names.py` 서버 백그라운드 재실행으로 복구 (68,981건)
+- 서버 접속 정보 메모리(`reference_gabia_server.md`)에 저장
+- 2026-05-29 09:41:48 | git log --oneline -10
+- 2026-05-29 09:41:53 | git log -1 --stat b00899e
+- 2026-05-29 09:41:57 | git status --short
+- 2026-05-29 09:42:37 | git diff --stat HEAD
+- 2026-05-29 09:43:02 | git diff checklist/history.md | head -80
+- 2026-05-29 09:43:02 | git diff data/kleague_results_2026.json | head -50
+- 2026-05-29 09:43:03 | git diff data/kleague_players_2026.json | head -30
+- 2026-05-29 09:44:48 | git diff --stat HEAD~10 HEAD -- static/ templates/ main.py | tail -30
+- 2026-05-29 09:46:53 | ls C:/Users/ehban/.claude/projects/C--Users-ehban-OneDrive-------today-tatics/memory/ | grep -iE "gabia|server|deploy"
+- 2026-05-29 09:46:55 | curl -s -o NUL -w "status=%{http_code} total=%{time_total}s connect=%{time_connect}s ttfb=%{time_starttransfer}s\n" https://today-tactics.co.kr/
+- 2026-05-29 09:48:12 | for url in "/api/teams" "/api/standings?league=K1" "/api/standings?league=K2" "/api/round-predictions?league=K1" "/api/insights/top-performers?league=K1" "/api/league-dashboard?league=K1" "/api/matches-by-date" "/api/next-round?league=K1" "/api/team-trend?team=suwon"; do /   printf "%-55s " "$url" /   curl -s -o NUL -w "ttfb=%{time_starttransfer}s total=%{time_total}s size=%{size_download}\n" "https://today-tactics.co.kr$url" / done
+- 2026-05-29 09:49:17 | for url in "/api/player-analytics?player_id=1046525" "/api/match-prediction?home=suwon&away=cheonan" "/api/team-analytics?team=suwon" "/api/team-top-players?team=suwon" "/api/team-compare?home=suwon&away=cheonan" "/api/match-extras?event_id=15372989" "/api/match-retrospective?event_id=15372989" "/api/predicted-lineup?event_id=15372989" "/api/player-stat-report?player_id=1046525" "/api/heatmap?player_id=1046525" "/api/standings?league=K1" "/api/next-round?league=K1"; do /   printf "%-65s " "$url" /   curl -s -o NUL -w "ttfb=%{time_starttransfer}s total=%{time_total}s size=%{size_download}\n" "https://today-tactics.co.kr$url" / done
+- 2026-05-29 09:49:25 | curl -sI -H "Accept-Encoding: gzip" https://today-tactics.co.kr/api/matches-by-date | grep -iE "content-encoding|content-length|cache-control" / echo "---" / curl -sI -H "Accept-Encoding: gzip" "https://today-tactics.co.kr/static/js/app.js" | grep -iE "content-encoding|content-length|cache-control" / echo "---" / curl -sI -H "Accept-Encoding: gzip" https://today-tactics.co.kr/ | grep -iE "content-encoding|content-length|cache-control"
+- 2026-05-29 09:55:43 | git diff --stat main.py
+- 2026-05-29 10:14:19 | git push origin main
+- 2026-05-29 10:14:34 | gh run list --limit 1 --json status,conclusion,name,createdAt 2>/dev/null || echo "gh unavailable"
+- 2026-05-29 10:15:24 | Start-Sleep -Seconds 90; curl -s -o NUL -w "deploy_check status=%{http_code} ttfb=%{time_starttransfer}s\n" https://today-tactics.co.kr/health
+- 2026-05-29 10:21:12 | for url in "/api/next-round?league=K2" "/api/next-round?league=K2" "/api/team-stats-by-year?teamId=suwon" "/api/team-stats?teamId=suwon" "/api/team-stats?teamId=suwon" "/api/insights/xg-efficiency?league=K1" "/api/insights/forward-goals?league=K1" "/api/insights/defender-score?league=K1" "/api/predicted-lineup?event_id=15372989" "/api/h2h?teamA=suwon&teamB=cheonan"; do /   printf "%-60s " "$url" /   curl -s -o NUL -w "ttfb=%{time_starttransfer}s size=%{size_download}\n" "https://today-tactics.co.kr$url" / done
+- 2026-05-29 10:44:02 | curl -s "http://127.0.0.1:5000/api/predicted-lineup-pair?home_slug=suwon&away_slug=cheonan" | python -c " / import sys, json / d = json.load(sys.stdin) / print('ready:', d.get('ready')) / print('source:', d.get('source')) / print('based_on_home:', d.get('based_on_home')) / print('based_on_away:', d.get('based_on_away')) / for side in ('home', 'away'): /     s = d.get(side, {}) /     print(f'-- {side} --') /     print('  slug:', s.get('slug'), '/ short:', s.get('short'), '/ formation:', s.get('formation')) /     print('  slots:', len(s.get('slots', [])), '/ starters:', len(s.get('starters', [])), '/ subs:', len(s.get('subs', []))) /     if s.get('starters'): /         st = s['starters'][0] /         print('  starter[0]:', {k: st.get(k) for k in ('player_id','name','shirt_number','position','slot_order')}) /     if s.get('slots'): /         print('  slot[0]:', s['slots'][0]) /         print('  slot[10]:', s['slots'][10] if len(s['slots']) > 10 else '?') / "
+- 2026-05-29 10:44:05 | curl -s -o NUL -w "pair ttfb=%{time_starttransfer}s size=%{size_download}\n" "http://127.0.0.1:5000/api/predicted-lineup-pair?home_slug=suwon&away_slug=cheonan" / curl -s -o NUL -w "pair ttfb=%{time_starttransfer}s size=%{size_download}\n" "http://127.0.0.1:5000/api/predicted-lineup-pair?home_slug=suwon&away_slug=cheonan" / echo "--- validation cases ---" / curl -s "http://127.0.0.1:5000/api/predicted-lineup-pair?home_slug=&away_slug=cheonan" -w " status=%{http_code}\n" / curl -s "http://127.0.0.1:5000/api/predicted-lineup-pair?home_slug=suwon&away_slug=suwon" -w " status=%{http_code}\n"
+- 2026-05-29 10:47:15 | git status --short && echo "---" && git diff --stat main.py static/js/prediction.js static/css/style.css
+- 2026-05-29 10:48:20 | git push origin main
+- 2026-05-29 10:49:37 | until curl -fsS -o /dev/null "https://today-tactics.co.kr/api/predicted-lineup-pair?home_slug=suwon&away_slug=cheonan" 2>/dev/null; do /   echo "waiting CI deploy..." /   sleep 15 / done / echo "DEPLOY READY" / echo "--- response check ---" / curl -s "https://today-tactics.co.kr/api/predicted-lineup-pair?home_slug=suwon&away_slug=cheonan" | python -c " / import sys, json / d = json.load(sys.stdin) / print('ready:', d.get('ready'), '| source:', d.get('source')) / for side in ('home', 'away'): /   s = d.get(side, {}) /   print(f'  {side}: slug={s.get(\"slug\")} formation={s.get(\"formation\")} slots={len(s.get(\"slots\",[]))} starters={len(s.get(\"starters\",[]))}') / " 2>&1 / echo "--- timing (3 runs) ---" / for i in 1 2 3; do /   curl -s -o NUL -w "run$i ttfb=%{time_starttransfer}s size=%{size_download}\n" "https://today-tactics.co.kr/api/predicted-lineup-pair?home_slug=suwon&away_slug=cheonan" / done
+
+## 2026-05-29 | 무거운 read-only API 32개 인메모리 캐싱 + 워밍업 보강 (commit `f2b40bd`)
+
+### 측정 (운영 today-tactics.co.kr, before)
+| 라우트 | TTFB |
+|---|---|
+| /api/next-round?league=K1 | **1.7s** ← 가장 큰 병목 |
+| /api/matches-by-date | 330ms (858KB) |
+| /api/standings?league=K1 | 318ms |
+| /api/league-dashboard | 247ms |
+| /api/insights/top-performers | 223ms |
+| /api/team-trend | 441ms |
+| /api/player-stat-report | 513ms |
+
+진단: 무거운 read-only 라우트 대부분이 매 호출 SQL 실행. `@cached_response`가 7개만 적용되어 있었음. nginx gzip + 정적 immutable 캐시는 이미 적용됨.
+
+### 변경
+- `cached_response` 데코레이터 강화: LRU cap 4096(키 폭발 방지) + 4xx/5xx 응답 미캐시
+- 32개 read-only 라우트에 `@cached_response` 추가 (1800s/3600s/600s 차등 TTL)
+  - 1800s: standings, next-round, team-ranking, team-top-players, match-prediction, player-matches, player-analytics, league-dashboard, goal-timing, predicted-lineup, insights/* 7개
+  - 3600s: results, h2h, h2h-matches, team-stats(-by-year), team-analytics, team-compare, team-trend, heatmap, player-stat-report, player-vs-teams, match-lineup, match-extras, match-retrospective, team-goal-timing
+  - 600s: matches-by-date, matches-latest-lineup-date
+- `_warm_cache` URL 7→23개 — 첫 화면 진입 위젯(standings, next-round, league-dashboard, matches-by-date, insights) 미리 데움
+- 캐시 stale 방지: `update_data.py` 종료 hook이 기존대로 자동 invalidate
+- P7 보안: 세션/CRUD(auth, saves, squads, player-status, trigger-update, cache-invalidate)는 캐싱 미적용 — 사용자별 교차노출 차단
+
+### 결과 (운영 재측정)
+| 라우트 | Before | After | 배율 |
+|---|---|---|---|
+| /api/next-round K1 | 1.7s | 50ms | **34×** |
+| /api/next-round K2 | 1.6s | 75ms | **21×** |
+| /api/standings K1 | 318ms | 50ms | **6.4×** |
+| /api/league-dashboard | 247ms | 66ms | 3.7× |
+| /api/insights/top-performers | 223ms | 62ms | 3.6× |
+| /api/matches-by-date (858KB) | 330ms | 106ms | 3.1× |
+| /api/match-retrospective | 145ms | 49ms | 3× |
+
+모든 라우트가 50~100ms 영역으로 수렴.
+
+## 2026-05-29 | 예측 패널 → 전술판 자동 브릿지 (commit `702c284`)
+
+### 배경
+앱 정체성인 전술판이 최근 30 commit 정체. 데이터·예측·인사이트는 비대해지는데 "예측 라인업 → 전술판"의 연결고리 없음. 사용자가 수동으로 다시 팀·포메이션·선수 배치해야 했음.
+
+### 백엔드
+- `_compute_predicted_lineup_data(slug)` 헬퍼 추출 — 기존 `/api/predicted-lineup`이 함수 호출만 하도록 분리
+- `_build_predicted_side_for_tactic(d, is_home)` — predicted-lineup dict를 match-lineup 응답 한 쪽 형식으로 변환
+  - `_build_formation_slots(formation, mirror=not is_home)`로 좌표(홈=좌→우, 원정=우→좌) 적용
+  - starter `slot_order`는 라인별(G→D→M→F) 단순 매핑 — 예측이라 ground-truth 좌우 정렬 없음 (사용자 드래그로 보정)
+- `/api/predicted-lineup-pair` 신규 라우트:
+  - 입력: `?home_slug=X&away_slug=Y`
+  - 응답 스키마: match-lineup과 100% 정합 (home/away.slug/short/formation/slots[]/starters[]/subs[])
+  - 입력 검증: 빈 slug → 400, 동일 팀 → 400 (P7)
+  - 캐싱 1800s
+
+### 프론트
+- `prediction.js`: 예상 라인업 카드 아래 **"⚙ 이 라인업으로 전술판 열기"** CTA 버튼 추가 (양 팀 모두 ready일 때만 노출)
+- `openTacticWithPredictedLineup(btn)`: pair fetch → `matchLineupLoaded` 커스텀 이벤트 디스패치 → app.js의 `applyMatchLineup`이 양 팀 포메이션·선수 슬롯 자동 배치 → 전술판으로 smooth scroll
+- `_pairCache`로 세션 내 재호출 방지
+- 클릭 위임 핸들러를 선수(`scorer-link`) + CTA 분기로 통합
+
+### UI 슈퍼파워 (P6 7원칙)
+- 블루-퍼플-핑크 그라데이션 (200% bg-size → hover 시 슬라이드)
+- 5가지 상태: idle / hover(상승+그림자) / active(pressed) / focus-visible(outline ring) / loading(spin) / success(green 페이드) / error(shake)
+- aria-label, focus-visible outline (P7 접근성)
+- 700px 이하: hint 텍스트 숨김 + padding 축소 (반응형)
+
+### 검증
+- 로컬 응답 스키마 match-lineup과 100% 일치 확인
+- 좌표 mirror OK (home GK x=0.05 / away GK x=0.95)
+- 포메이션 자동 감지: 수원 4-4-2, 천안 3-4-3
+- 로컬 첫 호출 16ms / 캐시 hit 18ms
+- 운영 응답 52~68ms, 입력 검증 400 정상
+
+### 7인 관점
+- P1(감독) 예측→전술 설계 즉시 / P2(팬) 매치→예측→전술판 자연 흐름 /
+  P3(선수) GK/D/M/F 정확 배치 / P4(분석가) 단순 매핑 한계는 사용자 드래그 보정 /
+  P5(코치) 협업 도구 즉시 / P6(UI) 7원칙 적용 / P7(보안) 입력검증·캐싱·세션 의존성 0
+  → 전원 PASS
