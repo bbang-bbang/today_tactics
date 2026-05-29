@@ -4307,6 +4307,96 @@ body {
     text-align: right;
 }
 
+/* ── 예측 → 전술판 진입 CTA 버튼 (P6 UI 슈퍼파워) ────────── */
+.pred-lineup-cta {
+    display: flex;
+    justify-content: center;
+    margin: 4px 0 8px;
+}
+.pred-cta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 22px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #fff;
+    background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 55%, #ec4899 100%);
+    background-size: 200% 100%;
+    background-position: 0% 50%;
+    border: 0;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35), inset 0 1px 0 rgba(255,255,255,0.18);
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out,
+                filter 0.2s, background-position 0.4s ease-out;
+}
+.pred-cta-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5), inset 0 1px 0 rgba(255,255,255,0.22);
+    filter: brightness(1.08);
+    background-position: 100% 50%;
+}
+.pred-cta-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+.pred-cta-btn:focus-visible {
+    outline: 3px solid rgba(167, 198, 255, 0.85);
+    outline-offset: 2px;
+}
+.pred-cta-btn:disabled {
+    opacity: 0.6;
+    cursor: progress;
+    transform: none;
+    filter: none;
+}
+.pred-cta-btn.loading .pred-cta-icon {
+    animation: pred-cta-spin 0.9s linear infinite;
+}
+.pred-cta-btn.success {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.45);
+}
+.pred-cta-btn.error {
+    background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.45);
+    animation: pred-cta-shake 0.45s ease-out;
+}
+.pred-cta-icon {
+    display: inline-block;
+    font-size: 1.05rem;
+    line-height: 1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+.pred-cta-text {
+    white-space: nowrap;
+}
+.pred-cta-hint {
+    font-size: 0.68rem;
+    font-weight: 500;
+    opacity: 0.85;
+    padding-left: 10px;
+    margin-left: 2px;
+    border-left: 1px solid rgba(255, 255, 255, 0.35);
+    white-space: nowrap;
+}
+@keyframes pred-cta-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+@keyframes pred-cta-shake {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-4px); }
+    75%      { transform: translateX(4px); }
+}
+@media (max-width: 700px) {
+    .pred-cta-btn { padding: 10px 16px; font-size: 0.8rem; gap: 8px; }
+    .pred-cta-hint { display: none; }
+}
+
 /* 휴식일 + 심판 정보 카드 */
 /* 스타일 + 카드 2-col 그리드 */
 .pred-style-cards-grid {

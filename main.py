@@ -5905,17 +5905,15 @@ def prediction_backtest():
     return jsonify(result)
 
 
-@app.route("/api/predicted-lineup")
-@cached_response(ttl=1800)
-def get_predicted_lineup():
+def _compute_predicted_lineup_data(team_slug):
+    """팀 예상 출전 라인업 계산 (가장 최근 완료 경기 + 출전시간 TOP11).
+    /api/predicted-lineup 단건 라우트와 /api/predicted-lineup-pair 통합 라우트가 공유.
+    return: {ready, team, team_id, league, based_on_event, based_on_date, formation, starters[]}
+            또는 {ready: False, reason}
     """
-    팀 예상 출전 라인업 (가장 최근 완료 경기 + 출전시간 TOP11 기반).
-    팀 예상 출전 라인업 (가장 최근 완료 경기 + 출전시간 TOP11 기반).
-    """
-    team_id = request.args.get("teamId", "")
-    team_info = next((t for t in TEAMS if t["id"] == team_id), None)
+    team_info = next((t for t in TEAMS if t["id"] == team_slug), None)
     if not team_info:
-        return jsonify({"ready": False, "reason": "unknown_team"}), 404
+        return {"ready": False, "reason": "unknown_team"}
     ss_id  = team_info["sofascore_id"]
     league = team_info.get("league", "K2")
     tid    = 410 if league == "K1" else 777
@@ -5935,7 +5933,7 @@ def get_predicted_lineup():
     recent_events = cur.fetchall()
     if not recent_events:
         conn.close()
-        return jsonify({"ready": False, "reason": "no_recent_match"})
+        return {"ready": False, "reason": "no_recent_match"}
 
     last_eid = last_ts = None
     rows = []
@@ -5959,7 +5957,7 @@ def get_predicted_lineup():
 
     if not rows or len(rows) < 11:
         conn.close()
-        return jsonify({"ready": False, "reason": "insufficient_lineup_data"})
+        return {"ready": False, "reason": "insufficient_lineup_data"}
 
     starters = []
     pos_counts = {"G": 0, "D": 0, "M": 0, "F": 0}
@@ -5983,15 +5981,129 @@ def get_predicted_lineup():
         formation = None
 
     conn.close()
-    return jsonify({
+    return {
         "ready":          True,
         "team":           team_info["name"],
-        "team_id":        team_id,
+        "team_id":        team_slug,
         "league":         league,
         "based_on_event": last_eid,
         "based_on_date":  datetime.fromtimestamp(last_ts).strftime("%Y-%m-%d"),
         "formation":      formation,
         "starters":       starters,
+    }
+
+
+@app.route("/api/predicted-lineup")
+@cached_response(ttl=1800)
+def get_predicted_lineup():
+    """팀 예상 출전 라인업 (가장 최근 완료 경기 + 출전시간 TOP11 기반)."""
+    team_id = request.args.get("teamId", "")
+    result = _compute_predicted_lineup_data(team_id)
+    if not result.get("ready") and result.get("reason") == "unknown_team":
+        return jsonify(result), 404
+    return jsonify(result)
+
+
+def _build_predicted_side_for_tactic(d, is_home):
+    """predicted-lineup dict → match-lineup 응답 한 쪽 형식 변환.
+    is_home으로 mirror(home=좌→우, away=우→좌) 결정.
+
+    slot_order는 라인별(G→D→M→F) 단순 매핑. starters position(G/D/M/F)만으로
+    formation 분포(rows)에 순차 배치. K리그 ground-truth가 없는 예측이라
+    정교한 좌우 정렬은 생략(전술판 진입 후 사용자가 드래그로 조정).
+    """
+    slug = d["team_id"]
+    team_info = next((t for t in TEAMS if t["id"] == slug), {}) or {}
+    formation = d.get("formation") or "4-4-2"
+    slots = _build_formation_slots(formation, mirror=(not is_home))
+
+    by_line = {"G": [], "D": [], "M": [], "F": []}
+    for st in (d.get("starters") or []):
+        pos = st.get("position") or "?"
+        if pos in by_line:
+            by_line[pos].append(st)
+
+    try:
+        rows = [int(x) for x in formation.split("-")]
+        nD = rows[0]
+        nF = rows[-1]
+        nM = sum(rows[1:-1]) if len(rows) >= 3 else 0
+    except (ValueError, IndexError):
+        nD, nM, nF = 4, 4, 2  # fallback
+
+    def _wrap(st_in, label, slot_idx):
+        return {
+            "player_id":    st_in.get("player_id"),
+            "name":         st_in.get("name", "") or "",
+            "name_raw":     st_in.get("name", "") or "",
+            "shirt_number": st_in.get("shirt_number"),
+            "position":     label,
+            "height":       None,
+            "slot_order":   slot_idx,
+        }
+
+    starters_out = []
+    idx = 0
+    if by_line["G"]:
+        starters_out.append(_wrap(by_line["G"][0], "G", 0))
+    idx = 1
+    for st_in in by_line["D"][:nD]:
+        starters_out.append(_wrap(st_in, "D", idx)); idx += 1
+    for st_in in by_line["M"][:nM]:
+        starters_out.append(_wrap(st_in, "M", idx)); idx += 1
+    for st_in in by_line["F"][:nF]:
+        starters_out.append(_wrap(st_in, "F", idx)); idx += 1
+
+    return {
+        "team_id":    team_info.get("sofascore_id"),
+        "slug":       slug,
+        "name":       team_info.get("name") or d.get("team", ""),
+        "short":      team_info.get("short") or (d.get("team", "") or ""),
+        "emblem":     team_info.get("emblem"),
+        "formation":  formation,
+        "slots":      slots,
+        "starters":   starters_out,
+        "subs":       [],
+    }
+
+
+@app.route("/api/predicted-lineup-pair")
+@cached_response(ttl=1800)
+def predicted_lineup_pair():
+    """홈/원정 두 팀 예상 라인업을 match-lineup 응답 형식으로 통합 반환.
+    예측 패널 → 전술판 자동 적용 진입점 (matchLineupLoaded 이벤트와 동일 스키마).
+    """
+    home_slug = request.args.get("home_slug", "").strip()
+    away_slug = request.args.get("away_slug", "").strip()
+    if not home_slug or not away_slug:
+        return jsonify({"error": "home_slug and away_slug required"}), 400
+    if home_slug == away_slug:
+        return jsonify({"error": "home and away must differ"}), 400
+
+    home_pred = _compute_predicted_lineup_data(home_slug)
+    away_pred = _compute_predicted_lineup_data(away_slug)
+
+    if not home_pred.get("ready") or not away_pred.get("ready"):
+        return jsonify({
+            "ready":       False,
+            "reason":      "predicted_lineup_unavailable",
+            "home_ready":  bool(home_pred.get("ready")),
+            "away_ready":  bool(away_pred.get("ready")),
+            "home_reason": home_pred.get("reason"),
+            "away_reason": away_pred.get("reason"),
+        })
+
+    home_side = _build_predicted_side_for_tactic(home_pred, is_home=True)
+    away_side = _build_predicted_side_for_tactic(away_pred, is_home=False)
+
+    return jsonify({
+        "ready":         True,
+        "source":        "predicted",
+        "based_on_home": home_pred.get("based_on_date"),
+        "based_on_away": away_pred.get("based_on_date"),
+        "date":          "예상 라인업",  # showToast 표시용 라벨
+        "home":          home_side,
+        "away":          away_side,
     })
 
 

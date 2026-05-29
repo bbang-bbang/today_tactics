@@ -1163,19 +1163,79 @@
             <div class="pred-extras-row pred-lineup-row">
                 ${lineupCardHtml(hLineup, home.name, "pred-lineup-home")}
                 ${lineupCardHtml(aLineup, away.name, "pred-lineup-away")}
+            </div>
+            ${(hLineup && hLineup.ready && aLineup && aLineup.ready) ? `
+            <div class="pred-lineup-cta">
+                <button type="button" class="pred-cta-btn" data-home="${homeId}" data-away="${awayId}"
+                    aria-label="${home.name}과 ${away.name}의 예상 라인업을 상단 전술판에 자동 배치합니다">
+                    <span class="pred-cta-icon" aria-hidden="true">⚙</span>
+                    <span class="pred-cta-text">이 라인업으로 전술판 열기</span>
+                    <span class="pred-cta-hint">상단 전술판에 양 팀 자동 배치</span>
+                </button>
             </div>` : ""}
+            ` : ""}
         </div>`;
 
-        // 선수 클릭 → 모달
+        // 이벤트 위임: 선수 클릭(scorer-link) + 전술판 진입 버튼(pred-cta-btn)
         report.addEventListener("click", (e) => {
-            const el = e.target.closest(".scorer-link");
-            if (!el) return;
-            const pid = parseInt(el.dataset.playerId);
-            if (!pid) return;
-            document.dispatchEvent(new CustomEvent("playerSelected", {
-                detail: { playerId: pid, playerName: el.textContent.trim() }
-            }));
+            const playerEl = e.target.closest(".scorer-link");
+            if (playerEl) {
+                const pid = parseInt(playerEl.dataset.playerId);
+                if (!pid) return;
+                document.dispatchEvent(new CustomEvent("playerSelected", {
+                    detail: { playerId: pid, playerName: playerEl.textContent.trim() }
+                }));
+                return;
+            }
+            const ctaEl = e.target.closest(".pred-cta-btn");
+            if (ctaEl) {
+                openTacticWithPredictedLineup(ctaEl);
+                return;
+            }
         });
+    }
+
+    // ── 예측 → 전술판 브릿지 ──────────────────────────────
+    // /api/predicted-lineup-pair 응답을 matchLineupLoaded 이벤트로 디스패치 →
+    // app.js의 applyMatchLineup이 양 팀 포메이션·선수를 자동 배치한다.
+    const _pairCache = {};  // "home|away" → match-lineup 스키마 data
+
+    function openTacticWithPredictedLineup(btn) {
+        const home = btn.dataset.home;
+        const away = btn.dataset.away;
+        if (!home || !away) return;
+        const key = `${home}|${away}`;
+
+        const setState = (cls) => {
+            btn.classList.remove("loading", "success", "error");
+            if (cls) btn.classList.add(cls);
+        };
+        const finish = (state) => {
+            btn.disabled = false;
+            setState(state);
+            if (state === "success") setTimeout(() => setState(null), 1400);
+        };
+
+        const apply = (data) => {
+            if (!data || !data.ready) {
+                console.warn("[pred-cta] pair lineup not ready", data);
+                finish("error");
+                return;
+            }
+            document.dispatchEvent(new CustomEvent("matchLineupLoaded", { detail: data }));
+            const board = document.querySelector(".canvas-wrap, #field, .field-wrap") || document.body;
+            try { board.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+            finish("success");
+        };
+
+        btn.disabled = true;
+        setState("loading");
+
+        if (_pairCache[key]) { apply(_pairCache[key]); return; }
+        fetch(`/api/predicted-lineup-pair?home_slug=${encodeURIComponent(home)}&away_slug=${encodeURIComponent(away)}`)
+            .then(r => r.json())
+            .then(data => { _pairCache[key] = data; apply(data); })
+            .catch(err => { console.error("[pred-cta] fetch 실패", err); finish("error"); });
     }
 
     function formBadges(form) {
