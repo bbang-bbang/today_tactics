@@ -2955,6 +2955,175 @@ KLEAGUE_CODE_MAP = {
 }
 TEAMS_BY_ID = {t["id"]: t for t in TEAMS}
 
+
+# ── 세트피스 효율 API (shotmap 기반 — 코너킥/프리킥/PK 분리) ──────────
+def _setpiece_team_season(cur, ss_id, tournament_id, year):
+    """팀의 시즌 세트피스 효율 (situation 분리). 매치 진행 여부 무관 누적.
+    xG는 shotmap에 백필된 리그(K2)만 표시. 미백필 리그(K1 2026)는 None.
+    """
+    cur.execute("""
+        SELECT s.situation,
+               COUNT(*) shots,
+               SUM(CASE WHEN s.outcome='goal' THEN 1 ELSE 0 END) goals,
+               SUM(CASE WHEN s.xg IS NOT NULL THEN s.xg ELSE 0 END) xg_sum,
+               SUM(CASE WHEN s.xg IS NOT NULL THEN 1 ELSE 0 END) xg_known
+        FROM match_shotmap s
+        JOIN events e ON s.event_id = e.id
+        WHERE e.tournament_id = ?
+          AND ((s.is_home=1 AND e.home_team_id=?) OR (s.is_home=0 AND e.away_team_id=?))
+          AND s.situation IN ('corner','free-kick','penalty')
+          AND strftime('%Y', datetime(e.date_ts, 'unixepoch', 'localtime')) = ?
+        GROUP BY s.situation
+    """, (tournament_id, ss_id, ss_id, year))
+    out = {}
+    for sit, shots, goals, xg_sum, xg_known in cur.fetchall():
+        shots = shots or 0
+        goals = goals or 0
+        xg_sum = float(xg_sum or 0.0)
+        has_xg = (xg_known or 0) > 0
+        out[sit] = {
+            "shots":          shots,
+            "goals":          goals,
+            "xg":             round(xg_sum, 2) if has_xg else None,
+            "conversion_pct": round(goals / shots * 100, 1) if shots else None,
+            "xg_per_shot":    round(xg_sum / shots, 3) if (has_xg and shots) else None,
+            "xg_diff":        round(goals - xg_sum, 2) if has_xg else None,
+        }
+    for k in ("corner", "free-kick", "penalty"):
+        if k not in out:
+            out[k] = {"shots": 0, "goals": 0, "xg": None,
+                      "conversion_pct": None, "xg_per_shot": None, "xg_diff": None}
+    return out
+
+
+def _setpiece_league_avg(cur, tournament_id, year):
+    """리그 per-team 평균 세트피스 통계 (시즌 누적)."""
+    cur.execute("""
+        SELECT t.situation,
+               AVG(t.shots) avg_shots,
+               AVG(t.goals) avg_goals,
+               AVG(t.xg)    avg_xg
+        FROM (
+            SELECT s.situation,
+                   CASE WHEN s.is_home=1 THEN e.home_team_id ELSE e.away_team_id END team_id,
+                   COUNT(*) shots,
+                   SUM(CASE WHEN s.outcome='goal' THEN 1 ELSE 0 END) goals,
+                   SUM(s.xg) xg
+            FROM match_shotmap s
+            JOIN events e ON s.event_id = e.id
+            WHERE e.tournament_id = ?
+              AND s.situation IN ('corner','free-kick','penalty')
+              AND strftime('%Y', datetime(e.date_ts, 'unixepoch', 'localtime')) = ?
+            GROUP BY s.situation, team_id
+        ) t
+        GROUP BY t.situation
+    """, (tournament_id, year))
+    out = {}
+    for sit, ashots, agoals, axg in cur.fetchall():
+        ashots = float(ashots or 0); agoals = float(agoals or 0); axg = float(axg or 0)
+        out[sit] = {
+            "avg_shots":          round(ashots, 1),
+            "avg_goals":          round(agoals, 2),
+            "avg_xg":             round(axg, 2),
+            "avg_conversion_pct": round(agoals / ashots * 100, 1) if ashots else None,
+        }
+    for k in ("corner", "free-kick", "penalty"):
+        if k not in out:
+            out[k] = {"avg_shots": 0, "avg_goals": 0, "avg_xg": 0, "avg_conversion_pct": None}
+    return out
+
+
+def _setpiece_total(by_type):
+    shots = sum(v["shots"] for v in by_type.values())
+    goals = sum(v["goals"] for v in by_type.values())
+    xg_vals = [v["xg"] for v in by_type.values() if v["xg"] is not None]
+    has_xg = bool(xg_vals)
+    xg_sum = round(sum(xg_vals), 2) if has_xg else None
+    return {
+        "shots":          shots,
+        "goals":          goals,
+        "xg":             xg_sum,
+        "conversion_pct": round(goals / shots * 100, 1) if shots else None,
+        "xg_diff":        round(goals - xg_sum, 2) if has_xg else None,
+    }
+
+
+def _setpiece_total_avg(by_type):
+    ashots = sum(v["avg_shots"] for v in by_type.values())
+    agoals = sum(v["avg_goals"] for v in by_type.values())
+    axg    = round(sum(v["avg_xg"] for v in by_type.values()), 2)
+    return {
+        "avg_shots":          round(ashots, 1),
+        "avg_goals":          round(agoals, 2),
+        "avg_xg":             axg,
+        "avg_conversion_pct": round(agoals / ashots * 100, 1) if ashots else None,
+    }
+
+
+@app.route("/api/setpiece-efficiency")
+@cached_response(ttl=3600)
+def setpiece_efficiency():
+    """매치 양 팀의 시즌 세트피스 효율(코너킥/프리킥/PK 분리) + 리그 per-team 평균.
+
+    shotmap 기반: situation IN (corner, free-kick, penalty). 매치 진행 여부 무관
+    누적이라 예정 매치에도 작동. 리그는 home 팀 기준 (혼합 리그면 home 리그).
+    """
+    home_slug = request.args.get("home_slug", "").strip()
+    away_slug = request.args.get("away_slug", "").strip()
+    year      = request.args.get("year", "2026").strip()
+    if not home_slug or not away_slug:
+        return jsonify({"error": "home_slug and away_slug required"}), 400
+
+    home_info = next((t for t in TEAMS if t["id"] == home_slug), None)
+    away_info = next((t for t in TEAMS if t["id"] == away_slug), None)
+    if not home_info or not away_info:
+        return jsonify({"ready": False, "reason": "unknown_team"})
+
+    league = home_info.get("league", "K2")
+    tid    = 410 if league == "K1" else 777
+
+    conn = sqlite3.connect(DB_PATH)
+    cur  = conn.cursor()
+    try:
+        home_sp    = _setpiece_team_season(cur, home_info["sofascore_id"], tid, year)
+        away_sp    = _setpiece_team_season(cur, away_info["sofascore_id"], tid, year)
+        league_avg = _setpiece_league_avg(cur, tid, year)
+    finally:
+        conn.close()
+
+    # 양 팀 모두 데이터 없으면 not-ready (시즌 초반 또는 K3 등)
+    home_total_shots = sum(v["shots"] for v in home_sp.values())
+    away_total_shots = sum(v["shots"] for v in away_sp.values())
+    if home_total_shots == 0 and away_total_shots == 0:
+        return jsonify({"ready": False, "reason": "no_setpiece_data", "year": year, "league": league})
+
+    return jsonify({
+        "ready":   True,
+        "year":    year,
+        "league":  league,
+        "home": {
+            "slug":    home_slug,
+            "name":    home_info["name"],
+            "short":   home_info["short"],
+            "primary": home_info.get("primary"),
+            "by_type": home_sp,
+            "total":   _setpiece_total(home_sp),
+        },
+        "away": {
+            "slug":    away_slug,
+            "name":    away_info["name"],
+            "short":   away_info["short"],
+            "primary": away_info.get("primary"),
+            "by_type": away_sp,
+            "total":   _setpiece_total(away_sp),
+        },
+        "league_avg": {
+            "by_type": league_avg,
+            "total":   _setpiece_total_avg(league_avg),
+        },
+    })
+
+
 @app.route("/api/standings")
 @cached_response(ttl=1800)
 def get_standings():

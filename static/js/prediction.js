@@ -422,6 +422,7 @@
     const _lineupCache = {};  // "teamId"             → predicted-lineup data
     const _extrasCache = {};  // "date|homeId|awayId" → match-extras data
     const _retroCache  = {};  // "date|homeId|awayId" → match-retrospective data
+    const _speCache    = {};  // "homeId|awayId"      → setpiece-efficiency data
 
     function _cachedFetch(cache, key, fetchFn) {
         if (key in cache) return Promise.resolve(cache[key]);
@@ -572,6 +573,9 @@
                 fetch(`/api/match-retrospective?date=${encodeURIComponent(gameDate)}&home_slug=${encodeURIComponent(homeId)}&away_slug=${encodeURIComponent(awayId)}`)
                     .then(r => r.ok ? r.json() : null).catch(() => null))
             : Promise.resolve(null);
+        const speFetch = _cachedFetch(_speCache, `${homeId}|${awayId}`, () =>
+            fetch(`/api/setpiece-efficiency?home_slug=${encodeURIComponent(homeId)}&away_slug=${encodeURIComponent(awayId)}`)
+                .then(r => r.json()).catch(() => null));
         Promise.all([
             _cachedFetch(_predCache, `${homeId}|${awayId}`, () =>
                 fetch(`/api/match-prediction?homeTeam=${homeId}&awayTeam=${awayId}`)
@@ -584,8 +588,9 @@
                 fetch(`/api/predicted-lineup?teamId=${awayId}`).then(r => r.json()).catch(() => null)),
             extrasFetch,
             retroFetch,
+            speFetch,
         ])
-            .then(([data, bt, hLineup, aLineup, extras, retro]) => {
+            .then(([data, bt, hLineup, aLineup, extras, retro, spe]) => {
                 if (homeId !== _lastHome || awayId !== _lastAway) return;
                 if (!data || !data.home || !data.away) {
                     console.error("[예측] data 누락:", data);
@@ -606,6 +611,10 @@
                 if (extras && extras.ready) {
                     try { renderTacticsCard(extras, homeId, awayId); }
                     catch (err) { console.error("[전술보기 렌더 실패]", err); }
+                }
+                if (spe && spe.ready) {
+                    try { renderSetpieceEffCard(spe); }
+                    catch (err) { console.error("[세트피스 효율 렌더 실패]", err); }
                 }
             })
             .catch(err => {
@@ -1571,6 +1580,115 @@
                 redraw();
             });
         });
+    }
+
+    // ── 세트피스 효율 카드 (코너킥/프리킥/PK 분리 + 리그 평균) ──────
+    function renderSetpieceEffCard(spe) {
+        const wrap = report.querySelector(".pred-extras");
+        if (!wrap) return;
+        const old = wrap.querySelector(".pred-setpiece-eff");
+        if (old) old.remove();
+
+        const TYPES = [
+            { key: "corner",    icon: "⛳", label: "코너킥",     desc: "Corner Kick" },
+            { key: "free-kick", icon: "🎯", label: "프리킥 슛",   desc: "Direct Free-kick" },
+            { key: "penalty",   icon: "🥅", label: "페널티킥",   desc: "Penalty Kick" },
+        ];
+
+        const home = spe.home, away = spe.away, avg = spe.league_avg;
+        const homeColor = home.primary || "#4ea4f8";
+        const awayColor = away.primary || "#b87ef8";
+
+        // 한 행 (한 종류) 시각화 — 양 팀 시도 막대 + 리그 평균선 + xG 효율 라벨
+        const rowHtml = (t) => {
+            const h = home.by_type[t.key], a = away.by_type[t.key];
+            const la = avg.by_type[t.key];
+            const maxShots = Math.max(h.shots, a.shots, la.avg_shots || 0, 1);
+            const hBarW = (h.shots / maxShots) * 100;
+            const aBarW = (a.shots / maxShots) * 100;
+            const lineL = (la.avg_shots / maxShots) * 100;
+
+            const xgClass = (diff) => diff > 0.5 ? "spe-xg-up" : diff < -0.5 ? "spe-xg-down" : "spe-xg-flat";
+            const xgSign  = (diff) => diff > 0 ? "+" : "";
+            const xgChip  = (diff) => diff === null || diff === undefined
+                ? "" : `<span class="spe-xg ${xgClass(diff)}">xG ${xgSign(diff)}${diff}</span>`;
+
+            return `
+            <div class="spe-row">
+                <div class="spe-row-head">
+                    <span class="spe-row-icon" aria-hidden="true">${t.icon}</span>
+                    <span class="spe-row-lbl">${t.label}</span>
+                    <span class="spe-row-avg">리그 평균 ${la.avg_shots} 시도 · ${la.avg_conversion_pct ?? "—"}%</span>
+                </div>
+                <div class="spe-row-bars">
+                    <div class="spe-side spe-home">
+                        <div class="spe-stats">
+                            <span class="spe-shots">${h.shots}<small>시도</small></span>
+                            <span class="spe-goals">${h.goals}<small>골</small></span>
+                            <span class="spe-conv">${h.conversion_pct ?? "—"}${h.conversion_pct !== null ? "%" : ""}</span>
+                            ${xgChip(h.xg_diff)}
+                        </div>
+                        <div class="spe-bar-wrap">
+                            <div class="spe-bar" style="--w:${hBarW}%;--c:${homeColor}"></div>
+                            <div class="spe-avg-line" style="right:${100 - lineL}%" title="리그 평균 ${la.avg_shots} 시도"></div>
+                        </div>
+                    </div>
+                    <div class="spe-side spe-away">
+                        <div class="spe-bar-wrap spe-bar-wrap-r">
+                            <div class="spe-bar spe-bar-r" style="--w:${aBarW}%;--c:${awayColor}"></div>
+                            <div class="spe-avg-line" style="left:${100 - lineL}%" title="리그 평균 ${la.avg_shots} 시도"></div>
+                        </div>
+                        <div class="spe-stats spe-stats-r">
+                            ${xgChip(a.xg_diff)}
+                            <span class="spe-conv">${a.conversion_pct ?? "—"}${a.conversion_pct !== null ? "%" : ""}</span>
+                            <span class="spe-goals">${a.goals}<small>골</small></span>
+                            <span class="spe-shots">${a.shots}<small>시도</small></span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        };
+
+        // 자동 인사이트 — 효율 강점/약점 (xG 있는 경우만, 시도 5 이상 + xG_diff 1 이상)
+        // 그리고 시도 수가 리그 평균 1.5배 이상이면 시도량 우위 인사이트 (xG 무관)
+        const insights = [];
+        for (const t of TYPES) {
+            const h = home.by_type[t.key], a = away.by_type[t.key];
+            const la = avg.by_type[t.key];
+            if (h.xg_diff !== null && h.shots >= 5 && h.xg_diff >= 1.0)
+                insights.push(`⚡ ${home.short} ${t.label} 효율 우수 (xG +${h.xg_diff})`);
+            if (a.xg_diff !== null && a.shots >= 5 && a.xg_diff >= 1.0)
+                insights.push(`⚡ ${away.short} ${t.label} 효율 우수 (xG +${a.xg_diff})`);
+            if (h.xg_diff !== null && h.shots >= 5 && h.xg_diff <= -1.0)
+                insights.push(`⚠ ${home.short} ${t.label} 효율 미달 (xG ${h.xg_diff})`);
+            if (a.xg_diff !== null && a.shots >= 5 && a.xg_diff <= -1.0)
+                insights.push(`⚠ ${away.short} ${t.label} 효율 미달 (xG ${a.xg_diff})`);
+            // xG 없는 리그(K1)도 변환률 비교
+            if (la.avg_conversion_pct !== null && h.conversion_pct !== null
+                && h.shots >= 5 && h.conversion_pct >= la.avg_conversion_pct * 1.5)
+                insights.push(`🎯 ${home.short} ${t.label} 변환률 ${h.conversion_pct}% (리그 ${la.avg_conversion_pct}%)`);
+            if (la.avg_conversion_pct !== null && a.conversion_pct !== null
+                && a.shots >= 5 && a.conversion_pct >= la.avg_conversion_pct * 1.5)
+                insights.push(`🎯 ${away.short} ${t.label} 변환률 ${a.conversion_pct}% (리그 ${la.avg_conversion_pct}%)`);
+        }
+
+        const html = `
+        <div class="pred-setpiece-eff">
+            <div class="spe-header">
+                <span class="spe-title">⚙ 세트피스 효율 — ${spe.year} 시즌</span>
+                <span class="spe-sub">시도 / 골 / 변환률 / xG차(실득점-기댓값)</span>
+            </div>
+            <div class="spe-teams">
+                <span class="spe-team spe-team-home" style="color:${homeColor}">${home.short}</span>
+                <span class="spe-team-divider">vs 리그 평균 vs</span>
+                <span class="spe-team spe-team-away" style="color:${awayColor}">${away.short}</span>
+            </div>
+            ${TYPES.map(rowHtml).join("")}
+            ${insights.length ? `
+            <div class="spe-insights">${insights.map(t => `<div class="spe-insight">${t}</div>`).join("")}</div>` : ""}
+            <div class="spe-foot">xG차 = 실득점 − 누적 xG. 양수면 기댓값 초과 효율. 출처: SofaScore shotmap.</div>
+        </div>`;
+        wrap.insertAdjacentHTML("beforeend", html);
     }
 
     // ── 필드 그리기 헬퍼 (가로 방향 풀 피치) ─────────────────
