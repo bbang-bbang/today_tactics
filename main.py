@@ -13,10 +13,25 @@ import time as _time_mod
 
 
 # ── API 응답 인메모리 캐시 (TTL) ────────────────────────────
-# 사용처: prediction-backtest(15s), round-predictions(2.7s), k*/schedule(1.4s), k*/rounds(1.4s).
+# 사용처: 무거운 read-only 라우트(통계/누적/예측). 세션·CRUD 라우트는 절대 캐싱 금지.
 # Flask test 환경/단일 process gunicorn 가정. multi-worker 시 동기화 안 됨 (worker별 캐시).
-_API_CACHE = {}  # key → (expires_at, payload)
+_API_CACHE = {}  # key → (expires_at, payload). Python 3.7+ dict는 insertion order 보존 → LRU 흉내
 _API_CACHE_TTL = 3600  # 1시간
+_API_CACHE_MAX_KEYS = 4096  # player_id × 파라미터 조합 폭발 방지 cap
+
+
+def _api_cache_evict_if_full():
+    """캡 초과 시 만료된 키 우선 삭제, 그래도 초과면 oldest insertion부터 삭제."""
+    if len(_API_CACHE) < _API_CACHE_MAX_KEYS:
+        return
+    now = _time_mod.time()
+    expired = [k for k, v in _API_CACHE.items() if v[0] <= now]
+    for k in expired:
+        _API_CACHE.pop(k, None)
+    overflow = len(_API_CACHE) - _API_CACHE_MAX_KEYS + 128  # 한 번에 128개 헤드룸
+    if overflow > 0:
+        for k in list(_API_CACHE.keys())[:overflow]:
+            _API_CACHE.pop(k, None)
 
 
 def cached_response(ttl=_API_CACHE_TTL):
@@ -45,7 +60,10 @@ def cached_response(ttl=_API_CACHE_TTL):
                     body = resp
                     mimetype = "application/json"
                     status = 200
-                _API_CACHE[key] = (now + ttl, (body, mimetype, status))
+                # 4xx/5xx는 캐시하지 않음 (일시 오류가 굳지 않도록)
+                if 200 <= status < 300:
+                    _api_cache_evict_if_full()
+                    _API_CACHE[key] = (now + ttl, (body, mimetype, status))
             except Exception:
                 pass
             return resp
@@ -720,6 +738,7 @@ H2H_FILE      = os.path.join(BASE_DIR, "data", "kleague_h2h.json")
 STATS_FILE    = os.path.join(BASE_DIR, "data", "kleague_team_stats.json")
 
 @app.route("/api/results")
+@cached_response(ttl=3600)
 def get_results():
     team_id = request.args.get("teamId")
     if not os.path.exists(RESULTS_FILE):
@@ -731,6 +750,7 @@ def get_results():
     return jsonify(all_results)
 
 @app.route("/api/h2h")
+@cached_response(ttl=3600)
 def get_h2h():
     team_a = request.args.get("teamA")
     team_b = request.args.get("teamB")
@@ -744,6 +764,7 @@ def get_h2h():
     return jsonify(h2h.get(key, {"w": 0, "d": 0, "l": 0, "total": 0}))
 
 @app.route("/api/h2h-matches")
+@cached_response(ttl=3600)
 def get_h2h_matches():
     """두 팀 간 최근 맞대결 경기 목록 + 득점 선수 (events DB 기반)"""
     team_a = request.args.get("teamA")
@@ -829,6 +850,7 @@ def get_h2h_matches():
     return jsonify(result)
 
 @app.route("/api/team-stats")
+@cached_response(ttl=3600)
 def get_team_stats():
     team_id = request.args.get("teamId")
     if not os.path.exists(STATS_FILE):
@@ -841,6 +863,7 @@ def get_team_stats():
 
 
 @app.route("/api/team-stats-by-year")
+@cached_response(ttl=3600)
 def get_team_stats_by_year():
     """연도별 홈/원정 승무패 (match_player_stats DB 기반)"""
     team_id = request.args.get("teamId")
@@ -900,6 +923,7 @@ def get_team_stats_by_year():
 
 
 @app.route("/api/team-ranking")
+@cached_response(ttl=1800)
 def get_team_ranking():
     """현재 시즌(최신 연도) 리그 순위 계산"""
     team_id = request.args.get("teamId")
@@ -972,6 +996,7 @@ def get_team_ranking():
 
 
 @app.route("/api/team-top-players")
+@cached_response(ttl=1800)
 def get_team_top_players():
     """현재 시즌 팀 득점/어시스트 TOP 3"""
     team_id = request.args.get("teamId")
@@ -1051,6 +1076,7 @@ def _team_league(ss_id):
 
 
 @app.route("/api/team-analytics")
+@cached_response(ttl=3600)
 def get_team_analytics():
     """팀별 상대팀 승률 / 월별 승률 / 홈어웨이 분석"""
     team_id = request.args.get("teamId")
@@ -1240,6 +1266,7 @@ def get_team_analytics():
 
 
 @app.route("/api/team-compare")
+@cached_response(ttl=3600)
 def get_team_compare():
     """두 팀의 주요 스탯을 동일 기준으로 병렬 집계 (팀 비교용)."""
     team_a = request.args.get("teamA")
@@ -1751,6 +1778,7 @@ def _lr_metrics_meta():
 # ═══════════════════════════════════════════════════════════════
 
 @app.route("/api/team-trend")
+@cached_response(ttl=3600)
 def get_team_trend():
     """팀의 경기별 날짜 · 득점 · 실점 · 결과 · 누적승점 시계열."""
     team_id = request.args.get("teamId")
@@ -2188,6 +2216,7 @@ def _predict_core(cur, home_ss, away_ss, tid_filter, as_of_ts, year_str,
 
 
 @app.route("/api/match-prediction")
+@cached_response(ttl=1800)
 def get_match_prediction():
     """두 팀 간 예측 보고서: 포아송 승률·스코어 매트릭스·신뢰도·부상자 반영"""
     home_id = request.args.get("homeTeam")
@@ -2927,6 +2956,7 @@ KLEAGUE_CODE_MAP = {
 TEAMS_BY_ID = {t["id"]: t for t in TEAMS}
 
 @app.route("/api/standings")
+@cached_response(ttl=1800)
 def get_standings():
     try:
         req = urllib.request.Request(
@@ -3054,6 +3084,7 @@ def _flip_points(rows, player_team_id):
 CURRENT_YEAR = str(datetime.now().year)
 
 @app.route("/api/heatmap")
+@cached_response(ttl=3600)
 def get_heatmap():
     name = request.args.get("name", "").strip()
     if not name:
@@ -3111,6 +3142,7 @@ def get_heatmap():
                     "filtered": bool(opponent_id), "matchedName": matched_name})
 
 @app.route("/api/player-matches")
+@cached_response(ttl=1800)
 def get_player_matches():
     name = request.args.get("name", "").strip()
     if not name:
@@ -3165,6 +3197,7 @@ def get_player_matches():
 
 
 @app.route("/api/player-stat-report")
+@cached_response(ttl=3600)
 def get_player_stat_report():
     """선수 상세 스탯 보고서 - 포지션 대비 퍼센타일 포함"""
     import datetime as _dt
@@ -3574,6 +3607,7 @@ def get_player_stat_report():
 
 
 @app.route("/api/player-analytics")
+@cached_response(ttl=1800)
 def get_player_analytics():
     """선수 개인 분석 보고서"""
     import datetime as _dt
@@ -3860,6 +3894,7 @@ def get_player_analytics():
 
 
 @app.route("/api/league-dashboard")
+@cached_response(ttl=1800)
 def get_league_dashboard():
     """K리그 전체 선수 인사이트 대시보드 (league=k1|k2, 기본 k2)"""
     year = request.args.get("year")   # None → 전체
@@ -4062,6 +4097,7 @@ def get_league_dashboard():
 
 
 @app.route("/api/team-goal-timing")
+@cached_response(ttl=3600)
 def get_team_goal_timing():
     """팀 득점/실점 시간대·전후반 분석"""
     team_id_str = request.args.get("teamId")
@@ -4352,6 +4388,7 @@ def _league_team_filter(league):
 
 
 @app.route("/api/insights/top-performers")
+@cached_response(ttl=1800)
 def insights_top_performers():
     """포지션별 TOP 퍼포머 (최소 3경기 이상, 90분 환산). league=k1|k2|all 필터 지원"""
     year = request.args.get("year", "2026")
@@ -4439,6 +4476,7 @@ def insights_top_performers():
 
 
 @app.route("/api/insights/card-rankings")
+@cached_response(ttl=1800)
 def insights_card_rankings():
     """카드 수령 순위 — 선수별 + 팀별. year + league 필터 지원.
     옐로카드 TOP 10 + 레드카드 TOP 5 (선수별), 팀별 평균(/경기) TOP 8."""
@@ -4563,6 +4601,7 @@ def insights_card_rankings():
 
 
 @app.route("/api/insights/xg-efficiency")
+@cached_response(ttl=1800)
 def insights_xg_efficiency():
     """xG 효율 — 포지션 F + minutes>0 + 시즌 ≥3경기 + xG ≥0.5.
     league(all|k1|k2) 필터, 정렬은 클라가 처리(절대 골/효율 등)."""
@@ -4603,6 +4642,7 @@ def insights_xg_efficiency():
 
 
 @app.route("/api/insights/forward-goals")
+@cached_response(ttl=1800)
 def insights_forward_goals():
     player_id = request.args.get("playerId", "").strip()
     year = request.args.get("year", "all")
@@ -4675,6 +4715,7 @@ def insights_forward_goals():
 
 
 @app.route("/api/insights/midfielder-pass")
+@cached_response(ttl=1800)
 def insights_midfielder_pass():
     year = request.args.get("year", "2026")
     date_cond, date_params = _year_date_params(year)
@@ -4704,6 +4745,7 @@ def insights_midfielder_pass():
 
 
 @app.route("/api/insights/defender-score")
+@cached_response(ttl=1800)
 def insights_defender_score():
     year = request.args.get("year", "2026")
     date_cond, date_params = _year_date_params(year)
@@ -4737,6 +4779,7 @@ def insights_defender_score():
 
 
 @app.route("/api/insights/player-detail")
+@cached_response(ttl=1800)
 def insights_player_detail():
     player_id = request.args.get("playerId", "").strip()
     pos       = request.args.get("pos", "F")
@@ -5240,6 +5283,7 @@ def round_predictions():
 
 
 @app.route("/api/player-vs-teams")
+@cached_response(ttl=3600)
 def get_player_vs_teams():
     """선수가 상대팀별로 기록한 성적 (평점·G+A·출전수)"""
     player_id = request.args.get("playerId", type=int)
@@ -5349,6 +5393,7 @@ _BACKTEST_TTL_SEC = 600
 
 
 @app.route("/api/next-round")
+@cached_response(ttl=1800)
 def next_round():
     """
     다가오는 가장 빠른 라운드(같은 주차 묶음) 경기 + 모델 예측.
@@ -5861,6 +5906,7 @@ def prediction_backtest():
 
 
 @app.route("/api/predicted-lineup")
+@cached_response(ttl=1800)
 def get_predicted_lineup():
     """
     팀 예상 출전 라인업 (가장 최근 완료 경기 + 출전시간 TOP11 기반).
@@ -6012,6 +6058,7 @@ def _team_info_by_sofascore_id(ss_id):
 
 
 @app.route("/api/matches-by-date")
+@cached_response(ttl=600)
 def matches_by_date():
     """
     특정 날짜에 치러진 경기 목록 반환.
@@ -6094,6 +6141,7 @@ def matches_by_date():
 
 
 @app.route("/api/matches-latest-lineup-date")
+@cached_response(ttl=600)
 def matches_latest_lineup_date():
     """라인업이 저장된 가장 최근 경기일(YYYY-MM-DD) 반환. 프론트 기본값용."""
     conn = sqlite3.connect(DB_PATH)
@@ -6109,6 +6157,7 @@ def matches_latest_lineup_date():
 
 
 @app.route("/api/match-lineup")
+@cached_response(ttl=3600)
 def match_lineup():
     """
     특정 경기의 홈/원정 라인업(포메이션 + 선발 + 교체) 반환.
@@ -6666,6 +6715,7 @@ if not os.environ.get("DISABLE_SCHEDULER") and (
 
 
 @app.route("/api/goal-timing")
+@cached_response(ttl=1800)
 def goal_timing():
     """팀별 골 타이밍 분석 (15분 구간별 득점/실점)"""
     team_id_str = request.args.get("teamId")
@@ -6744,6 +6794,7 @@ def goal_timing():
 
 
 @app.route("/api/match-extras")
+@cached_response(ttl=3600)
 def match_extras():
     """
     경기별 평균 포지션 + 슛맵 데이터 반환.
@@ -6938,6 +6989,7 @@ def match_extras():
 
 
 @app.route("/api/match-retrospective")
+@cached_response(ttl=3600)
 def match_retrospective():
     """finished 매치 사후 분석 — 실제 결과 + xG/세트피스/PK/자책골/레드카드.
     프론트가 prediction 응답과 비교해 적중·실패 핀인을 생성한다.
@@ -7095,14 +7147,32 @@ def _warm_cache():
     """
     import urllib.request, time as _t
     warm_urls = [
+        # 시즌 시뮬 + 백테스트 (가장 무거움, 15s 단위)
         "http://127.0.0.1:5000/api/prediction-backtest?league=k1&year=2026",
         "http://127.0.0.1:5000/api/prediction-backtest?league=k2&year=2026",
+        "http://127.0.0.1:5000/api/season-simulation?league=k1&n=500",
+        "http://127.0.0.1:5000/api/season-simulation?league=k2&n=500",
+        # K리그 스케줄·라운드 (첫 화면 진입 호출)
         "http://127.0.0.1:5000/api/k1/schedule",
         "http://127.0.0.1:5000/api/k2/schedule",
         "http://127.0.0.1:5000/api/k1/rounds",
         "http://127.0.0.1:5000/api/k2/rounds",
-        "http://127.0.0.1:5000/api/season-simulation?league=k1&n=500",
-        "http://127.0.0.1:5000/api/season-simulation?league=k2&n=500",
+        # 첫 화면 핵심 위젯 (순위·다음 라운드·매치 by date·대시보드)
+        "http://127.0.0.1:5000/api/standings?league=K1",
+        "http://127.0.0.1:5000/api/standings?league=K2",
+        "http://127.0.0.1:5000/api/next-round?league=K1",
+        "http://127.0.0.1:5000/api/next-round?league=K2",
+        "http://127.0.0.1:5000/api/league-dashboard?league=K1",
+        "http://127.0.0.1:5000/api/league-dashboard?league=K2",
+        "http://127.0.0.1:5000/api/matches-by-date",
+        # 인사이트 드로어 (사용자 자주 진입)
+        "http://127.0.0.1:5000/api/insights/top-performers?league=K1",
+        "http://127.0.0.1:5000/api/insights/top-performers?league=K2",
+        "http://127.0.0.1:5000/api/insights/xg-efficiency?league=K1",
+        "http://127.0.0.1:5000/api/insights/forward-goals?league=K1",
+        "http://127.0.0.1:5000/api/insights/midfielder-pass?league=K1",
+        "http://127.0.0.1:5000/api/insights/defender-score?league=K1",
+        "http://127.0.0.1:5000/api/insights/card-rankings?league=K1",
     ]
     _t.sleep(2)  # 서버 listen 대기 (3→2초)
     def _fetch(u):
