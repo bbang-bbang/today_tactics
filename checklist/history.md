@@ -3255,3 +3255,12 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - **검증**: 로컬 K2(suwon vs cheonan, xG 존재) + K1(ulsan vs jeonbuk, xG None) 양쪽 정상. ttfb 캐시 후 ms 단위. 빈 slug → 400.
 - **7인**: P1 세트피스 실전 활용 / P2 정확한 전환율 / P3(후속: 선수단위 기여 백로그) / P4 xG 비대칭 명시적 처리 / P5 코치 협업 / P6 막대+칩 시각계층·반응형 / P7 파라미터 바인딩·캐싱·입력검증 → 전원 PASS
 - **후속 백로그**: K1 shotmap xG 백필(카드 완전체), 선수 단위 세트피스 기여, SSH 화이트리스트(P7).
+
+## 2026-05-29 K1 shotmap xG 백필 (세트피스 카드 완전체)
+- **문제**: K1 2026 match_shotmap.xg 전부 NULL (SofaScore 원천에 K1 xG 없음). 세트피스 카드가 K1에서 xG 칩 미표시 → 반쪽 작동. 기존 build_k1_xg.py는 mps.expected_goals만 채우고 shotmap.xg는 안 채웠음.
+- **해법**: crawlers/backfill_k1_shotmap_xg.py 신규. 재크롤링 없이 저장된 컬럼(x/y/situation/body_part/outcome)으로 샷 단위 xG 로컬 추정 → match_shotmap.xg 갱신. 모델은 build_k1_xg.estimate_xg와 동일 공식(거리·각도·헤더×0.6·fast-break×1.3·set-piece×0.9·PK0.78·직접FK0.05).
+- **결과**: K1 23,307샷 갱신, NULL 0. 검증 — xG합/실골 비율 1.08(이상적 1.0). PK 모델0.78 vs 실제79.8%(210/263) 정확. corner avg_xg 0.127, FK 0.05.
+- **의미 라벨링(P4)**: K1은 추정 xG, K2는 SofaScore 실측 → API에 xg_estimated 플래그 추가, 카드 헤더 "xG 추정" 배지 + 푸터 출처 구분 ("자체 모델 추정" vs "실측"). 분석가 오인 방지.
+- **캐시버스트**: prediction.js v=50, style.css v=42.
+- **운영 동기화 주의**: players.db는 gitignored → CI(git reset)로 미반영. 운영에서 백필 스크립트 직접 실행 필요 (SSH). idempotent(xg IS NULL만) 안전.
+- **7인**: P4 추정/실측 명시 구분 / P1·P5 K1 세트피스 효율 활용 가능 / P6 배지 시각계층 / P7 파라미터 바인딩·로컬계산(외부호출0) → 전원 PASS

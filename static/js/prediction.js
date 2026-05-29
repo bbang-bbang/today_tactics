@@ -1675,7 +1675,7 @@
         const html = `
         <div class="pred-setpiece-eff">
             <div class="spe-header">
-                <span class="spe-title">⚙ 세트피스 효율 — ${spe.year} 시즌</span>
+                <span class="spe-title">⚙ 세트피스 효율 — ${spe.year} 시즌${spe.xg_estimated ? ` <span class="spe-xg-badge" title="K1은 SofaScore 원천 xG가 없어 거리·각도·상황 기반 자체 모델로 추정한 값입니다">xG 추정</span>` : ""}</span>
                 <span class="spe-sub">시도 / 골 / 변환률 / xG차(실득점-기댓값)</span>
             </div>
             <div class="spe-teams">
@@ -1686,7 +1686,7 @@
             ${TYPES.map(rowHtml).join("")}
             ${insights.length ? `
             <div class="spe-insights">${insights.map(t => `<div class="spe-insight">${t}</div>`).join("")}</div>` : ""}
-            <div class="spe-foot">xG차 = 실득점 − 누적 xG. 양수면 기댓값 초과 효율. 출처: SofaScore shotmap.</div>
+            <div class="spe-foot">xG차 = 실득점 − 누적 xG. 양수면 기댓값 초과 효율. 출처: SofaScore shotmap${spe.xg_estimated ? " (xG는 자체 모델 추정)" : " (xG 실측)"}.</div>
         </div>`;
         wrap.insertAdjacentHTML("beforeend", html);
     }

@@ -3081,6 +3081,8 @@ def setpiece_efficiency():
 
     league = home_info.get("league", "K2")
     tid    = 410 if league == "K1" else 777
+    # K1 shotmap xG는 자체 모델 추정(build_k1_xg/backfill_k1_shotmap_xg), K2는 SofaScore 실측.
+    xg_estimated = (league == "K1")
 
     conn = sqlite3.connect(DB_PATH)
     cur  = conn.cursor()
@@ -3101,6 +3103,7 @@ def setpiece_efficiency():
         "ready":   True,
         "year":    year,
         "league":  league,
+        "xg_estimated": xg_estimated,
         "home": {
             "slug":    home_slug,
             "name":    home_info["name"],
