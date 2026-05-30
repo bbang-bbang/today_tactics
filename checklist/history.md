@@ -4,6 +4,53 @@
 
 ---
 
+## 2026-05-31 | UX 편의성 전면 개선 (v46) — 6인 관점 솔직 진단 후 패치
+
+### 작업 배경
+- 6인 관점(P1~P6) 편의성 솔직 진단: 기능은 많지만 발견하기 어렵고, 컨텍스트 없이 숫자만 나오고, 워크플로우가 이어지지 않는 문제 확인
+- 사용자 요청: "전부 개선"
+
+### 변경 내역
+
+#### style.css (v45→v46)
+- `.data-freshness-badge` + `.dfb-dot` / `.dfb-old` / `.dfb-error` — 헤더 데이터 신선도 배지
+- `.ob-reset-link` — 온보딩 "도움말" 링크 (기존 온보딩이 이미 구현돼 있었음 확인, 재진입 경로만 추가)
+- `.k2-search-wrap` + `.k2-search-input` — 히트맵 선수 검색 입력창 스타일
+- `.tt-help` + `.tt-help-tip` — 활동량 지수 설명 툴팁
+- `.pred-goto-tactic` — 예측→전술판 CTA 버튼 스타일 (기존 pred-cta-btn 보완용)
+- `@keyframes match-load-pulse` + `.match-load-glow` — 경기 선택 시 라인업 버튼 글로우
+- `.k2-player-context` + `.k2-ctx-pill` — 히트맵 선수 컨텍스트 배너
+- `.pa-loading-skeleton` + `.pa-skel-row` + `.pa-skel-chart` — 선수분석 skeleton 로딩
+
+#### templates/index.html
+- 헤더에 `#data-freshness-badge` + `#dfb-text` 추가 — 데이터 기준시각 상시 표시
+- 히트맵 STEP 2에 `#k2-player-search` 검색 입력창 추가
+- 히트맵 STEP 3에 `#k2-player-context-area` 컨텍스트 배너 영역 추가
+- 온보딩 JS 개선: `showOnboarding()` / `hideOnboarding()` 분리, "도움말" 링크 동적 삽입
+- 데이터 신선도 JS: `/api/update-status` 폴링 → `last_run` / `next_run` 조건부 표시
+- CSS v45→v46, JS 버전 bump: k2heatmap v1→v2, player_analytics v2→v3, prediction v53→v54
+
+#### static/js/k2heatmap.js (v1→v2)
+- `_allPlayerRows` 배열 + `k2-player-search` input 이벤트 — 이름 실시간 필터
+- 포지션 헤더도 해당 포지션 선수 전부 숨으면 같이 숨김
+- `selectTeam` 진입 시 검색창 초기화
+- `selectPlayer` 진입 시 선수 포지션·소속팀·경기수·평점 컨텍스트 배너 렌더
+
+#### static/js/player_analytics.js (v2→v3)
+- `loadData` 중 skeleton 로딩 화면 (기존 "분석 중..." 텍스트 → 애니메이션 skeleton)
+- "활동량 지수" 제목에 `?` 툴팁 추가: "90분 환산 터치·듀얼·패스·드리블 백분위 점수" 설명
+
+#### static/js/prediction.js (v53→v54)
+- 경기 카드 클릭 시 `btn-match-load`에 `match-load-glow` 클래스 4초 부여 → 발견성 강화
+
+### 사전 진단 결과 (이미 구현돼 있던 것)
+- 온보딩 오버레이: `.ob-overlay` 이미 존재 (재진입 경로만 추가)
+- 예측→전술판 CTA: `.pred-cta-btn` / `openTacticWithPredictedLineup` 이미 존재
+- 탭 라벨: 이미 한국어 ("상대팀별 승률", "월별 승률" 등)
+- 포메이션 변경 선수 보존: `loadFormationSide` 이미 역할 매칭으로 보존
+
+---
+
 ## 2026-05-20 | 전체 화면 레이아웃 구조 개선 — 세로 배치 → 그리드 레이아웃
 
 ### 작업 배경
@@ -3310,3 +3357,6 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - **캐시버스트**: prediction.js v=50, style.css v=42.
 - **운영 동기화 주의**: players.db는 gitignored → CI(git reset)로 미반영. 운영에서 백필 스크립트 직접 실행 필요 (SSH). idempotent(xg IS NULL만) 안전.
 - **7인**: P4 추정/실측 명시 구분 / P1·P5 K1 세트피스 효율 활용 가능 / P6 배지 시각계층 / P7 파라미터 바인딩·로컬계산(외부호출0) → 전원 PASS
+- 2026-05-31 00:38:31 | curl -s http://127.0.0.1:5000/api/update-status
+- 2026-05-31 00:38:52 | curl -s http://127.0.0.1:5000/ | grep -E "v=46|v=2.*heatmap|v=3.*analytics|v=54.*prediction|dfb-text|k2-player-search|k2-player-context|onboarding" | head -20
+- 2026-05-31 00:38:56 | curl -s http://127.0.0.1:5000/ | grep -E "k2heatmap.js|player_analytics.js|prediction.js"

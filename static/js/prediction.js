@@ -342,6 +342,12 @@
                     window.history.replaceState(null, "", u);
                 } catch (_) {}
                 loadPrediction(homeId, awayId, gameDate, isFinished);
+                // 경기 선택 시 "경기에서 불러오기" 버튼 글로우 강조 (2초)
+                const matchLoadBtn = document.getElementById("btn-match-load");
+                if (matchLoadBtn) {
+                    matchLoadBtn.classList.add("match-load-glow");
+                    setTimeout(() => matchLoadBtn.classList.remove("match-load-glow"), 4000);
+                }
                 // 라인업 유무와 무관하게 fhud-name 즉시 업데이트
                 // → MutationObserver(info.js) 트리거 → H2H / 전술판 팀명 동기화
                 const hTeam = kit(homeId), aTeam = kit(awayId);

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=45">
+    <link rel="stylesheet" href="/static/css/style.css?v=46">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -64,6 +64,10 @@
     <div id="app">
         <header id="toolbar">
             <h1>Today Tactics</h1>
+            <div id="data-freshness-badge" class="data-freshness-badge" title="마지막 데이터 업데이트 시각">
+                <span class="dfb-dot"></span>
+                <span id="dfb-text">데이터 로딩 중…</span>
+            </div>
             {% if current_user %}
             <div id="user-menu">
                 {% if current_user.picture %}
@@ -459,6 +463,9 @@
                     <span id="k2-selected-team-name"></span>
                 </div>
                 <p class="k2-step-label">② 선수 선택</p>
+                <div class="k2-search-wrap">
+                    <input id="k2-player-search" class="k2-search-input" type="text" placeholder="이름으로 검색…" autocomplete="off">
+                </div>
                 <div id="k2-player-list" class="k2-player-list"></div>
             </div>
 
@@ -468,6 +475,7 @@
                     <button id="k2-back-player" class="modal-btn cancel">← 선수 선택</button>
                     <span id="k2-selected-player-name"></span>
                 </div>
+                <div id="k2-player-context-area"></div>
                 <div class="k2-heatmap-wrap">
                     <canvas id="k2-heatmap-canvas" width="600" height="390"></canvas>
                     <div id="k2-heatmap-loading" class="k2-loading">로딩 중...</div>
@@ -757,11 +765,11 @@
     <script src="/static/js/app.js?v=16"></script>
 
     <script src="/static/js/info.js?v=7"></script>
-    <script src="/static/js/k2heatmap.js?v=1"></script>
+    <script src="/static/js/k2heatmap.js?v=2"></script>
     <script src="/static/js/banner_stats.js?v=2"></script>
     <script src="/static/js/analytics.js?v=2"></script>
     <script src="/static/js/team_compare.js?v=7"></script>
-    <script src="/static/js/prediction.js?v=53"></script>
+    <script src="/static/js/prediction.js?v=54"></script>
 
     <!-- 선수 분석 모달 -->
     <div id="player-analytics-modal" class="pa-modal hidden">
@@ -805,7 +813,7 @@
         </div>
     </div>
 
-    <script src="/static/js/player_analytics.js?v=2"></script>
+    <script src="/static/js/player_analytics.js?v=3"></script>
     <script src="/static/js/player_report.js?v=4"></script>
     <script src="/static/js/insights.js?v=7"></script>
 
@@ -851,17 +859,58 @@
     </div>
     <script>
     (function () {
-        var overlay = document.getElementById('onboarding-overlay');
+        // ── 온보딩 오버레이 ──────────────────────────────────────
+        var overlay  = document.getElementById('onboarding-overlay');
         var startBtn = document.getElementById('ob-start-btn');
-        if (!localStorage.getItem('tt_onboarded')) {
+        function showOnboarding() {
             overlay.style.display = '';
             requestAnimationFrame(function () { overlay.classList.add('ob-visible'); });
         }
-        startBtn.addEventListener('click', function () {
+        function hideOnboarding() {
             overlay.classList.remove('ob-visible');
             overlay.classList.add('ob-hiding');
-            setTimeout(function () { overlay.style.display = 'none'; }, 300);
+            setTimeout(function () { overlay.style.display = 'none'; overlay.classList.remove('ob-hiding'); }, 300);
             localStorage.setItem('tt_onboarded', '1');
+        }
+        if (!localStorage.getItem('tt_onboarded')) { showOnboarding(); }
+        startBtn.addEventListener('click', hideOnboarding);
+        // "다시 보기" 링크를 헤더 사용자 영역에 동적 추가
+        var um = document.getElementById('user-menu');
+        if (um) {
+            var resetLink = document.createElement('button');
+            resetLink.className = 'ob-reset-link';
+            resetLink.textContent = '도움말';
+            resetLink.title = '사용법 다시 보기';
+            resetLink.addEventListener('click', function () {
+                localStorage.removeItem('tt_onboarded');
+                showOnboarding();
+            });
+            um.appendChild(resetLink);
+        }
+
+        // ── 데이터 신선도 배지 ──────────────────────────────────
+        var dfbText  = document.getElementById('dfb-text');
+        var dfbBadge = document.getElementById('data-freshness-badge');
+        fetch('/api/update-status').then(function (r) { return r.json(); }).then(function (d) {
+            if (!dfbText) return;
+            if (d.last_run) {
+                dfbText.textContent = '데이터 ' + d.last_run.replace(' KST','');
+                if (d.last_result === 'error') {
+                    dfbBadge.classList.add('dfb-error');
+                    dfbBadge.title = '마지막 업데이트 실패: ' + (d.last_msg || '') + (d.next_run ? ' / 다음: ' + d.next_run : '');
+                } else {
+                    dfbBadge.title = '마지막 업데이트: ' + d.last_run + (d.next_run ? ' / 다음: ' + d.next_run : '');
+                }
+            } else if (d.next_run) {
+                dfbText.textContent = '다음 업데이트 ' + d.next_run.replace(' KST','');
+                dfbBadge.classList.add('dfb-old');
+                dfbBadge.title = '아직 업데이트 실행 전입니다. 다음 예정: ' + d.next_run;
+            } else {
+                dfbText.textContent = '데이터 기준 미확인';
+                dfbBadge.classList.add('dfb-old');
+            }
+        }).catch(function () {
+            if (dfbText) { dfbText.textContent = '업데이트 상태 확인 불가'; dfbBadge.classList.add('dfb-error'); }
         });
     })();
     </script>

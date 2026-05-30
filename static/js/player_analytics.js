@@ -30,7 +30,14 @@
     // ── 데이터 로딩 ──────────────────────────────────────────────
     function loadData(playerId, year) {
         const url = `/api/player-analytics?playerId=${playerId}${year ? `&year=${year}` : ""}`;
-        modal.querySelector(".pa-body-inner").innerHTML = `<div class="pa-loading">분석 중...</div>`;
+        modal.querySelector(".pa-body-inner").innerHTML = `
+            <div class="pa-loading-skeleton">
+                <div class="skeleton pa-skel-row w80"></div>
+                <div class="skeleton pa-skel-row w60"></div>
+                <div class="skeleton pa-skel-chart"></div>
+                <div class="skeleton pa-skel-row w40"></div>
+                <div class="skeleton pa-skel-chart"></div>
+            </div>`;
         fetch(url)
             .then(r => r.json())
             .then(data => render(data, playerId, year))
@@ -140,7 +147,9 @@
         <div class="pa-bottom-grid">
             <!-- 활동량 지수 -->
             <div class="pa-activity-wrap">
-                <div class="pa-section-title">활동량 지수 <span class="pa-sub">(90분 환산 · 리그 내 백분위)</span></div>
+                <div class="pa-section-title">활동량 지수 <span class="pa-sub">(90분 환산 · 리그 내 백분위)</span>
+                    <span class="tt-help" aria-label="활동량 지수 설명">?<span class="tt-help-tip">90분 환산 터치·듀얼·패스·드리블을 리그 전체 선수(3경기·150분 이상)와 비교한 백분위 점수입니다.<br>100점 = 리그 최상위 활동량</span></span>
+                </div>
                 ${activity && activity.values && Object.keys(activity.values).length ? `
                 <div class="pa-activity-score-row">
                     <span class="pa-activity-score-label">종합 활동량 점수</span>

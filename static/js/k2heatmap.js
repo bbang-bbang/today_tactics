@@ -78,11 +78,36 @@
         });
     }
 
+    // ── 선수 검색 핸들러 ─────────────────────────────────────
+    let _allPlayerRows = [];  // {el, name, pos} — selectTeam 후 채워짐
+    const searchInput  = document.getElementById("k2-player-search");
+    if (searchInput) {
+        searchInput.addEventListener("input", () => {
+            const q = searchInput.value.trim().toLowerCase();
+            _allPlayerRows.forEach(({ el, name }) => {
+                const match = !q || name.toLowerCase().includes(q);
+                el.style.display = match ? "" : "none";
+            });
+            // 포지션 헤더도 표시/숨김 (해당 포지션 선수가 모두 숨으면 헤더도 숨김)
+            playerList.querySelectorAll(".k2-pos-header").forEach(hdr => {
+                let sib = hdr.nextElementSibling;
+                let any = false;
+                while (sib && !sib.classList.contains("k2-pos-header")) {
+                    if (sib.style.display !== "none") { any = true; break; }
+                    sib = sib.nextElementSibling;
+                }
+                hdr.style.display = any ? "" : "none";
+            });
+        });
+    }
+
     // ── 팀 선택 → 선수 목록 ──────────────────────────────────
     async function selectTeam(team) {
         currentTeam = team;
         selTeamName.textContent = team.name;
         playerList.innerHTML = "<p style='color:#aaa'>로딩 중...</p>";
+        if (searchInput) { searchInput.value = ""; }
+        _allPlayerRows = [];
         showStep("player");
 
         const res     = await fetch(`${apiBase()}/players?teamId=${team.sofascore_id}`);
@@ -113,6 +138,7 @@
                     <span class="k2-player-meta">${p.games}경기 ${p.avgRating ? "⭐"+p.avgRating : ""}</span>`;
                 el.addEventListener("click", () => selectPlayer(p));
                 playerList.appendChild(el);
+                _allPlayerRows.push({ el, name: p.name, pos });
             });
         });
     }
@@ -125,6 +151,18 @@
         loading.style.display = "flex";
         matchList.innerHTML = "";
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // 선수 컨텍스트 배너
+        const ctxArea = document.getElementById("k2-player-context-area");
+        if (ctxArea) {
+            const posLabel = { G:"GK", D:"DF", M:"MF", F:"FW" }[player.position] || player.position;
+            const posClass = { G:"pos-g", D:"pos-d", M:"pos-m", F:"pos-f" }[player.position] || "";
+            ctxArea.innerHTML = `<div class="k2-player-context">
+                <span class="k2-ctx-pill ${posClass}">${posLabel}</span>
+                <span>${currentTeam.name}</span>
+                ${player.games ? `<span class="k2-ctx-pill">${player.games}경기</span>` : ""}
+                ${player.avgRating ? `<span class="k2-ctx-pill">⭐ ${player.avgRating}</span>` : ""}
+            </div>`;
+        }
 
         const res  = await fetch(`${apiBase()}/heatmap?playerId=${player.playerId}&teamId=${currentTeam.sofascore_id}`);
         const data = await res.json();

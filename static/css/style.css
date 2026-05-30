@@ -7925,3 +7925,208 @@ body.pr-expanded-lock {
 @media (max-width: 700px) {
     .pr-bottom-grid { grid-template-columns: 1fr; }
 }
+
+/* ═══════════════════════════════════════════════════════
+   v46 UX 편의성 개선 패치
+   ═══════════════════════════════════════════════════════ */
+
+/* ── 1. 데이터 신선도 배지 ── */
+.data-freshness-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    padding: 3px 10px;
+    margin-left: 16px;
+    white-space: nowrap;
+    transition: color var(--trans-fast);
+}
+.data-freshness-badge .dfb-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #22c55e;
+    flex-shrink: 0;
+}
+.data-freshness-badge.dfb-old .dfb-dot { background: #f59e0b; }
+.data-freshness-badge.dfb-error .dfb-dot { background: #ef4444; }
+
+/* ── 2. 온보딩 개선 — "다시 보기" 링크 ── */
+.ob-reset-link {
+    display: block;
+    text-align: center;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-faint);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 4px;
+}
+.ob-reset-link:hover { color: var(--text-muted); text-decoration: underline; }
+
+/* ── 3. 히트맵 선수 검색 ── */
+.k2-search-wrap {
+    padding: 8px 0 4px;
+    position: sticky;
+    top: 0;
+    background: var(--bg-surface);
+    z-index: 10;
+}
+.k2-search-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px 8px 32px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: var(--font-base);
+    outline: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+    transition: border-color var(--trans-fast);
+}
+.k2-search-input:focus { border-color: var(--accent); }
+.k2-search-input::placeholder { color: var(--text-faint); }
+
+/* ── 4. 활동량 지수 툴팁 ── */
+.tt-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px; height: 15px;
+    border-radius: 50%;
+    border: 1px solid var(--text-faint);
+    color: var(--text-faint);
+    font-size: 10px;
+    font-weight: 700;
+    cursor: help;
+    margin-left: 5px;
+    position: relative;
+    vertical-align: middle;
+}
+.tt-help:hover { border-color: var(--accent); color: var(--accent); }
+.tt-help-tip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 220px;
+    background: #0d1525;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    z-index: 200;
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.tt-help:hover .tt-help-tip { display: block; }
+.tt-help-tip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--border-subtle);
+}
+
+/* ── 5. 예측→전술판 CTA ── */
+.pred-goto-tactic {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 20px;
+    margin-top: 16px;
+    background: linear-gradient(135deg, #1a3a6b, #0f2d52);
+    border: 1px solid rgba(37,99,235,0.4);
+    border-radius: 10px;
+    color: #93c5fd;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--trans-base);
+    text-decoration: none;
+}
+.pred-goto-tactic:hover {
+    background: linear-gradient(135deg, #1e4080, #1a3670);
+    border-color: rgba(37,99,235,0.7);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(37,99,235,0.3);
+}
+.pred-goto-tactic .pgt-icon { font-size: 18px; }
+.pred-goto-tactic .pgt-sub {
+    font-size: 11px;
+    color: #60a5fa;
+    font-weight: 400;
+    margin-top: 1px;
+}
+
+/* ── 6. 라인업 불러오기 글로우 (경기 선택 시) ── */
+@keyframes match-load-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(233,69,96,0); }
+    50%       { box-shadow: 0 0 0 5px rgba(233,69,96,0.35); }
+}
+.match-load-glow {
+    animation: match-load-pulse 2s ease-in-out infinite;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+}
+
+/* ── 7. 히트맵 선수 컨텍스트 배너 ── */
+.k2-player-context {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+.k2-ctx-pill {
+    background: rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+.k2-ctx-pill.pos-g { color: #fbbf24; }
+.k2-ctx-pill.pos-d { color: #60a5fa; }
+.k2-ctx-pill.pos-m { color: #34d399; }
+.k2-ctx-pill.pos-f { color: #f87171; }
+
+/* ── 8. PA 로딩 skeleton 개선 ── */
+.pa-loading-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+}
+.pa-skel-row {
+    height: 14px;
+    border-radius: 4px;
+}
+.pa-skel-row.w80 { width: 80%; }
+.pa-skel-row.w60 { width: 60%; }
+.pa-skel-row.w40 { width: 40%; }
+.pa-skel-chart {
+    height: 180px;
+    border-radius: 8px;
+    margin-top: 4px;
+}
