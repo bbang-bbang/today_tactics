@@ -4293,6 +4293,13 @@ body {
 .lu-name { color: #e8f2ff; font-weight: 500; }
 .lu-name.scorer-link { cursor: pointer; }
 .lu-name.scorer-link:hover { color: #4ea4f8; text-decoration: underline; }
+.lu-player-unavail { opacity: 0.55; }
+.lu-player-unavail .lu-name { text-decoration: line-through; color: #8aa0bb; }
+.lu-status-badge {
+    font-size: 0.7rem;
+    cursor: help;
+    flex-shrink: 0;
+}
 .lu-rating {
     text-align: right;
     color: #facc15;

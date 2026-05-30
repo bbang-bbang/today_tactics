@@ -6131,10 +6131,14 @@ def _compute_predicted_lineup_data(team_slug):
         conn.close()
         return {"ready": False, "reason": "insufficient_lineup_data"}
 
+    player_status_map = _load_status()  # {str(player_id): {status, note, ...}}
+
     starters = []
     pos_counts = {"G": 0, "D": 0, "M": 0, "F": 0}
     for r in rows:
         pos = r["position"] or "?"
+        pid_str = str(r["player_id"])
+        ps = player_status_map.get(pid_str, {})
         s = {
             "player_id":    r["player_id"],
             "name":         r["name"],
@@ -6142,6 +6146,8 @@ def _compute_predicted_lineup_data(team_slug):
             "shirt_number": r["shirt_number"],
             "minutes":      r["minutes_played"],
             "rating":       round(r["rating"], 2) if r["rating"] is not None else None,
+            "status":       ps.get("status") if ps.get("status") not in (None, "available") else None,
+            "status_note":  ps.get("note") or None,
         }
         starters.append(s)
         if pos in pos_counts:

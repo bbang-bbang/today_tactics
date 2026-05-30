@@ -631,12 +631,22 @@
         const POS_LABEL  = { G: "골", D: "수", M: "미", F: "공" };
         const grouped = { G: [], D: [], M: [], F: [], "?": [] };
         for (const s of d.starters) (grouped[s.position] || grouped["?"]).push(s);
+        const STATUS_BADGE = {
+            injured:   { icon: "🚑", cls: "lu-status-injured",   tip: "부상" },
+            suspended: { icon: "🟥", cls: "lu-status-suspended", tip: "출전정지" },
+            doubtful:  { icon: "⚠", cls: "lu-status-doubtful",  tip: "출전의문" },
+        };
         const renderRow = (s) => {
             const pidAttr = s.player_id ? ` scorer-link" data-player-id="${s.player_id}` : ``;
-            return `<div class="lu-player">
+            const sb = s.status && STATUS_BADGE[s.status];
+            const statusBadge = sb
+                ? `<span class="lu-status-badge ${sb.cls}" title="${sb.tip}${s.status_note ? `: ${s.status_note}` : ""}" aria-label="${sb.tip}">${sb.icon}</span>`
+                : "";
+            return `<div class="lu-player${s.status ? " lu-player-unavail" : ""}">
                 <span class="lu-pos" style="background:${POS_COLORS[s.position] || "#666"}33;color:${POS_COLORS[s.position] || "#aaa"}">${POS_LABEL[s.position] || "?"}</span>
                 <span class="lu-num">#${s.shirt_number || "-"}</span>
                 <span class="lu-name${pidAttr}">${s.name}</span>
+                ${statusBadge}
                 ${s.rating ? `<span class="lu-rating">${s.rating}</span>` : ""}
             </div>`;
         };
