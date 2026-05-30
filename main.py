@@ -7394,12 +7394,23 @@ def get_update_status():
 @app.route("/api/cache-invalidate")
 def cache_invalidate():
     """API 인메모리 캐시 강제 무효화 + 백그라운드 워밍업 재실행.
-    update_data.py 종료 후 신규 매치 반영 위해 호출. 로컬 hit만 허용(127.0.0.1).
+    update_data.py 종료 후 신규 매치 반영 위해 호출.
+    허용 경로: ① 127.x 직접 호출 + X-Forwarded-For 없음(로컬 프로세스)
+              ② UPDATE_SECRET 인증 통과 (X-Update-Secret 헤더 또는 ?secret=)
+    nginx 경유 요청은 X-Forwarded-For가 주입되므로 ①로 우회 불가 (P7).
     """
     from flask import request as _req
     remote = _req.remote_addr or ""
-    if not (remote.startswith("127.") or remote == "::1"):
-        return ("forbidden", 403)
+    forwarded_for = _req.headers.get("X-Forwarded-For", "")
+    is_local = (remote.startswith("127.") or remote == "::1") and not forwarded_for
+
+    if not is_local:
+        import hmac
+        secret = os.environ.get("UPDATE_SECRET")
+        token = _req.headers.get("X-Update-Secret") or _req.args.get("secret", "")
+        if not secret or not token or not hmac.compare_digest(token, secret):
+            return ("forbidden", 403)
+
     n = len(_API_CACHE)
     invalidate_api_cache()
     threading.Thread(target=_warm_cache, daemon=True).start()
