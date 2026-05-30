@@ -3256,29 +3256,51 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - **7인**: P1 세트피스 실전 활용 / P2 정확한 전환율 / P3(후속: 선수단위 기여 백로그) / P4 xG 비대칭 명시적 처리 / P5 코치 협업 / P6 막대+칩 시각계층·반응형 / P7 파라미터 바인딩·캐싱·입력검증 → 전원 PASS
 - **후속 백로그**: K1 shotmap xG 백필(카드 완전체), 선수 단위 세트피스 기여, SSH 화이트리스트(P7).
 
-## 2026-05-30 | cache-invalidate 보안 강화 + xG 추정 배지 툴팁
+## 2026-05-30 | 운영 K1 xG 동기화 + PM 우선순위 5개 작업
 
-### 예측 라인업 결장/부상/출전정지 배지 (commit `a67ba41`)
-- **기능**: `_compute_predicted_lineup_data`에서 `player_status.json` 조회 후 starter별 `status`/`status_note` 추가. 부상(🚑)/출전정지(🟥)/출전의문(⚠) 배지 + `lu-player-unavail` 스타일(opacity 0.55 + strikethrough).
-- **한계**: `player_status.json`이 현재 1건(희소). 데이터 정기 업데이트 시 효과 극대화.
+### 배경 / 시작 상태
+- K1 shotmap xG 백필이 로컬에만 적용돼 운영 세트피스 카드 xG 칩이 null이었음
+- cache-invalidate 엔드포인트가 nginx 뒤에서 외부 우회 가능한 보안 취약점 존재
+- 전문가 6인+PM 관점 검토 후 우선순위 5개 선정: 보안→툴팁→결장자→SSH→선수기여
+
+### [SSH] 운영 서버 K1 shotmap xG 백필 동기화
+- **문제**: `players.db`는 gitignored → CI 배포 미포함. 운영에서 K1 xG null 유지 중.
+- **조치**: SSH → `./venv/bin/python crawlers/backfill_k1_shotmap_xg.py` 실행 (idempotent).
+- **결과**: K1 2026(tid=410) xg NULL **0** / 23,369샷 채워짐. corner xg=3.82, xg_diff=-0.82, xg_estimated=true 확인. 잔여 NULL(tid=777)은 2020 시즌 구데이터 — 카드 영향 없음.
+
+### [P7] cache-invalidate 외부 우회 차단 (commit `0cfd3a9`)
+- **취약점**: `remote_addr` 단독 체크 → nginx가 X-Forwarded-For 주입하므로 외부에서도 200 반환.
+- **수정**: 로컬 직접 호출(127.x + X-Forwarded-For 없음)만 무조건 허용. nginx 경유는 UPDATE_SECRET hmac 검증 필수. update_data.py loopback 호출 방식 그대로 유지.
+- **검증**: ① 로컬 직접 → 200 ② X-Forwarded-For + no secret → 403 확인.
+
+### [P4/P6] xG 추정 배지 CSS 커스텀 툴팁 (commit `19df793`)
+- **변경**: `title` 기본 툴팁 → `data-tip` + CSS `::after` 버블. "수비 압박·골키퍼 위치 미반영, K2 실측 대비 참고용" 180자 설명. `?` 원형 아이콘 + `role=tooltip tabindex=0` 키보드 접근성.
+- **캐시버스트**: style.css v43, prediction.js v51.
+- **검증**: `:focus` → `::after opacity:1 visibility:visible` 확인. CSS hover 규칙 force-class로 정상 확인.
+
+### [P1] 예측 라인업 결장/부상/출전정지 배지 (commit `a67ba41`)
+- **기능**: `_compute_predicted_lineup_data`에서 `player_status.json` 조회 → starter별 `status`/`status_note` 필드 추가. 부상(🚑)/출전정지(🟥)/출전의문(⚠) 아이콘 + `lu-player-unavail`(opacity 0.55 + strikethrough).
+- **한계**: player_status.json 현재 1건(희소) — 정기 업데이트 시 효과 극대화.
 - **캐시버스트**: style.css v44, prediction.js v52.
 - **검증**: `?teamId=suwon` 응답에 `status: null, status_note: null` 필드 정상 포함.
 
-### cache-invalidate 외부 우회 차단 (commit `0cfd3a9`)
-- **취약점**: `remote_addr` 단독 체크는 nginx `X-Forwarded-For` 주입으로 우회 가능. 외부에서 200 반환 확인.
-- **수정**: 로컬 직접 호출(127.x + `X-Forwarded-For` 없음)만 무조건 허용, nginx 경유 요청은 `UPDATE_SECRET` hmac 검증 필수로 변경.
-- **검증**: ① 로컬 직접 → 200, ② X-Forwarded-For + no secret → 403 확인.
+### [P4 스킵] SSH 화이트리스트
+- 유동 IP 환경 확인 → 락아웃 위험으로 스킵.
 
-### xG 추정 배지 커스텀 CSS 툴팁 (commit `19df793`)
-- **변경**: `title` 기본 툴팁 → `data-tip` + CSS `::after` 버블. 툴팁 내용: "수비 압박·골키퍼 위치 미반영, K2 실측 대비 참고용". `?` 원형 아이콘 추가. `role=tooltip tabindex=0`으로 키보드 접근성 보장.
-- **캐시버스트**: style.css v43, prediction.js v51.
-- **검증**: 배지 마크업 전 속성 확인, `:focus` → `opacity:1 visibility:visible` 확인, CSS hover 규칙 정상 작동 확인.
+### [P2/P3] 세트피스 기여 선수 섹션 (commit `1249e85`)
+- **기능**: `_setpiece_players(cur, ss_id, tid, year, limit=5)` 헬퍼 신규. 상황별(corner/free-kick/penalty) 슛·골·xG 집계 후 골>슛 순 TOP5. `/api/setpiece-efficiency` 응답에 `home.players` / `away.players` 배열 추가.
+- **프론트**: 세트피스 카드 인사이트 하단 2열 그리드 — 상황 아이콘(⛳🎯🥅) + 골 수치. 이름 `scorer-link` 클릭 → 선수 분석 모달 진입. P2 팬·P3 선수 니즈 동시 충족.
+- **캐시버스트**: style.css v45, prediction.js v53.
+- **검증**: K2 suwon vs cheonan — home 5명(헤이스 6슛 4골), away 5명. DOM 행 10개 확인.
 
-## 2026-05-30 | 운영 서버 K1 shotmap xG 백필 동기화
-- **문제**: `backfill_k1_shotmap_xg.py`가 로컬에서만 실행됨. 운영 서버 `players.db`는 gitignored라 CI 배포 미포함. K1 세트피스 카드 xG 칩이 운영에서 null이었음.
-- **조치**: SSH → `./venv/bin/python crawlers/backfill_k1_shotmap_xg.py` 실행 (idempotent, `xg IS NULL`만 갱신). 추가로 최신 라운드 신규 샷 62건도 함께 처리됨.
-- **결과**: K1 2026(tid=410) xg NULL **0** / 23,369샷 추정 xG 완전 채워짐. 캐시 무효화 후 API 확인 — corner xg=3.82, xg_diff=-0.82, xg_estimated=true 정상.
-- **참고**: 남은 NULL(tid=777)은 2020 시즌 구데이터로 세트피스 카드 영향 없음.
+### 최종 캐시버스트 버전
+| 파일 | 버전 |
+|------|------|
+| style.css | v45 |
+| prediction.js | v53 |
+
+### 7인 관점 (전체)
+- P1 결장자 예측 라인업 필터 완료 / P2·P3 세트피스 기여 선수 동시 충족 / P4 xG 추정 툴팁으로 모델 한계 명시 / P5 기존 기능 영향 없음 / P6 CSS 툴팁·배지·기여섹션 7원칙 적용 / P7 cache-invalidate 우회 차단 / PM 우선순위 4개 완료(SSH 스킵 정당) → 전원 PASS
 
 ## 2026-05-29 K1 shotmap xG 백필 (세트피스 카드 완전체)
 - **문제**: K1 2026 match_shotmap.xg 전부 NULL (SofaScore 원천에 K1 xG 없음). 세트피스 카드가 K1에서 xG 칩 미표시 → 반쪽 작동. 기존 build_k1_xg.py는 mps.expected_goals만 채우고 shotmap.xg는 안 채웠음.
