@@ -1675,7 +1675,7 @@
         const html = `
         <div class="pred-setpiece-eff">
             <div class="spe-header">
-                <span class="spe-title">⚙ 세트피스 효율 — ${spe.year} 시즌${spe.xg_estimated ? ` <span class="spe-xg-badge" title="K1은 SofaScore 원천 xG가 없어 거리·각도·상황 기반 자체 모델로 추정한 값입니다">xG 추정</span>` : ""}</span>
+                <span class="spe-title">⚙ 세트피스 효율 — ${spe.year} 시즌${spe.xg_estimated ? ` <span class="spe-xg-badge" data-tip="K1은 SofaScore 원천 xG가 없어 거리·각도·상황 기반 자체 모델로 추정한 값입니다. 수비 압박·골키퍼 위치 미반영으로 K2 실측 대비 참고용으로 활용하세요." role="tooltip" tabindex="0" aria-label="xG 추정 안내">xG 추정 <span class="spe-tip-icon" aria-hidden="true">?</span></span>` : ""}</span>
                 <span class="spe-sub">시도 / 골 / 변환률 / xG차(실득점-기댓값)</span>
             </div>
             <div class="spe-teams">
