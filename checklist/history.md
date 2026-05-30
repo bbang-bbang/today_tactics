@@ -4,6 +4,34 @@
 
 ---
 
+## 2026-05-31 | 가독성 즉시 개선 (v47) — 헤더 밀집 + H2H 이중 노출 제거
+
+### 작업 배경
+- 페이지 열자마자 모델 정확도 바·시즌 시뮬 바·매치업 비교가 동시에 노출 → 첫 화면 노이즈
+- 경기 선택 시 `banner-matchup`과 `prediction-section`에 H2H/팀스탯 이중 노출
+
+### 변경 내역
+
+#### templates/index.html (CSS v46→v47)
+- `header-accuracy-bar`: 전역 헤더(항상 표시) → `prediction-section` 내부(예측 볼 때만)
+- `season-sim-bar`: 전역 헤더 → `insights-section` 내부(⑤ 탭 열면 표시, 리그 통계와 맥락 일치)
+
+#### static/js/prediction.js (v54→v55)
+- `loadPrediction()` 진입 시 `_hideBannerMatchup()` — 예측 열리면 배너 자동 숨김
+- `closeBtn` / `clearMatchContext()` 시 `_restoreBannerMatchup()` — 팀 선택 상태 보존 시 복원
+
+#### static/js/banner_stats.js (v2→v3)
+- `showPanel()`: prediction-section 미숨김 상태면 표시 차단 (중복 방지)
+
+#### static/css/style.css (v46→v47)
+- `.header-accuracy-bar` / `.season-sim-bar` margin 조정 (전역 헤더 → 섹션 내부 맥락)
+
+### Before / After
+- Before: 첫 화면 = 헤더 + 정확도바 + 시뮬바 → 경기클릭 시 매치업비교 + 예측(H2H 중복)
+- After:  첫 화면 = 헤더 + 매치선택만 → 경기클릭 시 예측+정확도 / 인사이트 열면 시뮬
+
+---
+
 ## 2026-05-31 | UX 편의성 전면 개선 (v46) — 6인 관점 솔직 진단 후 패치
 
 ### 작업 배경
@@ -3360,3 +3388,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-05-31 00:38:31 | curl -s http://127.0.0.1:5000/api/update-status
 - 2026-05-31 00:38:52 | curl -s http://127.0.0.1:5000/ | grep -E "v=46|v=2.*heatmap|v=3.*analytics|v=54.*prediction|dfb-text|k2-player-search|k2-player-context|onboarding" | head -20
 - 2026-05-31 00:38:56 | curl -s http://127.0.0.1:5000/ | grep -E "k2heatmap.js|player_analytics.js|prediction.js"
+- 2026-05-31 02:13:26 | curl -s http://127.0.0.1:5000/ | grep -E "header-accuracy|season-sim-bar|prediction-section|banner-matchup" | head -10
