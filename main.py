@@ -3060,6 +3060,46 @@ def _setpiece_total_avg(by_type):
     }
 
 
+def _setpiece_players(cur, ss_id, tournament_id, year, limit=5):
+    """팀의 시즌 세트피스 슛 기여 선수 TOP N (상황별 집계 후 피벗)."""
+    cur.execute("""
+        SELECT ms.player_id,
+               COALESCE(p.name_ko, p.name, ms2.player_name) AS name,
+               ms.situation,
+               COUNT(*)                                      AS shots,
+               SUM(CASE WHEN ms.outcome='goal' THEN 1 ELSE 0 END) AS goals,
+               ROUND(SUM(COALESCE(ms.xg, 0)), 2)            AS xg_sum
+        FROM match_shotmap ms
+        JOIN events e ON e.id = ms.event_id
+        LEFT JOIN players p ON p.id = ms.player_id
+        LEFT JOIN (
+            SELECT DISTINCT player_id, player_name FROM match_player_stats
+        ) ms2 ON ms2.player_id = ms.player_id
+        WHERE e.tournament_id = ?
+          AND ((ms.is_home=1 AND e.home_team_id=?) OR (ms.is_home=0 AND e.away_team_id=?))
+          AND ms.situation IN ('corner','free-kick','penalty')
+          AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?
+          AND ms.player_id IS NOT NULL
+        GROUP BY ms.player_id, ms.situation
+        ORDER BY shots DESC
+    """, (tournament_id, ss_id, ss_id, year))
+
+    # player_id → {name, situations: {sit: {shots,goals,xg}}, totals}
+    players = {}
+    for pid, name, sit, shots, goals, xg_sum in cur.fetchall():
+        if pid not in players:
+            players[pid] = {"player_id": pid, "name": name or "?",
+                            "by_sit": {}, "total_shots": 0, "total_goals": 0, "total_xg": 0.0}
+        p = players[pid]
+        p["by_sit"][sit] = {"shots": shots, "goals": goals, "xg": round(float(xg_sum), 2)}
+        p["total_shots"]  += shots
+        p["total_goals"]  += goals
+        p["total_xg"]     = round(p["total_xg"] + float(xg_sum), 2)
+
+    ranked = sorted(players.values(), key=lambda x: (-x["total_goals"], -x["total_shots"]))
+    return ranked[:limit]
+
+
 @app.route("/api/setpiece-efficiency")
 @cached_response(ttl=3600)
 def setpiece_efficiency():
@@ -3087,9 +3127,13 @@ def setpiece_efficiency():
     conn = sqlite3.connect(DB_PATH)
     cur  = conn.cursor()
     try:
-        home_sp    = _setpiece_team_season(cur, home_info["sofascore_id"], tid, year)
-        away_sp    = _setpiece_team_season(cur, away_info["sofascore_id"], tid, year)
-        league_avg = _setpiece_league_avg(cur, tid, year)
+        home_ss = home_info["sofascore_id"]
+        away_ss = away_info["sofascore_id"]
+        home_sp      = _setpiece_team_season(cur, home_ss, tid, year)
+        away_sp      = _setpiece_team_season(cur, away_ss, tid, year)
+        league_avg   = _setpiece_league_avg(cur, tid, year)
+        home_players = _setpiece_players(cur, home_ss, tid, year)
+        away_players = _setpiece_players(cur, away_ss, tid, year)
     finally:
         conn.close()
 
@@ -3111,6 +3155,7 @@ def setpiece_efficiency():
             "primary": home_info.get("primary"),
             "by_type": home_sp,
             "total":   _setpiece_total(home_sp),
+            "players": home_players,
         },
         "away": {
             "slug":    away_slug,
@@ -3119,6 +3164,7 @@ def setpiece_efficiency():
             "primary": away_info.get("primary"),
             "by_type": away_sp,
             "total":   _setpiece_total(away_sp),
+            "players": away_players,
         },
         "league_avg": {
             "by_type": league_avg,

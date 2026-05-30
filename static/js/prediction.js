@@ -1609,6 +1609,21 @@
         const homeColor = home.primary || "#4ea4f8";
         const awayColor = away.primary || "#b87ef8";
 
+        const SIT_ICON = { "corner": "⛳", "free-kick": "🎯", "penalty": "🥅" };
+        const spContribRow = (p, color) => {
+            const sits = Object.entries(p.by_sit || {})
+                .sort((a, b) => b[1].goals - a[1].goals || b[1].shots - a[1].shots)
+                .map(([sit, v]) => `<span class="spe-contrib-sit" title="${sit} ${v.shots}시도 ${v.goals}골">${SIT_ICON[sit] || "·"}${v.goals ? `<b>${v.goals}</b>` : v.shots}</span>`)
+                .join("");
+            const xgTip = p.total_xg > 0 ? ` · xG ${p.total_xg}` : "";
+            return `<div class="spe-contrib-row scorer-link" data-player-id="${p.player_id}"
+                         title="${p.name} — ${p.total_shots}시도 ${p.total_goals}골${xgTip}">
+                <span class="spe-contrib-name" style="color:${color}">${p.name}</span>
+                <span class="spe-contrib-sits">${sits}</span>
+                <span class="spe-contrib-goals">${p.total_goals}골</span>
+            </div>`;
+        };
+
         // 한 행 (한 종류) 시각화 — 양 팀 시도 막대 + 리그 평균선 + xG 효율 라벨
         const rowHtml = (t) => {
             const h = home.by_type[t.key], a = away.by_type[t.key];
@@ -1696,6 +1711,18 @@
             ${TYPES.map(rowHtml).join("")}
             ${insights.length ? `
             <div class="spe-insights">${insights.map(t => `<div class="spe-insight">${t}</div>`).join("")}</div>` : ""}
+            ${(home.players?.length || away.players?.length) ? `
+            <div class="spe-contributors">
+                <div class="spe-contrib-title">세트피스 기여 선수 (시즌 누적)</div>
+                <div class="spe-contrib-grid">
+                    <div class="spe-contrib-col">
+                        ${(home.players || []).map(p => spContribRow(p, homeColor)).join("")}
+                    </div>
+                    <div class="spe-contrib-col spe-contrib-away">
+                        ${(away.players || []).map(p => spContribRow(p, awayColor)).join("")}
+                    </div>
+                </div>
+            </div>` : ""}
             <div class="spe-foot">xG차 = 실득점 − 누적 xG. 양수면 기댓값 초과 효율. 출처: SofaScore shotmap${spe.xg_estimated ? " (xG는 자체 모델 추정)" : " (xG 실측)"}.</div>
         </div>`;
         wrap.insertAdjacentHTML("beforeend", html);

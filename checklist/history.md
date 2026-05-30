@@ -3256,6 +3256,30 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - **7인**: P1 세트피스 실전 활용 / P2 정확한 전환율 / P3(후속: 선수단위 기여 백로그) / P4 xG 비대칭 명시적 처리 / P5 코치 협업 / P6 막대+칩 시각계층·반응형 / P7 파라미터 바인딩·캐싱·입력검증 → 전원 PASS
 - **후속 백로그**: K1 shotmap xG 백필(카드 완전체), 선수 단위 세트피스 기여, SSH 화이트리스트(P7).
 
+## 2026-05-30 | cache-invalidate 보안 강화 + xG 추정 배지 툴팁
+
+### 예측 라인업 결장/부상/출전정지 배지 (commit `a67ba41`)
+- **기능**: `_compute_predicted_lineup_data`에서 `player_status.json` 조회 후 starter별 `status`/`status_note` 추가. 부상(🚑)/출전정지(🟥)/출전의문(⚠) 배지 + `lu-player-unavail` 스타일(opacity 0.55 + strikethrough).
+- **한계**: `player_status.json`이 현재 1건(희소). 데이터 정기 업데이트 시 효과 극대화.
+- **캐시버스트**: style.css v44, prediction.js v52.
+- **검증**: `?teamId=suwon` 응답에 `status: null, status_note: null` 필드 정상 포함.
+
+### cache-invalidate 외부 우회 차단 (commit `0cfd3a9`)
+- **취약점**: `remote_addr` 단독 체크는 nginx `X-Forwarded-For` 주입으로 우회 가능. 외부에서 200 반환 확인.
+- **수정**: 로컬 직접 호출(127.x + `X-Forwarded-For` 없음)만 무조건 허용, nginx 경유 요청은 `UPDATE_SECRET` hmac 검증 필수로 변경.
+- **검증**: ① 로컬 직접 → 200, ② X-Forwarded-For + no secret → 403 확인.
+
+### xG 추정 배지 커스텀 CSS 툴팁 (commit `19df793`)
+- **변경**: `title` 기본 툴팁 → `data-tip` + CSS `::after` 버블. 툴팁 내용: "수비 압박·골키퍼 위치 미반영, K2 실측 대비 참고용". `?` 원형 아이콘 추가. `role=tooltip tabindex=0`으로 키보드 접근성 보장.
+- **캐시버스트**: style.css v43, prediction.js v51.
+- **검증**: 배지 마크업 전 속성 확인, `:focus` → `opacity:1 visibility:visible` 확인, CSS hover 규칙 정상 작동 확인.
+
+## 2026-05-30 | 운영 서버 K1 shotmap xG 백필 동기화
+- **문제**: `backfill_k1_shotmap_xg.py`가 로컬에서만 실행됨. 운영 서버 `players.db`는 gitignored라 CI 배포 미포함. K1 세트피스 카드 xG 칩이 운영에서 null이었음.
+- **조치**: SSH → `./venv/bin/python crawlers/backfill_k1_shotmap_xg.py` 실행 (idempotent, `xg IS NULL`만 갱신). 추가로 최신 라운드 신규 샷 62건도 함께 처리됨.
+- **결과**: K1 2026(tid=410) xg NULL **0** / 23,369샷 추정 xG 완전 채워짐. 캐시 무효화 후 API 확인 — corner xg=3.82, xg_diff=-0.82, xg_estimated=true 정상.
+- **참고**: 남은 NULL(tid=777)은 2020 시즌 구데이터로 세트피스 카드 영향 없음.
+
 ## 2026-05-29 K1 shotmap xG 백필 (세트피스 카드 완전체)
 - **문제**: K1 2026 match_shotmap.xg 전부 NULL (SofaScore 원천에 K1 xG 없음). 세트피스 카드가 K1에서 xG 칩 미표시 → 반쪽 작동. 기존 build_k1_xg.py는 mps.expected_goals만 채우고 shotmap.xg는 안 채웠음.
 - **해법**: crawlers/backfill_k1_shotmap_xg.py 신규. 재크롤링 없이 저장된 컬럼(x/y/situation/body_part/outcome)으로 샷 단위 xG 로컬 추정 → match_shotmap.xg 갱신. 모델은 build_k1_xg.estimate_xg와 동일 공식(거리·각도·헤더×0.6·fast-break×1.3·set-piece×0.9·PK0.78·직접FK0.05).
