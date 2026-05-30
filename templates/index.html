@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=46">
+    <link rel="stylesheet" href="/static/css/style.css?v=47">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -80,11 +80,6 @@
             </div>
             {% endif %}
         </header>
-        <!-- 모델 정확도 상시 표시 — 예측 신뢰도 첫인상 노출 -->
-        <div id="header-accuracy" class="header-accuracy-bar"></div>
-        <!-- 시즌 시뮬레이션 — 남은 매치 Monte Carlo 우승·AFC·강등 확률 -->
-        <div id="season-sim-bar" class="season-sim-bar"></div>
-
         <!-- ① 매치 선택 — 리그 일정 배너 (K1 / K2 탭) -->
         <div class="flow-section-head">
             <span class="flow-step">①</span>
@@ -113,6 +108,8 @@
         <!-- ③ 예측 보고서 (전술판+선수분석 위, 전체 너비) -->
         <section id="prediction-section" class="hidden">
             <button id="prediction-close" title="닫기">✕</button>
+            <!-- 모델 정확도 — 예측 볼 때만 표시 -->
+            <div id="header-accuracy" class="header-accuracy-bar"></div>
             <div id="prediction-report">
                 <!-- JS로 렌더링 -->
             </div>
@@ -307,6 +304,8 @@
             <span class="insights-toggle-label">K리그 통계 인사이트 (TOP 퍼포머·카드 순위)</span>
             <span class="insights-toggle-arrow">▼</span>
         </button>
+        <!-- 시즌 시뮬레이션 — 인사이트 탭과 묶음 -->
+        <div id="season-sim-bar" class="season-sim-bar"></div>
         <div class="ld-header">
             <h2 class="ld-title">🎯 포지션별 인사이트</h2>
             <div class="ld-year-filter" id="insights-year-filter"></div>
@@ -766,10 +765,10 @@
 
     <script src="/static/js/info.js?v=7"></script>
     <script src="/static/js/k2heatmap.js?v=2"></script>
-    <script src="/static/js/banner_stats.js?v=2"></script>
+    <script src="/static/js/banner_stats.js?v=3"></script>
     <script src="/static/js/analytics.js?v=2"></script>
     <script src="/static/js/team_compare.js?v=7"></script>
-    <script src="/static/js/prediction.js?v=54"></script>
+    <script src="/static/js/prediction.js?v=55"></script>
 
     <!-- 선수 분석 모달 -->
     <div id="player-analytics-modal" class="pa-modal hidden">

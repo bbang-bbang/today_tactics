@@ -59,8 +59,24 @@
     const section   = document.getElementById("prediction-section");
     const report    = document.getElementById("prediction-report");
     const closeBtn  = document.getElementById("prediction-close");
+    const _bm       = document.getElementById("banner-matchup");
+
+    // banner-matchup: 예측 섹션과 공존하면 H2H 이중 노출 → 예측 열리면 숨김
+    function _hideBannerMatchup() { if (_bm) _bm.classList.add("hidden"); }
+    function _restoreBannerMatchup() {
+        if (!_bm) return;
+        const nameA = document.getElementById("fhud-name-a");
+        const nameB = document.getElementById("fhud-name-b");
+        const hasA = nameA && nameA.textContent.trim() !== "HOME" && nameA.textContent.trim() !== "";
+        const hasB = nameB && nameB.textContent.trim() !== "AWAY" && nameB.textContent.trim() !== "";
+        if (hasA || hasB) _bm.classList.remove("hidden");
+    }
+
     if (closeBtn) {
-        closeBtn.addEventListener("click", () => section.classList.add("hidden"));
+        closeBtn.addEventListener("click", () => {
+            section.classList.add("hidden");
+            _restoreBannerMatchup();
+        });
     }
 
     // ── 매치 컨텍스트 초기화 (리그/라운드 전환 시 호출) ─────
@@ -69,6 +85,7 @@
         if (report) report.innerHTML = "";
         _lastHome = null;
         _lastAway = null;
+        _restoreBannerMatchup();
     }
 
     // ── 리그 탭 전환 ─────────────────────────────────────
@@ -563,6 +580,7 @@
 
     function loadPrediction(homeId, awayId, gameDate, isFinished) {
         _lastHome = homeId; _lastAway = awayId;
+        _hideBannerMatchup();  // 예측 열리면 H2H 중복 방지
         console.log(`[예측 시작] ${homeId} vs ${awayId} date=${gameDate} finished=${isFinished}`);
         report.innerHTML = `<div class="pred-loading">분석 중...</div>`;
         const league = _inferLeague(homeId, awayId);

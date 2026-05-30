@@ -4,6 +4,9 @@
     const bannerMatchup = document.getElementById("banner-matchup");
 
     function showPanel() {
+        // 예측 보고서가 열려 있으면 banner-matchup 미표시 (H2H 이중 노출 방지)
+        const predSection = document.getElementById("prediction-section");
+        if (predSection && !predSection.classList.contains("hidden")) return;
         bannerMatchup.classList.remove("hidden");
     }
 
