@@ -1611,7 +1611,7 @@
     function loadStatusCache() {
         return fetch("/api/player-status").then(r => r.json())
             .then(d => { _statusCache = d; return d; })
-            .catch(() => ({}));
+            .catch(err => { console.warn("선수 상태 로드 실패:", err?.message); return {}; });
     }
     loadStatusCache();
 
@@ -1627,7 +1627,8 @@
 
         if (next === "available") {
             fetch(`/api/player-status/${pid}`, { method: "DELETE" })
-                .then(() => { delete _statusCache[pid]; renderBench(); showToast(`${player.name}: 정상 복귀`); });
+                .then(() => { delete _statusCache[pid]; renderBench(); showToast(`${player.name}: 정상 복귀`); })
+                .catch(err => { console.warn("상태 삭제 실패:", err?.message); showToast("상태 변경 실패 — 네트워크 오류"); });
         } else {
             fetch("/api/player-status", {
                 method: "POST",
@@ -1637,7 +1638,7 @@
                 _statusCache[pid] = { playerId: pid, teamId, name: player.name, status: next };
                 renderBench();
                 showToast(`${player.name}: ${STATUS_LABELS[next]}`);
-            });
+            }).catch(err => { console.warn("상태 저장 실패:", err?.message); showToast("상태 변경 실패 — 네트워크 오류"); });
         }
     }
 

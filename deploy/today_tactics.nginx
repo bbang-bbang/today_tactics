@@ -43,6 +43,10 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    # CSP: 외부 리소스 = jsdelivr(Pretendard 폰트 + Chart.js)만 허용.
+    # script unsafe-inline: index.html 인라인 fetch 래퍼(글로벌 에러핸들링) 허용.
+    # img data:: Canvas toDataURL PNG 내보내기 + 팀 엠블럼.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';" always;
 
     # 서버 정보 노출 최소화
     server_tokens off;

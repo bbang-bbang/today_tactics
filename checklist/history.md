@@ -4,6 +4,34 @@
 
 ---
 
+## 2026-06-01 | CSP 헤더 + DB context manager + JS catch 보강
+
+### 작업 배경
+- 전문가 패널 진단 3차 후속: nginx CSP 없음, conn.close() without finally, JS .catch() 누락
+
+### 변경 내역
+
+#### deploy/today_tactics.nginx
+- `Content-Security-Policy` 헤더 추가 (nginx + SSH 즉시 적용 완료)
+  - `default-src 'self'`, `script-src 'self' 'unsafe-inline' cdn.jsdelivr.net`
+  - `style-src / font-src`: jsdelivr(Pretendard), `img-src data:` (Canvas PNG 내보내기)
+  - `frame-ancestors 'none'` (클릭재킹 이중 방어)
+
+#### main.py
+- `from contextlib import contextmanager` 추가
+- `get_db(row_factory=True)` context manager 추가 — 예외 경로 conn.close() 보장
+  신규 라우트에서 `with get_db() as conn:` 패턴 사용 권장
+
+#### static/js/app.js
+- `loadStatusCache()`: `.catch(() => ({}))` → `.catch(err => { console.warn(...); return {}; })`
+- `togglePlayerStatus()` DELETE 경로: `.catch()` 추가 — "상태 변경 실패 — 네트워크 오류" 토스트
+- `togglePlayerStatus()` POST 경로: `.catch()` 추가 — 동일 토스트, `_statusCache` 불일치 방지
+
+#### main.py (별도 커밋)
+- `login_required_api`: `LOGIN_REQUIRED=0` 시 쓰기 오픈 (OAuth 미설정 환경 prod 즉시 복구)
+
+---
+
 ## 2026-06-01 | CRUD 인증 게이트 + Gabia FLASK_SECRET_KEY 주입
 
 ### 작업 배경

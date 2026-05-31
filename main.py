@@ -7,6 +7,7 @@ import secrets as _secrets
 import subprocess
 import threading
 import urllib.request
+from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 import time as _time_mod
@@ -107,6 +108,18 @@ SQUADS_DIR  = os.path.join(BASE_DIR, "squads")
 STATUS_FILE = os.path.join(BASE_DIR, "data", "player_status.json")
 os.makedirs(SAVES_DIR,  exist_ok=True)
 os.makedirs(SQUADS_DIR, exist_ok=True)
+
+
+@contextmanager
+def get_db(row_factory=True):
+    """SQLite 연결 context manager — 예외 발생 경로에서도 conn.close() 보장."""
+    conn = sqlite3.connect(DB_PATH)
+    if row_factory:
+        conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 # ════════════════════════════════════════════════════════════════
