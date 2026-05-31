@@ -581,6 +581,7 @@ def _safe_path(base_dir, file_id):
 
 
 @app.route("/api/saves", methods=["POST"])
+@login_required_api
 def create_save():
     body = request.get_json()
     save_id = str(uuid.uuid4())[:8]
@@ -615,6 +616,7 @@ def get_save(save_id):
 
 
 @app.route("/api/saves/<save_id>", methods=["PUT"])
+@login_required_api
 def update_save(save_id):
     fpath = _safe_path(SAVES_DIR, save_id)
     if not fpath or not os.path.exists(fpath):
@@ -635,6 +637,7 @@ def update_save(save_id):
 
 
 @app.route("/api/saves/<save_id>", methods=["DELETE"])
+@login_required_api
 def delete_save(save_id):
     fpath = _safe_path(SAVES_DIR, save_id)
     if not fpath or not os.path.exists(fpath):
@@ -668,6 +671,7 @@ def list_squads():
 
 
 @app.route("/api/squads", methods=["POST"])
+@login_required_api
 def create_squad():
     body = request.get_json()
     squad_id = str(uuid.uuid4())[:8]
@@ -714,6 +718,7 @@ def get_squad(squad_id):
 
 
 @app.route("/api/squads/<squad_id>", methods=["DELETE"])
+@login_required_api
 def delete_squad(squad_id):
     # 직접 파일명으로 시도
     fpath = _safe_path(SQUADS_DIR, squad_id)

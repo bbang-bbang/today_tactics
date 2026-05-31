@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-06-01 | CRUD 인증 게이트 + Gabia FLASK_SECRET_KEY 주입
+
+### 작업 배경
+- 전 세션 진단 후속: saves/squads WRITE 엔드포인트 무인증 공개 → 익명 삭제 가능
+- FLASK_SECRET_KEY 미주입 → 서비스 재시작 시 로그인 세션 전부 무효화
+
+### 변경 내역
+
+#### main.py — `@login_required_api` 5곳 추가
+- `POST /api/saves` (create_save)
+- `PUT /api/saves/<id>` (update_save)
+- `DELETE /api/saves/<id>` (delete_save)
+- `POST /api/squads` (create_squad)
+- `DELETE /api/squads/<id>` (delete_squad)
+- GET 엔드포인트는 공개 유지 (전술 조회/로드는 비로그인 가능)
+
+#### static/js/app.js — 401 응답 핸들링 4곳
+- 전술 저장(PUT/POST), 전술 삭제(DELETE), 스쿼드 저장(POST), 스쿼드 삭제(DELETE)
+- 401 수신 시 `showToast("저장/삭제하려면 로그인이 필요합니다.")` + 조기 return
+
+#### Gabia 서버 (코드 외, SSH 직접 적용)
+- `/etc/systemd/system/today_tactics.service.d/secret.conf` 생성
+- `Environment="FLASK_SECRET_KEY=<랜덤 32바이트 서버측 생성>"` — 키는 서버에서만 생성, 전송 없음
+- `systemctl daemon-reload && restart` → `active` 확인
+
+### Before / After
+- Before: 누구나 DELETE /api/saves/<id> → 다른 사용자 전술 삭제 가능 / 재시작마다 세션 무효
+- After:  로그인 사용자만 쓰기 가능 / FLASK_SECRET_KEY 고정 → 재시작 후에도 세션 유지
+
+---
+
 ## 2026-06-01 | 전문가 패널 진단 → 보안·안정성·데이터 3종 수정
 
 ### 작업 배경

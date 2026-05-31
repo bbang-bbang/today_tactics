@@ -1949,10 +1949,12 @@
         if (!name) { saveNameInput.focus(); return; }
         const snap = getStateSnapshot(); snap.name = name;
         if (saveOverwriteId) {
-            await fetch(`/api/saves/${saveOverwriteId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(snap) });
+            const r = await fetch(`/api/saves/${saveOverwriteId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(snap) });
+            if (r.status === 401) { showToast("저장하려면 로그인이 필요합니다."); closeSaveModal(); return; }
             showToast("전술이 덮어쓰기 되었습니다.");
         } else {
             const _saveRes = await fetch("/api/saves", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(snap) });
+            if (_saveRes.status === 401) { showToast("저장하려면 로그인이 필요합니다."); closeSaveModal(); return; }
             const _saved = await _saveRes.json();
             showLinkToast(_saved.id);
         }
@@ -2004,7 +2006,7 @@
             if (btn.classList.contains("btn-load-item")) { const r = await fetch(`/api/saves/${id}`); applySnapshot(await r.json()); closeLoadModal(); showToast("전술을 불러왔습니다."); }
             else if (btn.classList.contains("btn-overwrite-item")) { closeLoadModal(); openSaveModal(id, btn.dataset.name); }
             else if (btn.classList.contains("btn-link-item")) { copyShareLink(id); }
-            else if (btn.classList.contains("btn-delete-item")) { if (!confirm("정말 삭제하시겠습니까?")) return; await fetch(`/api/saves/${id}`, { method: "DELETE" }); showToast("삭제되었습니다."); openLoadModal(); }
+            else if (btn.classList.contains("btn-delete-item")) { if (!confirm("정말 삭제하시겠습니까?")) return; const _dr = await fetch(`/api/saves/${id}`, { method: "DELETE" }); if (_dr.status === 401) { showToast("삭제하려면 로그인이 필요합니다."); return; } showToast("삭제되었습니다."); openLoadModal(); }
         };
     }
     document.getElementById("btn-load").addEventListener("click", openLoadModal);
@@ -2439,7 +2441,7 @@
             const name = prompt(`스쿼드 이름을 입력하세요:`, teamName + " 스쿼드");
             if (!name) return;
 
-            await fetch("/api/squads", {
+            const _sqRes = await fetch("/api/squads", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -2453,6 +2455,7 @@
                     })),
                 }),
             });
+            if (_sqRes.status === 401) { showToast("저장하려면 로그인이 필요합니다."); return; }
             showToast("스쿼드가 저장되었습니다.");
         });
     });
@@ -2491,6 +2494,7 @@
                 } else if (btn2.classList.contains("btn-delete-item")) {
                     if (!confirm("정말 삭제하시겠습니까?")) return;
                     const delRes = await fetch(`/api/squads/${id}`, { method: "DELETE" });
+                    if (delRes.status === 401) { showToast("삭제하려면 로그인이 필요합니다."); return; }
                     if (!delRes.ok) { showToast("삭제 실패"); return; }
                     showToast("삭제되었습니다.");
                     // 목록 새로고침
