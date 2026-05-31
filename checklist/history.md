@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-06-01 | 전문가 패널 진단 → 보안·안정성·데이터 3종 수정
+
+### 작업 배경
+- 전문가 패널(P1~P7, C1~C2) 합의 진단: Red 2개 + Yellow 1개 + 인프라 누락 즉시 수정
+- `_API_CACHE` threading Lock 없음(gunicorn gthread 환경), shotmap 좌표 불일치(백로그 미해결), POST 크기 미제한
+
+### 변경 내역
+
+#### main.py (보안/안정성 3종)
+- `_API_CACHE_LOCK = threading.Lock()` 추가 — 캐시 read/write/evict/clear 전 구역 Lock 보유
+  - gunicorn `--worker-class gthread --threads 2` 환경에서 워커 내 2스레드 동시 dict 변조 race condition 방지
+- `MAX_CONTENT_LENGTH=512 * 1024` Flask 설정 추가 — POST /api/saves, /api/squads 무제한 업로드로 디스크 채우기 공격 방지
+- `/api/match-extras` shots 응답: `x = round(100.0 - x, 2)` 정규화 후 반환 — SofaScore 원본("공격 골=x=0")을 avg_positions 좌표계("자기 골=x=0")로 통일
+
+#### static/js/prediction.js (v55→v56)
+- `drawShotmap()`: `mapPos(100 - s.x, ...)` → `mapPos(s.x, ...)` — 좌표 정규화가 백엔드로 이전됨에 따라 프론트 임시 hack 제거
+
+#### templates/index.html
+- prediction.js 버전 55→56 bump
+
+#### deploy/today_tactics.service
+- `FLASK_SECRET_KEY` 미설정 시 재기동 시 세션 무효화 경고 주석 추가 — 운영 서버 `systemctl edit`으로 고정 키 주입 권장
+
+### Before / After
+- Before: 다중 스레드 동시 캐시 접근 → dict 손상 가능 / shotmap x 좌표 API 응답에 뒤집힌 값 그대로 노출 / POST 무제한
+- After:  Lock으로 안전 / 좌표 API/DB 기준 통일 / 512KB 상한
+
+---
+
 ## 2026-05-31 | 가독성 즉시 개선 (v47) — 헤더 밀집 + H2H 이중 노출 제거
 
 ### 작업 배경

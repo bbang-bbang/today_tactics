@@ -8,6 +8,10 @@ Group=rocky
 WorkingDirectory=/opt/today_tactics
 Environment="PATH=/opt/today_tactics/venv/bin"
 Environment="FLASK_DEBUG=0"
+# FLASK_SECRET_KEY 미설정 시 재기동마다 새 키 생성 → 모든 로그인 세션 무효화.
+# 운영 서버에서 반드시 고정 키를 주입할 것:
+#   sudo systemctl edit today_tactics  →  Environment="FLASK_SECRET_KEY=<32바이트 이상 랜덤>" 추가
+# Environment="FLASK_SECRET_KEY=<설정 필요>"
 
 # CPU 우선순위 — 같은 서버의 다른 프로세스(bunting 봇) 폭주 시
 # today_tactics가 사용자 응답 우선으로 CPU 받도록 비례 가중치 + nice 조정

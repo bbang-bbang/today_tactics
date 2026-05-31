@@ -1872,14 +1872,12 @@
         const w = canvas.width, h = canvas.height;
         drawPitch(ctx, w, h);
 
-        // SofaScore shotmap 좌표는 "공격 골 = x=0"이라 avg_positions(자기 골=x=0)과 반대.
-        // shot.x를 (100 - shot.x)로 뒤집어 같은 좌표계로 맞춘 뒤 mapPos에 전달.
-        // 슛 ring = 키트 stroke 색 (홈/어웨이 구분)
+        // 좌표 정규화는 백엔드(/api/match-extras)에서 완료 — 프론트 변환 불필요.
         const drawShots = [];
         for (const s of shots) {
             if (s.x == null || s.y == null) continue;
             const isHome = s.is_home === 1;
-            const [px, py] = mapPos(100 - s.x, s.y, isHome, w, h);
+            const [px, py] = mapPos(s.x, s.y, isHome, w, h);
             const color = SHOT_COLORS[s.shot_type] || "#888";
             const r = s.shot_type === "goal" ? 8 : 5.5;
 

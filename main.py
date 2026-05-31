@@ -18,10 +18,11 @@ import time as _time_mod
 _API_CACHE = {}  # key → (expires_at, payload). Python 3.7+ dict는 insertion order 보존 → LRU 흉내
 _API_CACHE_TTL = 3600  # 1시간
 _API_CACHE_MAX_KEYS = 4096  # player_id × 파라미터 조합 폭발 방지 cap
+_API_CACHE_LOCK = threading.Lock()  # 다중 스레드(gunicorn thread-worker) 동시 접근 보호
 
 
 def _api_cache_evict_if_full():
-    """캡 초과 시 만료된 키 우선 삭제, 그래도 초과면 oldest insertion부터 삭제."""
+    """캡 초과 시 만료된 키 우선 삭제, 그래도 초과면 oldest insertion부터 삭제. Lock 보유 상태로만 호출."""
     if len(_API_CACHE) < _API_CACHE_MAX_KEYS:
         return
     now = _time_mod.time()
@@ -45,10 +46,11 @@ def cached_response(ttl=_API_CACHE_TTL):
             except Exception:
                 return fn(*args, **kwargs)
             now = _time_mod.time()
-            ent = _API_CACHE.get(key)
-            if ent and ent[0] > now:
-                body, mimetype, status = ent[1]
-                return Response(body, status=status, mimetype=mimetype)
+            with _API_CACHE_LOCK:
+                ent = _API_CACHE.get(key)
+                if ent and ent[0] > now:
+                    body, mimetype, status = ent[1]
+                    return Response(body, status=status, mimetype=mimetype)
             resp = fn(*args, **kwargs)
             try:
                 # Response 객체 또는 tuple 처리
@@ -62,8 +64,9 @@ def cached_response(ttl=_API_CACHE_TTL):
                     status = 200
                 # 4xx/5xx는 캐시하지 않음 (일시 오류가 굳지 않도록)
                 if 200 <= status < 300:
-                    _api_cache_evict_if_full()
-                    _API_CACHE[key] = (now + ttl, (body, mimetype, status))
+                    with _API_CACHE_LOCK:
+                        _api_cache_evict_if_full()
+                        _API_CACHE[key] = (now + ttl, (body, mimetype, status))
             except Exception:
                 pass
             return resp
@@ -73,7 +76,8 @@ def cached_response(ttl=_API_CACHE_TTL):
 
 def invalidate_api_cache():
     """update_data.py 실행 후 새 데이터 반영 위해 캐시 클리어."""
-    _API_CACHE.clear()
+    with _API_CACHE_LOCK:
+        _API_CACHE.clear()
 
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, abort
 from authlib.integrations.flask_client import OAuth
@@ -89,6 +93,7 @@ app.config.update(
     SESSION_COOKIE_SECURE=True,           # HTTPS 전용 (프로덕션 today-tactics.co.kr)
     SESSION_COOKIE_SAMESITE="Lax",
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+    MAX_CONTENT_LENGTH=512 * 1024,        # 요청 바디 최대 512 KB — POST /saves·/squads 디스크 채우기 방지
 )
 
 # 로컬 개발(127.0.0.1, http) 접근 허용 — Secure 쿠키 비활성
@@ -7315,11 +7320,20 @@ def match_extras():
 
     conn.close()
 
+    # SofaScore shotmap 원본 좌표는 "공격 골 = x=0" (avg_positions과 반대).
+    # 여기서 x = 100 - x 로 정규화해 avg_positions("자기 골 = x=0")과 통일.
+    shots_normalized = []
+    for s in shot_rows:
+        d = dict(s)
+        if d.get("x") is not None:
+            d["x"] = round(100.0 - float(d["x"]), 2)
+        shots_normalized.append(d)
+
     return jsonify({
         "ready":         True,
         "event_id":      eid,
         "avg_positions": [dict(r) for r in pos_rows],
-        "shots":         [dict(r) for r in shot_rows],
+        "shots":         shots_normalized,
         "subs":          subs,
     })
 
