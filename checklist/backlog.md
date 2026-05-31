@@ -6,7 +6,29 @@
 
 ## 🔴 P1 — 가치 큰 단기 작업
 
-(없음 — 5/7 세션으로 자동화 + 데이터 정합성 + UI 핵심 처리됨)
+### [ ] Google OAuth 발급 + LOGIN_REQUIRED=1 활성화 — 2026-06-01 진행 중
+
+**상태**: Google Cloud Console에서 OAuth 앱 등록 대기 중
+
+**필요한 것**:
+- [Google Cloud Console](https://console.cloud.google.com) → OAuth 2.0 클라이언트 ID 발급
+- 콜백 URL 등록: `https://today-tactics.co.kr/auth/callback/google`
+- 획득: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+
+**Gabia 서버 적용 명령** (발급 후 SSH로 실행):
+```bash
+ssh -i ~/today-project.pem rocky@1.201.126.200
+sudo systemctl edit today_tactics
+# 아래 3줄 추가:
+# Environment="GOOGLE_CLIENT_ID=<발급값>"
+# Environment="GOOGLE_CLIENT_SECRET=<발급값>"
+# Environment="LOGIN_REQUIRED=1"
+sudo systemctl daemon-reload && sudo systemctl restart today_tactics
+```
+
+**확인**: `https://today-tactics.co.kr/login` → Google 로그인 버튼 동작 확인
+
+**효과**: saves/squads 쓰기가 로그인 사용자만 가능 (현재는 LOGIN_REQUIRED=0으로 누구나 쓸 수 있음)
 
 ---
 

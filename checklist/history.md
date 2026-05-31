@@ -4,6 +4,36 @@
 
 ---
 
+## 2026-06-01 | 전문가 패널 보안 강화 세션 — 전체 요약
+
+### 이번 세션에서 완료된 작업 (커밋 4개)
+
+| 커밋 | 내용 |
+|------|------|
+| `db2a58c` | _API_CACHE Lock + MAX_CONTENT_LENGTH + shotmap 좌표 정규화 |
+| `1091422` | saves/squads @login_required_api + 프론트 401 핸들링 |
+| `75c04e6` | login_required_api LOGIN_REQUIRED=0 시 bypass (prod 복구) |
+| `176f2d7` | CSP 헤더 + get_db() context manager + JS .catch() |
+
+### Gabia 서버 직접 적용 (SSH, 코드 외)
+- `/etc/systemd/system/today_tactics.service.d/secret.conf` — `FLASK_SECRET_KEY` 랜덤 생성·주입
+- `/etc/nginx/conf.d/today_tactics.conf` — CSP 헤더 즉시 적용 (nginx reload 완료)
+
+### 다음 PC에서 이어서 해야 할 것
+- **Google OAuth 발급** → `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` 획득
+  - 콜백 URL: `https://today-tactics.co.kr/auth/callback/google`
+  - 발급 후: Gabia 서버에 환경변수 주입 + `LOGIN_REQUIRED=1` 설정
+  - 명령: `sudo systemctl edit today_tactics` → 아래 추가
+    ```
+    Environment="GOOGLE_CLIENT_ID=..."
+    Environment="GOOGLE_CLIENT_SECRET=..."
+    Environment="LOGIN_REQUIRED=1"
+    ```
+  - `sudo systemctl daemon-reload && sudo systemctl restart today_tactics`
+- 로그인 버튼 동작 확인 (today-tactics.co.kr/login)
+
+---
+
 ## 2026-06-01 | CSP 헤더 + DB context manager + JS catch 보강
 
 ### 작업 배경
