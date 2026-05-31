@@ -217,10 +217,11 @@ def login_required(view):
 
 
 def login_required_api(view):
-    """API 라우트용 — 미인증 시 401 JSON."""
+    """API 라우트용 — 미인증 시 401 JSON.
+    LOGIN_REQUIRED=0(공개 모드)일 때는 쓰기도 열어줌. OAuth 설정 후 LOGIN_REQUIRED=1로 잠금."""
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if not session.get("user"):
+        if LOGIN_REQUIRED and not session.get("user"):
             return jsonify({"error": "unauthorized"}), 401
         return view(*args, **kwargs)
     return wrapped
