@@ -21,6 +21,13 @@ _API_CACHE_TTL = 3600  # 1시간
 _API_CACHE_MAX_KEYS = 4096  # player_id × 파라미터 조합 폭발 방지 cap
 _API_CACHE_LOCK = threading.Lock()  # 다중 스레드(gunicorn thread-worker) 동시 접근 보호
 
+# K리그 공식 스케줄 원본 캐시 — _fetch_k1/k2_all_games는 호출마다 월별 12회 HTTP를
+# 반복하므로(라운드 예측·일정 등 여러 엔드포인트가 사용) 결과를 메모이즈해 콜드 호출을 가속.
+# 스케줄은 하루 단위로만 바뀌므로 30분 TTL이면 충분. 데이터 업데이트 시 invalidate_api_cache가 함께 비움.
+_GAMES_CACHE = {}            # key: f"{league}|{year}" → (expires_at, games)
+_GAMES_CACHE_TTL = 1800      # 30분
+_GAMES_CACHE_LOCK = threading.Lock()
+
 
 def _api_cache_evict_if_full():
     """캡 초과 시 만료된 키 우선 삭제, 그래도 초과면 oldest insertion부터 삭제. Lock 보유 상태로만 호출."""
@@ -79,6 +86,8 @@ def invalidate_api_cache():
     """update_data.py 실행 후 새 데이터 반영 위해 캐시 클리어."""
     with _API_CACHE_LOCK:
         _API_CACHE.clear()
+    with _GAMES_CACHE_LOCK:
+        _GAMES_CACHE.clear()
 
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from authlib.integrations.flask_client import OAuth
@@ -840,23 +849,40 @@ def get_h2h_matches():
         result_a = "W" if (is_home_a and hs > as_) or (not is_home_a and as_ > hs) \
                    else ("D" if hs == as_ else "L")
 
-        # 득점 선수 조회 (자책골 제외: 홈팀 득점자만 홈에, 원정팀 득점자만 원정에)
+        # 득점자 + 득점 시간 — goal_events(분 단위) 우선, 없으면 match_player_stats 폴백.
+        scorers_home, scorers_away = [], []
         cur.execute("""
-            SELECT mps.team_id,
-                   COALESCE(p.name_ko, mps.player_name, p.name) as name,
-                   SUM(mps.goals) as g
-            FROM match_player_stats mps
-            LEFT JOIN players p ON mps.player_id = p.id
-            WHERE mps.event_id = ? AND mps.goals > 0
-            GROUP BY mps.player_id, mps.team_id
-            ORDER BY mps.team_id, g DESC
+            SELECT g.team_id,
+                   COALESCE(p.name_ko, g.player_name, p.name) AS name,
+                   g.minute, g.added_time, g.is_penalty, g.is_own_goal
+            FROM goal_events g
+            LEFT JOIN players p ON g.player_id = p.id
+            WHERE g.event_id = ?
+            ORDER BY g.minute, g.added_time
         """, (event_id,))
-        scorer_rows = cur.fetchall()
-
-        # 홈팀 득점자는 home_id와 team_id가 일치하는 선수만
-        # 원정팀 득점자는 away_id(= not home_id)와 team_id가 일치하는 선수만
-        scorers_home = [{"name": r[1], "goals": r[2]} for r in scorer_rows if r[0] == home_id]
-        scorers_away = [{"name": r[1], "goals": r[2]} for r in scorer_rows if r[0] == away_id]
+        ge_rows = cur.fetchall()
+        if ge_rows:
+            for tid_g, name, minute, added, is_pen, is_og in ge_rows:
+                # 자책골은 득점자 팀(team_id)의 상대팀 득점으로 귀속
+                benefit = tid_g if not is_og else (away_id if tid_g == home_id else home_id)
+                entry = {"name": name, "minute": minute, "added": added or 0,
+                         "pen": bool(is_pen), "og": bool(is_og)}
+                (scorers_home if benefit == home_id else scorers_away).append(entry)
+        else:
+            # 폴백: goal_events 미수집 경기 → 분 정보 없이 득점자만 (자책골 제외)
+            cur.execute("""
+                SELECT mps.team_id,
+                       COALESCE(p.name_ko, mps.player_name, p.name) as name,
+                       SUM(mps.goals) as g
+                FROM match_player_stats mps
+                LEFT JOIN players p ON mps.player_id = p.id
+                WHERE mps.event_id = ? AND mps.goals > 0
+                GROUP BY mps.player_id, mps.team_id
+                ORDER BY mps.team_id, g DESC
+            """, (event_id,))
+            for r in cur.fetchall():
+                entry = {"name": r[1], "goals": r[2]}
+                (scorers_home if r[0] == home_id else scorers_away).append(entry)
 
         result.append({
             "date": date_str,
@@ -5179,11 +5205,17 @@ KLEAGUE_TEAM_CODE = {
 }
 
 def _fetch_k2_all_games(year=None):
-    """K리그 공식 API에서 K2 전체 경기(완료+예정) 수집 — 1~12월"""
+    """K리그 공식 API에서 K2 전체 경기(완료+예정) 수집 — 1~12월. 결과 30분 메모이즈."""
     import urllib.request, datetime
     url = "https://www.kleague.com/getScheduleList.do"
     if year is None:
         year = datetime.datetime.now().year
+    _ck = f"k2|{year}"
+    _now = time.time()
+    with _GAMES_CACHE_LOCK:
+        _hit = _GAMES_CACHE.get(_ck)
+        if _hit and _hit[0] > _now:
+            return _hit[1]
     games = []
     # 시즌 전체 12개월 fetch — 라운드 일정 전체 확보 (R1~R38 등)
     for m in range(1, 13):
@@ -5196,6 +5228,9 @@ def _fetch_k2_all_games(year=None):
                 games += data.get("data", {}).get("scheduleList", [])
         except Exception:
             pass
+    if games:  # 빈 결과(네트워크 실패)는 캐시하지 않음
+        with _GAMES_CACHE_LOCK:
+            _GAMES_CACHE[_ck] = (_now + _GAMES_CACHE_TTL, games)
     return games
 
 def _parse_k2_game(g):
@@ -5294,11 +5329,17 @@ def get_k2_rounds():
 
 
 def _fetch_k1_all_games(year=None):
-    """K리그 공식 API에서 K1 전체 경기(완료+예정) 수집 — 1~12월"""
+    """K리그 공식 API에서 K1 전체 경기(완료+예정) 수집 — 1~12월. 결과 30분 메모이즈."""
     import urllib.request, datetime
     url = "https://www.kleague.com/getScheduleList.do"
     if year is None:
         year = datetime.datetime.now().year
+    _ck = f"k1|{year}"
+    _now = time.time()
+    with _GAMES_CACHE_LOCK:
+        _hit = _GAMES_CACHE.get(_ck)
+        if _hit and _hit[0] > _now:
+            return _hit[1]
     games = []
     # 시즌 전체 12개월 fetch — 라운드 일정 전체 확보 (R1~R38 등)
     for m in range(1, 13):
@@ -5311,6 +5352,9 @@ def _fetch_k1_all_games(year=None):
                 games += data.get("data", {}).get("scheduleList", [])
         except Exception:
             pass
+    if games:  # 빈 결과(네트워크 실패)는 캐시하지 않음
+        with _GAMES_CACHE_LOCK:
+            _GAMES_CACHE[_ck] = (_now + _GAMES_CACHE_TTL, games)
     return games
 
 
@@ -5408,7 +5452,8 @@ def get_k1_rounds():
 
 
 @app.route("/api/round-predictions")
-@cached_response(ttl=1800)  # 30분 (라운드는 며칠 단위)
+@cached_response(ttl=21600)  # 6시간 — 계산 비용 큼(_predict_core×경기수). 라운드는 주 단위라 안전.
+                             # 데이터 업데이트 시 invalidate_api_cache + _warm_cache로 재계산됨.
 def round_predictions():
     """
     라운드별 사전 예측 — look-ahead bias 차단.
@@ -7524,7 +7569,7 @@ def _warm_cache():
     K1/K2 백테스트 + 스케줄/라운드 + 시즌 시뮬 + 라운드 예측 — 워밍업 후 영구 빠름.
     모든 URL을 병렬 스레드로 동시 호출 → 총 대기 시간 = max(개별 시간).
     """
-    import urllib.request, time as _t
+    import urllib.request, time as _t, json as _json
     warm_urls = [
         # 시즌 시뮬 + 백테스트 (가장 무거움, 15s 단위)
         "http://127.0.0.1:5000/api/prediction-backtest?league=k1&year=2026",
@@ -7557,6 +7602,17 @@ def _warm_cache():
     def _fetch(u):
         try:
             urllib.request.urlopen(u, timeout=120).read()
+        except Exception:
+            pass
+    # 라운드별 사전 예측 — 현재 라운드를 동적으로 워밍업(_predict_core가 무거워 콜드 시 수십초).
+    # rounds 호출로 현재 라운드 확보(게임 캐시도 함께 채움) 후 해당 라운드 예측을 워밍 목록에 추가.
+    for _lg in ("k1", "k2"):
+        try:
+            _rd = _json.loads(urllib.request.urlopen(
+                f"http://127.0.0.1:5000/api/{_lg}/rounds", timeout=60).read())
+            _cr = _rd.get("current_round")
+            if _cr:
+                warm_urls.append(f"http://127.0.0.1:5000/api/round-predictions?league={_lg}&round={_cr}")
         except Exception:
             pass
     threads = [threading.Thread(target=_fetch, args=(u,), daemon=True) for u in warm_urls]

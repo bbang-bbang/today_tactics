@@ -28,6 +28,9 @@
     let trendChart   = null;
     let balanceChart = null;
     const _sparkCharts = {}; // key: "A"|"B" → Chart instance
+    // 골 타이밍 비교(두 팀 오버레이)
+    let _gtChartFor = null, _gtChartAgainst = null;
+    const _gtCache = new Map();   // key: `${teamA}|${teamB}|${year}` → {gtA, gtB, names}
 
     function populateSelects() {
         if (teamsLoaded) return;
@@ -134,6 +137,69 @@
         // 맞대결 경기 리스트는 병렬 fetch
         if (_matchesCache.has(matchesKey)) renderMatches(_matchesCache.get(matchesKey));
         else fetchMatches(a, b, matchesKey);
+
+        // 골 타이밍 두 팀 비교 (병렬 fetch)
+        const gtNames = {
+            a: (selA.options[selA.selectedIndex] || {}).text || "팀 A",
+            b: (selB.options[selB.selectedIndex] || {}).text || "팀 B",
+        };
+        if (_gtCache.has(cacheKey)) renderGoalTimingCompare(_gtCache.get(cacheKey));
+        else fetchGoalTiming(a, b, cacheKey, gtNames);
+    }
+
+    function fetchGoalTiming(a, b, cacheKey, names) {
+        const yp = currentYear !== "전체" ? `&year=${currentYear}` : "";
+        Promise.all([
+            fetch(`/api/goal-timing?teamId=${a}${yp}`).then(r => r.json()).catch(() => null),
+            fetch(`/api/goal-timing?teamId=${b}${yp}`).then(r => r.json()).catch(() => null),
+        ]).then(([gtA, gtB]) => {
+            const payload = { gtA, gtB, names };
+            _gtCache.set(cacheKey, payload);
+            if (_gtCache.size > 30) _gtCache.delete(_gtCache.keys().next().value);
+            renderGoalTimingCompare(payload);
+        }).catch(() => {});
+    }
+
+    function renderGoalTimingCompare(payload) {
+        const elFor = document.getElementById("tc-gt-for");
+        const elAg  = document.getElementById("tc-gt-against");
+        if (!elFor || !elAg) return;
+        const { gtA, gtB, names } = payload;
+        const ok = gtA && gtA.buckets && gtB && gtB.buckets;
+        const wrap = elFor.closest(".tc-gt-grid");
+        const note = document.getElementById("tc-gt-note");
+        if (!ok) {
+            if (_gtChartFor) { _gtChartFor.destroy(); _gtChartFor = null; }
+            if (_gtChartAgainst) { _gtChartAgainst.destroy(); _gtChartAgainst = null; }
+            if (wrap) wrap.style.opacity = "0.4";
+            if (note) note.textContent = "골 타이밍 데이터 없음 (해당 리그/시즌 미수집)";
+            return;
+        }
+        if (wrap) wrap.style.opacity = "1";
+        if (note) note.textContent = "막대 = 시간대별 골 수 · 팀 A(파랑) vs 팀 B(주황)";
+        const labels = gtA.buckets.map(x => x.label + "'");
+        const COL_A = "rgba(78,164,248,0.85)", COL_B = "rgba(248,161,78,0.85)";
+        const mk = (el, prev, dA, dB) => {
+            if (prev) prev.destroy();
+            return new Chart(el, {
+                type: "bar",
+                data: { labels, datasets: [
+                    { label: names.a, data: dA, backgroundColor: COL_A, borderRadius: 4 },
+                    { label: names.b, data: dB, backgroundColor: COL_B, borderRadius: 4 },
+                ] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: "#c8d0e8", font: { size: 11 }, boxWidth: 12, usePointStyle: true } },
+                        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}골` } } },
+                    scales: {
+                        x: { ticks: { color: "#8a9fb8", font: { size: 10 } }, grid: { display: false } },
+                        y: { beginAtZero: true, ticks: { color: "#8a9fb8", precision: 0, font: { size: 10 } }, grid: { color: "rgba(255,255,255,0.06)" } }
+                    }
+                }
+            });
+        };
+        _gtChartFor     = mk(elFor, _gtChartFor, gtA.buckets.map(x => x.for),     gtB.buckets.map(x => x.for));
+        _gtChartAgainst = mk(elAg,  _gtChartAgainst, gtA.buckets.map(x => x.against), gtB.buckets.map(x => x.against));
     }
 
     function fetchMatches(a, b, cacheKey) {
@@ -300,13 +366,13 @@
                 maintainAspectRatio: false,
                 animation: { duration: 600, easing: "easeOutQuart" },
                 plugins: {
-                    legend: { labels: { color: "#1f2d47", font: { weight: "600" }, usePointStyle: true, padding: 12 } },
+                    legend: { labels: { color: "#cdd8e8", font: { weight: "600" }, usePointStyle: true, padding: 12 } },
                     tooltip: {
                         backgroundColor: "#ffffff",
                         borderColor: "rgba(74,130,199,0.35)",
                         borderWidth: 1,
-                        titleColor: "#1f2d47",
-                        bodyColor: "#1f2d47",
+                        titleColor: "#cdd8e8",
+                        bodyColor: "#cdd8e8",
                         padding: 10,
                         cornerRadius: 8,
                         boxShadow: "0 6px 18px rgba(70,90,140,0.15)",
@@ -318,10 +384,10 @@
                 scales: {
                     r: {
                         min: 0, max: 100,
-                        angleLines: { color: "rgba(90,110,140,0.18)" },
-                        grid: { color: "rgba(90,110,140,0.14)" },
-                        pointLabels: { color: "#1f2d47", font: { size: 11, weight: "600" } },
-                        ticks: { color: "#8592a8", backdropColor: "rgba(255,255,255,0.7)", stepSize: 25, font: { size: 9 } }
+                        angleLines: { color: "rgba(255,255,255,0.12)" },
+                        grid: { color: "rgba(255,255,255,0.10)" },
+                        pointLabels: { color: "#cdd8e8", font: { size: 11, weight: "600" } },
+                        ticks: { color: "#9aa7bd", backdropColor: "transparent", stepSize: 25, font: { size: 9 } }
                     }
                 }
             }
@@ -466,12 +532,19 @@
             card.className = "tc-match-card tc-match-" + m.result_a.toLowerCase();
             const resultText = m.result_a === "W" ? "승" : m.result_a === "D" ? "무" : "패";
             // 홈/원정 박스 - A가 홈이면 왼쪽이 A
-            const homeScorerHTML = (m.scorers_home || []).map(s =>
-                `<span class="tc-scorer">${escapeHtml(s.name)}${s.goals > 1 ? ` ⚽×${s.goals}` : " ⚽"}</span>`
-            ).join("");
-            const awayScorerHTML = (m.scorers_away || []).map(s =>
-                `<span class="tc-scorer">${escapeHtml(s.name)}${s.goals > 1 ? ` ⚽×${s.goals}` : " ⚽"}</span>`
-            ).join("");
+            // 득점자 표시 — goal_events(분 포함) 있으면 "이름 51'", 없으면 폴백("이름 ⚽")
+            const fmtScorer = (s) => {
+                const nm = escapeHtml(s.name);
+                if (s.minute != null) {
+                    const t = s.added ? `${s.minute}+${s.added}'` : `${s.minute}'`;
+                    const tag = s.og ? ' <span class="tc-scorer-tag tc-scorer-og">OG</span>'
+                              : (s.pen ? ' <span class="tc-scorer-tag tc-scorer-pk">PK</span>' : '');
+                    return `<span class="tc-scorer">${nm}${tag} <span class="tc-scorer-min">${t}</span></span>`;
+                }
+                return `<span class="tc-scorer">${nm}${s.goals > 1 ? ` ⚽×${s.goals}` : " ⚽"}</span>`;
+            };
+            const homeScorerHTML = (m.scorers_home || []).map(fmtScorer).join("");
+            const awayScorerHTML = (m.scorers_away || []).map(fmtScorer).join("");
 
             card.innerHTML = `
                 <div class="tc-match-date">${m.date}</div>
@@ -641,9 +714,8 @@
             host.appendChild(row);
         });
 
-        // 선제득점 카드 (D) + 공수 밸런스 플롯 (H)는 동일 rankings 데이터 재사용
+        // 선제득점 카드 (D) — rankings 데이터 재사용 (공수밸런스 산점도는 중복으로 제거됨)
         renderFirstGoal(rankingsList, teamA, teamB);
-        renderBalance(rankingsList, teamA, teamB);
     }
 
     // ─── D. 선제득점 / 선제실점 후 성적 카드 ─────────────
@@ -795,27 +867,27 @@
                 animation: { duration: 500 },
                 scales: {
                     x: {
-                        title: { display: true, text: "경기당 득점 →", color: "#4a5a75", font: { weight: 600 } },
+                        title: { display: true, text: "경기당 득점 →", color: "#9fb0c8", font: { weight: 600 } },
                         min: 0,
-                        ticks: { color: "#5a6c85", font: { weight: 600 } },
-                        grid: { color: "rgba(90,110,140,0.08)" },
+                        ticks: { color: "#8a9fb8", font: { weight: 600 } },
+                        grid: { color: "rgba(255,255,255,0.07)" },
                     },
                     y: {
-                        title: { display: true, text: "← 경기당 실점 (낮을수록 좋음)", color: "#4a5a75", font: { weight: 600 } },
+                        title: { display: true, text: "← 경기당 실점 (낮을수록 좋음)", color: "#9fb0c8", font: { weight: 600 } },
                         min: 0,
                         reverse: true,
-                        ticks: { color: "#5a6c85", font: { weight: 600 } },
-                        grid: { color: "rgba(90,110,140,0.08)" },
+                        ticks: { color: "#8a9fb8", font: { weight: 600 } },
+                        grid: { color: "rgba(255,255,255,0.07)" },
                     },
                 },
                 plugins: {
-                    legend: { labels: { color: "#1f2d47", font: { weight: 600 }, usePointStyle: true, padding: 12 } },
+                    legend: { labels: { color: "#cdd8e8", font: { weight: 600 }, usePointStyle: true, padding: 12 } },
                     tooltip: {
                         backgroundColor: "#ffffff",
                         borderColor: "rgba(74,130,199,0.35)",
                         borderWidth: 1,
-                        titleColor: "#1f2d47",
-                        bodyColor: "#1f2d47",
+                        titleColor: "#cdd8e8",
+                        bodyColor: "#cdd8e8",
                         callbacks: {
                             label: (c) => {
                                 const p = c.raw;
@@ -989,26 +1061,26 @@
                 maintainAspectRatio: false,
                 animation: { duration: 600 },
                 plugins: {
-                    legend: { labels: { color: "#1f2d47", font: { weight: 600 }, usePointStyle: true, padding: 12 } },
+                    legend: { labels: { color: "#cdd8e8", font: { weight: 600 }, usePointStyle: true, padding: 12 } },
                     tooltip: {
                         backgroundColor: "#ffffff",
                         borderColor: "rgba(74,130,199,0.35)",
                         borderWidth: 1,
-                        titleColor: "#1f2d47",
-                        bodyColor: "#1f2d47",
+                        titleColor: "#cdd8e8",
+                        bodyColor: "#cdd8e8",
                     }
                 },
                 scales: {
                     x: {
-                        title: { display: true, text: "경기 순서 →", color: "#4a5a75", font: { weight: 600 } },
-                        ticks: { color: "#5a6c85", maxTicksLimit: 10, font: { weight: 600 } },
-                        grid: { color: "rgba(90,110,140,0.06)" },
+                        title: { display: true, text: "경기 순서 →", color: "#9fb0c8", font: { weight: 600 } },
+                        ticks: { color: "#8a9fb8", maxTicksLimit: 10, font: { weight: 600 } },
+                        grid: { color: "rgba(255,255,255,0.06)" },
                     },
                     y: {
-                        title: { display: true, text: "골", color: "#4a5a75", font: { weight: 600 } },
+                        title: { display: true, text: "골", color: "#9fb0c8", font: { weight: 600 } },
                         beginAtZero: true,
-                        ticks: { color: "#5a6c85", stepSize: 1, font: { weight: 600 } },
-                        grid: { color: "rgba(90,110,140,0.08)" },
+                        ticks: { color: "#8a9fb8", stepSize: 1, font: { weight: 600 } },
+                        grid: { color: "rgba(255,255,255,0.07)" },
                     },
                 }
             }

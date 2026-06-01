@@ -8130,3 +8130,202 @@ body.pr-expanded-lock {
     border-radius: 8px;
     margin-top: 4px;
 }
+
+/* ═══════════════════════════════════════════════════════
+   작업공간 탭 (전술판 / 경기예측 / 팀 / 선수)
+   롱스크롤+모달 → 상위 탭 IA. 선택 매치는 탭바 위 스트립에 상주.
+   ═══════════════════════════════════════════════════════ */
+#workspace-tabs {
+    display: flex;
+    gap: 6px;
+    margin: 14px 0 12px;
+    padding: 5px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+}
+.ws-tab {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px 14px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.ws-tab .ws-tab-icon { font-size: 1.05rem; line-height: 1; }
+.ws-tab:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+}
+.ws-tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+.ws-tab.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    box-shadow: 0 2px 10px var(--accent-glow);
+}
+.ws-tab.active .ws-tab-label { font-weight: 700; }
+
+/* 탭 패널 */
+.ws-panel { display: block; }
+.ws-panel.hidden { display: none; }
+
+/* 인라인된 모달/오버레이/드로어를 패널 안에서는 정적 블록으로 전환
+   (position:fixed·backdrop·중앙정렬 해제) */
+.ws-panel .modal {
+    position: static;
+    inset: auto;
+    z-index: auto;
+    display: block;
+}
+.ws-panel .modal.hidden { display: none; }
+.ws-panel .modal-backdrop { display: none; }
+.ws-panel .modal-content {
+    position: static;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    border: none;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+/* 인라인 시 모달 내부 "닫기" 버튼은 불필요(탭이 가시성 관리) */
+.ws-panel .modal-content > .analytics-header #analytics-close,
+.ws-panel #tc-close { display: none; }
+
+/* 팀 선택 통합: 팀 분석 자체 드롭다운 숨김(팀 비교의 팀 A가 구동) */
+.ws-panel #analytics-team-select { display: none; }
+/* 팀 탭 상단 안내 */
+.ws-team-hint {
+    margin: 2px 2px 14px;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 9px;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+.ws-team-hint strong { color: var(--text-primary); font-weight: 700; }
+
+/* 팀 비교 패널 — 카테고리별 컬러 코딩 (좌측 accent 보더 + 헤더 색) */
+#tc-body .tc-panel {
+    border-left: 3px solid var(--tc-accent, var(--border-subtle));
+    box-shadow: inset 2px 0 0 -1px var(--tc-accent, transparent), 0 1px 3px rgba(0,0,0,0.25);
+    transition: border-color 0.2s ease;
+}
+#tc-body .tc-panel .tc-panel-label {
+    color: var(--tc-accent, var(--text-secondary));
+    letter-spacing: -0.01em;
+}
+/* 강원/광주 등 데이터 색과 헤더 색이 충돌하지 않도록 라벨만 accent, 본문 텍스트는 기존 유지 */
+
+/* H2H 맞대결 — 득점 시간 표시 */
+.tc-scorer-min { color: var(--text-faint); font-variant-numeric: tabular-nums; font-size: 0.92em; }
+.tc-scorer-tag {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 3px;
+    vertical-align: middle;
+}
+.tc-scorer-pk { background: rgba(96,165,250,0.2); color: #93c5fd; }
+.tc-scorer-og { background: rgba(248,113,113,0.2); color: #fca5a5; }
+
+/* 골 타이밍 비교 (두 팀 · 득점/실점 2분할) */
+.tc-gt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.tc-gt-block { min-width: 0; }
+.tc-gt-sub { margin: 0 0 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
+@media (max-width: 760px) { .tc-gt-grid { grid-template-columns: 1fr; } }
+
+/* 탭 도입으로 중복된 단계 라벨(④ 전술판) 및 bench 내 분석 버튼 숨김
+   (#btn-analytics/#btn-team-compare는 팀 탭 onShow에서 프로그램적으로만 사용) */
+.flow-section-head-mid { display: none; }
+#analytics-widget-area { display: none; }
+
+@media (max-width: 720px) {
+    .ws-tab { padding: 9px 8px; font-size: 0.85rem; }
+    .ws-tab .ws-tab-label { display: none; }  /* 좁은 화면: 아이콘만 */
+}
+
+/* 매치 선택 스트립 접기 토글 */
+.match-strip-toggle {
+    margin-left: auto;
+    padding: 5px 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 7px;
+    background: var(--bg-card);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.match-strip-toggle:hover { background: var(--bg-elevated); color: var(--text-primary); }
+.match-strip-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 접힘 상태: 라운드 일정 그리드 숨김(선택 후 세로 공간 회복) */
+body.match-strip-collapsed #league-schedule-wrap { display: none; }
+
+/* ═══════════════════════════════════════════════════════
+   팀 비교 — 다크 테마 전환 (라이트 모달 → 다크 탭 인라인 일관화)
+   team_compare는 원래 라이트 모달이라 흰 카드/어두운 텍스트였음.
+   작업공간 탭(다크)에 인라인되니 이질적 → 테마 변수 + 하드코딩 배경을 다크로 오버라이드.
+   (차트 텍스트색은 team_compare.js에서 별도 변경)
+   ═══════════════════════════════════════════════════════ */
+.ws-panel .tc-modal-content {
+    --tc-ink:         #e2e8f0;
+    --tc-ink-soft:    #aab6c9;
+    --tc-ink-muted:   #8492a8;
+    --tc-border:      rgba(255, 255, 255, 0.10);
+    --tc-border-soft: rgba(255, 255, 255, 0.055);
+    --tc-card:        #16213e;
+    color: var(--tc-ink);
+}
+/* 흰 인셋 하이라이트 제거 + 패널 다크 */
+.ws-panel #tc-body .tc-panel { box-shadow: inset 2px 0 0 -1px var(--tc-accent, transparent), 0 4px 14px rgba(0,0,0,0.30); }
+/* 하드코딩 라이트 배경 → 다크 */
+.ws-panel .tc-team-select { background: #0f1b33; }
+.ws-panel .tc-team-select option { background: #16213e; color: #e2e8f0; }
+.ws-panel .tc-title-row {
+    background:
+        radial-gradient(ellipse 60% 120% at 0% 50%, var(--tc-color-a, rgba(74,130,199,0.22)) 0%, transparent 55%),
+        radial-gradient(ellipse 60% 120% at 100% 50%, var(--tc-color-b, rgba(224,109,79,0.22)) 0%, transparent 55%),
+        linear-gradient(180deg, #18233f, #131d35);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+.ws-panel .tc-h2h-summary {
+    background: linear-gradient(180deg, rgba(201,138,46,0.20), rgba(201,138,46,0.08));
+    box-shadow: none;
+}
+.ws-panel .tc-ha-pct { background: rgba(255,255,255,0.06); }
+.ws-panel .tc-matches-count { background: rgba(255,255,255,0.07); }
+.ws-panel .tc-match-card { background: linear-gradient(180deg, #18233f, #131d35); }
+.ws-panel .tc-scorer { background: rgba(255,255,255,0.06); }
+.ws-panel .tc-match-score { background: linear-gradient(180deg, rgba(201,138,46,0.18), rgba(201,138,46,0.07)); }
+.ws-panel .tc-bar-winner { text-shadow: none; }
+.ws-panel .tc-modal-content .year-filter-btn { background: #16213e; color: var(--tc-ink-soft); box-shadow: none; }
+.ws-panel .tc-modal-content .year-filter-btn.active,
+.ws-panel .tc-modal-content .year-filter-btn:hover {
+    background: linear-gradient(180deg, rgba(201,138,46,0.22), rgba(201,138,46,0.10));
+    color: var(--tc-gold);
+}

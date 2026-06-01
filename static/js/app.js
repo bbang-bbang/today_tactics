@@ -71,6 +71,9 @@
         canvas.height = Math.floor(h);
         render();
     }
+    // 작업공간 탭 컨트롤러(workspace.js)가 탭 전환·컨테이너 리사이즈 시 호출.
+    // 전술판이 display:none 탭에서 다시 보일 때 캔버스 크기를 재계산하기 위함.
+    window.__ttResize = resize;
 
     // ── Draw field ─────────────────────────────────────────
     function drawField() {

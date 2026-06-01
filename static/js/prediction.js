@@ -395,29 +395,45 @@
             });
         });
 
-        // 자동 매치 선택 — URL 파라미터 우선, 없으면 가장 최근 완료 매치.
+        // 자동 매치 선택 정책:
+        //  - 새로고침(reload)·뒤로가기 → 선택 초기화(빈 화면). URL의 매치 파라미터도 제거.
+        //  - 공유 링크(?home=&away=)로 "처음" 진입(navigate) → 해당 매치만 자동 선택.
         if (!_autoSelectedOnce) {
             _autoSelectedOnce = true;
-            let target = null;
+            let navType = "navigate";
             try {
-                const params = new URLSearchParams(window.location.search);
-                const uHome = params.get("home"), uAway = params.get("away"), uDate = params.get("date");
-                if (uHome && uAway) {
-                    // 같은 페이지의 매치 카드 모두에서 매칭 탐색 (현재 리스트 + 다른 리그 wrap)
-                    const wrappers = document.querySelectorAll(".ksb-list");
-                    for (const w of wrappers) {
-                        const cand = w.querySelector(
-                            `.kmc[data-home="${uHome}"][data-away="${uAway}"]` +
-                            (uDate ? `[data-full-date="${uDate.replace(/-/g, ".")}"]` : "")
-                        );
-                        if (cand) { target = cand; break; }
-                    }
-                }
+                const navEntry = performance.getEntriesByType("navigation")[0];
+                if (navEntry && navEntry.type) navType = navEntry.type;
             } catch (_) {}
-            // 첫 접속 시 자동선택 없음 — URL 공유 링크(?home=&away=)로 들어온 경우만 해당 매치 선택.
-            // (이전엔 즐겨찾기/최신/첫카드를 자동 클릭했으나, 빈 화면으로 시작하는 게 사용자 의도)
-            if (target) {
-                requestAnimationFrame(() => target.click());
+
+            if (navType === "reload" || navType === "back_forward") {
+                // 새로고침 → 초기화: 주소창의 매치 파라미터 제거(공유 링크 잔류 방지)
+                try {
+                    const u = new URL(window.location);
+                    let changed = false;
+                    ["home", "away", "date"].forEach(k => {
+                        if (u.searchParams.has(k)) { u.searchParams.delete(k); changed = true; }
+                    });
+                    if (changed) window.history.replaceState(null, "", u);
+                } catch (_) {}
+            } else {
+                // 공유 링크 첫 진입 시에만 해당 매치 자동 선택
+                let target = null;
+                try {
+                    const params = new URLSearchParams(window.location.search);
+                    const uHome = params.get("home"), uAway = params.get("away"), uDate = params.get("date");
+                    if (uHome && uAway) {
+                        const wrappers = document.querySelectorAll(".ksb-list");
+                        for (const w of wrappers) {
+                            const cand = w.querySelector(
+                                `.kmc[data-home="${uHome}"][data-away="${uAway}"]` +
+                                (uDate ? `[data-full-date="${uDate.replace(/-/g, ".")}"]` : "")
+                            );
+                            if (cand) { target = cand; break; }
+                        }
+                    }
+                } catch (_) {}
+                if (target) requestAnimationFrame(() => target.click());
             }
         }
     }
@@ -442,7 +458,6 @@
 
     // ── 클라이언트 세션 캐시 (페이지 새로고침 전까지 유지) ──────
     const _predCache   = {};  // "homeId|awayId"      → prediction data
-    const _lineupCache = {};  // "teamId"             → predicted-lineup data
     const _extrasCache = {};  // "date|homeId|awayId" → match-extras data
     const _retroCache  = {};  // "date|homeId|awayId" → match-retrospective data
     const _speCache    = {};  // "homeId|awayId"      → setpiece-efficiency data
@@ -606,15 +621,11 @@
                     .then(r => { if (!r.ok) throw new Error(`prediction ${r.status}`); return r.json(); })
                     .catch(e => { console.error("[예측 API 실패]", e); return null; })),
             loadBacktest(league),
-            _cachedFetch(_lineupCache, homeId, () =>
-                fetch(`/api/predicted-lineup?teamId=${homeId}`).then(r => r.json()).catch(() => null)),
-            _cachedFetch(_lineupCache, awayId, () =>
-                fetch(`/api/predicted-lineup?teamId=${awayId}`).then(r => r.json()).catch(() => null)),
             extrasFetch,
             retroFetch,
             speFetch,
         ])
-            .then(([data, bt, hLineup, aLineup, extras, retro, spe]) => {
+            .then(([data, bt, extras, retro, spe]) => {
                 if (homeId !== _lastHome || awayId !== _lastAway) return;
                 if (!data || !data.home || !data.away) {
                     console.error("[예측] data 누락:", data);
@@ -622,7 +633,7 @@
                     return;
                 }
                 try {
-                    render(data, homeId, awayId, bt, hLineup, aLineup);
+                    render(data, homeId, awayId, bt);
                 } catch (err) {
                     console.error("[render 실패]", err);
                     report.innerHTML = `<div class="pred-loading" style="color:#f87171">렌더 오류: ${err.message}</div>`;
@@ -649,45 +660,6 @@
     }
 
     // ── 예상 라인업 카드 ───────────────────────────────────
-    function lineupCardHtml(d, label, colorClass) {
-        if (!d || !d.ready || !d.starters || !d.starters.length) return "";
-        const POS_COLORS = { G: "#facc15", D: "#4ea4f8", M: "#7bed9f", F: "#f87171" };
-        const POS_LABEL  = { G: "골", D: "수", M: "미", F: "공" };
-        const grouped = { G: [], D: [], M: [], F: [], "?": [] };
-        for (const s of d.starters) (grouped[s.position] || grouped["?"]).push(s);
-        const STATUS_BADGE = {
-            injured:   { icon: "🚑", cls: "lu-status-injured",   tip: "부상" },
-            suspended: { icon: "🟥", cls: "lu-status-suspended", tip: "출전정지" },
-            doubtful:  { icon: "⚠", cls: "lu-status-doubtful",  tip: "출전의문" },
-        };
-        const renderRow = (s) => {
-            const pidAttr = s.player_id ? ` scorer-link" data-player-id="${s.player_id}` : ``;
-            const sb = s.status && STATUS_BADGE[s.status];
-            const statusBadge = sb
-                ? `<span class="lu-status-badge ${sb.cls}" title="${sb.tip}${s.status_note ? `: ${s.status_note}` : ""}" aria-label="${sb.tip}">${sb.icon}</span>`
-                : "";
-            return `<div class="lu-player${s.status ? " lu-player-unavail" : ""}">
-                <span class="lu-pos" style="background:${POS_COLORS[s.position] || "#666"}33;color:${POS_COLORS[s.position] || "#aaa"}">${POS_LABEL[s.position] || "?"}</span>
-                <span class="lu-num">#${s.shirt_number || "-"}</span>
-                <span class="lu-name${pidAttr}">${s.name}</span>
-                ${statusBadge}
-                ${s.rating ? `<span class="lu-rating">${s.rating}</span>` : ""}
-            </div>`;
-        };
-        const formationStr = d.formation ? `<span class="lu-formation">${d.formation}</span>` : "";
-        return `<div class="pred-lineup ${colorClass || ""}">
-            <div class="lu-header">
-                <span class="lu-label">예상 라인업 — ${label}</span>
-                ${formationStr}
-            </div>
-            <div class="lu-section"><div class="lu-section-title">GK</div>${grouped.G.map(renderRow).join("")}</div>
-            <div class="lu-section"><div class="lu-section-title">DF</div>${grouped.D.map(renderRow).join("")}</div>
-            <div class="lu-section"><div class="lu-section-title">MF</div>${grouped.M.map(renderRow).join("")}</div>
-            <div class="lu-section"><div class="lu-section-title">FW</div>${grouped.F.map(renderRow).join("")}</div>
-            <div class="lu-based">기준: ${d.based_on_date} 경기</div>
-        </div>`;
-    }
-
     // ── 순위 뱃지 ────────────────────────────────────────────
     function standingBadge(st) {
         if (!st) return "";
@@ -1070,7 +1042,7 @@
     }
 
     // ── 렌더링 ───────────────────────────────────────────────
-    function render(d, homeId, awayId, backtest, hLineup, aLineup) {
+    function render(d, homeId, awayId, backtest) {
         const { home, away, h2h, prediction } = d;
         const MONTHS = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
         const nowMonth = new Date().getMonth();
@@ -1202,24 +1174,9 @@
                 ${styleCardHtml(home, away)}
                 ${cardsCardHtml(home, away)}
             </div>
-            ${(hLineup && hLineup.ready) || (aLineup && aLineup.ready) ? `
-            <div class="pred-extras-row pred-lineup-row">
-                ${lineupCardHtml(hLineup, home.name, "pred-lineup-home")}
-                ${lineupCardHtml(aLineup, away.name, "pred-lineup-away")}
-            </div>
-            ${(hLineup && hLineup.ready && aLineup && aLineup.ready) ? `
-            <div class="pred-lineup-cta">
-                <button type="button" class="pred-cta-btn" data-home="${homeId}" data-away="${awayId}"
-                    aria-label="${home.name}과 ${away.name}의 예상 라인업을 상단 전술판에 자동 배치합니다">
-                    <span class="pred-cta-icon" aria-hidden="true">⚙</span>
-                    <span class="pred-cta-text">이 라인업으로 전술판 열기</span>
-                    <span class="pred-cta-hint">상단 전술판에 양 팀 자동 배치</span>
-                </button>
-            </div>` : ""}
-            ` : ""}
         </div>`;
 
-        // 이벤트 위임: 선수 클릭(scorer-link) + 전술판 진입 버튼(pred-cta-btn)
+        // 이벤트 위임: 선수 클릭(scorer-link) → 선수 분석
         report.addEventListener("click", (e) => {
             const playerEl = e.target.closest(".scorer-link");
             if (playerEl) {
@@ -1230,55 +1187,7 @@
                 }));
                 return;
             }
-            const ctaEl = e.target.closest(".pred-cta-btn");
-            if (ctaEl) {
-                openTacticWithPredictedLineup(ctaEl);
-                return;
-            }
         });
-    }
-
-    // ── 예측 → 전술판 브릿지 ──────────────────────────────
-    // /api/predicted-lineup-pair 응답을 matchLineupLoaded 이벤트로 디스패치 →
-    // app.js의 applyMatchLineup이 양 팀 포메이션·선수를 자동 배치한다.
-    const _pairCache = {};  // "home|away" → match-lineup 스키마 data
-
-    function openTacticWithPredictedLineup(btn) {
-        const home = btn.dataset.home;
-        const away = btn.dataset.away;
-        if (!home || !away) return;
-        const key = `${home}|${away}`;
-
-        const setState = (cls) => {
-            btn.classList.remove("loading", "success", "error");
-            if (cls) btn.classList.add(cls);
-        };
-        const finish = (state) => {
-            btn.disabled = false;
-            setState(state);
-            if (state === "success") setTimeout(() => setState(null), 1400);
-        };
-
-        const apply = (data) => {
-            if (!data || !data.ready) {
-                console.warn("[pred-cta] pair lineup not ready", data);
-                finish("error");
-                return;
-            }
-            document.dispatchEvent(new CustomEvent("matchLineupLoaded", { detail: data }));
-            const board = document.querySelector(".canvas-wrap, #field, .field-wrap") || document.body;
-            try { board.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
-            finish("success");
-        };
-
-        btn.disabled = true;
-        setState("loading");
-
-        if (_pairCache[key]) { apply(_pairCache[key]); return; }
-        fetch(`/api/predicted-lineup-pair?home_slug=${encodeURIComponent(home)}&away_slug=${encodeURIComponent(away)}`)
-            .then(r => r.json())
-            .then(data => { _pairCache[key] = data; apply(data); })
-            .catch(err => { console.error("[pred-cta] fetch 실패", err); finish("error"); });
     }
 
     function formBadges(form) {

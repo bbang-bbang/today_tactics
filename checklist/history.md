@@ -3511,3 +3511,5 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-01 12:29:36 | KEY="<KEY-REDACTED>" / ssh -i "$KEY" -o ConnectTimeout=25 rocky@<IP-REDACTED> 'bash -s' < _remote_check.sh
 - 2026-06-01 12:30:19 | KEY="<KEY-REDACTED>" / echo "########## SERVER ##########" / ssh -i "$KEY" -o ConnectTimeout=25 rocky@<IP-REDACTED> 'bash -s' < _remote_r14.sh 2>/dev/null
 - 2026-06-01 12:35:22 | KEY="<KEY-REDACTED>" / ssh -i "$KEY" -o ConnectTimeout=25 rocky@<IP-REDACTED> 'bash -s' < _remote_cron.sh 2>/dev/null
+- 2026-06-01 14:42:47 | sleep 22; cat "C:\Users\ehban\AppData\Local\Temp\claude\C--Users-ehban-OneDrive-------today-tatics\2eea3110-4e76-42f2-8ffa-d96ac2b995b6\tasks\baooifedm.output" 2>/dev/null || cat "/c/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/2eea3110-4e76-42f2-8ffa-d96ac2b995b6/tasks/baooifedm.output"
+- 2026-06-01 14:43:14 | sleep 8; f="/c/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/2eea3110-4e76-42f2-8ffa-d96ac2b995b6/tasks/baooifedm.output"; wc -l < "$f"; echo "---"; cat "$f"

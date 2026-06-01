@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=47">
+    <link rel="stylesheet" href="/static/css/style.css?v=54">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -85,6 +85,8 @@
             <span class="flow-step">①</span>
             <h2 class="flow-title">매치 선택</h2>
             <span class="flow-hint">라운드와 경기를 클릭하면 아래 흐름이 자동 갱신됩니다</span>
+            <button id="match-strip-toggle" class="match-strip-toggle" type="button"
+                    aria-expanded="true" aria-controls="league-schedule-wrap">▴ 접기</button>
         </div>
         <div id="league-schedule-wrap">
             <div id="league-tabs">
@@ -102,6 +104,30 @@
                     <span>위에서 HOME · AWAY 팀을 선택하면 전적이 표시됩니다</span>
                 </div>
             </div>
+        </div>
+
+        <!-- 작업공간 탭 (전술판 / 경기예측 / 팀 / 선수) — 선택한 매치가 전 탭 공통 맥락 -->
+        <nav id="workspace-tabs" role="tablist" aria-label="작업공간">
+            <button class="ws-tab active" data-ws="tactics" role="tab" aria-selected="true" tabindex="0">
+                <span class="ws-tab-icon" aria-hidden="true">🎯</span><span class="ws-tab-label">전술판</span>
+            </button>
+            <button class="ws-tab" data-ws="predict" role="tab" aria-selected="false" tabindex="-1">
+                <span class="ws-tab-icon" aria-hidden="true">📊</span><span class="ws-tab-label">경기예측</span>
+            </button>
+            <button class="ws-tab" data-ws="team" role="tab" aria-selected="false" tabindex="-1">
+                <span class="ws-tab-icon" aria-hidden="true">🛡</span><span class="ws-tab-label">팀</span>
+            </button>
+            <button class="ws-tab" data-ws="player" role="tab" aria-selected="false" tabindex="-1">
+                <span class="ws-tab-icon" aria-hidden="true">👤</span><span class="ws-tab-label">선수</span>
+            </button>
+        </nav>
+        <div id="workspace-panels">
+            <section class="ws-panel" id="ws-tactics" data-ws="tactics" role="tabpanel" aria-label="전술판"></section>
+            <section class="ws-panel hidden" id="ws-predict" data-ws="predict" role="tabpanel" aria-label="경기예측"></section>
+            <section class="ws-panel hidden" id="ws-team" data-ws="team" role="tabpanel" aria-label="팀 분석·비교">
+                <p class="ws-team-hint">아래에서 <strong>두 팀</strong>을 선택하면 종합 비교(레이더·폼·트렌드·골 타이밍·순위·H2H)가 표시됩니다.</p>
+            </section>
+            <section class="ws-panel hidden" id="ws-player" data-ws="player" role="tabpanel" aria-label="선수"></section>
         </div>
 
         <div id="board-report-wrap">
@@ -578,79 +604,6 @@
         </div>
     </div>
 
-    <!-- 팀 분석 모달 -->
-    <div id="analytics-modal" class="modal hidden">
-        <div class="modal-backdrop"></div>
-        <div class="modal-content analytics-modal-content">
-            <div class="analytics-header">
-                <h2 id="analytics-team-title">팀 분석</h2>
-                <select id="analytics-team-select" class="analytics-team-select"></select>
-                <button id="analytics-close" class="modal-btn cancel">닫기</button>
-            </div>
-            <div class="analytics-tabs-row">
-                <div class="analytics-tabs">
-                    <button class="analytics-tab-btn active" data-tab="vs">상대팀별 승률</button>
-                    <button class="analytics-tab-btn" data-tab="month">월별 승률</button>
-                    <button class="analytics-tab-btn" data-tab="ha">홈/어웨이</button>
-                    <button class="analytics-tab-btn" data-tab="weather">날씨</button>
-                    <button class="analytics-tab-btn" data-tab="goal-timing">골 타이밍</button>
-                </div>
-                <div id="year-filter-global" class="year-filter-wrap"></div>
-            </div>
-
-            <!-- 상대팀별 -->
-            <div id="analytics-panel-vs" class="analytics-panel">
-                <div class="an-panel-grid">
-                    <div class="chart-wrap"><canvas id="chart-vs"></canvas></div>
-                    <div class="analytics-table-wrap">
-                        <table id="table-vs" class="analytics-table"></table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 월별 -->
-            <div id="analytics-panel-month" class="analytics-panel hidden">
-                <div class="chart-wrap" style="height:260px"><canvas id="chart-month"></canvas></div>
-            </div>
-
-            <!-- 홈/어웨이 -->
-            <div id="analytics-panel-ha" class="analytics-panel hidden">
-                <div class="an-panel-grid">
-                    <div class="chart-wrap" style="height:240px"><canvas id="chart-ha"></canvas></div>
-                    <div class="analytics-table-wrap">
-                        <table id="table-ha" class="analytics-table"></table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 날씨 -->
-            <div id="analytics-panel-weather" class="analytics-panel hidden">
-                <div class="an-weather-grid">
-                    <div class="an-weather-block">
-                        <p class="analytics-section-label">🌡 기온별 승률</p>
-                        <div class="chart-wrap"><canvas id="chart-temp"></canvas></div>
-                    </div>
-                    <div class="an-weather-block">
-                        <p class="analytics-section-label">💧 습도별 승률</p>
-                        <div class="chart-wrap"><canvas id="chart-hum"></canvas></div>
-                    </div>
-                    <div class="an-weather-block">
-                        <p class="analytics-section-label">💨 풍속별 승률 (m/s)</p>
-                        <div class="chart-wrap"><canvas id="chart-wind"></canvas></div>
-                    </div>
-                </div>
-            </div>
-            <!-- 골 타이밍 -->
-            <div id="analytics-panel-goal-timing" class="analytics-panel hidden">
-                <div class="gt-half-labels">
-                    <span class="gt-half-label">전반</span>
-                    <span class="gt-half-label">후반</span>
-                </div>
-                <div class="chart-wrap" style="height:260px"><canvas id="chart-goal-timing"></canvas></div>
-                <div id="goal-timing-summary" class="gt-summary"></div>
-            </div>
-        </div>
-    </div>
 
     <!-- 팀 비교 모달 -->
     <div id="team-compare-modal" class="modal hidden">
@@ -689,12 +642,12 @@
 
                 <!-- 레이더 + 폼 -->
                 <div class="tc-grid tc-grid-top">
-                    <div class="tc-panel">
+                    <div class="tc-panel" style="--tc-accent:#a78bfa">
                         <p class="tc-panel-label">📡 종합 지표 (오버레이)</p>
                         <div class="chart-wrap" style="height:300px"><canvas id="tc-radar"></canvas></div>
                         <p class="tc-hint">※ 평균 실점은 낮을수록 좋음 → 역수화 반영</p>
                     </div>
-                    <div class="tc-panel">
+                    <div class="tc-panel" style="--tc-accent:#34d399">
                         <p class="tc-panel-label">🔥 폼 & 스파크라인 (최근 10경기 PPG)</p>
                         <div class="tc-form-team-row" id="tc-form-row-a"></div>
                         <div class="tc-form-team-row" id="tc-form-row-b"></div>
@@ -704,7 +657,7 @@
                 </div>
 
                 <!-- 시즌 득/실 트렌드 라인 (A) -->
-                <div class="tc-panel">
+                <div class="tc-panel" style="--tc-accent:#fbbf24">
                     <div class="tc-rank-header">
                         <p class="tc-panel-label" style="margin:0">📈 시즌 득/실 트렌드</p>
                         <span id="tc-trend-scope" class="tc-rank-scope"></span>
@@ -714,30 +667,37 @@
                 </div>
 
                 <!-- 선제득점/실점 후 성적 (D) -->
-                <div class="tc-panel tc-first-goal-panel">
+                <div class="tc-panel tc-first-goal-panel" style="--tc-accent:#fb923c">
                     <p class="tc-panel-label">⚡ 선제득점 / 선제실점 후 성적</p>
                     <div class="tc-first-goal-grid" id="tc-first-goal-grid"></div>
                 </div>
 
-                <!-- 공수 밸런스 산점도 (H) -->
-                <div class="tc-panel">
-                    <div class="tc-rank-header">
-                        <p class="tc-panel-label" style="margin:0">🎯 공수 밸런스 (리그 내 포지셔닝)</p>
-                        <span id="tc-balance-scope" class="tc-rank-scope"></span>
-                    </div>
-                    <div class="chart-wrap" style="height:320px"><canvas id="tc-balance"></canvas></div>
-                    <p class="tc-hint">X=경기당 득점 · Y=경기당 실점 (위로 갈수록 수비↑) · 회색점=리그 전 팀</p>
-                </div>
 
                 <!-- 스탯 바 비교 -->
-                <div class="tc-panel">
+                <div class="tc-panel" style="--tc-accent:#60a5fa">
                     <p class="tc-panel-label">📊 주요 스탯 비교</p>
                     <div class="tc-bars" id="tc-bars"></div>
                 </div>
 
+                <!-- 골 타이밍 비교 (두 팀 · 득점/실점 시간대) -->
+                <div class="tc-panel" style="--tc-accent:#f472b6">
+                    <p class="tc-panel-label">⏱ 골 타이밍 비교</p>
+                    <div class="tc-gt-grid">
+                        <div class="tc-gt-block">
+                            <p class="tc-gt-sub">⚽ 득점 시간대</p>
+                            <div class="chart-wrap" style="height:200px"><canvas id="tc-gt-for"></canvas></div>
+                        </div>
+                        <div class="tc-gt-block">
+                            <p class="tc-gt-sub">🛡 실점 시간대</p>
+                            <div class="chart-wrap" style="height:200px"><canvas id="tc-gt-against"></canvas></div>
+                        </div>
+                    </div>
+                    <p class="tc-hint" id="tc-gt-note">막대 = 시간대별 골 수 · 팀 A(파랑) vs 팀 B(주황)</p>
+                </div>
+
                 <!-- 리그 순위 비교 + H2H 맞대결 2-col -->
                 <div class="tc-rank-matches-grid">
-                    <div class="tc-panel tc-rank-panel">
+                    <div class="tc-panel tc-rank-panel" style="--tc-accent:#fcd34d">
                         <div class="tc-rank-header">
                             <p class="tc-panel-label" style="margin:0">🏆 리그 순위 비교</p>
                             <span id="tc-rank-scope" class="tc-rank-scope"></span>
@@ -747,7 +707,7 @@
                     </div>
 
                     <!-- 경기별 맞대결 기록 -->
-                    <div class="tc-panel tc-matches-panel">
+                    <div class="tc-panel tc-matches-panel" style="--tc-accent:#f87171">
                         <div class="tc-matches-header">
                             <p class="tc-panel-label" style="margin:0">📅 H2H 맞대결 기록</p>
                             <span id="tc-matches-count" class="tc-matches-count"></span>
@@ -761,14 +721,13 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=16"></script>
+    <script src="/static/js/app.js?v=17"></script>
 
     <script src="/static/js/info.js?v=7"></script>
     <script src="/static/js/k2heatmap.js?v=2"></script>
     <script src="/static/js/banner_stats.js?v=3"></script>
-    <script src="/static/js/analytics.js?v=2"></script>
-    <script src="/static/js/team_compare.js?v=7"></script>
-    <script src="/static/js/prediction.js?v=56"></script>
+    <script src="/static/js/team_compare.js?v=11"></script>
+    <script src="/static/js/prediction.js?v=59"></script>
 
     <!-- 선수 분석 모달 -->
     <div id="player-analytics-modal" class="pa-modal hidden">
@@ -812,9 +771,12 @@
         </div>
     </div>
 
-    <script src="/static/js/player_analytics.js?v=3"></script>
+    <script src="/static/js/player_analytics.js?v=4"></script>
     <script src="/static/js/player_report.js?v=4"></script>
     <script src="/static/js/insights.js?v=7"></script>
+
+    <!-- 작업공간 탭 컨트롤러 — 반드시 모든 모듈 스크립트 뒤에 로드 -->
+    <script src="/static/js/workspace.js?v=4"></script>
 
     <!-- 온보딩 오버레이 -->
     <div id="onboarding-overlay" class="ob-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Today Tactics 소개">
