@@ -93,18 +93,18 @@ def main():
     print(f"=== 총 {total} sides ===")
     print(f"적용: {sum(fdist.values())}  거부: {sum(fail_reasons.values())}")
 
-    print(f"\n=== A1. 거부 사유 ===")
+    print("\n=== A1. 거부 사유 ===")
     for r, n in fail_reasons.most_common():
         print(f"  {r}: {n}")
         for ex in fail_examples[r][:3]:
             print(f"    ex: ev={ex[0]} {ex[1]} rows={ex[2]}")
 
-    print(f"\n=== A2. formation 분포 ===")
+    print("\n=== A2. formation 분포 ===")
     for f, n in fdist.most_common(20):
         pct = n / max(sum(fdist.values()), 1) * 100
         print(f"  {f}: {n} ({pct:.1f}%)")
 
-    print(f"\n=== A4. row 패턴 → formation 매핑 (top 15) ===")
+    print("\n=== A4. row 패턴 → formation 매핑 (top 15) ===")
     sorted_pats = sorted(row_pat_to_form.items(), key=lambda x: -sum(x[1].values()))
     for pat, forms in sorted_pats[:15]:
         total_pat = sum(forms.values())

@@ -8,7 +8,7 @@
   4. 연관 테이블(heatmap_points, match_player_stats) 도 함께 UPDATE
   5. 라인업 수집
 """
-import asyncio, sqlite3, datetime, sys
+import asyncio, sqlite3, datetime
 from pathlib import Path
 from playwright.async_api import async_playwright
 

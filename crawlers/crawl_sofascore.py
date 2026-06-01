@@ -9,9 +9,7 @@ SofaScore K리그 선수 스탯 + 히트맵 수집기
 import asyncio
 import json
 import sqlite3
-import time
 import sys
-from pathlib import Path
 from playwright.async_api import async_playwright
 
 # ── 설정 ────────────────────────────────────────────────

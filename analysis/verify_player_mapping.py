@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import sqlite3
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 try:
@@ -107,7 +106,7 @@ def main():
         else:
             matched += 1
 
-    print(f"=== 매핑 검증 (출전 player_id 기준) ===")
+    print("=== 매핑 검증 (출전 player_id 기준) ===")
     print(f"  매칭 OK:          {matched}")
     print(f"  name_ko ≠ portal: {len(mismatches)}")
     print(f"  portal에 #shirt 없음 (DB name_ko 있음): {len(no_portal_entry)}")
@@ -116,7 +115,7 @@ def main():
     print(f"  합계: {total}")
 
     if mismatches:
-        print(f"\n=== 불일치 상위 30 (출전수 내림차순) ===")
+        print("\n=== 불일치 상위 30 (출전수 내림차순) ===")
         mismatches.sort(key=lambda x: -x[6])
         print(f"{'pid':>7} | {'sofa name':<24} | {'DB name_ko':<12} | {'portal name':<12} | {'team':<10} #{'shirt':<3} {'games':>4}")
         print("-" * 100)
@@ -124,7 +123,7 @@ def main():
             print(f"{pid:>7} | {sofa[:24]:<24} | {db_ko[:12]:<12} | {portal_name[:12]:<12} | {slug:<10} #{str(shirt):<3} {games:>4}")
 
     if no_portal_entry:
-        print(f"\n=== portal #shirt 누락 상위 10 (DB에 name_ko 있어서 문제 없음 가능) ===")
+        print("\n=== portal #shirt 누락 상위 10 (DB에 name_ko 있어서 문제 없음 가능) ===")
         no_portal_entry.sort(key=lambda x: -x[5])
         for pid, sofa, db_ko, slug, shirt, games in no_portal_entry[:10]:
             print(f"  pid={pid} sofa={sofa[:24]:<24} db_ko={db_ko:<10} {slug} #{shirt} games={games}")

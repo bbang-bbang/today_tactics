@@ -14,7 +14,6 @@ K1+K2 finished 모든 매치에서 main.py build_side 로직을 그대로 시뮬
 """
 from __future__ import annotations
 
-import os
 import sqlite3
 import sys
 from collections import Counter, defaultdict
@@ -195,27 +194,27 @@ def main():
 
     # ── 보고 ────────────────────────────────────────
     print("=" * 78)
-    print(f"S1. 포메이션 재도출 비율")
+    print("S1. 포메이션 재도출 비율")
     print(f"  sides 합계: {sides_total}")
     print(f"  재도출 발생: {sides_formation_rederived} ({sides_formation_rederived/max(sides_total,1)*100:.1f}%)")
     print(f"  변화 없음:   {sides_formation_same}")
-    print(f"\n  자주 발생한 변환 (top 10):")
+    print("\n  자주 발생한 변환 (top 10):")
     for chg, n in formation_changes.most_common(10):
         print(f"    {n:>4}회  {chg}")
 
     print("\n" + "=" * 78)
-    print(f"S2. 라인 내 starter swap 비율")
-    print(f"  avg_position 있는 sides 중:")
+    print("S2. 라인 내 starter swap 비율")
+    print("  avg_position 있는 sides 중:")
     swap_pool = sides_total - sides_no_avg
     print(f"    swap 적용: {sides_swap_applied} / {swap_pool} ({sides_swap_applied/max(swap_pool,1)*100:.1f}%)")
     print(f"    swap 없음: {sides_no_swap}")
     print(f"  avg_position 없음(swap 불가): {sides_no_avg} sides")
-    print(f"\n  라인별 swap 발생 횟수:")
+    print("\n  라인별 swap 발생 횟수:")
     for line in ("D", "M", "F"):
         print(f"    {line}: {line_swap_count[line]} 매치")
 
     print("\n" + "=" * 78)
-    print(f"S3. 이상 매치")
+    print("S3. 이상 매치")
     if not anomalies:
         print("  PASS — 0건")
     else:
@@ -225,13 +224,13 @@ def main():
             print(f"  ... (+{len(anomalies)-10})")
 
     print("\n" + "=" * 78)
-    print(f"샘플 — 포메이션 재도출 (최근 10건)")
+    print("샘플 — 포메이션 재도출 (최근 10건)")
     for s in sample_rederive:
         side = "HOME" if s["is_home"] else "AWAY"
         print(f"  ev={s['event_id']} {side} {s['from']:>7} -> {s['to']:<7} (D/M/F={s['d/m/f']})")
 
     print("\n" + "=" * 78)
-    print(f"샘플 — 라인 내 swap (최근 8건)")
+    print("샘플 — 라인 내 swap (최근 8건)")
     for s in sample_swap:
         side = "HOME" if s["is_home"] else "AWAY"
         print(f"  ev={s['event_id']} {side} line={s['line']}")

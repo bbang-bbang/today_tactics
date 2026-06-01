@@ -42,7 +42,7 @@ def cluster(kl):
     m_start, m_end = d_used, len(non_gk) - 1
     if m_start >= m_end: return None
     m_line = []
-    for t in non_gk[m_start:m_end]: m_line.extend(by_top[t]) if False else m_line.extend(by_t[t])
+    for t in non_gk[m_start:m_end]: m_line.extend(by_t[t])
     if len(m_line) < 1: return None
     return {
         "formation": f"{len(d_line)}-{len(m_line)}-{len(f_line)}",
@@ -101,17 +101,17 @@ def main():
                 if 1 <= last <= 2 and 1 <= prev <= 2 and last + prev in (2, 3):
                     suspicious["split_wing_lost"].append((eid, side, cl["formation"], row_pat))
 
-    print(f"=== formation 분포 ===")
+    print("=== formation 분포 ===")
     for f, n in formation_dist.most_common(15):
         print(f"  {f}: {n}")
 
-    print(f"\n=== K리그 row 패턴 (top 15) ===")
+    print("\n=== K리그 row 패턴 (top 15) ===")
     for pat, n in row_pattern_dist.most_common(15):
         print(f"  {pat}: {n}")
 
-    print(f"\n=== 의심 케이스 ===")
+    print("\n=== 의심 케이스 ===")
     print(f"S2-1 nM>=6 (윙어/DM 흡수): {len(suspicious['high_m'])}")
-    print(f"  샘플:")
+    print("  샘플:")
     for s in suspicious["high_m"][:5]:
         print(f"    ev={s[0]} {s[1]} formation={s[2]} rows={s[3]}")
     print(f"\nS2-2 nM<=1 (M 빈약): {len(suspicious['low_m'])}")

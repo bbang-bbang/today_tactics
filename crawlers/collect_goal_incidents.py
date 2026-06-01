@@ -146,7 +146,7 @@ async def main():
 
     if args.refetch:
         targets = [e for e in all_events if e["id"] not in zero_zero]
-        log(f"[--refetch] 재수집 모드")
+        log("[--refetch] 재수집 모드")
     else:
         cur.execute("SELECT DISTINCT event_id FROM goal_events")
         done_g = {r[0] for r in cur.fetchall()}

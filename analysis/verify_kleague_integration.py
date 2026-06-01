@@ -148,23 +148,23 @@ def main():
                     label_diff_pid += 1
 
     print()
-    print(f"K1. K리그 라인업 적용 가능 sides")
+    print("K1. K리그 라인업 적용 가능 sides")
     total_sides = sides_kl_ok + sides_kl_fail
     print(f"  적용 가능: {sides_kl_ok} ({sides_kl_ok/max(total_sides,1)*100:.1f}%)")
     print(f"  적용 불가: {sides_kl_fail}")
     for reason, n in fail_reasons.most_common():
         print(f"    - {reason}: {n}")
 
-    print(f"\nK2. formation 차이 (SS 카운트 → K리그 카운트)")
+    print("\nK2. formation 차이 (SS 카운트 → K리그 카운트)")
     print(f"  동일: {formation_same}")
     print(f"  다름: {sum(formation_diff.values())}")
-    print(f"  상위 10:")
+    print("  상위 10:")
     for chg, n in formation_diff.most_common(10):
         print(f"    {n:>4}회  {chg}")
 
     print(f"\nK3. position 라벨 차이 (등번호 매칭된 starters): {label_diff_pid}명")
 
-    print(f"\nK4. 등번호 매칭률 (sides 기준)")
+    print("\nK4. 등번호 매칭률 (sides 기준)")
     for k in sorted(shirt_match_dist.keys()):
         print(f"  {k}/11: {shirt_match_dist[k]} sides")
 

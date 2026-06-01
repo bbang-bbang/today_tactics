@@ -2,7 +2,7 @@
 events 테이블에 round 컬럼을 추가하고 K리그 공식 API(kleague.com)로 채운다.
 K1(leagueId=1) + K2(leagueId=2) 모두 처리.
 """
-import sqlite3, json, urllib.request, datetime, sys, os
+import sqlite3, json, urllib.request, datetime, os
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "players.db")
 

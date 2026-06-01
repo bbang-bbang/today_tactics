@@ -17,7 +17,6 @@ K리그 공식 분류 (예: 4-4-2)가 SofaScore 분류 (예: 4-1-4-1)보다
 
 import argparse
 import json
-import os
 import re
 import sqlite3
 import subprocess

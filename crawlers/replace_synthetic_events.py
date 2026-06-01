@@ -11,7 +11,7 @@ event_id로 교체.
 5. 이후 crawl_lineups.py, collect_goal_incidents.py가 자동으로 lineup + 카드 수집
 """
 
-import asyncio, json, sqlite3, sys, time
+import asyncio, sqlite3, sys
 from pathlib import Path
 from playwright.async_api import async_playwright
 

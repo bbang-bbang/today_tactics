@@ -297,7 +297,7 @@ async def fill_heatmap(page, conn):
             batch
         )
         conn.commit()
-    log(f"  히트맵 수집 완료")
+    log("  히트맵 수집 완료")
 
 # ── result + 날씨 일괄 보완 ──────────────────────────────
 def fill_result_and_weather(conn):

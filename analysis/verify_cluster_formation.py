@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import sqlite3
 import sys
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 
 try:

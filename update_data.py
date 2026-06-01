@@ -74,7 +74,7 @@ def main():
                     help="히트맵 스킵")
     args = ap.parse_args()
 
-    print(f"\n#### update_data.py — K1+K2 통합 증분 ####")
+    print("\n#### update_data.py — K1+K2 통합 증분 ####")
     print(f"  days={args.days}  skip_mps={args.skip_mps}  skip_heatmap={args.skip_heatmap}")
 
     t_total = time.time()

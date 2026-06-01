@@ -143,12 +143,12 @@ def main():
 
     # ── 보고 ────────────────────────────────────────
     print("=" * 70)
-    print(f"V1. avg_position 커버리지 (side 단위)")
+    print("V1. avg_position 커버리지 (side 단위)")
     print(f"   sides 합계: {sides_total}")
     print(f"   full(11/11):   {sides_full_avg} ({sides_full_avg/max(sides_total,1)*100:.1f}%)")
     print(f"   partial(1~10): {sides_partial_avg} ({sides_partial_avg/max(sides_total,1)*100:.1f}%)")
     print(f"   none(0/11):    {sides_no_avg} ({sides_no_avg/max(sides_total,1)*100:.1f}%)")
-    print(f"   partial 커버리지 분포 (선수 수→sides):")
+    print("   partial 커버리지 분포 (선수 수→sides):")
     for cov in sorted(coverage_dist):
         if cov in (0, 11):
             continue

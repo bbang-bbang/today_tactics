@@ -94,20 +94,20 @@ def main():
                             "formation": formation, "kl_rows": kl_rows,
                         })
 
-    print(f"\nC1. K리그 적용 vs SS fallback:")
+    print("\nC1. K리그 적용 vs SS fallback:")
     print(f"  방문 sides: {visited_sides}")
     print(f"  K리그 적용 추정: {kl_applied} ({kl_applied/max(visited_sides,1)*100:.1f}%)")
     print(f"  SS fallback 추정: {ss_fallback}")
 
-    print(f"\nC2. K리그 적용 formation 분포 (top 15):")
+    print("\nC2. K리그 적용 formation 분포 (top 15):")
     for f, n in formation_dist.most_common(15):
         print(f"  {f}: {n}")
 
-    print(f"\nC3. SS fallback 사유 (top 10):")
+    print("\nC3. SS fallback 사유 (top 10):")
     for r, n in fallback_reasons.most_common(10):
         print(f"  {r}: {n}")
 
-    print(f"\nC5. 의심 매치 (shirt 매칭 < 11, K리그 미적용):")
+    print("\nC5. 의심 매치 (shirt 매칭 < 11, K리그 미적용):")
     for s in suspect:
         print(f"  ev={s['ev']} {s['d']} {s['side']} shirt={s['shirt_match']}/11 formation={s['formation']} kl_rows={s['kl_rows']}")
 

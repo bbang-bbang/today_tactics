@@ -5,7 +5,7 @@ players 테이블의 name_ko를 업데이트한다.
 
 대상: name_ko가 없거나 영어(ASCII)로만 돼 있는 선수
 """
-import asyncio, sqlite3, sys, re
+import asyncio, sqlite3, sys
 from playwright.async_api import async_playwright
 
 DB_PATH = "players.db"

@@ -12,8 +12,6 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
-import seaborn as sns
 from scipy import stats
 import warnings
 warnings.filterwarnings('ignore')

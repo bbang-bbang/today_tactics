@@ -135,7 +135,7 @@ def main():
         for ex in v[:5]:
             print(f"    {ex}")
     print(f"\n전체 무결성: {sum(len(v) for v in fails.values())}건 이상")
-    print(f"\nformation 분포 top 15:")
+    print("\nformation 분포 top 15:")
     for f, n in formation_dist.most_common(15):
         print(f"  {f}: {n}")
 

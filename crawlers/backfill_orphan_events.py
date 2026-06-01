@@ -103,7 +103,7 @@ async def main():
 
     conn.close()
     log("")
-    log(f"=== 완료 ===")
+    log("=== 완료 ===")
     log(f"  inserted (events 백필): {inserted}")
     log(f"  deleted (cascading):    {deleted}")
     log(f"  errored (재시도 필요):   {len(errored)}")

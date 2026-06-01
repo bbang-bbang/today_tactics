@@ -18,8 +18,6 @@ SofaScore 원천에 K1 xG가 없어 (K2는 있음) K1 예측 모델 열세. 이 
 
 import argparse
 import asyncio
-import json
-import math
 import os
 import sqlite3
 import sys
@@ -196,7 +194,7 @@ async def main():
         await browser.close()
 
     conn.close()
-    log(f"\n완료:")
+    log("\n완료:")
     log(f"  처리: {stats['ok']}경기 / 스킵(shotmap 없음): {stats['skip_no_shot']}")
     log(f"  mps xG 업데이트: {stats['updated_rows']} rows")
     log(f"  xG 합계 / 실제 골: {stats['total_xg_sum']:.1f} / {stats['total_goals']} "

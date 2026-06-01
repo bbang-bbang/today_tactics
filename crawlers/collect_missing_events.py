@@ -6,7 +6,7 @@ K리그2 누락 이벤트 수집기
 - 이어서 누락 이벤트의 player stats 도 수집
 """
 
-import asyncio, sqlite3, sys, time
+import asyncio, sqlite3, sys
 from playwright.async_api import async_playwright
 
 DB_PATH      = "players.db"

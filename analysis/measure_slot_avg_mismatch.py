@@ -94,7 +94,7 @@ def main():
     print(f"side 단위 합계: {sides_total}")
     print(f"  avg_position 보유: {sides_with_avg}")
     print(f"  slot_order ≠ avg_x 정렬 mismatch: {sides_mismatch} ({sides_mismatch/max(sides_with_avg,1)*100:.1f}%)")
-    print(f"\n샘플 (최대 8건):")
+    print("\n샘플 (최대 8건):")
     for s in mismatch_samples:
         print(f"  ev={s['event_id']} {'HOME' if s['is_home'] else 'AWAY'} line={s['line']}")
         print(f"    slot 순:  {s['slot_order']}")

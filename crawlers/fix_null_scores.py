@@ -56,7 +56,7 @@ async def main():
                 conn.commit()
                 print(f"  → UPDATE 완료: {hs}-{as_}")
             else:
-                print(f"  → SKIP (점수 없음 또는 미종료)")
+                print("  → SKIP (점수 없음 또는 미종료)")
 
             await asyncio.sleep(0.5)
 

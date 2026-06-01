@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import sqlite3
 import sys
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 
 try:
@@ -117,7 +117,7 @@ def main():
         if len(fails) > head:
             print(f"  ... (+{len(fails)-head} more)")
 
-    print(f"\n검사 결과")
+    print("\n검사 결과")
     report("A starter 정확히 11명",        fail_A_starter_count)
     report("B slot_order 0~10 unique",    fail_B_slot_order)
     report("C GK 슬롯 position='G'",      fail_C_gk_position)

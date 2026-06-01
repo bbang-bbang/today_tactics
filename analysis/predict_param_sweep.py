@@ -11,7 +11,7 @@ look-ahead 차단은 _predict_core가 as_of_ts로 보장.
 
 사용: ./venv/bin/python analysis/predict_param_sweep.py
 """
-import sys, os, sqlite3, copy
+import sys, os, sqlite3
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import main  # noqa: E402
@@ -87,7 +87,7 @@ def sweep(tid, year, label):
     base = run_backtest(tid, year, None)
     print(f"  [baseline 운영계수]   {fmt(base)}")
     print(f"   실제(H/D/A)={base['actual']['home']}/{base['actual']['draw']}/{base['actual']['away']}")
-    print(f"\n  --- draw_boost × dc_rho 스윕 ---")
+    print("\n  --- draw_boost × dc_rho 스윕 ---")
     best = (base["hit_pct"], -base["brier"], "baseline", base)
     for db_ in (0.04, 0.08, 0.12, 0.16, 0.20, 0.24):
         for rho in (0.06, 0.10, 0.14):

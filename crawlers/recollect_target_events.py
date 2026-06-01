@@ -3,7 +3,7 @@
 특정 event_id 의 player stats 를 재수집하는 스크립트.
 """
 
-import asyncio, sqlite3, sys, time, json
+import asyncio, sqlite3, sys
 from playwright.async_api import async_playwright
 
 DB_PATH = "players.db"
@@ -137,13 +137,13 @@ async def main():
             await asyncio.sleep(DELAY)
 
             if not data:
-                log(f"  → 데이터 없음")
+                log("  → 데이터 없음")
                 continue
 
             cur.execute("SELECT date_ts, home_score, away_score, home_team_id, away_team_id FROM events WHERE id=?", (eid,))
             erow = cur.fetchone()
             if not erow:
-                log(f"  → events 테이블에 없음")
+                log("  → events 테이블에 없음")
                 continue
 
             date_ts, home_score, away_score, home_team_id, away_team_id = erow

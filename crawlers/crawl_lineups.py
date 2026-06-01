@@ -13,7 +13,6 @@ SofaScore K리그 경기별 라인업(포메이션 + 출전 선수) 수집기.
 
 import argparse
 import asyncio
-import json
 import sqlite3
 import sys
 import time

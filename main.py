@@ -80,7 +80,7 @@ def invalidate_api_cache():
     with _API_CACHE_LOCK:
         _API_CACHE.clear()
 
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for, abort
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from authlib.integrations.flask_client import OAuth
 
 app = Flask(__name__)
@@ -2260,7 +2260,7 @@ def get_match_prediction():
     conn = sqlite3.connect(db_path)
     cur  = conn.cursor()
 
-    import math, datetime
+    import datetime
     now_month = datetime.datetime.now().month
     now_year  = str(datetime.datetime.now().year)
 
@@ -5376,7 +5376,6 @@ def get_k1_schedule():
 @cached_response(ttl=600)
 def get_k1_rounds():
     """K1 라운드 목록 + 각 라운드 경기 결과/예정"""
-    import datetime
     try:
         raw = _fetch_k1_all_games()
     except Exception:

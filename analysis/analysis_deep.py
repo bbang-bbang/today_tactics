@@ -16,13 +16,10 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import seaborn as sns
 from scipy import stats
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_val_score
-from sklearn.metrics import classification_report
 warnings.filterwarnings('ignore')
 
 import platform
@@ -201,7 +198,6 @@ print("\n" + "="*55)
 print("3. 팀별 플레이스타일 클러스터링")
 print("="*55)
 
-from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 

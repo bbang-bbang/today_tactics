@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 import sys, os, sqlite3
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 
 try: sys.stdout.reconfigure(encoding="utf-8")
@@ -71,7 +71,7 @@ def main():
             print(f"│   K리그 row 패턴: {row_pat}")
 
     # 사용자 인지 의심 — SofaScore formation vs K리그 formation 가장 다른 매치
-    print(f"\n\n=== SofaScore vs K리그 formation 차이 큰 매치 top 10 ===\n")
+    print("\n\n=== SofaScore vs K리그 formation 차이 큰 매치 top 10 ===\n")
     with app.test_client() as cl:
         diff_examples = []
         for ev in events[:500]:  # 500개 샘플
