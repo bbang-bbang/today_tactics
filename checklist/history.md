@@ -3507,3 +3507,7 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-05-31 00:38:52 | curl -s http://127.0.0.1:5000/ | grep -E "v=46|v=2.*heatmap|v=3.*analytics|v=54.*prediction|dfb-text|k2-player-search|k2-player-context|onboarding" | head -20
 - 2026-05-31 00:38:56 | curl -s http://127.0.0.1:5000/ | grep -E "k2heatmap.js|player_analytics.js|prediction.js"
 - 2026-05-31 02:13:26 | curl -s http://127.0.0.1:5000/ | grep -E "header-accuracy|season-sim-bar|prediction-section|banner-matchup" | head -10
+- 2026-06-01 10:31:35 | sleep 660; echo "=== ban likely expired, ready to retry @ $(date) ==="
+- 2026-06-01 12:29:36 | KEY="<KEY-REDACTED>" / ssh -i "$KEY" -o ConnectTimeout=25 rocky@<IP-REDACTED> 'bash -s' < _remote_check.sh
+- 2026-06-01 12:30:19 | KEY="<KEY-REDACTED>" / echo "########## SERVER ##########" / ssh -i "$KEY" -o ConnectTimeout=25 rocky@<IP-REDACTED> 'bash -s' < _remote_r14.sh 2>/dev/null
+- 2026-06-01 12:35:22 | KEY="<KEY-REDACTED>" / ssh -i "$KEY" -o ConnectTimeout=25 rocky@<IP-REDACTED> 'bash -s' < _remote_cron.sh 2>/dev/null
