@@ -872,7 +872,7 @@
   function renderForm(d) {
     const el = document.getElementById("ins-form-body"); if (!el) return;
     const row = (p, cls, mark) =>
-      `<li><span class="${cls} ins-adv-delta">${mark}${Math.abs(p.delta).toFixed(2)}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">시즌 ${p.season_avg}→최근 ${p.last5}</span></li>`;
+      `<li><span class="${cls} ins-adv-delta">${mark}${Math.abs(p.delta).toFixed(2)}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team ? p.team + " · " : ""}시즌 ${p.season_avg}→최근 ${p.last5}</span></li>`;
     const up = (d.rising || []).slice(0, 5).map(p => row(p, "ins-pos", "▲ +")).join("");
     const dn = (d.falling || []).slice(0, 5).map(p => row(p, "ins-neg", "▼ −")).join("");
     el.innerHTML =
