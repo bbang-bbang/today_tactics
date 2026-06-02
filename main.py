@@ -4701,7 +4701,7 @@ def insights_top_performers():
         FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
         WHERE m.position IN ('F','M','D') AND m.minutes_played>0 {date_cond} {league_cond}
         GROUP BY m.player_id HAVING games>=3 AND mins>=90
-        ORDER BY avg_rating DESC LIMIT 100
+        ORDER BY mins DESC LIMIT 600
     """, date_params + date_params + date_params + league_params).fetchall()
 
     def serialize_all(r):

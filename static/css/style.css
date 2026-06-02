@@ -5956,11 +5956,15 @@ body.pr-expanded-lock {
 /* 산식/근거 캡션 — 신빙성 표시 */
 .ins-method { margin-top: 9px; padding-top: 7px; border-top: 1px dashed rgba(255,255,255,0.10); font-size: 0.68rem; color: #8090a6; line-height: 1.5; }
 /* 산식 안내 — 표 위에 크게/박스로 (예전 하단 작은 footnote → 상단 강조) */
-.ins-formula { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 12px; padding: 11px 14px; background: rgba(100,180,255,0.08); border: 1px solid rgba(100,180,255,0.20); border-left: 3px solid #4ea4f8; border-radius: 8px; font-size: 0.82rem; color: #d2deed; line-height: 1.6; }
-.ins-formula b { color: #eaf2fc; font-weight: 700; }
-.ins-formula-ic { font-size: 1.05rem; line-height: 1.4; }
-.ins-formula-sub { color: #8aa0b8; font-size: 0.74rem; }
-.ins-formula-avg { display: inline-block; font-size: 0.7rem; color: #7ecfff; background: rgba(100,180,255,0.14); border-radius: 4px; padding: 0 5px; margin-left: 3px; font-weight: 600; }
+.ins-formula { margin-bottom: 12px; padding: 11px 14px; background: rgba(100,180,255,0.07); border: 1px solid rgba(100,180,255,0.18); border-left: 3px solid #4ea4f8; border-radius: 8px; }
+.ins-formula-head { font-size: 0.86rem; font-weight: 700; color: #eaf2fc; margin-bottom: 8px; }
+.ins-formula-tag { font-size: 0.68rem; font-weight: 600; color: #8aa0b8; margin-left: 5px; }
+.ins-formula-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.ins-formula-list li { display: flex; align-items: center; gap: 9px; font-size: 0.8rem; color: #d2deed; flex-wrap: wrap; }
+.ins-fm-name { display: inline-block; min-width: 50px; font-weight: 800; color: #7ecfff; }
+.ins-fm-eq { color: #cdd8e8; }
+.ins-formula-avg { font-size: 0.7rem; color: #9fd0ff; background: rgba(100,180,255,0.16); border-radius: 4px; padding: 1px 7px; font-weight: 700; margin-left: auto; white-space: nowrap; }
+.ins-formula-sub { color: #8aa0b8; font-size: 0.73rem; margin-top: 9px; padding-top: 7px; border-top: 1px solid rgba(255,255,255,0.07); line-height: 1.5; }
 .ins-method b { color: #aab8cc; font-weight: 700; }
 .ins-th-tip { font-size: 0.62rem; color: #6f86a2; margin-left: 2px; cursor: help; vertical-align: super; }
 .ins-adv-loading { font-size: 0.76rem; color: #7a8aa0; padding: 14px 4px; font-style: italic; }
