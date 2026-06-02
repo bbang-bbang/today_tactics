@@ -4,13 +4,11 @@
 
   let currentYear = "2026";
   let currentLeague = "all";  // "all" | "k1" | "k2"
-  let currentPos = "F";
+  let currentPos = "all";     // "all"(통합) | "F" | "M" | "D" — 통합표 위 포지션 필터 칩
 
-  // 포지션별 다중 정렬 상태: [{ key, dir }, ...] 우선순위 순
+  // 정렬 상태: [{ key, dir }, ...] 우선순위 순 — 통합표는 컬럼이 고정이라 단일 상태
   const sortState = {
-    F: [{ key: "goals", dir: -1 }],
-    M: [{ key: "pass_acc", dir: -1 }],
-    D: [{ key: "def_score_p90", dir: -1 }],
+    all: [{ key: "rating", dir: -1 }],   // 통합 리더보드 — 평점(포지션 중립) 기본
   };
 
   // 카드 패널 — 표별 정렬 상태 + 컬럼 정의
@@ -48,39 +46,22 @@
 
   // 정렬 컬럼 정의
   const SORT_COLS = {
-    F: [
+    all: [
       { label: "#",        key: null },
       { label: "선수",      key: "name" },
       { label: "구단",      key: "team" },
+      { label: "포지션",    key: "pos" },
       { label: "경기",      key: "games" },
-      { label: "총 골",     key: "goals" },
-      { label: "PK",       key: "pk_goals" },
-      { label: "PK제외",   key: "np_goals" },
-      { label: "PK제외/90",key: "np_goals_p90" },
-      { label: "xG효율",   key: "xg_eff" },
-      { label: "평점",      key: "rating" },
-    ],
-    M: [
-      { label: "#",        key: null },
-      { label: "선수",      key: "name" },
-      { label: "구단",      key: "team" },
-      { label: "경기",      key: "games" },
-      { label: "패스성공률", key: "pass_acc" },
-      { label: "패스/90",  key: "passes_p90" },
+      { label: "골",       key: "goals" },
+      { label: "도움",      key: "assists" },
+      { label: "키패스",    key: "key_passes" },
       { label: "태클/90",  key: "tackles_p90" },
-      { label: "평점",      key: "rating" },
-    ],
-    D: [
-      { label: "#",        key: null },
-      { label: "선수",      key: "name" },
-      { label: "구단",      key: "team" },
-      { label: "경기",      key: "games" },
-      { label: "수비점수/90", key: "def_score_p90" },
-      { label: "태클/90",  key: "tackles_p90" },
-      { label: "클리어/90", key: "clearances_p90" },
       { label: "평점",      key: "rating" },
     ],
   };
+
+  // 포지션 배지 표시용
+  const POS_BADGE = { F: "공격", M: "미드", D: "수비", G: "GK" };
 
   function shortName(name) {
     if (!name) return "";
@@ -145,13 +126,13 @@
     });
   }
 
-  /* ── 포지션 탭 ── */
+  /* ── 포지션 필터 칩 (통합표 위 — 데이터셋 교체가 아닌 행 필터) ── */
   function initPosTab() {
     document.querySelectorAll(".ins-pos-tab").forEach(btn => {
       btn.addEventListener("click", () => {
         document.querySelectorAll(".ins-pos-tab").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
-        currentPos = btn.dataset.pos;
+        currentPos = btn.dataset.pos;   // "all" | "F" | "M" | "D"
         renderTopTable(window._insTopData);
       });
     });
@@ -165,7 +146,7 @@
       .then(r => r.json())
       .then(data => {
         window._insTopData = data;
-        const hasData = (data.F?.length || data.M?.length || data.D?.length) > 0;
+        const hasData = (data.all?.length || 0) > 0;
         showBlock("ins-panel-top", hasData);
         if (hasData) renderTopTable(data);
       });
@@ -207,75 +188,51 @@
   function renderTopTable(data) {
     const body = document.getElementById("ins-top-body");
     if (!body || !data) return;
-    const raw = data[currentPos] || [];
+    const base = data.all || [];
+    // 포지션 칩은 데이터셋 교체가 아니라 통합표의 행 필터 (정렬 상태 유지)
+    const raw = currentPos === "all" ? base : base.filter(r => r.pos === currentPos);
     if (!raw.length) { body.innerHTML = '<p class="ins-empty">데이터 없음</p>'; return; }
 
-    const rows = sortRows(raw, sortState[currentPos]);
+    const rows = sortRows(raw, sortState.all);
 
-    let tbody = "";
-    if (currentPos === "F") {
-      rows.forEach((r, i) => {
-        const eff = r.xg_eff != null ? `${r.xg_eff > 1 ? "+" : ""}${(r.xg_eff - 1).toFixed(2)}` : "-";
-        const effClass = r.xg_eff > 1 ? "ins-pos" : r.xg_eff < 1 ? "ins-neg" : "";
-        tbody += `<tr>
-          <td class="ins-rank">${i + 1}</td><td class="ins-name">${r.name}</td>
-          <td class="ins-team">${r.team || "-"}</td>
-          <td>${r.games}</td><td>${r.goals}</td>
-          <td class="ins-team">${r.pk_goals > 0 ? r.pk_goals : "-"}</td>
-          <td><strong>${r.np_goals}</strong></td>
-          <td>${r.np_goals_p90}</td>
-          <td class="${effClass}">${eff}</td><td>${r.rating ?? "-"}</td>
-        </tr>`;
-      });
-    } else if (currentPos === "M") {
-      rows.forEach((r, i) => {
-        tbody += `<tr>
-          <td class="ins-rank">${i + 1}</td><td class="ins-name">${r.name}</td>
-          <td class="ins-team">${r.team || "-"}</td>
-          <td>${r.games}</td><td><strong>${r.pass_acc ?? "-"}%</strong></td>
-          <td>${r.passes_p90}</td><td>${r.tackles_p90}</td><td>${r.rating ?? "-"}</td>
-        </tr>`;
-      });
-    } else if (currentPos === "D") {
-      rows.forEach((r, i) => {
-        tbody += `<tr>
-          <td class="ins-rank">${i + 1}</td><td class="ins-name">${r.name}</td>
-          <td class="ins-team">${r.team || "-"}</td>
-          <td>${r.games}</td><td><strong>${r.def_score_p90}</strong></td>
-          <td>${r.tackles_p90}</td><td>${r.clearances_p90}</td><td>${r.rating ?? "-"}</td>
-        </tr>`;
-      });
-    }
+    const tbody = rows.map((r, i) => {
+      const posCls = r.pos ? `ins-pos-badge ins-pos-${r.pos}` : "ins-pos-badge";
+      const badge  = `<span class="${posCls}">${POS_BADGE[r.pos] || "-"}</span>`;
+      const rCls   = r.rating >= 7.5 ? "ins-pos" : r.rating && r.rating < 6.5 ? "ins-neg" : "";
+      return `<tr>
+        <td class="ins-rank">${i + 1}</td>
+        <td class="ins-name">${r.name}</td>
+        <td class="ins-team">${r.team || "-"}</td>
+        <td>${badge}</td>
+        <td>${r.games}</td>
+        <td><strong>${r.goals}</strong></td>
+        <td>${r.assists}</td>
+        <td>${r.key_passes}</td>
+        <td>${r.tackles_p90}</td>
+        <td class="${rCls}">${r.rating ?? "-"}</td>
+      </tr>`;
+    }).join("");
 
-    body.innerHTML = `<table class="ins-table">${buildThead(currentPos)}<tbody>${tbody}</tbody></table>`;
+    body.innerHTML = `<table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table>`;
 
-    // 헤더 클릭 → 다중 정렬
-    // 첫 클릭: 추가(내림차순), 재클릭: 오름차순, 한번 더: 제거
+    // 헤더 클릭 → 다중 정렬 (첫 클릭: 추가/내림 → 재클릭: 오름 → 한번 더: 제거)
     body.querySelectorAll(".ins-th-sort").forEach(th => {
       th.addEventListener("click", () => {
         const key  = th.dataset.key;
-        const sorts = sortState[currentPos];
+        const sorts = sortState.all;
         const idx  = sorts.findIndex(s => s.key === key);
-        if (idx === -1) {
-          // 새로 추가 (내림차순)
-          sorts.push({ key, dir: -1 });
-        } else if (sorts[idx].dir === -1) {
-          // 오름차순으로 변경
-          sorts[idx].dir = 1;
-        } else {
-          // 제거
-          sorts.splice(idx, 1);
-          // 제거 후 뒤 항목들 재번호는 자동
-        }
+        if (idx === -1)               sorts.push({ key, dir: -1 });
+        else if (sorts[idx].dir === -1) sorts[idx].dir = 1;
+        else                          sorts.splice(idx, 1);
         renderTopTable(window._insTopData);
       });
     });
 
-    // 행 클릭 → 드로어 열기
+    // 행 클릭 → 드로어 열기 (선수 실제 포지션으로 상세 차트 정확도 유지)
     body.querySelectorAll("tbody tr").forEach((tr, i) => {
       const r = rows[i];
       tr.classList.add("ins-row-clickable");
-      tr.addEventListener("click", () => openDrawer(r.player_id, currentPos));
+      tr.addEventListener("click", () => openDrawer(r.player_id, r.pos || "F"));
     });
   }
 
@@ -664,7 +621,6 @@
 
   /* ── 카드 수령 순위 ── */
   let currentCardMode = "player";    // "player" | "team"
-  let currentCardLeague = "all";     // 카드 패널 전용 — 전역 currentLeague와 독립
   let _cardCache = null;
 
   function initCardModeTab() {
@@ -678,20 +634,8 @@
     });
   }
 
-  function initCardLeagueTab() {
-    document.querySelectorAll(".ins-card-league-tab").forEach(btn => {
-      btn.addEventListener("click", () => {
-        if (btn.dataset.cardLeague === currentCardLeague) return;
-        document.querySelectorAll(".ins-card-league-tab").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        currentCardLeague = btn.dataset.cardLeague;
-        loadCardRankings();
-      });
-    });
-  }
-
   function loadCardRankings() {
-    return fetch(`/api/insights/card-rankings?year=${currentYear}&league=${currentCardLeague}`)
+    return fetch(`/api/insights/card-rankings?year=${currentYear}&league=${currentLeague}`)
       .then(r => r.json())
       .then(d => {
         _cardCache = d;
@@ -805,7 +749,6 @@
   }
 
   /* ── xG 효율 리더보드 ── */
-  let currentXgLeague = "all";
   let currentXgMode   = "diff";   // diff | goals | xg
   let _xgCache = null;
 
@@ -820,19 +763,8 @@
       });
     });
   }
-  function initXgLeagueTab() {
-    document.querySelectorAll(".ins-xg-league-tab").forEach(btn => {
-      btn.addEventListener("click", () => {
-        if (btn.dataset.xgLeague === currentXgLeague) return;
-        document.querySelectorAll(".ins-xg-league-tab").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        currentXgLeague = btn.dataset.xgLeague;
-        loadXgLeaders();
-      });
-    });
-  }
   function loadXgLeaders() {
-    return fetch(`/api/insights/xg-efficiency?year=${currentYear}&league=${currentXgLeague}`)
+    return fetch(`/api/insights/xg-efficiency?year=${currentYear}&league=${currentLeague}`)
       .then(r => r.json())
       .then(d => {
         _xgCache = Array.isArray(d) ? d : [];
@@ -858,7 +790,7 @@
           <td class="ins-name">${r.name}</td>
           <td class="ins-team-cell">${r.team || "—"}</td>
           <td>${r.games}</td>
-          <td><strong>${r.goals}</strong>${r.pk_goals > 0 ? ` <span class="ins-sub">(NP ${r.np_goals})</span>` : ""}</td>
+          <td><strong>${r.goals}</strong>${r.pk_goals > 0 ? ` <span class="ins-sub" title="페널티킥 제외 골">(PK제외 ${r.np_goals})</span>` : ""}</td>
           <td>${r.xg}</td>
           <td class="${diffCls}"><strong>${sign}${r.diff}</strong></td>
           <td>${r.shots}</td>
@@ -900,9 +832,7 @@
           initYearFilter();
           initPosTab();
           initCardModeTab();
-          initCardLeagueTab();
           initXgModeTab();
-          initXgLeagueTab();
           loadAll();
           loaded = true;
         }
@@ -912,7 +842,7 @@
       initYearFilter();
       initPosTab();
       initCardModeTab();
-      initCardLeagueTab();
+      initXgModeTab();
       loadAll();
     }
     document.getElementById("drawer-close")?.addEventListener("click", closeDrawer);

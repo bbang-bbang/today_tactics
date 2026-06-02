@@ -217,7 +217,7 @@
                     legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: ctx => ` ${ctx.parsed.r}%ile`
+                            label: ctx => ` 상위 ${100 - ctx.parsed.r}%`
                         }
                     }
                 }
@@ -351,7 +351,7 @@
                                 if (item.datasetIndex !== 0) return "";
                                 const key = keys[item.dataIndex];
                                 const pct = activity.percentiles ? (activity.percentiles[key] || 0) : 0;
-                                return `상위 ${100 - pct}%ile`;
+                                return `상위 ${100 - pct}%`;
                             }
                         }
                     }

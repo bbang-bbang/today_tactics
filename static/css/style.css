@@ -5899,9 +5899,17 @@ body.pr-expanded-lock {
     color: #c8d8f0;
     margin-bottom: 12px;
 }
+.ins-block-hint { font-size: 0.7rem; font-weight: 400; color: #8aa2bd; margin-left: 8px; }
 .ins-pos-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
-.ins-pos-tab { background: rgba(255,255,255,0.07); color: #aaa; border: none; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
+.ins-pos-tab { background: rgba(255,255,255,0.07); color: #aaa; border: none; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; transition: background .15s, color .15s; }
+.ins-pos-tab:hover { background: rgba(255,255,255,0.12); color: #d8e4f0; }
 .ins-pos-tab.active { background: rgba(100,180,255,0.2); color: #7ecfff; }
+/* 통합 리더보드 포지션 배지 — 색상만이 아닌 텍스트(공격/미드/수비)로도 구분 (색맹 고려) */
+.ins-pos-badge { display: inline-block; min-width: 32px; text-align: center; padding: 1px 7px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; background: rgba(255,255,255,0.08); color: #c8d8f0; }
+.ins-pos-badge.ins-pos-F { background: rgba(248,113,113,0.18); color: #f8a8a8; }
+.ins-pos-badge.ins-pos-M { background: rgba(78,164,248,0.18); color: #93c4ff; }
+.ins-pos-badge.ins-pos-D { background: rgba(74,222,128,0.16); color: #8ce8ab; }
+.ins-pos-badge.ins-pos-G { background: rgba(251,191,36,0.16); color: #f3cf6e; }
 .ins-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .ins-table th { color: #7ecfff; font-weight: 600; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left; white-space: nowrap; }
 .ins-table td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #ccc; }

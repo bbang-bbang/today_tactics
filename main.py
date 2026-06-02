@@ -4676,6 +4676,37 @@ def insights_top_performers():
 
     result = {}
 
+    # ── 통합 리더보드 (포지션 무관) — 기본 화면. 역할이 섞이는 선수(골 넣는 수비수 등)를
+    #    버킷에 가두지 않고 한 표에서 어느 지표로든 정렬 가능하게 한다.
+    rows = conn.execute(f"""
+        SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) as name_ko, m.player_name, m.team_id,
+               COUNT(*) as games, SUM(m.minutes_played) as mins,
+               SUM(m.goals) as goals, SUM(COALESCE(m.assists,0)) as assists,
+               SUM(COALESCE(m.key_passes,0)) as kp, SUM(COALESCE(m.tackles,0)) as tkl,
+               AVG(m.rating) as avg_rating,
+               (SELECT m2.position FROM match_player_stats m2
+                WHERE m2.player_id=m.player_id {date_cond}
+                GROUP BY m2.position ORDER BY COUNT(*) DESC LIMIT 1) as main_pos,
+               (SELECT COUNT(*) FROM goal_events g
+                WHERE g.player_id=m.player_id AND g.is_penalty=1 AND g.is_own_goal=0
+                AND g.event_id IN (
+                    SELECT event_id FROM match_player_stats
+                    WHERE player_id=m.player_id {date_cond})) as pk_goals
+        FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
+        WHERE m.position IN ('F','M','D') AND m.minutes_played>0 {date_cond} {league_cond}
+        GROUP BY m.player_id HAVING games>=3 AND mins>=90
+        ORDER BY avg_rating DESC LIMIT 100
+    """, date_params + date_params + date_params + league_params).fetchall()
+    result["all"] = [{**pinfo(r),
+        "pos": r["main_pos"] or "",
+        "goals": r["goals"] or 0,
+        "np_goals": (r["goals"] or 0) - (r["pk_goals"] or 0),
+        "assists": r["assists"] or 0,
+        "key_passes": r["kp"] or 0,
+        "tackles_p90": round((r["tkl"] or 0) / r["mins"] * 90, 2),
+        "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
+    } for r in rows]
+
     rows = conn.execute(f"""
         SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) as name_ko, m.player_name, m.team_id,
                COUNT(*) as games, SUM(m.minutes_played) as mins,

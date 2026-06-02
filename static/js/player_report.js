@@ -173,7 +173,7 @@
                 <div class="pr-pct-bar" style="width:${pct}%;background:${color}"></div>
             </div>
             <div class="pr-pct-info">
-                <span style="color:${color}">${pct}%ile</span>
+                <span style="color:${color}">상위 ${100 - pct}%</span>
                 <span class="pr-grade" style="color:${color}">${grade}</span>
             </div>
         </div>`;
@@ -335,7 +335,7 @@
                             afterLabel: (item) => {
                                 if (item.datasetIndex !== 0) return "";
                                 const pct = activity.percentiles ? (activity.percentiles[keys[item.dataIndex]] || 0) : 0;
-                                return `상위 ${100 - pct}%ile`;
+                                return `상위 ${100 - pct}%`;
                             }
                         }
                     }
@@ -385,7 +385,7 @@
                 },
                 plugins: {
                     legend: { display:false },
-                    tooltip: { callbacks: { label: c => ` ${c.parsed.r}%ile` } }
+                    tooltip: { callbacks: { label: c => ` 상위 ${100 - c.parsed.r}%` } }
                 }
             }
         });
