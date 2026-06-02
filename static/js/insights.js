@@ -795,7 +795,8 @@
           <td class="ins-team-cell">${r.team || "—"}</td>
           <td>${badge}</td>
           <td>${r.games}</td>
-          <td><strong>${r.goals}</strong>${r.pk_goals > 0 ? ` <span class="ins-sub" title="페널티킥 제외 골">(PK제외 ${r.np_goals})</span>` : ""}</td>
+          <td><strong>${r.goals}</strong></td>
+          <td>${r.pk_goals > 0 ? `<strong>${r.pk_goals}</strong>` : '<span class="ins-sub">0</span>'}</td>
           <td>${r.xg}</td>
           <td class="${diffCls}"><strong>${sign}${r.diff}</strong></td>
           <td>${r.shots}</td>
@@ -808,11 +809,11 @@
       <table class="ins-table">
         <thead><tr>
           <th>#</th><th>선수</th><th>팀</th><th>포지션</th><th>경기</th>
-          <th>G</th><th>xG</th><th>G−xG</th><th>슈팅</th>
+          <th>G</th><th title="페널티킥 득점 (G·xG에 포함)">PK</th><th>xG</th><th>G−xG</th><th>슈팅</th>
         </tr></thead>
         <tbody>${tbody}</tbody>
       </table>
-      <div class="ins-card-foot">${modeNote} TOP 15. 조건: 전 포지션 · 출전 ≥3경기 · xG ≥0.5.</div>
+      <div class="ins-card-foot">${modeNote} G·xG는 PK 포함. TOP 15. 조건: 전 포지션 · 출전 ≥3경기 · xG ≥0.5.</div>
     `;
   }
 
