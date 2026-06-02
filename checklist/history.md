@@ -3532,3 +3532,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-02 18:53:27 | curl -sk --max-time 30 "https://<IP-REDACTED>/" | grep -oE "insights.js\?v=[0-9]+"
 - 2026-06-02 18:54:39 | KEY="C:/Users/ehban/.ssh/<KEY-REDACTED>" / ssh -i "$KEY" -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -o ConnectTimeout=15 rocky@<IP-REDACTED> 'bash -lc " / cd /opt/today_tactics / echo HEAD: \$(git rev-parse --short HEAD) / grep -n \"key: .goals\" static/js/insights.js | head -1 / systemctl is-active today_tactics / "' 2>&1 | grep -vE "post-quantum|store now|openssh.com|Warning: Perm"
 - 2026-06-02 19:03:45 | curl -sk --max-time 30 "https://<IP-REDACTED>/" | grep -oE "insights.js\?v=[0-9]+|style.css\?v=[0-9]+"
+- 2026-06-02 19:56:20 | for i in 1 2 3; do /   curl -sk --max-time 30 "https://<IP-REDACTED>/api/insights/top-performers?year=2026&league=all" -o /dev/null -w "  #$i: %{http_code} %{time_total}s\n" / done
