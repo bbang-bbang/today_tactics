@@ -5910,7 +5910,9 @@ body.pr-expanded-lock {
 .ins-table td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #ccc; }
 .ins-table tr:hover td { background: rgba(255,255,255,0.04); }
 /* TOP 퍼포머 — 길어진 통합표를 가볍게: 스크롤 캡 + 헤더 고정 + zebra + 더보기 */
-.ins-top-scroll { max-height: 600px; overflow-y: auto; border-radius: 8px; }
+.ins-top-scroll { max-height: 600px; overflow-y: auto; overflow-x: auto; border-radius: 8px; }
+/* 종합 지표 컬럼이 많아 좁은 칸에선 가로 스크롤 (헤더는 세로 고정 유지) */
+#ins-top-body .ins-table { min-width: 760px; }
 .ins-top-scroll::-webkit-scrollbar { width: 8px; }
 .ins-top-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
 #ins-top-body .ins-table thead th { position: sticky; top: 0; z-index: 2; background: #141d31; }
@@ -8335,10 +8337,17 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ws-panel .tc-match-card { background: linear-gradient(180deg, #18233f, #131d35); }
 .ws-panel .tc-scorer { background: rgba(255,255,255,0.06); }
 .ws-panel .tc-match-score { background: linear-gradient(180deg, rgba(201,138,46,0.18), rgba(201,138,46,0.07)); }
-.ws-panel .tc-bar-winner { text-shadow: none; }
+/* 우위 숫자 — 어두운 팀 색이면 다크 배경에서 안 보이던 문제 → 흰색 고정(식별은 막대/글로우가 담당) */
+.ws-panel .tc-bar-winner { text-shadow: none; color: #ffffff !important; }
 .ws-panel .tc-modal-content .year-filter-btn { background: #16213e; color: var(--tc-ink-soft); box-shadow: none; }
 .ws-panel .tc-modal-content .year-filter-btn.active,
 .ws-panel .tc-modal-content .year-filter-btn:hover {
     background: linear-gradient(180deg, rgba(201,138,46,0.22), rgba(201,138,46,0.10));
     color: var(--tc-gold);
 }
+/* 선제득점/선제실점 카드 — 하드코딩 흰 배경 → 다크 (밝은 텍스트가 묻히던 문제 해결) */
+.ws-panel .tc-fg-card {
+    background: linear-gradient(180deg, #18233f, #131d35);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.30);
+}
+.ws-panel .tc-fg-meta strong { color: var(--tc-gold); }

@@ -281,17 +281,42 @@
         }
     }
 
-    // 팀 색상 → 레이더 데이터셋 색상
-    function teamColors(team, isSecond) {
-        const base = team.primary || (isSecond ? "#b87ef8" : "#4ea4f8");
-        // hex → rgb
-        const m = /^#?([a-f0-9]{2})([a-f0-9]{2})([a-f0-9]{2})$/i.exec(base);
+    // hex → 레이더 데이터셋 색상 세트
+    function colorsFromHex(hex) {
+        const m = /^#?([a-f0-9]{2})([a-f0-9]{2})([a-f0-9]{2})$/i.exec(hex || "");
         const rgb = m ? [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)] : [78,164,248];
         return {
+            rgb,
             border: `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.95)`,
             fill:   `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.18)`,
             point:  `rgba(${rgb[0]},${rgb[1]},${rgb[2]},1)`,
         };
+    }
+    function teamColors(team, isSecond) {
+        return colorsFromHex(team.primary || (isSecond ? "#b87ef8" : "#4ea4f8"));
+    }
+    // 두 팀 색이 너무 비슷한지(레이더에서 구분 안 되는 문제 방지)
+    function colorTooClose(h1, h2) {
+        if (!h1 || !h2) return false;
+        const a = colorsFromHex(h1).rgb, b = colorsFromHex(h2).rgb;
+        const d = Math.hypot(a[0]-b[0], a[1]-b[1], a[2]-b[2]);
+        return d < 90;
+    }
+    let _radarRaw = null;   // 툴팁용 실제값 보관
+
+    // 다크 배경에서 팀 색을 텍스트로 쓸 때 너무 어두우면 밝게 보정 (보색 가독성)
+    function readableInk(hex) {
+        const m = /^#?([a-f0-9]{2})([a-f0-9]{2})([a-f0-9]{2})$/i.exec(hex || "");
+        if (!m) return hex || "#cdd8e8";
+        let r = parseInt(m[1],16), g = parseInt(m[2],16), b = parseInt(m[3],16);
+        const lum = 0.2126*r + 0.7152*g + 0.0722*b;   // 0~255
+        if (lum < 120) {
+            const t = (120 - lum) / 120 * 0.7;        // 흰색 쪽으로 블렌딩
+            r = Math.round(r + (255 - r) * t);
+            g = Math.round(g + (255 - g) * t);
+            b = Math.round(b + (255 - b) * t);
+        }
+        return `rgb(${r},${g},${b})`;
     }
 
     function renderRadar(data) {
@@ -299,38 +324,52 @@
         if (!el) return;
 
         const a = data.teamA, b = data.teamB;
-        const labels = ["승률(%)", "경기당 승점×30", "평균 득점×30", "평균 실점⁻¹×50", "홈 승률(%)", "원정 승률(%)"];
-        const pct = (n, g) => g > 0 ? (n / g * 100) : 0;
+        // 직관적 축 — 모두 "클수록 좋음", 0~100 정규화. 라벨에 ×N 같은 가공식 노출 안 함.
+        const labels = ["승률", "득점력", "수비력", "승점", "홈 승률", "원정 승률"];
+        const pct   = (n, g) => g > 0 ? (n / g * 100) : 0;
+        const clamp = (v) => Math.max(0, Math.min(100, v));
 
-        const toRow = (t) => {
-            const homeG = t.home && t.home.games || 0;
-            const awayG = t.away && t.away.games || 0;
-            return [
-                t.win_pct || 0,
-                (t.ppg || 0) * 30,
-                (t.avg_gf || 0) * 30,
-                t.avg_ga > 0 ? Math.min(100, 50 / t.avg_ga) : 50,
-                pct((t.home && t.home.w) || 0, homeG),
-                pct((t.away && t.away.w) || 0, awayG),
-            ];
+        // norm(레이더 0~100) + raw(툴팁에 보여줄 실제값)
+        const build = (t) => {
+            const homeG = (t.home && t.home.games) || 0;
+            const awayG = (t.away && t.away.games) || 0;
+            const gf = t.avg_gf || 0, ga = t.avg_ga || 0, ppg = t.ppg || 0;
+            const homePct = pct((t.home && t.home.w) || 0, homeG);
+            const awayPct = pct((t.away && t.away.w) || 0, awayG);
+            return {
+                norm: [
+                    clamp(t.win_pct || 0),
+                    clamp(gf / 2.5 * 100),         // 득점력: 2.5골/경기 = 만점
+                    clamp((1 - ga / 2.5) * 100),   // 수비력: 0실점=100, 2.5실점=0
+                    clamp(ppg / 3 * 100),          // 승점: 3.0점/경기 = 만점
+                    clamp(homePct),
+                    clamp(awayPct),
+                ],
+                raw: [
+                    `${(t.win_pct || 0).toFixed(0)}%`,
+                    `${gf.toFixed(2)} 골/경기`,
+                    `${ga.toFixed(2)} 실점/경기`,
+                    `${ppg.toFixed(2)} 점/경기`,
+                    `${homePct.toFixed(0)}%`,
+                    `${awayPct.toFixed(0)}%`,
+                ],
+            };
         };
 
+        const dA = build(a), dB = build(b);
         const cA = teamColors(a, false);
-        const cB = teamColors(b, true);
-        const rowA = toRow(a), rowB = toRow(b);
+        // 두 팀 색이 너무 비슷하면 B를 대비색(앰버)으로 교체
+        const cB = colorTooClose(a.primary, b.primary) ? colorsFromHex("#ffa657") : teamColors(b, true);
+        const aLabel = a.short || a.name, bLabel = b.short || b.name;
+        _radarRaw = { a: dA.raw, b: dB.raw, labels };
 
-        // 인스턴스 재사용 (destroy 없이 data만 교체 → 렌더 비용 절감)
+        // 인스턴스 재사용 (destroy 없이 data만 교체)
         if (radarChart) {
-            radarChart.data.datasets[0].label = a.short || a.name;
-            radarChart.data.datasets[0].data  = rowA;
-            radarChart.data.datasets[0].borderColor = cA.border;
-            radarChart.data.datasets[0].backgroundColor = cA.fill;
-            radarChart.data.datasets[0].pointBackgroundColor = cA.point;
-            radarChart.data.datasets[1].label = b.short || b.name;
-            radarChart.data.datasets[1].data  = rowB;
-            radarChart.data.datasets[1].borderColor = cB.border;
-            radarChart.data.datasets[1].backgroundColor = cB.fill;
-            radarChart.data.datasets[1].pointBackgroundColor = cB.point;
+            const ds = radarChart.data.datasets;
+            ds[0].label = aLabel; ds[0].data = dA.norm;
+            ds[0].borderColor = cA.border; ds[0].backgroundColor = cA.fill; ds[0].pointBackgroundColor = cA.point;
+            ds[1].label = bLabel; ds[1].data = dB.norm;
+            ds[1].borderColor = cB.border; ds[1].backgroundColor = cB.fill; ds[1].pointBackgroundColor = cB.point;
             radarChart.update();
             return;
         }
@@ -341,23 +380,14 @@
                 labels,
                 datasets: [
                     {
-                        label: a.short || a.name,
-                        data: rowA,
-                        borderColor: cA.border,
-                        backgroundColor: cA.fill,
-                        pointBackgroundColor: cA.point,
-                        pointRadius: 4,
-                        borderWidth: 2,
+                        label: aLabel, data: dA.norm,
+                        borderColor: cA.border, backgroundColor: cA.fill, pointBackgroundColor: cA.point,
+                        pointRadius: 4, pointHoverRadius: 6, borderWidth: 2.5,
                     },
                     {
-                        label: b.short || b.name,
-                        data: rowB,
-                        borderColor: cB.border,
-                        backgroundColor: cB.fill,
-                        pointBackgroundColor: cB.point,
-                        pointRadius: 4,
-                        borderWidth: 2,
-                        borderDash: [6, 4],
+                        label: bLabel, data: dB.norm,
+                        borderColor: cB.border, backgroundColor: cB.fill, pointBackgroundColor: cB.point,
+                        pointRadius: 4, pointHoverRadius: 6, borderWidth: 2.5, borderDash: [6, 4],
                     }
                 ]
             },
@@ -368,16 +398,19 @@
                 plugins: {
                     legend: { labels: { color: "#cdd8e8", font: { weight: "600" }, usePointStyle: true, padding: 12 } },
                     tooltip: {
-                        backgroundColor: "#ffffff",
-                        borderColor: "rgba(74,130,199,0.35)",
+                        backgroundColor: "rgba(15,25,45,0.96)",
+                        borderColor: "rgba(120,160,220,0.35)",
                         borderWidth: 1,
-                        titleColor: "#cdd8e8",
-                        bodyColor: "#cdd8e8",
+                        titleColor: "#ffffff",
+                        bodyColor: "#d8e4f0",
                         padding: 10,
                         cornerRadius: 8,
-                        boxShadow: "0 6px 18px rgba(70,90,140,0.15)",
                         callbacks: {
-                            label: (c) => `${c.dataset.label}: ${(+c.parsed.r).toFixed(1)}`
+                            title: (items) => _radarRaw.labels[items[0].dataIndex],
+                            label: (c) => {
+                                const raw = c.datasetIndex === 0 ? _radarRaw.a : _radarRaw.b;
+                                return `${c.dataset.label}: ${raw[c.dataIndex]}`;
+                            }
                         }
                     }
                 },
@@ -386,7 +419,7 @@
                         min: 0, max: 100,
                         angleLines: { color: "rgba(255,255,255,0.12)" },
                         grid: { color: "rgba(255,255,255,0.10)" },
-                        pointLabels: { color: "#cdd8e8", font: { size: 11, weight: "600" } },
+                        pointLabels: { color: "#e2e8f0", font: { size: 12, weight: "700" } },
                         ticks: { color: "#9aa7bd", backdropColor: "transparent", stepSize: 25, font: { size: 9 } }
                     }
                 }
@@ -407,14 +440,14 @@
         tbl.innerHTML = `
             <tr><th>팀</th><th>홈 승률</th><th>홈 전적</th><th>원정 승률</th><th>원정 전적</th></tr>
             <tr>
-                <td style="color:${a.primary||'#4ea4f8'};font-weight:700">${a.short||a.name}</td>
+                <td style="color:${readableInk(a.primary||'#4ea4f8')};font-weight:700">${a.short||a.name}</td>
                 <td>${pctBadge(aHome.pct)}</td>
                 <td>${aHome.w}-${aHome.d}-${aHome.l}</td>
                 <td>${pctBadge(aAway.pct)}</td>
                 <td>${aAway.w}-${aAway.d}-${aAway.l}</td>
             </tr>
             <tr>
-                <td style="color:${b.primary||'#b87ef8'};font-weight:700">${b.short||b.name}</td>
+                <td style="color:${readableInk(b.primary||'#b87ef8')};font-weight:700">${b.short||b.name}</td>
                 <td>${pctBadge(bHome.pct)}</td>
                 <td>${bHome.w}-${bHome.d}-${bHome.l}</td>
                 <td>${pctBadge(bAway.pct)}</td>
@@ -462,9 +495,10 @@
         const rgbB = hexRgb(b.primary, "184,126,248");
 
         metrics.forEach(m => {
-            const max = Math.max(Math.abs(m.va), Math.abs(m.vb), 0.0001);
-            const pctA = Math.abs(m.va) / max * 100;
-            const pctB = Math.abs(m.vb) / max * 100;
+            // 점유율(share) 기준 — 두 값이 비슷해도 막대가 가운데서 갈려 차이가 한눈에 보임
+            const sum = Math.abs(m.va) + Math.abs(m.vb);
+            const pctA = sum > 0 ? Math.abs(m.va) / sum * 100 : 50;
+            const pctB = sum > 0 ? Math.abs(m.vb) / sum * 100 : 50;
 
             let winner = "none";
             if (m.higher === "higher") {
@@ -937,7 +971,7 @@
 
         host.innerHTML = `
             <div class="tc-form-team-header">
-                <span class="tc-form-team-name" style="color:${teamInfo.primary || '#4a82c7'}">${escapeHtml(teamInfo.short || teamInfo.name || '')}</span>
+                <span class="tc-form-team-name" style="color:${readableInk(teamInfo.primary || '#4a82c7')}">${escapeHtml(teamInfo.short || teamInfo.name || '')}</span>
                 <div class="tc-form-badges">${badges || '<span class="tc-scorer-empty">경기 없음</span>'}</div>
             </div>
             <div class="tc-form-spark-row">

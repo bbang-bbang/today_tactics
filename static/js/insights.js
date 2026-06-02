@@ -8,12 +8,9 @@
   let topExpanded = false;    // TOP 퍼포머 전체 펼침 여부 (기본은 미리보기)
   const TOP_PREVIEW = 20;     // 기본 노출 행 수 (나머지는 "더 보기")
 
-  // 정렬 상태: 포지션 칩(view)별로 기본 정렬 키가 다름
+  // 정렬 상태 — 컬럼이 고정 종합 세트라 단일 상태 (공격기여 우선, 평점 2차)
   const sortState = {
-    all: [{ key: "attack_pts", dir: -1 }, { key: "rating", dir: -1 }],  // 전체 — 공격기여 우선, 평점 2차
-    F:   [{ key: "goals", dir: -1 }],                                    // 공격 — 골
-    M:   [{ key: "pass_acc", dir: -1 }],                                 // 미드 — 패스 정확도
-    D:   [{ key: "tackles_p90", dir: -1 }],                              // 수비 — 태클/90
+    all: [{ key: "attack_pts", dir: -1 }, { key: "rating", dir: -1 }],
   };
 
   // 카드 패널 — 표별 정렬 상태 + 컬럼 정의
@@ -49,8 +46,9 @@
     ],
   };
 
-  // 컬럼 정의 — 포지션 칩(view)에 따라 비교 지표 세트가 바뀐다.
+  // 컬럼 정의 — 포지션 무관 종합 세트. 공격수의 패스%, 미드의 몸싸움(공중볼%)까지 전부 한 표에서.
   //   col 메타: { label, key, suffix?, primary?(굵게), rcls?(평점 색상) }
+  //   포지션 칩은 컬럼이 아니라 "행"만 필터한다.
   const LEAD = [
     { label: "#",     key: null },
     { label: "선수",   key: "name" },
@@ -65,29 +63,10 @@
       { label: "도움", key: "assists" },
       { label: "공격P", key: "attack_pts", primary: true },
       { label: "패스%", key: "pass_acc", suffix: "%" },
-      { label: "태클/90", key: "tackles_p90" },
-      RATING],
-    F: [...LEAD,
-      { label: "골", key: "goals", primary: true },
-      { label: "PK제외", key: "np_goals" },
-      { label: "도움", key: "assists" },
-      { label: "xG", key: "xg" },
-      { label: "xG효율", key: "xg_eff" },
-      { label: "슈팅", key: "shots" },
-      RATING],
-    M: [...LEAD,
-      { label: "패스%", key: "pass_acc", suffix: "%", primary: true },
-      { label: "패스/90", key: "passes_p90" },
       { label: "키패스", key: "key_passes" },
-      { label: "도움", key: "assists" },
       { label: "태클/90", key: "tackles_p90" },
-      RATING],
-    D: [...LEAD,
-      { label: "태클/90", key: "tackles_p90", primary: true },
       { label: "인터셉트/90", key: "interceptions_p90" },
-      { label: "클리어/90", key: "clearances_p90" },
       { label: "공중볼%", key: "aerial_pct", suffix: "%" },
-      { label: "패스%", key: "pass_acc", suffix: "%" },
       RATING],
   };
 
@@ -244,8 +223,8 @@
     const raw = currentPos === "all" ? base : base.filter(r => r.pos === currentPos);
     if (!raw.length) { body.innerHTML = '<p class="ins-empty">데이터 없음</p>'; return; }
 
-    const cols = SORT_COLS[currentPos] || SORT_COLS.all;
-    const rows = sortRows(raw, sortState[currentPos]);
+    const cols = SORT_COLS.all;          // 종합 컬럼 고정 — 칩은 행만 필터
+    const rows = sortRows(raw, sortState.all);
     const total = rows.length;
     const shown = topExpanded ? rows : rows.slice(0, TOP_PREVIEW);
 
@@ -258,13 +237,13 @@
       : "";
 
     body.innerHTML =
-      `<div class="ins-top-scroll"><table class="ins-table">${buildThead(currentPos)}<tbody>${tbody}</tbody></table></div>${moreBtn}`;
+      `<div class="ins-top-scroll"><table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table></div>${moreBtn}`;
 
     // 헤더 클릭 → 다중 정렬 (첫 클릭: 추가/내림 → 재클릭: 오름 → 한번 더: 제거)
     body.querySelectorAll(".ins-th-sort").forEach(th => {
       th.addEventListener("click", () => {
         const key  = th.dataset.key;
-        const sorts = sortState[currentPos];
+        const sorts = sortState.all;
         const idx  = sorts.findIndex(s => s.key === key);
         if (idx === -1)               sorts.push({ key, dir: -1 });
         else if (sorts[idx].dir === -1) sorts[idx].dir = 1;
