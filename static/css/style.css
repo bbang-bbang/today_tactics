@@ -5929,11 +5929,21 @@ body.pr-expanded-lock {
 .ins-adv-list li b { margin-left: auto; color: #e8f0fb; font-variant-numeric: tabular-nums; }
 .ins-adv-delta { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 52px; }
 .ins-adv-empty { color: #7a8aa0; font-style: italic; font-size: 0.74rem; }
-/* 시간대별 득점 미니 바 */
-.ins-tl { display: flex; align-items: flex-end; gap: 5px; height: 64px; padding-top: 4px; }
-.ins-tl-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
-.ins-tl-bar { width: 100%; min-height: 2px; background: linear-gradient(180deg, #6fb4ff, #3d7fd6); border-radius: 3px 3px 0 0; transition: height .4s cubic-bezier(.22,1,.36,1); }
-.ins-tl-lbl { font-size: 0.58rem; color: #8aa0b8; margin-top: 3px; white-space: nowrap; }
+/* 시간대별 득점 — 값 라벨 + 점유율 + 최다 시간대 강조 */
+.ins-tl-total { font-size: 0.68rem; font-weight: 600; color: #8aa0b8; margin-left: 6px; }
+.ins-tl { display: flex; align-items: flex-end; gap: 6px; padding: 2px 0 0; }
+.ins-tl-col { flex: 1; display: flex; flex-direction: column; align-items: center; }
+.ins-tl-val { font-size: 0.66rem; font-weight: 700; color: #c8d8f0; margin-bottom: 2px; font-variant-numeric: tabular-nums; }
+.ins-tl-track { width: 100%; height: 76px; display: flex; align-items: flex-end; background: rgba(255,255,255,0.03); border-radius: 4px; }
+.ins-tl-bar { width: 100%; min-height: 3px; background: linear-gradient(180deg, #6fb4ff, #3d7fd6); border-radius: 4px 4px 0 0; transition: height .5s cubic-bezier(.22,1,.36,1); }
+.ins-tl-col:hover .ins-tl-bar { filter: brightness(1.15); }
+.ins-tl-peak .ins-tl-bar { background: linear-gradient(180deg, #ffb24d, #f08a2e); box-shadow: 0 0 10px rgba(240,138,46,0.45); }
+.ins-tl-peak .ins-tl-val { color: #ffc870; }
+.ins-tl-lbl { font-size: 0.56rem; color: #8aa0b8; margin-top: 4px; white-space: nowrap; display: flex; flex-direction: column; align-items: center; line-height: 1.25; }
+.ins-tl-share { color: #6f86a2; font-size: 0.54rem; }
+.ins-tl-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 9px; font-size: 0.72rem; color: #aab8cc; }
+.ins-tl-sg b { color: #e8f0fb; font-weight: 800; }
+.ins-tl-sg-peak b { color: #ffc870; }
 @media (max-width: 760px) { .ins-adv-grid { grid-template-columns: 1fr; } }
 /* 산식/근거 캡션 — 신빙성 표시 */
 .ins-method { margin-top: 9px; padding-top: 7px; border-top: 1px dashed rgba(255,255,255,0.10); font-size: 0.68rem; color: #8090a6; line-height: 1.5; }

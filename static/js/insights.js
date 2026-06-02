@@ -850,12 +850,27 @@
     const late = (d.late_top || []).slice(0, 5).map((p, i) =>
       `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.late_goals}골</b></li>`).join("");
     const tl = d.timeline || [];
+    const total = tl.reduce((s, t) => s + t.goals, 0) || 1;
     const max = Math.max(...tl.map(t => t.goals), 1);
-    const bars = tl.map(t =>
-      `<div class="ins-tl-col" title="${t.bucket}분 · ${t.goals}골"><div class="ins-tl-bar" style="height:${Math.round(t.goals / max * 100)}%"></div><span class="ins-tl-lbl">${t.bucket}</span></div>`).join("");
+    const peakIdx = tl.reduce((mi, t, i, a) => (t.goals > a[mi].goals ? i : mi), 0);
+    const firstHalf = tl.filter(t => ["0-15", "15-30", "30-45"].includes(t.bucket)).reduce((s, t) => s + t.goals, 0);
+    const secondHalf = total - firstHalf;
+    const peak = tl[peakIdx];
+    const bars = tl.map((t, i) => {
+      const h = Math.round(t.goals / max * 100);
+      const share = Math.round(t.goals / total * 100);
+      const peakCls = i === peakIdx ? " ins-tl-peak" : "";
+      return `<div class="ins-tl-col${peakCls}" title="${t.bucket}분 · ${t.goals}골 (${share}%)">
+        <span class="ins-tl-val">${t.goals}</span>
+        <div class="ins-tl-track"><div class="ins-tl-bar" style="height:${h}%"></div></div>
+        <span class="ins-tl-lbl">${t.bucket}<span class="ins-tl-share">${share}%</span></span>
+      </div>`;
+    }).join("");
     el.innerHTML =
       `<div class="ins-adv-sub-h">⚡ 막판(75'+) 해결사</div><ol class="ins-adv-list">${late || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
-       <div class="ins-adv-sub-h">시간대별 리그 득점</div><div class="ins-tl">${bars}</div>
+       <div class="ins-adv-sub-h">⏱ 시간대별 리그 득점 <span class="ins-tl-total">총 ${total}골</span></div>
+       <div class="ins-tl">${bars}</div>
+       <div class="ins-tl-summary"><span class="ins-tl-sg">🕐 전반 <b>${firstHalf}</b></span><span class="ins-tl-sg">🕝 후반 <b>${secondHalf}</b></span><span class="ins-tl-sg ins-tl-sg-peak">🔥 최다 <b>${peak ? peak.bucket : "-"}분</b> (${peak ? peak.goals : 0}골)</span></div>
        <div class="ins-method">근거 — 골 발생 분(minute) 기준 · 막판=75분 이후(자책골 제외) · 시간대=해당 리그 전체 득점</div>`;
   }
   function renderForm(d) {
