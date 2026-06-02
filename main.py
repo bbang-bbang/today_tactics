@@ -4717,6 +4717,7 @@ def insights_top_performers():
             "attack_pts": (r["goals"] or 0) + (r["assists"] or 0),   # 공격기여 = 골+도움
             "xg": round(r["xg"] or 0, 2),
             "xg_eff": round((r["goals"] or 0) / r["xg"], 2) if (r["xg"] or 0) > 0 else None,
+            "xg_diff": round((r["goals"] or 0) - (r["xg"] or 0), 2),   # 결정력 (G−xG)
             "shots": r["shots"] or 0,
             "pass_acc": round((r["ap"] or 0) / r["tp"] * 100, 1) if r["tp"] else None,
             "passes_p90": round((r["tp"] or 0) / mins * 90, 1) if mins else None,

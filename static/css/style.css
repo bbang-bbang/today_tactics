@@ -5867,16 +5867,8 @@ body.pr-expanded-lock {
     font-size: clamp(1.1rem, 1.4vw, 1.3rem);
     line-height: 1.4;
 }
+/* TOP 퍼포머(전 지표·전 너비) → 카드 순위 순으로 세로 스택 */
 #insights-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    align-items: start;
-}
-#ins-panel-top { grid-column: 1; }
-/* 우측 컬럼 — xG 위, 카드가 바로 아래 (좌측 TOP 표 높이와 무관하게 붙음) */
-.ins-col-right {
-    grid-column: 2;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -7736,10 +7728,8 @@ body.pr-expanded-lock {
     .retro-export { font-size: 10px; padding: 3px 8px; }
     .retro-row { font-size: 11px; gap: 6px; flex-wrap: wrap; }
 
-    /* 인사이트 그리드 — 1열로 */
-    #insights-grid { grid-template-columns: 1fr !important; gap: 12px; }
-    #ins-panel-top, .ins-col-right { grid-column: auto; grid-row: auto; }
-    .ins-col-right { gap: 12px; }
+    /* 인사이트 그리드 — 모바일 간격 축소 (이미 세로 스택) */
+    #insights-grid { gap: 12px; }
 }
 
 @media (max-width: 480px) {

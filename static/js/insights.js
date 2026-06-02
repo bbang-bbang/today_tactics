@@ -62,10 +62,12 @@
       { label: "골", key: "goals" },
       { label: "도움", key: "assists" },
       { label: "공격P", key: "attack_pts", primary: true },
+      { label: "xG", key: "xg" },
+      { label: "결정력", key: "xg_diff", signed: true },   // G−xG (구 xG 효율 박스 흡수)
+      { label: "슈팅", key: "shots" },
       { label: "패스%", key: "pass_acc", suffix: "%" },
       { label: "키패스", key: "key_passes" },
       { label: "태클/90", key: "tackles_p90" },
-      { label: "인터셉트/90", key: "interceptions_p90" },
       { label: "공중볼%", key: "aerial_pct", suffix: "%" },
       RATING],
   };
@@ -83,6 +85,10 @@
       return `<td><span class="${posCls}">${POS_BADGE[r.pos] || "-"}</span></td>`;
     }
     let v = r[col.key];
+    if (col.signed && typeof v === "number") {   // 결정력(G−xG) — ± 부호 + 색
+      const cls = v > 0 ? "ins-pos" : v < 0 ? "ins-neg" : "";
+      return `<td class="${cls}"><strong>${v > 0 ? "+" : ""}${v}</strong></td>`;
+    }
     v = (v === null || v === undefined) ? "-" : (col.suffix ? `${v}${col.suffix}` : v);
     if (col.rcls) {
       const rc = r.rating >= 7.5 ? "ins-pos" : r.rating && r.rating < 6.5 ? "ins-neg" : "";
@@ -778,77 +784,9 @@
     });
   }
 
-  /* ── xG 효율 리더보드 ── */
-  let currentXgMode   = "diff";   // diff | goals | xg
-  let _xgCache = null;
-
-  function initXgModeTab() {
-    document.querySelectorAll(".ins-xg-mode-tab").forEach(btn => {
-      btn.addEventListener("click", () => {
-        if (btn.dataset.mode === currentXgMode) return;
-        document.querySelectorAll(".ins-xg-mode-tab").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        currentXgMode = btn.dataset.mode;
-        if (_xgCache) renderXg(_xgCache);
-      });
-    });
-  }
-  function loadXgLeaders() {
-    return fetch(`/api/insights/xg-efficiency?year=${currentYear}&league=${currentLeague}`)
-      .then(r => r.json())
-      .then(d => {
-        _xgCache = Array.isArray(d) ? d : [];
-        showBlock("ins-panel-xg", _xgCache.length > 0);
-        renderXg(_xgCache);
-      });
-  }
-  function renderXg(rows) {
-    const wrap = document.getElementById("ins-xg-body");
-    if (!wrap) return;
-    if (!rows.length) { wrap.innerHTML = '<p class="ins-empty">데이터 없음</p>'; return; }
-    const sorted = [...rows].sort((a, b) => {
-      if (currentXgMode === "diff")  return b.diff - a.diff;
-      if (currentXgMode === "goals") return b.goals - a.goals;
-      return b.xg - a.xg;
-    }).slice(0, 15);
-    const tbody = sorted.map((r, i) => {
-      const diffCls = r.diff >= 0 ? "ins-pos" : "ins-neg";
-      const sign    = r.diff > 0 ? "+" : "";
-      const posCls  = r.pos ? `ins-pos-badge ins-pos-${r.pos}` : "ins-pos-badge";
-      const badge   = `<span class="${posCls}">${POS_BADGE[r.pos] || "-"}</span>`;
-      return `
-        <tr>
-          <td class="ins-rank">${i+1}</td>
-          <td class="ins-name">${r.name}</td>
-          <td class="ins-team-cell">${r.team || "—"}</td>
-          <td>${badge}</td>
-          <td>${r.games}</td>
-          <td><strong>${r.goals}</strong></td>
-          <td>${r.pk_goals > 0 ? `<strong>${r.pk_goals}</strong>` : '<span class="ins-sub">0</span>'}</td>
-          <td>${r.xg}</td>
-          <td class="${diffCls}"><strong>${sign}${r.diff}</strong></td>
-          <td>${r.shots}</td>
-        </tr>`;
-    }).join("");
-    const modeNote = currentXgMode === "diff"  ? "결정력(G−xG) 내림차순. + = xG 대비 초과 득점 (마무리 능력)."
-                   : currentXgMode === "goals" ? "절대 득점 내림차순."
-                   : "절대 xG(슈팅 질) 내림차순.";
-    wrap.innerHTML = `
-      <table class="ins-table">
-        <thead><tr>
-          <th>#</th><th>선수</th><th>팀</th><th>포지션</th><th>경기</th>
-          <th>G</th><th title="페널티킥 득점 (G·xG에 포함)">PK</th><th>xG</th><th>G−xG</th><th>슈팅</th>
-        </tr></thead>
-        <tbody>${tbody}</tbody>
-      </table>
-      <div class="ins-card-foot">${modeNote} G·xG는 PK 포함. TOP 15. 조건: 전 포지션 · 출전 ≥3경기 · xG ≥0.5.</div>
-    `;
-  }
-
-  /* ── 전체 로드 ── */
+  /* ── 전체 로드 ── (xG 효율은 TOP 퍼포머 표에 컬럼으로 흡수됨) */
   function loadAll() {
     loadTopPerformers();
-    loadXgLeaders();
     loadCardRankings();
   }
 
@@ -866,7 +804,6 @@
           initYearFilter();
           initPosTab();
           initCardModeTab();
-          initXgModeTab();
           loadAll();
           loaded = true;
         }
@@ -876,7 +813,6 @@
       initYearFilter();
       initPosTab();
       initCardModeTab();
-      initXgModeTab();
       loadAll();
     }
     document.getElementById("drawer-close")?.addEventListener("click", closeDrawer);
