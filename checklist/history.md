@@ -3519,3 +3519,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-02 10:36:05 | claude update
 - 2026-06-02 10:46:34 | ssh -i ~/.ssh/<KEY-REDACTED> -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new rocky@<IP-REDACTED> "echo SSH_OK && ls -la /opt/today_tactics/static/js/insights.js" 2>&1 | head -20
 - 2026-06-02 10:47:19 | ssh -i ~/.ssh/<KEY-REDACTED> -o BatchMode=yes rocky@<IP-REDACTED> "sudo systemctl restart today_tactics && sleep 2 && systemctl is-active today_tactics && curl -s -o /dev/null -w 'site HTTP %{http_code}\n' http://127.0.0.1/ && curl -s -o /dev/null -w 'insights.js HTTP %{http_code}\n' http://127.0.0.1/static/js/insights.js && grep -o 'insights.js?v=[0-9]*' /opt/today_tactics/templates/index.html" 2>&1 | grep -v "post-quantum\|store now\|openssh.com\|WARNING\|vulnerable"
+- 2026-06-02 11:26:00 | curl -sk --max-time 20 "https://<IP-REDACTED>/" -w "\n[HTTP %{http_code}]\n" | grep -oE "insights.js\?v=[0-9]+|style.css\?v=[0-9]+" | sort -u

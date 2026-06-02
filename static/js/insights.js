@@ -8,9 +8,12 @@
   let topExpanded = false;    // TOP 퍼포머 전체 펼침 여부 (기본은 미리보기)
   const TOP_PREVIEW = 20;     // 기본 노출 행 수 (나머지는 "더 보기")
 
-  // 정렬 상태: [{ key, dir }, ...] 우선순위 순 — 통합표는 컬럼이 고정이라 단일 상태
+  // 정렬 상태: 포지션 칩(view)별로 기본 정렬 키가 다름
   const sortState = {
-    all: [{ key: "attack_pts", dir: -1 }, { key: "rating", dir: -1 }],  // 공격기여(골+도움) 우선, 평점 2차
+    all: [{ key: "attack_pts", dir: -1 }, { key: "rating", dir: -1 }],  // 전체 — 공격기여 우선, 평점 2차
+    F:   [{ key: "goals", dir: -1 }],                                    // 공격 — 골
+    M:   [{ key: "pass_acc", dir: -1 }],                                 // 미드 — 패스 정확도
+    D:   [{ key: "tackles_p90", dir: -1 }],                              // 수비 — 태클/90
   };
 
   // 카드 패널 — 표별 정렬 상태 + 컬럼 정의
@@ -46,25 +49,68 @@
     ],
   };
 
-  // 정렬 컬럼 정의
+  // 컬럼 정의 — 포지션 칩(view)에 따라 비교 지표 세트가 바뀐다.
+  //   col 메타: { label, key, suffix?, primary?(굵게), rcls?(평점 색상) }
+  const LEAD = [
+    { label: "#",     key: null },
+    { label: "선수",   key: "name" },
+    { label: "구단",   key: "team" },
+    { label: "포지션", key: "pos" },
+    { label: "경기",   key: "games" },
+  ];
+  const RATING = { label: "평점", key: "rating", rcls: true };
   const SORT_COLS = {
-    all: [
-      { label: "#",        key: null },
-      { label: "선수",      key: "name" },
-      { label: "구단",      key: "team" },
-      { label: "포지션",    key: "pos" },
-      { label: "경기",      key: "games" },
-      { label: "골",       key: "goals" },
-      { label: "도움",      key: "assists" },
-      { label: "공격P",     key: "attack_pts" },
-      { label: "키패스",    key: "key_passes" },
-      { label: "태클/90",  key: "tackles_p90" },
-      { label: "평점",      key: "rating" },
-    ],
+    all: [...LEAD,
+      { label: "골", key: "goals" },
+      { label: "도움", key: "assists" },
+      { label: "공격P", key: "attack_pts", primary: true },
+      { label: "패스%", key: "pass_acc", suffix: "%" },
+      { label: "태클/90", key: "tackles_p90" },
+      RATING],
+    F: [...LEAD,
+      { label: "골", key: "goals", primary: true },
+      { label: "PK제외", key: "np_goals" },
+      { label: "도움", key: "assists" },
+      { label: "xG", key: "xg" },
+      { label: "xG효율", key: "xg_eff" },
+      { label: "슈팅", key: "shots" },
+      RATING],
+    M: [...LEAD,
+      { label: "패스%", key: "pass_acc", suffix: "%", primary: true },
+      { label: "패스/90", key: "passes_p90" },
+      { label: "키패스", key: "key_passes" },
+      { label: "도움", key: "assists" },
+      { label: "태클/90", key: "tackles_p90" },
+      RATING],
+    D: [...LEAD,
+      { label: "태클/90", key: "tackles_p90", primary: true },
+      { label: "인터셉트/90", key: "interceptions_p90" },
+      { label: "클리어/90", key: "clearances_p90" },
+      { label: "공중볼%", key: "aerial_pct", suffix: "%" },
+      { label: "패스%", key: "pass_acc", suffix: "%" },
+      RATING],
   };
 
   // 포지션 배지 표시용
   const POS_BADGE = { F: "공격", M: "미드", D: "수비", G: "GK" };
+
+  // 셀 1개 렌더 (컬럼 메타 기반)
+  function renderCell(col, r, rank) {
+    if (col.key === null)   return `<td class="ins-rank">${rank}</td>`;
+    if (col.key === "name") return `<td class="ins-name">${r.name}</td>`;
+    if (col.key === "team") return `<td class="ins-team">${r.team || "-"}</td>`;
+    if (col.key === "pos") {
+      const posCls = r.pos ? `ins-pos-badge ins-pos-${r.pos}` : "ins-pos-badge";
+      return `<td><span class="${posCls}">${POS_BADGE[r.pos] || "-"}</span></td>`;
+    }
+    let v = r[col.key];
+    v = (v === null || v === undefined) ? "-" : (col.suffix ? `${v}${col.suffix}` : v);
+    if (col.rcls) {
+      const rc = r.rating >= 7.5 ? "ins-pos" : r.rating && r.rating < 6.5 ? "ins-neg" : "";
+      return `<td class="${rc}">${v}</td>`;
+    }
+    return col.primary ? `<td><strong>${v}</strong></td>` : `<td>${v}</td>`;
+  }
 
   function shortName(name) {
     if (!name) return "";
@@ -166,7 +212,7 @@
         const bv = b[key] ?? (typeof b[key] === "string" ? "" : -Infinity);
         let cmp = 0;
         if (typeof av === "string") cmp = av.localeCompare(bv);
-        else cmp = bv - av;         // 기본 내림차순 기준
+        else cmp = av - bv;         // 오름차순 기준 — dir=-1이면 내림차순(▼, 큰 값 위로)
         if (cmp !== 0) return dir * cmp;
       }
       return 0;
@@ -198,41 +244,27 @@
     const raw = currentPos === "all" ? base : base.filter(r => r.pos === currentPos);
     if (!raw.length) { body.innerHTML = '<p class="ins-empty">데이터 없음</p>'; return; }
 
-    const rows = sortRows(raw, sortState.all);
+    const cols = SORT_COLS[currentPos] || SORT_COLS.all;
+    const rows = sortRows(raw, sortState[currentPos]);
     const total = rows.length;
     const shown = topExpanded ? rows : rows.slice(0, TOP_PREVIEW);
 
-    const tbody = shown.map((r, i) => {
-      const posCls = r.pos ? `ins-pos-badge ins-pos-${r.pos}` : "ins-pos-badge";
-      const badge  = `<span class="${posCls}">${POS_BADGE[r.pos] || "-"}</span>`;
-      const rCls   = r.rating >= 7.5 ? "ins-pos" : r.rating && r.rating < 6.5 ? "ins-neg" : "";
-      return `<tr>
-        <td class="ins-rank">${i + 1}</td>
-        <td class="ins-name">${r.name}</td>
-        <td class="ins-team">${r.team || "-"}</td>
-        <td>${badge}</td>
-        <td>${r.games}</td>
-        <td>${r.goals}</td>
-        <td>${r.assists}</td>
-        <td><strong>${r.attack_pts}</strong></td>
-        <td>${r.key_passes}</td>
-        <td>${r.tackles_p90}</td>
-        <td class="${rCls}">${r.rating ?? "-"}</td>
-      </tr>`;
-    }).join("");
+    const tbody = shown.map((r, i) =>
+      `<tr>${cols.map(c => renderCell(c, r, i + 1)).join("")}</tr>`
+    ).join("");
 
     const moreBtn = total > TOP_PREVIEW
       ? `<button class="ins-top-more" type="button">${topExpanded ? "접기 ▲" : `더 보기 (전체 ${total}명) ▼`}</button>`
       : "";
 
     body.innerHTML =
-      `<div class="ins-top-scroll"><table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table></div>${moreBtn}`;
+      `<div class="ins-top-scroll"><table class="ins-table">${buildThead(currentPos)}<tbody>${tbody}</tbody></table></div>${moreBtn}`;
 
     // 헤더 클릭 → 다중 정렬 (첫 클릭: 추가/내림 → 재클릭: 오름 → 한번 더: 제거)
     body.querySelectorAll(".ins-th-sort").forEach(th => {
       th.addEventListener("click", () => {
         const key  = th.dataset.key;
-        const sorts = sortState.all;
+        const sorts = sortState[currentPos];
         const idx  = sorts.findIndex(s => s.key === key);
         if (idx === -1)               sorts.push({ key, dir: -1 });
         else if (sorts[idx].dir === -1) sorts[idx].dir = 1;

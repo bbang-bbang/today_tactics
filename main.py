@@ -4676,13 +4676,19 @@ def insights_top_performers():
 
     result = {}
 
-    # ── 통합 리더보드 (포지션 무관) — 기본 화면. 역할이 섞이는 선수(골 넣는 수비수 등)를
-    #    버킷에 가두지 않고 한 표에서 어느 지표로든 정렬 가능하게 한다.
+    # ── 통합 리더보드 (포지션 무관) — 단일 표에 역할별 비교 지표를 모두 실어,
+    #    프런트의 포지션 칩이 컬럼 세트를 바꿔가며 보여준다 (공격=골/xG, 미드=패스, 수비=태클/인터셉트 등).
     rows = conn.execute(f"""
         SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) as name_ko, m.player_name, m.team_id,
                COUNT(*) as games, SUM(m.minutes_played) as mins,
                SUM(m.goals) as goals, SUM(COALESCE(m.assists,0)) as assists,
-               SUM(COALESCE(m.key_passes,0)) as kp, SUM(COALESCE(m.tackles,0)) as tkl,
+               SUM(COALESCE(m.expected_goals,0)) as xg, SUM(COALESCE(m.total_shots,0)) as shots,
+               SUM(COALESCE(m.total_passes,0)) as tp, SUM(COALESCE(m.accurate_passes,0)) as ap,
+               SUM(COALESCE(m.key_passes,0)) as kp,
+               SUM(COALESCE(m.tackles,0)) as tkl, SUM(COALESCE(m.interceptions,0)) as intc,
+               SUM(COALESCE(m.clearances,0)) as clr,
+               SUM(COALESCE(m.aerial_won,0)) as aw, SUM(COALESCE(m.aerial_lost,0)) as al,
+               SUM(COALESCE(m.duel_won,0)) as dw, SUM(COALESCE(m.duel_lost,0)) as dl,
                AVG(m.rating) as avg_rating,
                (SELECT m2.position FROM match_player_stats m2
                 WHERE m2.player_id=m.player_id {date_cond}
@@ -4697,79 +4703,32 @@ def insights_top_performers():
         GROUP BY m.player_id HAVING games>=3 AND mins>=90
         ORDER BY avg_rating DESC LIMIT 100
     """, date_params + date_params + date_params + league_params).fetchall()
-    result["all"] = [{**pinfo(r),
-        "pos": r["main_pos"] or "",
-        "goals": r["goals"] or 0,
-        "np_goals": (r["goals"] or 0) - (r["pk_goals"] or 0),
-        "assists": r["assists"] or 0,
-        "attack_pts": (r["goals"] or 0) + (r["assists"] or 0),   # 공격기여 = 골+도움
-        "key_passes": r["kp"] or 0,
-        "tackles_p90": round((r["tkl"] or 0) / r["mins"] * 90, 2),
-        "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
-    } for r in rows]
 
-    rows = conn.execute(f"""
-        SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) as name_ko, m.player_name, m.team_id,
-               COUNT(*) as games, SUM(m.minutes_played) as mins,
-               SUM(m.goals) as goals, SUM(COALESCE(m.expected_goals,0)) as xg,
-               AVG(m.rating) as avg_rating,
-               (SELECT COUNT(*) FROM goal_events g
-                WHERE g.player_id=m.player_id AND g.is_penalty=1 AND g.is_own_goal=0
-                AND g.event_id IN (
-                    SELECT event_id FROM match_player_stats
-                    WHERE player_id=m.player_id {date_cond})) as pk_goals
-        FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
-        WHERE m.position='F' AND m.minutes_played>0 {date_cond} {league_cond}
-        GROUP BY m.player_id HAVING games>=3 AND mins>=90
-        ORDER BY goals DESC LIMIT 30
-    """, date_params + date_params + league_params).fetchall()
-    result["F"] = [{**pinfo(r),
-        "goals": r["goals"] or 0,
-        "pk_goals": r["pk_goals"] or 0,
-        "np_goals": (r["goals"] or 0) - (r["pk_goals"] or 0),
-        "goals_p90": round((r["goals"] or 0) / r["mins"] * 90, 2),
-        "np_goals_p90": round(((r["goals"] or 0) - (r["pk_goals"] or 0)) / r["mins"] * 90, 2),
-        "xg": round(r["xg"] or 0, 2),
-        "xg_eff": round((r["goals"] or 0) / r["xg"], 2) if (r["xg"] or 0) > 0 else None,
-        "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
-    } for r in rows]
-
-    rows = conn.execute(f"""
-        SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) as name_ko, m.player_name, m.team_id,
-               COUNT(*) as games, SUM(m.minutes_played) as mins,
-               SUM(m.total_passes) as tp, SUM(m.accurate_passes) as ap,
-               SUM(m.tackles) as tkl, AVG(m.rating) as avg_rating
-        FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
-        WHERE m.position='M' AND m.minutes_played>0 {date_cond} {league_cond}
-        GROUP BY m.player_id HAVING games>=3 AND mins>=90 AND tp>0
-        ORDER BY (CAST(ap AS REAL)/tp) DESC LIMIT 30
-    """, date_params + league_params).fetchall()
-    result["M"] = [{**pinfo(r),
-        "pass_acc": round((r["ap"] or 0) / r["tp"] * 100, 1) if r["tp"] else None,
-        "passes_p90": round((r["tp"] or 0) / r["mins"] * 90, 1),
-        "tackles_p90": round((r["tkl"] or 0) / r["mins"] * 90, 2),
-        "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
-    } for r in rows]
-
-    rows = conn.execute(f"""
-        SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) as name_ko, m.player_name, m.team_id,
-               COUNT(*) as games, SUM(m.minutes_played) as mins,
-               SUM(m.tackles) as tkl, SUM(COALESCE(m.interceptions,0)) as intc,
-               SUM(m.clearances) as clr, SUM(m.aerial_won) as aer,
-               SUM(m.duel_won) as duel, AVG(m.rating) as avg_rating
-        FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
-        WHERE m.position='D' AND m.minutes_played>0 {date_cond} {league_cond}
-        GROUP BY m.player_id HAVING games>=3 AND mins>=90
-        ORDER BY (tkl + intc*1.5 + clr + aer + duel) / mins DESC LIMIT 30
-    """, date_params + league_params).fetchall()
-    result["D"] = [{**pinfo(r),
-        "def_score_p90": round(
-            ((r["tkl"] or 0) + (r["intc"] or 0)*1.5 + (r["clr"] or 0)
-             + (r["aer"] or 0) + (r["duel"] or 0)) / r["mins"] * 90, 2),
-        "tackles_p90": round((r["tkl"] or 0) / r["mins"] * 90, 2),
-        "clearances_p90": round((r["clr"] or 0) / r["mins"] * 90, 2),
-        "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
-    } for r in rows]
+    def serialize_all(r):
+        mins  = r["mins"] or 0
+        aerial_tot = (r["aw"] or 0) + (r["al"] or 0)
+        duel_tot   = (r["dw"] or 0) + (r["dl"] or 0)
+        return {**pinfo(r),
+            "pos": r["main_pos"] or "",
+            "goals": r["goals"] or 0,
+            "pk_goals": r["pk_goals"] or 0,
+            "np_goals": (r["goals"] or 0) - (r["pk_goals"] or 0),
+            "assists": r["assists"] or 0,
+            "attack_pts": (r["goals"] or 0) + (r["assists"] or 0),   # 공격기여 = 골+도움
+            "xg": round(r["xg"] or 0, 2),
+            "xg_eff": round((r["goals"] or 0) / r["xg"], 2) if (r["xg"] or 0) > 0 else None,
+            "shots": r["shots"] or 0,
+            "pass_acc": round((r["ap"] or 0) / r["tp"] * 100, 1) if r["tp"] else None,
+            "passes_p90": round((r["tp"] or 0) / mins * 90, 1) if mins else None,
+            "key_passes": r["kp"] or 0,
+            "tackles_p90": round((r["tkl"] or 0) / mins * 90, 2) if mins else None,
+            "interceptions_p90": round((r["intc"] or 0) / mins * 90, 2) if mins else None,
+            "clearances_p90": round((r["clr"] or 0) / mins * 90, 2) if mins else None,
+            "aerial_pct": round((r["aw"] or 0) / aerial_tot * 100) if aerial_tot else None,
+            "duel_pct": round((r["dw"] or 0) / duel_tot * 100) if duel_tot else None,
+            "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
+        }
+    result["all"] = [serialize_all(r) for r in rows]
 
     conn.close()
     return jsonify(result)
