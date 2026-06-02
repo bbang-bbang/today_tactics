@@ -847,8 +847,8 @@
   }
   function renderClutch(d) {
     const el = document.getElementById("ins-clutch-body"); if (!el) return;
-    const late = (d.late_top || []).slice(0, 5).map((p, i) =>
-      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.late_goals}골</b></li>`).join("");
+    const dec = (d.decisive_top || []).slice(0, 5).map((p, i) =>
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team} · 결승 ${p.gwg}·동점 ${p.eq}</span><b>${p.total}</b></li>`).join("");
     const tl = d.timeline || [];
     const total = tl.reduce((s, t) => s + t.goals, 0) || 1;
     const max = Math.max(...tl.map(t => t.goals), 1);
@@ -867,11 +867,12 @@
       </div>`;
     }).join("");
     el.innerHTML =
-      `<div class="ins-adv-sub-h">⚡ 막판(75'+) 해결사</div><ol class="ins-adv-list">${late || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
+      `<div class="ins-adv-sub-h">🎯 결정적 골 해결사 <span class="ins-clutch-hint">결승골+동점골</span></div>
+       <ol class="ins-adv-list">${dec || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
        <div class="ins-adv-sub-h">⏱ 시간대별 리그 득점 <span class="ins-tl-total">총 ${total}골</span></div>
        <div class="ins-tl">${bars}</div>
        <div class="ins-tl-summary"><span class="ins-tl-sg">🕐 전반 <b>${firstHalf}</b></span><span class="ins-tl-sg">🕝 후반 <b>${secondHalf}</b></span><span class="ins-tl-sg ins-tl-sg-peak">🔥 최다 <b>${peak ? peak.bucket : "-"}분</b> (${peak ? peak.goals : 0}골)</span></div>
-       <div class="ins-method">근거 — 골 발생 분(minute) 기준 · 막판=75분 이후(자책골 제외) · 시간대=해당 리그 전체 득점</div>`;
+       <div class="ins-method">근거 — 결승골=승자가 패자 최종+1 득점에 도달한 골 · 동점골=뒤지다 동점 만든 골 · 시간대=리그 전체 득점 분포</div>`;
   }
   function renderForm(d) {
     const el = document.getElementById("ins-form-body"); if (!el) return;

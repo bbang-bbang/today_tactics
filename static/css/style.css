@@ -5944,6 +5944,7 @@ body.pr-expanded-lock {
 .ins-tl-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 9px; font-size: 0.72rem; color: #aab8cc; }
 .ins-tl-sg b { color: #e8f0fb; font-weight: 800; }
 .ins-tl-sg-peak b { color: #ffc870; }
+.ins-clutch-hint { font-size: 0.66rem; font-weight: 600; color: #8aa0b8; margin-left: 6px; }
 @media (max-width: 760px) { .ins-adv-grid { grid-template-columns: 1fr; } }
 /* 산식/근거 캡션 — 신빙성 표시 */
 .ins-method { margin-top: 9px; padding-top: 7px; border-top: 1px dashed rgba(255,255,255,0.10); font-size: 0.68rem; color: #8090a6; line-height: 1.5; }

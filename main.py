@@ -4830,8 +4830,57 @@ def insights_clutch():
     order = ['0-15', '15-30', '30-45', '45-60', '60-75', '75-90', '90+']
     dmap = {r["bucket"]: r["goals"] for r in dist}
     timeline = [{"bucket": b, "goals": dmap.get(b, 0)} for b in order]
+
+    # 결정적 골 — 경기별 골 시퀀스 복원해 결승골/동점골 분류 (막판 득점보다 진짜 '해결사')
+    dec_conds = []; dec_params = []
+    if tid is not None:
+        dec_conds.append("e.tournament_id = ?"); dec_params.append(tid)
+    if year and year != "all":
+        dec_conds.append("strftime('%Y', datetime(e.date_ts, 'unixepoch', 'localtime')) = ?"); dec_params.append(str(year))
+    dec_where = (" AND " + " AND ".join(dec_conds)) if dec_conds else ""
+    grows = conn.execute(f"""
+        SELECT g.event_id, e.home_team_id, e.away_team_id, e.home_score, e.away_score,
+               g.team_id, g.player_id, COALESCE(p.name_ko, g.player_name) name, g.is_own_goal
+        FROM goal_events g JOIN events e ON g.event_id = e.id
+        LEFT JOIN players p ON g.player_id = p.id
+        WHERE e.home_score IS NOT NULL AND e.id < 50000000 AND g.minute IS NOT NULL {dec_where}
+        ORDER BY g.event_id, g.minute, g.added_time
+    """, tuple(dec_params)).fetchall()
+    from itertools import groupby
+    dec = {}
+    def _d(pid):
+        if pid not in dec:
+            dec[pid] = {"name": "", "team_id": None, "gwg": 0, "eq": 0}
+        return dec[pid]
+    for _eid, grp in groupby(grows, key=lambda r: r["event_id"]):
+        gl = list(grp); e0 = gl[0]
+        hid, aid = e0["home_team_id"], e0["away_team_id"]
+        hs_f, as_f = e0["home_score"], e0["away_score"]
+        winner = hid if hs_f > as_f else (aid if as_f > hs_f else None)
+        loser_final = min(hs_f, as_f)
+        sh = sa = 0; gwg_done = False
+        for g in gl:
+            scoring = (aid if g["team_id"] == hid else hid) if g["is_own_goal"] else g["team_id"]
+            bef_s = sh if scoring == hid else sa
+            bef_o = sa if scoring == hid else sh
+            if scoring == hid: sh += 1
+            else: sa += 1
+            credit = (not g["is_own_goal"]) and g["player_id"]
+            if bef_s + 1 == bef_o and credit:   # 1점 뒤지다 동점
+                d = _d(g["player_id"]); d["eq"] += 1; d["name"] = g["name"] or ""; d["team_id"] = g["team_id"]
+            if winner is not None and not gwg_done:   # 결승골: 승자가 패자 최종+1에 처음 도달
+                win_run = sh if winner == hid else sa
+                if scoring == winner and win_run == loser_final + 1:
+                    gwg_done = True
+                    if credit:
+                        d = _d(g["player_id"]); d["gwg"] += 1; d["name"] = g["name"] or ""; d["team_id"] = g["team_id"]
+    decisive_top = sorted(
+        ({"name": v["name"], "team": _ko_team(v["team_id"], ""),
+          "gwg": v["gwg"], "eq": v["eq"], "total": v["gwg"] + v["eq"]}
+         for v in dec.values() if (v["gwg"] + v["eq"]) > 0),
+        key=lambda x: (-x["total"], -x["gwg"]))[:6]
     conn.close()
-    return jsonify({"late_top": late_top, "timeline": timeline})
+    return jsonify({"late_top": late_top, "decisive_top": decisive_top, "timeline": timeline})
 
 
 @app.route("/api/insights/form")
