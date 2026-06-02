@@ -5887,6 +5887,31 @@ body.pr-expanded-lock {
     margin-bottom: 12px;
 }
 .ins-block-hint { font-size: 0.7rem; font-weight: 400; color: #8aa2bd; margin-left: 8px; }
+/* 부문별 TOP 카드 — 각 부문 1위를 한눈에 (클릭 시 해당 지표 정렬) */
+.ins-cat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.ins-cat-card {
+    text-align: left;
+    background: linear-gradient(180deg, rgba(100,180,255,0.08), rgba(100,180,255,0.03));
+    border: 1px solid rgba(100,180,255,0.16);
+    border-radius: 10px;
+    padding: 9px 11px;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, transform .1s;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.ins-cat-card:hover { background: linear-gradient(180deg, rgba(100,180,255,0.16), rgba(100,180,255,0.06)); border-color: rgba(100,180,255,0.34); transform: translateY(-1px); }
+.ins-cat-head { display: flex; align-items: center; gap: 5px; }
+.ins-cat-icon { font-size: 0.9rem; }
+.ins-cat-label { font-size: 0.72rem; font-weight: 700; color: #9fb4cc; letter-spacing: 0.2px; }
+.ins-cat-val { font-size: 1.15rem; font-weight: 800; color: #e8f0fb; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.ins-cat-leader { font-size: 0.76rem; color: #c8d8f0; font-weight: 600; display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ins-pos-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
 .ins-pos-tab { background: rgba(255,255,255,0.07); color: #aaa; border: none; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; transition: background .15s, color .15s; }
 .ins-pos-tab:hover { background: rgba(255,255,255,0.12); color: #d8e4f0; }

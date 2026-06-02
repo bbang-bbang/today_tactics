@@ -4727,6 +4727,10 @@ def insights_top_performers():
             "clearances_p90": round((r["clr"] or 0) / mins * 90, 2) if mins else None,
             "aerial_pct": round((r["aw"] or 0) / aerial_tot * 100) if aerial_tot else None,
             "duel_pct": round((r["dw"] or 0) / duel_tot * 100) if duel_tot else None,
+            # ── 파생 비교 점수 (90분 환산 합성 지표 — 포지션 무관 비교용) ──
+            "create_score": round(((r["kp"] or 0) + (r["assists"] or 0) * 2) / mins * 90, 2) if mins else None,   # 창출P: 키패스 + 도움×2
+            "def_score": round(((r["tkl"] or 0) + (r["intc"] or 0) * 1.5 + (r["clr"] or 0)
+                                 + (r["aw"] or 0) + (r["dw"] or 0)) / mins * 90, 1) if mins else None,            # 수비P: 태클+인터셉트×1.5+클리어+공중볼승+듀얼승
             "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
         }
     result["all"] = [serialize_all(r) for r in rows]

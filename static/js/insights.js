@@ -67,10 +67,22 @@
       { label: "슈팅", key: "shots" },
       { label: "패스%", key: "pass_acc", suffix: "%" },
       { label: "키패스", key: "key_passes" },
+      { label: "창출P", key: "create_score" },
       { label: "태클/90", key: "tackles_p90" },
       { label: "공중볼%", key: "aerial_pct", suffix: "%" },
+      { label: "수비P", key: "def_score" },
       RATING],
   };
+
+  // 부문별 TOP 카드 정의 (각 부문 1위를 박스로) — key로 최댓값 리더 산출
+  const CATEGORY_DEFS = [
+    { label: "최다 득점",  icon: "⚽", key: "goals",       fmt: v => `${v}골` },
+    { label: "최다 도움",  icon: "🅰", key: "assists",     fmt: v => `${v}도움` },
+    { label: "결정력",     icon: "🎯", key: "xg_diff",     fmt: v => `${v > 0 ? "+" : ""}${v}` },
+    { label: "창출",       icon: "🧠", key: "create_score",fmt: v => `${v}` },
+    { label: "수비",       icon: "🛡", key: "def_score",   fmt: v => `${v}` },
+    { label: "평점",       icon: "⭐", key: "rating",      fmt: v => `${v}` },
+  ];
 
   // 포지션 배지 표시용
   const POS_BADGE = { F: "공격", M: "미드", D: "수비", G: "GK" };
@@ -221,12 +233,41 @@
     return `<thead><tr>${ths.join("")}</tr></thead>`;
   }
 
+  // 부문별 TOP 카드 — 현재 필터(리그+포지션 칩)된 집합에서 각 부문 1위를 박스로
+  function renderCategoryBoxes(rows) {
+    const host = document.getElementById("ins-top-cats");
+    if (!host) return;
+    host.innerHTML = CATEGORY_DEFS.map(c => {
+      let best = null;
+      for (const r of rows) {
+        const v = r[c.key];
+        if (v == null) continue;
+        if (!best || v > best.v) best = { v, r };
+      }
+      if (!best) return "";
+      const r = best.r;
+      return `<button class="ins-cat-card" data-key="${c.key}" data-pid="${r.player_id}" title="${c.label} 1위 · 클릭하면 이 지표로 정렬">
+        <div class="ins-cat-head"><span class="ins-cat-icon">${c.icon}</span><span class="ins-cat-label">${c.label}</span></div>
+        <div class="ins-cat-val">${c.fmt(best.v)}</div>
+        <div class="ins-cat-leader"><span class="ins-pos-badge ins-pos-${r.pos}">${POS_BADGE[r.pos] || "-"}</span> ${r.name}</div>
+      </button>`;
+    }).join("");
+    host.querySelectorAll(".ins-cat-card").forEach(btn => {
+      btn.addEventListener("click", () => {
+        sortState.all = [{ key: btn.dataset.key, dir: -1 }];
+        topExpanded = false;
+        renderTopTable(window._insTopData);
+      });
+    });
+  }
+
   function renderTopTable(data) {
     const body = document.getElementById("ins-top-body");
     if (!body || !data) return;
     const base = data.all || [];
     // 포지션 칩은 데이터셋 교체가 아니라 통합표의 행 필터 (정렬 상태 유지)
     const raw = currentPos === "all" ? base : base.filter(r => r.pos === currentPos);
+    renderCategoryBoxes(raw);   // 부문 카드도 같은 필터 집합 기준
     if (!raw.length) { body.innerHTML = '<p class="ins-empty">데이터 없음</p>'; return; }
 
     const cols = SORT_COLS.all;          // 종합 컬럼 고정 — 칩은 행만 필터
