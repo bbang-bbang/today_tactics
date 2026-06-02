@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=65">
+    <link rel="stylesheet" href="/static/css/style.css?v=66">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -336,12 +336,18 @@
             <h2 class="ld-title">🎯 포지션별 인사이트</h2>
             <div class="ld-year-filter" id="insights-year-filter"></div>
         </div>
+        <!-- 인사이트 탭 (랭킹 / 심화 / 규율) — 한 번에 하나만 노출 -->
+        <nav class="ins-tabs" role="tablist">
+            <button class="ins-tab active" data-itab="rank" role="tab">🏆 랭킹·부문</button>
+            <button class="ins-tab" data-itab="adv" role="tab">🔬 심화 인사이트</button>
+            <button class="ins-tab" data-itab="discipline" role="tab">🟨 규율·카드</button>
+        </nav>
 
         <div id="insights-grid">
         <!-- TOP 퍼포머 -->
-        <div class="ins-block" id="ins-panel-top">
+        <div class="ins-block" id="ins-panel-top" data-itab-panel="rank">
             <div class="ins-block-title">🏆 TOP 퍼포머
-                <span class="ins-block-hint">전 지표 한 표에 · 칩은 포지션 필터 · 헤더를 눌러 정렬</span>
+                <span class="ins-block-hint">부문 1위 카드 → 핵심 지표 표 · 칩=포지션 필터 · 선수 클릭 시 상세</span>
             </div>
             <div class="ins-pos-tabs">
                 <button class="ins-pos-tab active" data-pos="all">전체</button>
@@ -354,7 +360,7 @@
         </div>
 
         <!-- 심화 인사이트 (날씨·승부처·폼·활동량) -->
-        <div class="ins-block" id="ins-panel-adv">
+        <div class="ins-block hidden" id="ins-panel-adv" data-itab-panel="adv">
             <div class="ins-block-title">🔬 심화 인사이트
                 <span class="ins-block-hint">날씨·승부처·폼·활동량 — 상단 리그/시즌 필터 적용</span>
             </div>
@@ -367,7 +373,7 @@
         </div>
 
         <!-- 카드 수령 순위 -->
-        <div class="ins-block" id="ins-panel-cards">
+        <div class="ins-block hidden" id="ins-panel-cards" data-itab-panel="discipline">
             <div class="ins-block-title">🟨🟥 카드 수령 순위</div>
             <div class="ins-card-controls">
                 <div class="ins-pos-tabs" id="ins-card-mode-tabs">
@@ -767,7 +773,7 @@
 
     <script src="/static/js/player_analytics.js?v=5"></script>
     <script src="/static/js/player_report.js?v=5"></script>
-    <script src="/static/js/insights.js?v=20"></script>
+    <script src="/static/js/insights.js?v=21"></script>
 
     <!-- 작업공간 탭 컨트롤러 — 반드시 모든 모듈 스크립트 뒤에 로드 -->
     <script src="/static/js/workspace.js?v=4"></script>

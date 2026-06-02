@@ -5887,6 +5887,11 @@ body.pr-expanded-lock {
     margin-bottom: 12px;
 }
 .ins-block-hint { font-size: 0.7rem; font-weight: 400; color: #8aa2bd; margin-left: 8px; }
+/* 인사이트 탭 (랭킹/심화/규율) — 한 번에 하나만 */
+.ins-tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.ins-tab { background: transparent; border: none; border-bottom: 2px solid transparent; color: #8aa0b8; padding: 9px 16px; cursor: pointer; font-size: 0.86rem; font-weight: 700; transition: color .15s, border-color .15s; margin-bottom: -1px; }
+.ins-tab:hover { color: #cdd8e8; }
+.ins-tab.active { color: #7ecfff; border-bottom-color: #4ea4f8; }
 /* 부문별 TOP 카드 — 각 부문 1위를 한눈에 (클릭 시 해당 지표 정렬) */
 .ins-cat-grid {
     display: grid;

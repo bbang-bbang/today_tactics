@@ -57,19 +57,14 @@
     { label: "경기",   key: "games" },
   ];
   const RATING = { label: "평점", key: "rating", rcls: true };
+  // 슬림 컬럼 — 핵심 합성지표 위주(공격P·창출P·수비P)로 스캔 가능하게.
+  //   raw 세부(xG·슈팅·패스%·키패스·공중볼%·결정력 등)는 행 클릭 → 선수 상세 드로어에서.
   const SORT_COLS = {
     all: [...LEAD,
       { label: "골", key: "goals" },
       { label: "도움", key: "assists" },
       { label: "공격P", key: "attack_pts", primary: true, tip: "공격 기여 = 골 + 도움" },
-      { label: "xG", key: "xg", tip: "기대 득점(Expected Goals) — 슈팅 질의 합" },
-      { label: "결정력", key: "xg_diff", signed: true, tip: "결정력 = 골 − xG. +면 기대보다 더 넣음(마무리 우수)" },
-      { label: "슈팅", key: "shots" },
-      { label: "패스%", key: "pass_acc", suffix: "%", tip: "정확한 패스 / 시도 패스" },
-      { label: "키패스", key: "key_passes" },
       { label: "창출P", key: "create_score", tip: "창출 = (키패스 + 도움×2) / 90분" },
-      { label: "태클/90", key: "tackles_p90" },
-      { label: "공중볼%", key: "aerial_pct", suffix: "%", tip: "공중볼 경합 승률" },
       { label: "수비P", key: "def_score", tip: "수비 = (태클 + 인터셉트×1.5 + 클리어 + 공중볼승 + 듀얼승) / 90분" },
       RATING],
   };
@@ -285,7 +280,7 @@
       ? `<button class="ins-top-more" type="button">${topExpanded ? "접기 ▲" : `더 보기 (전체 ${total}명) ▼`}</button>`
       : "";
 
-    const methodFoot = `<div class="ins-method">📐 산식 — <b>공격P</b>=골+도움 · <b>결정력</b>=골−xG · <b>창출P</b>=(키패스+도움×2)/90분 · <b>수비P</b>=(태클+인터셉트×1.5+클리어+공중볼승+듀얼승)/90분 · 표본: 3경기·90분 이상 · 헤더 ⓘ에 마우스 올리면 설명</div>`;
+    const methodFoot = `<div class="ins-method">📐 산식 — <b>공격P</b>=골+도움 · <b>창출P</b>=(키패스+도움×2)/90분 · <b>수비P</b>=(태클+인터셉트×1.5+클리어+공중볼승+듀얼승)/90분 · 표본 3경기·90분↑ · <b>선수 클릭 시 xG·패스%·슈팅 등 상세</b></div>`;
     body.innerHTML =
       `<div class="ins-top-scroll"><table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table></div>${moreBtn}${methodFoot}`;
 
@@ -901,11 +896,32 @@
     fetch(`/api/insights/activity?${qs}`).then(r => r.json()).then(renderActivity).catch(() => {});
   }
 
-  /* ── 전체 로드 ── (xG 효율은 TOP 퍼포머 표에 컬럼으로 흡수됨)
-     무거운 심화 패널(히트맵 등)은 메인 표·카드가 먼저 뜬 뒤 로드해 초기 버퍼 방지 */
+  /* ── 인사이트 탭 (랭킹 / 심화 / 규율) — 활성 탭만 지연 로드 ── */
+  let _activeItab = "rank";
+  let _itabLoaded = { rank: false, adv: false, discipline: false };
+  function loadInsTab(tab) {
+    if (tab === "rank" && !_itabLoaded.rank) { _itabLoaded.rank = true; loadTopPerformers(); }
+    else if (tab === "adv" && !_itabLoaded.adv) { _itabLoaded.adv = true; loadAdvanced(); }
+    else if (tab === "discipline" && !_itabLoaded.discipline) { _itabLoaded.discipline = true; loadCardRankings(); }
+  }
+  function initInsTabs() {
+    document.querySelectorAll(".ins-tab").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const tab = btn.dataset.itab;
+        if (tab === _activeItab) return;
+        _activeItab = tab;
+        document.querySelectorAll(".ins-tab").forEach(b => b.classList.toggle("active", b === btn));
+        document.querySelectorAll("[data-itab-panel]").forEach(p =>
+          p.classList.toggle("hidden", p.dataset.itabPanel !== tab));
+        loadInsTab(tab);
+      });
+    });
+  }
+
+  /* ── 전체 로드 ── (필터 변경/최초) — 활성 탭만 로드, 나머지는 재방문 시 재로드 */
   function loadAll() {
-    Promise.allSettled([loadTopPerformers(), loadCardRankings()])
-      .finally(() => loadAdvanced());
+    _itabLoaded = { rank: false, adv: false, discipline: false };
+    loadInsTab(_activeItab);
   }
 
   function init() {
@@ -920,6 +936,7 @@
         if (!collapsed && !loaded) {
           // lazy load: 첫 펼침 시에만 API 호출
           initYearFilter();
+          initInsTabs();
           initPosTab();
           initCardModeTab();
           loadAll();
@@ -929,6 +946,7 @@
     } else {
       // 접기 UI 없으면 즉시 로드 (안전 fallback)
       initYearFilter();
+      initInsTabs();
       initPosTab();
       initCardModeTab();
       loadAll();
