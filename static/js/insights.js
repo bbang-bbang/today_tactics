@@ -280,9 +280,13 @@
       ? `<button class="ins-top-more" type="button">${topExpanded ? "접기 ▲" : `더 보기 (전체 ${total}명) ▼`}</button>`
       : "";
 
-    const methodFoot = `<div class="ins-method">📐 산식 — <b>공격P</b>=골+도움 · <b>창출P</b>=(키패스+도움×2)/90분 · <b>수비P</b>=(태클+인터셉트×1.5+클리어+공중볼승+듀얼승)/90분 · 표본 3경기·90분↑ · <b>선수 클릭 시 xG·패스%·슈팅 등 상세</b></div>`;
+    const formulaNote =
+      `<div class="ins-formula"><span class="ins-formula-ic">📐</span><div><b>지표 산식</b> — ` +
+      `<b>공격P</b> = 골+도움 · <b>창출P</b> = (키패스+도움×2)/90분 · ` +
+      `<b>수비P</b> = (태클+인터셉트×1.5+클리어+공중볼승+듀얼승)/90분` +
+      `<span class="ins-formula-sub"> · 표본 3경기·90분↑ · 선수 클릭 시 xG·패스%·슈팅 등 상세</span></div></div>`;
     body.innerHTML =
-      `<div class="ins-top-scroll"><table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table></div>${moreBtn}${methodFoot}`;
+      `${formulaNote}<div class="ins-top-scroll"><table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table></div>${moreBtn}`;
 
     // 헤더 클릭 → 다중 정렬 (첫 클릭: 추가/내림 → 재클릭: 오름 → 한번 더: 제거)
     body.querySelectorAll(".ins-th-sort").forEach(th => {

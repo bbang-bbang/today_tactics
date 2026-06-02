@@ -5955,6 +5955,11 @@ body.pr-expanded-lock {
 @media (max-width: 760px) { .ins-adv-grid { grid-template-columns: 1fr; } }
 /* 산식/근거 캡션 — 신빙성 표시 */
 .ins-method { margin-top: 9px; padding-top: 7px; border-top: 1px dashed rgba(255,255,255,0.10); font-size: 0.68rem; color: #8090a6; line-height: 1.5; }
+/* 산식 안내 — 표 위에 크게/박스로 (예전 하단 작은 footnote → 상단 강조) */
+.ins-formula { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 12px; padding: 11px 14px; background: rgba(100,180,255,0.08); border: 1px solid rgba(100,180,255,0.20); border-left: 3px solid #4ea4f8; border-radius: 8px; font-size: 0.82rem; color: #d2deed; line-height: 1.6; }
+.ins-formula b { color: #eaf2fc; font-weight: 700; }
+.ins-formula-ic { font-size: 1.05rem; line-height: 1.4; }
+.ins-formula-sub { color: #8aa0b8; font-size: 0.74rem; }
 .ins-method b { color: #aab8cc; font-weight: 700; }
 .ins-th-tip { font-size: 0.62rem; color: #6f86a2; margin-left: 2px; cursor: help; vertical-align: super; }
 .ins-adv-loading { font-size: 0.76rem; color: #7a8aa0; padding: 14px 4px; font-style: italic; }
