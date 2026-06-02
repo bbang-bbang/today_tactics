@@ -5870,21 +5870,16 @@ body.pr-expanded-lock {
 #insights-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
     gap: 16px;
     align-items: start;
 }
-#ins-panel-top {
-    grid-column: 1;
-    grid-row: 1 / 3;
-}
-#ins-panel-xg {
+#ins-panel-top { grid-column: 1; }
+/* 우측 컬럼 — xG 위, 카드가 바로 아래 (좌측 TOP 표 높이와 무관하게 붙음) */
+.ins-col-right {
     grid-column: 2;
-    grid-row: 1;
-}
-#ins-panel-cards {
-    grid-column: 2;
-    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 .ins-block {
     background: rgba(255,255,255,0.03);
@@ -7732,7 +7727,8 @@ body.pr-expanded-lock {
 
     /* 인사이트 그리드 — 1열로 */
     #insights-grid { grid-template-columns: 1fr !important; gap: 12px; }
-    #ins-panel-top, #ins-panel-xg, #ins-panel-cards { grid-column: auto; grid-row: auto; }
+    #ins-panel-top, .ins-col-right { grid-column: auto; grid-row: auto; }
+    .ins-col-right { gap: 12px; }
 }
 
 @media (max-width: 480px) {

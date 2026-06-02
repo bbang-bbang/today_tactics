@@ -4702,6 +4702,7 @@ def insights_top_performers():
         "goals": r["goals"] or 0,
         "np_goals": (r["goals"] or 0) - (r["pk_goals"] or 0),
         "assists": r["assists"] or 0,
+        "attack_pts": (r["goals"] or 0) + (r["assists"] or 0),   # 공격기여 = 골+도움
         "key_passes": r["kp"] or 0,
         "tackles_p90": round((r["tkl"] or 0) / r["mins"] * 90, 2),
         "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
@@ -4902,7 +4903,7 @@ def insights_card_rankings():
 @app.route("/api/insights/xg-efficiency")
 @cached_response(ttl=1800)
 def insights_xg_efficiency():
-    """xG 효율 — 포지션 F + minutes>0 + 시즌 ≥3경기 + xG ≥0.5.
+    """xG 효율 — 전 포지션(F/M/D) + minutes>0 + 시즌 ≥3경기 + xG ≥0.5.
     league(all|k1|k2) 필터, 정렬은 클라가 처리(절대 골/효율 등)."""
     year = request.args.get("year", "2026")
     league = request.args.get("league", "all")
@@ -4914,22 +4915,26 @@ def insights_xg_efficiency():
         SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) as name_ko, m.team_id,
                COUNT(*) as games, SUM(m.goals) as goals,
                SUM(COALESCE(m.expected_goals,0)) as xg, SUM(m.total_shots) as shots,
+               (SELECT m2.position FROM match_player_stats m2
+                WHERE m2.player_id=m.player_id {date_cond}
+                GROUP BY m2.position ORDER BY COUNT(*) DESC LIMIT 1) as main_pos,
                (SELECT COUNT(*) FROM goal_events g
                 WHERE g.player_id=m.player_id AND g.is_penalty=1 AND g.is_own_goal=0
                 AND g.event_id IN (
                     SELECT event_id FROM match_player_stats
                     WHERE player_id=m.player_id {date_cond})) as pk_goals
         FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
-        WHERE m.position='F' AND m.minutes_played>0 {date_cond} {league_cond}
+        WHERE m.position IN ('F','M','D') AND m.minutes_played>0 {date_cond} {league_cond}
         GROUP BY m.player_id HAVING games>=3 AND xg>0.5
         ORDER BY (SUM(m.goals) - SUM(COALESCE(m.expected_goals,0))) DESC
-        LIMIT 20
-    """, date_params * 2 + league_params).fetchall()
+        LIMIT 25
+    """, date_params * 3 + league_params).fetchall()
     conn.close()
     return jsonify([{
         "player_id": r["player_id"],
         "name": r["name_ko"] or "",
         "team": _ko_team(r["team_id"], ""),
+        "pos": r["main_pos"] or "",
         "games": r["games"],
         "goals": r["goals"] or 0,
         "pk_goals": r["pk_goals"] or 0,

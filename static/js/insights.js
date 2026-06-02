@@ -8,7 +8,7 @@
 
   // 정렬 상태: [{ key, dir }, ...] 우선순위 순 — 통합표는 컬럼이 고정이라 단일 상태
   const sortState = {
-    all: [{ key: "rating", dir: -1 }],   // 통합 리더보드 — 평점(포지션 중립) 기본
+    all: [{ key: "attack_pts", dir: -1 }, { key: "rating", dir: -1 }],  // 공격기여(골+도움) 우선, 평점 2차
   };
 
   // 카드 패널 — 표별 정렬 상태 + 컬럼 정의
@@ -54,6 +54,7 @@
       { label: "경기",      key: "games" },
       { label: "골",       key: "goals" },
       { label: "도움",      key: "assists" },
+      { label: "공격P",     key: "attack_pts" },
       { label: "키패스",    key: "key_passes" },
       { label: "태클/90",  key: "tackles_p90" },
       { label: "평점",      key: "rating" },
@@ -205,8 +206,9 @@
         <td class="ins-team">${r.team || "-"}</td>
         <td>${badge}</td>
         <td>${r.games}</td>
-        <td><strong>${r.goals}</strong></td>
+        <td>${r.goals}</td>
         <td>${r.assists}</td>
+        <td><strong>${r.attack_pts}</strong></td>
         <td>${r.key_passes}</td>
         <td>${r.tackles_p90}</td>
         <td class="${rCls}">${r.rating ?? "-"}</td>
@@ -784,11 +786,14 @@
     const tbody = sorted.map((r, i) => {
       const diffCls = r.diff >= 0 ? "ins-pos" : "ins-neg";
       const sign    = r.diff > 0 ? "+" : "";
+      const posCls  = r.pos ? `ins-pos-badge ins-pos-${r.pos}` : "ins-pos-badge";
+      const badge   = `<span class="${posCls}">${POS_BADGE[r.pos] || "-"}</span>`;
       return `
         <tr>
           <td class="ins-rank">${i+1}</td>
           <td class="ins-name">${r.name}</td>
           <td class="ins-team-cell">${r.team || "—"}</td>
+          <td>${badge}</td>
           <td>${r.games}</td>
           <td><strong>${r.goals}</strong>${r.pk_goals > 0 ? ` <span class="ins-sub" title="페널티킥 제외 골">(PK제외 ${r.np_goals})</span>` : ""}</td>
           <td>${r.xg}</td>
@@ -802,12 +807,12 @@
     wrap.innerHTML = `
       <table class="ins-table">
         <thead><tr>
-          <th>#</th><th>선수</th><th>팀</th><th>경기</th>
+          <th>#</th><th>선수</th><th>팀</th><th>포지션</th><th>경기</th>
           <th>G</th><th>xG</th><th>G−xG</th><th>슈팅</th>
         </tr></thead>
         <tbody>${tbody}</tbody>
       </table>
-      <div class="ins-card-foot">${modeNote} TOP 15. 조건: 포지션 F · 출전 ≥3경기 · xG ≥0.5.</div>
+      <div class="ins-card-foot">${modeNote} TOP 15. 조건: 전 포지션 · 출전 ≥3경기 · xG ≥0.5.</div>
     `;
   }
 

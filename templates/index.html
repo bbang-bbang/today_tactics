@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=55">
+    <link rel="stylesheet" href="/static/css/style.css?v=56">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -352,9 +352,11 @@
             <div id="ins-top-body"></div>
         </div>
 
+        <!-- 우측 컬럼: xG 효율 + 카드 순위 (카드가 xG 바로 아래 붙도록 flex 스택) -->
+        <div class="ins-col-right">
         <!-- xG 효율 리더보드 -->
         <div class="ins-block" id="ins-panel-xg">
-            <div class="ins-block-title">📐 xG 효율 (공격수)</div>
+            <div class="ins-block-title">📐 xG 효율 (전 포지션)</div>
             <div class="ins-card-controls">
                 <div class="ins-pos-tabs" id="ins-xg-mode-tabs">
                     <button class="ins-xg-mode-tab active" data-mode="diff">⚡ 결정력 (G−xG)</button>
@@ -376,6 +378,7 @@
             </div>
             <div id="ins-card-body"></div>
         </div>
+        </div><!-- /ins-col-right -->
 
         </div><!-- /insights-grid -->
     </section>
@@ -766,7 +769,7 @@
 
     <script src="/static/js/player_analytics.js?v=5"></script>
     <script src="/static/js/player_report.js?v=5"></script>
-    <script src="/static/js/insights.js?v=8"></script>
+    <script src="/static/js/insights.js?v=9"></script>
 
     <!-- 작업공간 탭 컨트롤러 — 반드시 모든 모듈 스크립트 뒤에 로드 -->
     <script src="/static/js/workspace.js?v=4"></script>
