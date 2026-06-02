@@ -5960,6 +5960,7 @@ body.pr-expanded-lock {
 .ins-formula b { color: #eaf2fc; font-weight: 700; }
 .ins-formula-ic { font-size: 1.05rem; line-height: 1.4; }
 .ins-formula-sub { color: #8aa0b8; font-size: 0.74rem; }
+.ins-formula-avg { display: inline-block; font-size: 0.7rem; color: #7ecfff; background: rgba(100,180,255,0.14); border-radius: 4px; padding: 0 5px; margin-left: 3px; font-weight: 600; }
 .ins-method b { color: #aab8cc; font-weight: 700; }
 .ins-th-tip { font-size: 0.62rem; color: #6f86a2; margin-left: 2px; cursor: help; vertical-align: super; }
 .ins-adv-loading { font-size: 0.76rem; color: #7a8aa0; padding: 14px 4px; font-style: italic; }

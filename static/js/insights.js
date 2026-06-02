@@ -280,11 +280,19 @@
       ? `<button class="ins-top-more" type="button">${topExpanded ? "접기 ▲" : `더 보기 (전체 ${total}명) ▼`}</button>`
       : "";
 
+    // 리그 평균(현재 표 필터 기준) — 합성지표를 상대적으로 판단할 기준선
+    const avg = (k) => {
+      const v = raw.map(r => r[k]).filter(x => x != null);
+      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+    };
+    const aAtk = avg("attack_pts").toFixed(1), aCre = avg("create_score").toFixed(1), aDef = avg("def_score").toFixed(1);
     const formulaNote =
-      `<div class="ins-formula"><span class="ins-formula-ic">📐</span><div><b>지표 산식</b> — ` +
-      `<b>공격P</b> = 골+도움 · <b>창출P</b> = (키패스+도움×2)/90분 · ` +
-      `<b>수비P</b> = (태클+인터셉트×1.5+클리어+공중볼승+듀얼승)/90분` +
-      `<span class="ins-formula-sub"> · 표본 3경기·90분↑ · 선수 클릭 시 xG·패스%·슈팅 등 상세</span></div></div>`;
+      `<div class="ins-formula"><span class="ins-formula-ic">📐</span><div>` +
+      `<b>합성 지수</b> (90분 환산·상대 비교용) — ` +
+      `<b>공격P</b> 골+도움 <span class="ins-formula-avg">평균 ${aAtk}</span> · ` +
+      `<b>창출P</b> (키패스+도움×2)/90 <span class="ins-formula-avg">평균 ${aCre}</span> · ` +
+      `<b>수비P</b> (태클+인터셉트×1.5+클리어+공중볼승+듀얼승)/90 <span class="ins-formula-avg">평균 ${aDef}</span>` +
+      `<span class="ins-formula-sub"> · 표본 3경기·90분↑ · 평균은 현재 표(리그·포지션) 기준 · 선수 클릭 시 xG·패스% 등 원자료</span></div></div>`;
     body.innerHTML =
       `${formulaNote}<div class="ins-top-scroll"><table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table></div>${moreBtn}`;
 
