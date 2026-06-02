@@ -4739,6 +4739,174 @@ def insights_top_performers():
     return jsonify(result)
 
 
+def _league_tid(league):
+    """league('k1'|'k2'|'all') → tournament_id(410/777) 또는 None(전체)."""
+    league = (league or "all").lower()
+    return 410 if league == "k1" else 777 if league == "k2" else None
+
+
+@app.route("/api/insights/weather")
+@cached_response(ttl=1800)
+def insights_weather():
+    """날씨 영향 — 온도대별 리그 평균(경기당 득점·평균 평점) + 혹서기(>25°C) 강자."""
+    year = request.args.get("year", "2026")
+    league = request.args.get("league", "all")
+    date_cond, date_params = _year_date_params(year)
+    league_cond, league_params = _league_team_filter(league)
+    base_params = tuple(date_params) + tuple(league_params)
+    conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+
+    buckets = [
+        ("저온 <10°C",   "m.temperature < 10"),
+        ("선선 10~20°C", "m.temperature >= 10 AND m.temperature < 20"),
+        ("온화 20~25°C", "m.temperature >= 20 AND m.temperature < 25"),
+        ("더위 ≥25°C",   "m.temperature >= 25"),
+    ]
+    temp_buckets = []
+    for label, cond in buckets:
+        r = conn.execute(f"""
+            SELECT COUNT(DISTINCT m.event_id) games,
+                   ROUND(AVG(m.rating), 2) rating,
+                   ROUND(CAST(SUM(m.goals) AS REAL) / NULLIF(COUNT(DISTINCT m.event_id), 0), 2) gpm
+            FROM match_player_stats m
+            WHERE m.temperature IS NOT NULL AND m.minutes_played > 0 AND ({cond})
+              {date_cond} {league_cond}
+        """, base_params).fetchone()
+        temp_buckets.append({"label": label, "games": r["games"] or 0,
+                             "rating": r["rating"], "gpm": r["gpm"]})
+
+    hot = conn.execute(f"""
+        SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) name, m.team_id,
+               COUNT(*) games, ROUND(AVG(m.rating), 2) rating, SUM(m.goals) goals
+        FROM match_player_stats m LEFT JOIN players p ON m.player_id = p.id
+        WHERE m.temperature >= 25 AND m.minutes_played > 0 AND m.rating IS NOT NULL
+          {date_cond} {league_cond}
+        GROUP BY m.player_id HAVING games >= 3
+        ORDER BY AVG(m.rating) DESC LIMIT 6
+    """, base_params).fetchall()
+    hot_top = [{"name": r["name"] or "", "team": _ko_team(r["team_id"], ""),
+                "games": r["games"], "rating": r["rating"], "goals": r["goals"] or 0} for r in hot]
+    conn.close()
+    return jsonify({"temp_buckets": temp_buckets, "hot_top": hot_top})
+
+
+@app.route("/api/insights/clutch")
+@cached_response(ttl=1800)
+def insights_clutch():
+    """승부처 — 막판(75'+) 득점 TOP + 시간대별 리그 득점 분포."""
+    year = request.args.get("year", "2026")
+    league = request.args.get("league", "all")
+    tid = _league_tid(league)
+    conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+    conds = ["g.is_own_goal = 0"]; params = []
+    if tid is not None:
+        conds.append("e.tournament_id = ?"); params.append(tid)
+    if year and year != "all":
+        conds.append("strftime('%Y', datetime(e.date_ts, 'unixepoch', 'localtime')) = ?"); params.append(str(year))
+    where = " AND ".join(conds)
+
+    late = conn.execute(f"""
+        SELECT g.player_id, COALESCE(p.name_ko, g.player_name) name, g.team_id, COUNT(*) late_goals
+        FROM goal_events g JOIN events e ON g.event_id = e.id
+        LEFT JOIN players p ON g.player_id = p.id
+        WHERE {where} AND g.minute >= 75
+        GROUP BY g.player_id ORDER BY late_goals DESC, name LIMIT 8
+    """, tuple(params)).fetchall()
+    late_top = [{"name": r["name"] or "", "team": _ko_team(r["team_id"], ""),
+                 "late_goals": r["late_goals"]} for r in late]
+
+    dist = conn.execute(f"""
+        SELECT CASE
+                 WHEN g.minute < 15 THEN '0-15'   WHEN g.minute < 30 THEN '15-30'
+                 WHEN g.minute < 45 THEN '30-45'  WHEN g.minute < 60 THEN '45-60'
+                 WHEN g.minute < 75 THEN '60-75'  WHEN g.minute < 90 THEN '75-90'
+                 ELSE '90+' END bucket, COUNT(*) goals
+        FROM goal_events g JOIN events e ON g.event_id = e.id
+        WHERE {where}
+        GROUP BY bucket
+    """, tuple(params)).fetchall()
+    order = ['0-15', '15-30', '30-45', '45-60', '60-75', '75-90', '90+']
+    dmap = {r["bucket"]: r["goals"] for r in dist}
+    timeline = [{"bucket": b, "goals": dmap.get(b, 0)} for b in order]
+    conn.close()
+    return jsonify({"late_top": late_top, "timeline": timeline})
+
+
+@app.route("/api/insights/form")
+@cached_response(ttl=1800)
+def insights_form():
+    """폼 트렌드 — 최근 5경기 평점 vs 시즌 평점 (상승/하락세)."""
+    year = request.args.get("year", "2026")
+    league = request.args.get("league", "all")
+    date_cond, date_params = _year_date_params(year)
+    league_cond, league_params = _league_team_filter(league)
+    conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+    rows = conn.execute(f"""
+        WITH rated AS (
+            SELECT m.player_id, m.team_id, m.rating,
+                   ROW_NUMBER() OVER (PARTITION BY m.player_id ORDER BY m.match_date DESC) rn,
+                   AVG(m.rating) OVER (PARTITION BY m.player_id) season_avg,
+                   COUNT(*) OVER (PARTITION BY m.player_id) games
+            FROM match_player_stats m
+            WHERE m.rating IS NOT NULL AND m.minutes_played > 0 {date_cond} {league_cond}
+        )
+        SELECT r.player_id, COALESCE(p.name_ko, p.name) name, r.team_id,
+               MAX(r.games) games, ROUND(AVG(r.season_avg), 2) season_avg,
+               ROUND(AVG(CASE WHEN r.rn <= 5 THEN r.rating END), 2) last5
+        FROM rated r LEFT JOIN players p ON r.player_id = p.id
+        GROUP BY r.player_id HAVING games >= 6
+    """, tuple(date_params) + tuple(league_params)).fetchall()
+    items = []
+    for r in rows:
+        if r["last5"] is None or r["season_avg"] is None:
+            continue
+        items.append({"name": r["name"] or "", "team": _ko_team(r["team_id"], ""),
+                      "season_avg": r["season_avg"], "last5": r["last5"],
+                      "delta": round(r["last5"] - r["season_avg"], 2), "games": r["games"]})
+    rising = sorted([x for x in items if x["delta"] > 0], key=lambda x: -x["delta"])[:6]
+    falling = sorted([x for x in items if x["delta"] < 0], key=lambda x: x["delta"])[:6]
+    conn.close()
+    return jsonify({"rising": rising, "falling": falling})
+
+
+@app.route("/api/insights/activity")
+@cached_response(ttl=1800)
+def insights_activity():
+    """활동량·동선 — 히트맵 좌표 분산(활동 범위) + 평균 전진성."""
+    import math
+    year = request.args.get("year", "2026")
+    league = request.args.get("league", "all")
+    tid = _league_tid(league)
+    conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+    conds = []; params = []
+    if tid is not None:
+        conds.append("e.tournament_id = ?"); params.append(tid)
+    if year and year != "all":
+        conds.append("strftime('%Y', datetime(e.date_ts, 'unixepoch', 'localtime')) = ?"); params.append(str(year))
+    join = "JOIN events e ON h.event_id = e.id" if conds else ""
+    where = (" AND " + " AND ".join(conds)) if conds else ""
+    rows = conn.execute(f"""
+        SELECT h.player_id, COALESCE(p.name_ko, p.name) name,
+               (SELECT m2.team_id FROM match_player_stats m2 WHERE m2.player_id = h.player_id LIMIT 1) team_sid,
+               COUNT(*) pts, COUNT(DISTINCT h.event_id) games,
+               AVG(h.x) ax,
+               AVG(h.x*h.x) - AVG(h.x)*AVG(h.x) varx,
+               AVG(h.y*h.y) - AVG(h.y)*AVG(h.y) vary
+        FROM heatmap_points h {join}
+        LEFT JOIN players p ON h.player_id = p.id
+        WHERE 1=1 {where}
+        GROUP BY h.player_id HAVING games >= 3 AND pts >= 300
+    """, tuple(params)).fetchall()
+    out = []
+    for r in rows:
+        spread = math.sqrt(max(0, r["varx"] or 0) + max(0, r["vary"] or 0))
+        out.append({"name": r["name"] or "", "team": _ko_team(r["team_sid"], ""),
+                    "games": r["games"], "spread": round(spread, 1), "advance": round(r["ax"] or 0, 1)})
+    out.sort(key=lambda x: -x["spread"])
+    conn.close()
+    return jsonify({"top": out[:8]})
+
+
 @app.route("/api/insights/card-rankings")
 @cached_response(ttl=1800)
 def insights_card_rankings():

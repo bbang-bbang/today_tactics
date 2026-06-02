@@ -825,9 +825,61 @@
     });
   }
 
+  /* ══════════════════════════════════════════════════
+     심화 인사이트 — 날씨 · 승부처 · 폼 · 활동량
+  ══════════════════════════════════════════════════ */
+  function renderWeather(d) {
+    const el = document.getElementById("ins-weather-body"); if (!el) return;
+    const tb = d.temp_buckets || [];
+    const rows = tb.map(b =>
+      `<tr><td>${b.label}</td><td>${b.games}</td><td>${b.rating ?? "-"}</td><td><strong>${b.gpm ?? "-"}</strong></td></tr>`).join("");
+    const hot = (d.hot_top || []).slice(0, 4).map((p, i) =>
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.rating}</b></li>`).join("");
+    el.innerHTML =
+      `<table class="ins-adv-tbl"><thead><tr><th>기온</th><th>경기</th><th>평점</th><th>경기당 골</th></tr></thead><tbody>${rows}</tbody></table>
+       <div class="ins-adv-sub-h">🔥 더위(≥25°C) 강자</div><ol class="ins-adv-list">${hot || '<li class="ins-adv-empty">표본 부족</li>'}</ol>`;
+  }
+  function renderClutch(d) {
+    const el = document.getElementById("ins-clutch-body"); if (!el) return;
+    const late = (d.late_top || []).slice(0, 5).map((p, i) =>
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.late_goals}골</b></li>`).join("");
+    const tl = d.timeline || [];
+    const max = Math.max(...tl.map(t => t.goals), 1);
+    const bars = tl.map(t =>
+      `<div class="ins-tl-col" title="${t.bucket}분 · ${t.goals}골"><div class="ins-tl-bar" style="height:${Math.round(t.goals / max * 100)}%"></div><span class="ins-tl-lbl">${t.bucket}</span></div>`).join("");
+    el.innerHTML =
+      `<div class="ins-adv-sub-h">⚡ 막판(75'+) 해결사</div><ol class="ins-adv-list">${late || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
+       <div class="ins-adv-sub-h">시간대별 리그 득점</div><div class="ins-tl">${bars}</div>`;
+  }
+  function renderForm(d) {
+    const el = document.getElementById("ins-form-body"); if (!el) return;
+    const row = (p, cls, mark) =>
+      `<li><span class="${cls} ins-adv-delta">${mark}${Math.abs(p.delta).toFixed(2)}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">시즌 ${p.season_avg}→최근 ${p.last5}</span></li>`;
+    const up = (d.rising || []).slice(0, 5).map(p => row(p, "ins-pos", "▲ +")).join("");
+    const dn = (d.falling || []).slice(0, 5).map(p => row(p, "ins-neg", "▼ −")).join("");
+    el.innerHTML =
+      `<div class="ins-adv-sub-h">📈 폼 상승 (최근 5경기 vs 시즌)</div><ol class="ins-adv-list">${up || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
+       <div class="ins-adv-sub-h">📉 폼 하락</div><ol class="ins-adv-list">${dn || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>`;
+  }
+  function renderActivity(d) {
+    const el = document.getElementById("ins-activity-body"); if (!el) return;
+    const top = (d.top || []).slice(0, 6).map((p, i) =>
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.spread}</b></li>`).join("");
+    el.innerHTML =
+      `<div class="ins-adv-sub-h">🏃 활동 범위 (히트맵 분산 — 클수록 넓게 커버)</div><ol class="ins-adv-list">${top || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>`;
+  }
+  function loadAdvanced() {
+    const qs = `year=${currentYear}&league=${currentLeague}`;
+    fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(() => {});
+    fetch(`/api/insights/clutch?${qs}`).then(r => r.json()).then(renderClutch).catch(() => {});
+    fetch(`/api/insights/form?${qs}`).then(r => r.json()).then(renderForm).catch(() => {});
+    fetch(`/api/insights/activity?${qs}`).then(r => r.json()).then(renderActivity).catch(() => {});
+  }
+
   /* ── 전체 로드 ── (xG 효율은 TOP 퍼포머 표에 컬럼으로 흡수됨) */
   function loadAll() {
     loadTopPerformers();
+    loadAdvanced();
     loadCardRankings();
   }
 

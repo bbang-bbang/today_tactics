@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=61">
+    <link rel="stylesheet" href="/static/css/style.css?v=62">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -351,6 +351,19 @@
             </div>
             <div id="ins-top-cats" class="ins-cat-grid"></div>
             <div id="ins-top-body"></div>
+        </div>
+
+        <!-- 심화 인사이트 (날씨·승부처·폼·활동량) -->
+        <div class="ins-block" id="ins-panel-adv">
+            <div class="ins-block-title">🔬 심화 인사이트
+                <span class="ins-block-hint">날씨·승부처·폼·활동량 — 상단 리그/시즌 필터 적용</span>
+            </div>
+            <div class="ins-adv-grid">
+                <div class="ins-adv-card"><div class="ins-adv-h">🌡️ 날씨 영향</div><div id="ins-weather-body"></div></div>
+                <div class="ins-adv-card"><div class="ins-adv-h">⏱️ 승부처 해결사</div><div id="ins-clutch-body"></div></div>
+                <div class="ins-adv-card"><div class="ins-adv-h">📊 폼 트렌드</div><div id="ins-form-body"></div></div>
+                <div class="ins-adv-card"><div class="ins-adv-h">🏃 활동량·동선</div><div id="ins-activity-body"></div></div>
+            </div>
         </div>
 
         <!-- 카드 수령 순위 -->
@@ -754,7 +767,7 @@
 
     <script src="/static/js/player_analytics.js?v=5"></script>
     <script src="/static/js/player_report.js?v=5"></script>
-    <script src="/static/js/insights.js?v=15"></script>
+    <script src="/static/js/insights.js?v=16"></script>
 
     <!-- 작업공간 탭 컨트롤러 — 반드시 모든 모듈 스크립트 뒤에 로드 -->
     <script src="/static/js/workspace.js?v=4"></script>
