@@ -8351,3 +8351,20 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
     box-shadow: 0 4px 14px rgba(0,0,0,0.30);
 }
 .ws-panel .tc-fg-meta strong { color: var(--tc-gold); }
+
+/* 리그 순위 비교 — 라이트 셀/배지 잔재 → 다크. 밝은 셀에 밝은 값 텍스트가 묻히던 문제 해결 */
+.ws-panel .tc-rank-cell {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.07);
+}
+.ws-panel .tc-rank-cell.tc-rank-winner {
+    background: linear-gradient(180deg, rgba(201,138,46,0.20), rgba(201,138,46,0.08));
+    border-color: rgba(201,138,46,0.38);
+    box-shadow: 0 2px 10px rgba(201,138,46,0.14);
+}
+/* 순위 배지 톤 — 라이트 배경 → 다크 틴트(텍스트 대비 확보) */
+.ws-panel .tc-rank-tone-gold    { background: rgba(201,138,46,0.18); color: #f0c75e; border-color: rgba(201,138,46,0.40); box-shadow: none; }
+.ws-panel .tc-rank-tone-mint    { background: rgba(61,196,122,0.16); color: #6fe3a4; border-color: rgba(61,196,122,0.35); }
+.ws-panel .tc-rank-tone-rose    { background: rgba(226,78,78,0.16);  color: #ff9ea2; border-color: rgba(226,78,78,0.35); }
+.ws-panel .tc-rank-tone-neutral { background: rgba(255,255,255,0.06); color: var(--tc-ink-soft); border-color: rgba(255,255,255,0.10); }
+.ws-panel .tc-rank-tone-na      { background: rgba(255,255,255,0.035); color: #8492a8; border-color: rgba(255,255,255,0.12); }
