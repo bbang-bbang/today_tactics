@@ -3523,3 +3523,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-02 13:54:39 | sleep 2; curl -sk --max-time 25 "https://<IP-REDACTED>/" -w "\n[HTTP %{http_code}]\n" | grep -oE "insights.js\?v=[0-9]+|style.css\?v=[0-9]+"
 - 2026-06-02 14:05:24 | cat "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/bb646d0c-2e48-4d39-a823-ecc1ab52f5c6/tasks/bzh1ez5fm.output" 2>/dev/null
 - 2026-06-02 14:08:29 | sleep 12; cat "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/bb646d0c-2e48-4d39-a823-ecc1ab52f5c6/tasks/bo1ch0jhb.output" 2>/dev/null
+- 2026-06-02 15:17:58 | sleep 11; cat "C:/Users/ehban/AppData/Local/Temp/claude/C--Users-ehban-OneDrive-------today-tatics/bb646d0c-2e48-4d39-a823-ecc1ab52f5c6/tasks/bdhiocdis.output" 2>/dev/null | tail -8

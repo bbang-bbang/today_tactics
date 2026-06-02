@@ -5935,6 +5935,11 @@ body.pr-expanded-lock {
 .ins-tl-bar { width: 100%; min-height: 2px; background: linear-gradient(180deg, #6fb4ff, #3d7fd6); border-radius: 3px 3px 0 0; transition: height .4s cubic-bezier(.22,1,.36,1); }
 .ins-tl-lbl { font-size: 0.58rem; color: #8aa0b8; margin-top: 3px; white-space: nowrap; }
 @media (max-width: 760px) { .ins-adv-grid { grid-template-columns: 1fr; } }
+/* 산식/근거 캡션 — 신빙성 표시 */
+.ins-method { margin-top: 9px; padding-top: 7px; border-top: 1px dashed rgba(255,255,255,0.10); font-size: 0.68rem; color: #8090a6; line-height: 1.5; }
+.ins-method b { color: #aab8cc; font-weight: 700; }
+.ins-th-tip { font-size: 0.62rem; color: #6f86a2; margin-left: 2px; cursor: help; vertical-align: super; }
+.ins-adv-loading { font-size: 0.76rem; color: #7a8aa0; padding: 14px 4px; font-style: italic; }
 .ins-pos-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
 .ins-pos-tab { background: rgba(255,255,255,0.07); color: #aaa; border: none; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; transition: background .15s, color .15s; }
 .ins-pos-tab:hover { background: rgba(255,255,255,0.12); color: #d8e4f0; }

@@ -61,16 +61,16 @@
     all: [...LEAD,
       { label: "골", key: "goals" },
       { label: "도움", key: "assists" },
-      { label: "공격P", key: "attack_pts", primary: true },
-      { label: "xG", key: "xg" },
-      { label: "결정력", key: "xg_diff", signed: true },   // G−xG (구 xG 효율 박스 흡수)
+      { label: "공격P", key: "attack_pts", primary: true, tip: "공격 기여 = 골 + 도움" },
+      { label: "xG", key: "xg", tip: "기대 득점(Expected Goals) — 슈팅 질의 합" },
+      { label: "결정력", key: "xg_diff", signed: true, tip: "결정력 = 골 − xG. +면 기대보다 더 넣음(마무리 우수)" },
       { label: "슈팅", key: "shots" },
-      { label: "패스%", key: "pass_acc", suffix: "%" },
+      { label: "패스%", key: "pass_acc", suffix: "%", tip: "정확한 패스 / 시도 패스" },
       { label: "키패스", key: "key_passes" },
-      { label: "창출P", key: "create_score" },
+      { label: "창출P", key: "create_score", tip: "창출 = (키패스 + 도움×2) / 90분" },
       { label: "태클/90", key: "tackles_p90" },
-      { label: "공중볼%", key: "aerial_pct", suffix: "%" },
-      { label: "수비P", key: "def_score" },
+      { label: "공중볼%", key: "aerial_pct", suffix: "%", tip: "공중볼 경합 승률" },
+      { label: "수비P", key: "def_score", tip: "수비 = (태클 + 인터셉트×1.5 + 클리어 + 공중볼승 + 듀얼승) / 90분" },
       RATING],
   };
 
@@ -226,8 +226,10 @@
       const priority = active && sorts.length > 1 ? `<span class="ins-sort-badge">${idx + 1}</span>` : "";
       const arrow = active ? (sorts[idx].dir === -1 ? "▼" : "▲") : "";
       const hint = !active ? `<span class="ins-sort-hint">↕</span>` : "";
-      return `<th class="ins-th-sort${active ? " ins-th-active" : ""}" data-key="${col.key}">
-        ${col.label}${priority}${active ? ` <span class="ins-sort-arrow">${arrow}</span>` : hint}
+      const tipMark = col.tip ? `<span class="ins-th-tip">ⓘ</span>` : "";
+      const tipAttr = col.tip ? ` title="${col.tip}"` : "";
+      return `<th class="ins-th-sort${active ? " ins-th-active" : ""}" data-key="${col.key}"${tipAttr}>
+        ${col.label}${tipMark}${priority}${active ? ` <span class="ins-sort-arrow">${arrow}</span>` : hint}
       </th>`;
     });
     return `<thead><tr>${ths.join("")}</tr></thead>`;
@@ -283,8 +285,9 @@
       ? `<button class="ins-top-more" type="button">${topExpanded ? "접기 ▲" : `더 보기 (전체 ${total}명) ▼`}</button>`
       : "";
 
+    const methodFoot = `<div class="ins-method">📐 산식 — <b>공격P</b>=골+도움 · <b>결정력</b>=골−xG · <b>창출P</b>=(키패스+도움×2)/90분 · <b>수비P</b>=(태클+인터셉트×1.5+클리어+공중볼승+듀얼승)/90분 · 표본: 3경기·90분 이상 · 헤더 ⓘ에 마우스 올리면 설명</div>`;
     body.innerHTML =
-      `<div class="ins-top-scroll"><table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table></div>${moreBtn}`;
+      `<div class="ins-top-scroll"><table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table></div>${moreBtn}${methodFoot}`;
 
     // 헤더 클릭 → 다중 정렬 (첫 클릭: 추가/내림 → 재클릭: 오름 → 한번 더: 제거)
     body.querySelectorAll(".ins-th-sort").forEach(th => {
@@ -731,8 +734,10 @@
       const priority = active && sorts.length > 1 ? `<span class="ins-sort-badge">${idx + 1}</span>` : "";
       const arrow = active ? (sorts[idx].dir === -1 ? "▼" : "▲") : "";
       const hint = !active ? `<span class="ins-sort-hint">↕</span>` : "";
-      return `<th class="ins-th-sort${active ? " ins-th-active" : ""}" data-key="${col.key}">
-        ${col.label}${priority}${active ? ` <span class="ins-sort-arrow">${arrow}</span>` : hint}
+      const tipMark = col.tip ? `<span class="ins-th-tip">ⓘ</span>` : "";
+      const tipAttr = col.tip ? ` title="${col.tip}"` : "";
+      return `<th class="ins-th-sort${active ? " ins-th-active" : ""}" data-key="${col.key}"${tipAttr}>
+        ${col.label}${tipMark}${priority}${active ? ` <span class="ins-sort-arrow">${arrow}</span>` : hint}
       </th>`;
     });
     return `<thead><tr>${ths.join("")}</tr></thead>`;
@@ -837,7 +842,8 @@
       `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.rating}</b></li>`).join("");
     el.innerHTML =
       `<table class="ins-adv-tbl"><thead><tr><th>기온</th><th>경기</th><th>평점</th><th>경기당 골</th></tr></thead><tbody>${rows}</tbody></table>
-       <div class="ins-adv-sub-h">🔥 더위(≥25°C) 강자</div><ol class="ins-adv-list">${hot || '<li class="ins-adv-empty">표본 부족</li>'}</ol>`;
+       <div class="ins-adv-sub-h">🔥 더위(≥25°C) 강자</div><ol class="ins-adv-list">${hot || '<li class="ins-adv-empty">표본 부족</li>'}</ol>
+       <div class="ins-method">근거 — 경기 당시 실측 기상(Open-Meteo) · 경기당 골=양 팀 합/경기 · 강자=더위 3경기↑ 평균 평점순</div>`;
   }
   function renderClutch(d) {
     const el = document.getElementById("ins-clutch-body"); if (!el) return;
@@ -849,7 +855,8 @@
       `<div class="ins-tl-col" title="${t.bucket}분 · ${t.goals}골"><div class="ins-tl-bar" style="height:${Math.round(t.goals / max * 100)}%"></div><span class="ins-tl-lbl">${t.bucket}</span></div>`).join("");
     el.innerHTML =
       `<div class="ins-adv-sub-h">⚡ 막판(75'+) 해결사</div><ol class="ins-adv-list">${late || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
-       <div class="ins-adv-sub-h">시간대별 리그 득점</div><div class="ins-tl">${bars}</div>`;
+       <div class="ins-adv-sub-h">시간대별 리그 득점</div><div class="ins-tl">${bars}</div>
+       <div class="ins-method">근거 — 골 발생 분(minute) 기준 · 막판=75분 이후(자책골 제외) · 시간대=해당 리그 전체 득점</div>`;
   }
   function renderForm(d) {
     const el = document.getElementById("ins-form-body"); if (!el) return;
@@ -859,14 +866,16 @@
     const dn = (d.falling || []).slice(0, 5).map(p => row(p, "ins-neg", "▼ −")).join("");
     el.innerHTML =
       `<div class="ins-adv-sub-h">📈 폼 상승 (최근 5경기 vs 시즌)</div><ol class="ins-adv-list">${up || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
-       <div class="ins-adv-sub-h">📉 폼 하락</div><ol class="ins-adv-list">${dn || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>`;
+       <div class="ins-adv-sub-h">📉 폼 하락</div><ol class="ins-adv-list">${dn || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
+       <div class="ins-method">근거 — 최근 5경기 평균 평점 − 시즌 평균 평점 (6경기 이상 출전) · +상승/−하락</div>`;
   }
   function renderActivity(d) {
     const el = document.getElementById("ins-activity-body"); if (!el) return;
     const top = (d.top || []).slice(0, 6).map((p, i) =>
       `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.spread}</b></li>`).join("");
     el.innerHTML =
-      `<div class="ins-adv-sub-h">🏃 활동 범위 (히트맵 분산 — 클수록 넓게 커버)</div><ol class="ins-adv-list">${top || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>`;
+      `<div class="ins-adv-sub-h">🏃 활동 범위 (히트맵 분산 — 클수록 넓게 커버)</div><ol class="ins-adv-list">${top || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
+       <div class="ins-method">근거 — 히트맵 좌표 분산 √(가로²+세로²) · 3경기·300좌표 이상 · 위치 다양성↑ = 활동량↑</div>`;
   }
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;

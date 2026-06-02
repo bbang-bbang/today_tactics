@@ -4944,7 +4944,8 @@ def insights_card_rankings():
         FROM card_events c
         JOIN events e ON c.event_id = e.id
         LEFT JOIN players p ON c.player_id = p.id
-        WHERE c.player_id IS NOT NULL {ts_cond} {ce_league_cond}
+        WHERE c.player_id IS NOT NULL AND e.id < 50000000 AND e.home_score IS NOT NULL
+          {ts_cond} {ce_league_cond}
         GROUP BY c.player_id HAVING yc >= 1
         ORDER BY yc DESC, rc DESC LIMIT 10
     """, ts_params + league_params).fetchall()
@@ -4960,7 +4961,8 @@ def insights_card_rankings():
         FROM card_events c
         JOIN events e ON c.event_id = e.id
         LEFT JOIN players p ON c.player_id = p.id
-        WHERE c.player_id IS NOT NULL {ts_cond} {ce_league_cond}
+        WHERE c.player_id IS NOT NULL AND e.id < 50000000 AND e.home_score IS NOT NULL
+          {ts_cond} {ce_league_cond}
         GROUP BY c.player_id HAVING rc >= 1
         ORDER BY rc DESC, yc DESC LIMIT 5
     """, ts_params + league_params).fetchall()
@@ -4987,7 +4989,7 @@ def insights_card_rankings():
                COALESCE(SUM(CASE WHEN c.card_type IN ('red','yellowRed') THEN 1 ELSE 0 END), 0) AS rc
         FROM teams t
         JOIN events e ON (e.home_team_id = t.id OR e.away_team_id = t.id)
-        LEFT JOIN card_events c ON c.event_id = e.id AND c.team_id = t.id
+        LEFT JOIN card_events c ON c.event_id = e.id AND c.team_id = t.id AND c.player_id IS NOT NULL
         WHERE e.home_score IS NOT NULL
           AND e.id < 50000000
           {e_ts_cond} {team_league_cond}
