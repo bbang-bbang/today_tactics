@@ -5,6 +5,8 @@
   let currentYear = "2026";
   let currentLeague = "all";  // "all" | "k1" | "k2"
   let currentPos = "all";     // "all"(통합) | "F" | "M" | "D" — 통합표 위 포지션 필터 칩
+  let topExpanded = false;    // TOP 퍼포머 전체 펼침 여부 (기본은 미리보기)
+  const TOP_PREVIEW = 20;     // 기본 노출 행 수 (나머지는 "더 보기")
 
   // 정렬 상태: [{ key, dir }, ...] 우선순위 순 — 통합표는 컬럼이 고정이라 단일 상태
   const sortState = {
@@ -134,6 +136,7 @@
         document.querySelectorAll(".ins-pos-tab").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
         currentPos = btn.dataset.pos;   // "all" | "F" | "M" | "D"
+        topExpanded = false;            // 필터 바꾸면 미리보기로 리셋
         renderTopTable(window._insTopData);
       });
     });
@@ -147,6 +150,7 @@
       .then(r => r.json())
       .then(data => {
         window._insTopData = data;
+        topExpanded = false;   // 새 데이터(연도/리그 변경)면 미리보기로 리셋
         const hasData = (data.all?.length || 0) > 0;
         showBlock("ins-panel-top", hasData);
         if (hasData) renderTopTable(data);
@@ -195,8 +199,10 @@
     if (!raw.length) { body.innerHTML = '<p class="ins-empty">데이터 없음</p>'; return; }
 
     const rows = sortRows(raw, sortState.all);
+    const total = rows.length;
+    const shown = topExpanded ? rows : rows.slice(0, TOP_PREVIEW);
 
-    const tbody = rows.map((r, i) => {
+    const tbody = shown.map((r, i) => {
       const posCls = r.pos ? `ins-pos-badge ins-pos-${r.pos}` : "ins-pos-badge";
       const badge  = `<span class="${posCls}">${POS_BADGE[r.pos] || "-"}</span>`;
       const rCls   = r.rating >= 7.5 ? "ins-pos" : r.rating && r.rating < 6.5 ? "ins-neg" : "";
@@ -215,7 +221,12 @@
       </tr>`;
     }).join("");
 
-    body.innerHTML = `<table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table>`;
+    const moreBtn = total > TOP_PREVIEW
+      ? `<button class="ins-top-more" type="button">${topExpanded ? "접기 ▲" : `더 보기 (전체 ${total}명) ▼`}</button>`
+      : "";
+
+    body.innerHTML =
+      `<div class="ins-top-scroll"><table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table></div>${moreBtn}`;
 
     // 헤더 클릭 → 다중 정렬 (첫 클릭: 추가/내림 → 재클릭: 오름 → 한번 더: 제거)
     body.querySelectorAll(".ins-th-sort").forEach(th => {
@@ -230,9 +241,15 @@
       });
     });
 
+    // 더 보기 / 접기 토글
+    body.querySelector(".ins-top-more")?.addEventListener("click", () => {
+      topExpanded = !topExpanded;
+      renderTopTable(window._insTopData);
+    });
+
     // 행 클릭 → 드로어 열기 (선수 실제 포지션으로 상세 차트 정확도 유지)
     body.querySelectorAll("tbody tr").forEach((tr, i) => {
-      const r = rows[i];
+      const r = shown[i];
       tr.classList.add("ins-row-clickable");
       tr.addEventListener("click", () => openDrawer(r.player_id, r.pos || "F"));
     });

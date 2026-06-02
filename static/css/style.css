@@ -5909,6 +5909,15 @@ body.pr-expanded-lock {
 .ins-table th { color: #7ecfff; font-weight: 600; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left; white-space: nowrap; }
 .ins-table td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #ccc; }
 .ins-table tr:hover td { background: rgba(255,255,255,0.04); }
+/* TOP 퍼포머 — 길어진 통합표를 가볍게: 스크롤 캡 + 헤더 고정 + zebra + 더보기 */
+.ins-top-scroll { max-height: 600px; overflow-y: auto; border-radius: 8px; }
+.ins-top-scroll::-webkit-scrollbar { width: 8px; }
+.ins-top-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+#ins-top-body .ins-table thead th { position: sticky; top: 0; z-index: 2; background: #141d31; }
+#ins-top-body .ins-table tbody tr:nth-child(even) td { background: rgba(255,255,255,0.022); }
+#ins-top-body .ins-table tbody tr:hover td { background: rgba(100,180,255,0.10); }
+.ins-top-more { width: 100%; margin-top: 10px; padding: 8px 10px; background: rgba(100,180,255,0.10); color: #7ecfff; border: 1px solid rgba(100,180,255,0.25); border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: background 0.15s, border-color 0.15s; }
+.ins-top-more:hover { background: rgba(100,180,255,0.18); border-color: rgba(100,180,255,0.4); }
 .ins-th-sort { cursor: pointer; user-select: none; transition: color 0.15s; white-space: nowrap; }
 .ins-th-sort:hover { color: #a8d8ff; }
 .ins-th-active { color: #fff !important; }
