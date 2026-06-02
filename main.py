@@ -4756,24 +4756,26 @@ def insights_weather():
     base_params = tuple(date_params) + tuple(league_params)
     conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
 
-    buckets = [
-        ("저온 <10°C",   "m.temperature < 10"),
-        ("선선 10~20°C", "m.temperature >= 10 AND m.temperature < 20"),
-        ("온화 20~25°C", "m.temperature >= 20 AND m.temperature < 25"),
-        ("더위 ≥25°C",   "m.temperature >= 25"),
-    ]
-    temp_buckets = []
-    for label, cond in buckets:
-        r = conn.execute(f"""
-            SELECT COUNT(DISTINCT m.event_id) games,
-                   ROUND(AVG(m.rating), 2) rating,
-                   ROUND(CAST(SUM(m.goals) AS REAL) / NULLIF(COUNT(DISTINCT m.event_id), 0), 2) gpm
-            FROM match_player_stats m
-            WHERE m.temperature IS NOT NULL AND m.minutes_played > 0 AND ({cond})
-              {date_cond} {league_cond}
-        """, base_params).fetchone()
-        temp_buckets.append({"label": label, "games": r["games"] or 0,
-                             "rating": r["rating"], "gpm": r["gpm"]})
+    # 온도 버킷 — 단일 GROUP BY 1회 스캔 (버킷별 4회 스캔 → 1회로 최적화)
+    brows = conn.execute(f"""
+        SELECT CASE WHEN m.temperature < 10 THEN 0
+                    WHEN m.temperature < 20 THEN 1
+                    WHEN m.temperature < 25 THEN 2
+                    ELSE 3 END bidx,
+               COUNT(DISTINCT m.event_id) games,
+               ROUND(AVG(m.rating), 2) rating,
+               ROUND(CAST(SUM(m.goals) AS REAL) / NULLIF(COUNT(DISTINCT m.event_id), 0), 2) gpm
+        FROM match_player_stats m
+        WHERE m.temperature IS NOT NULL AND m.minutes_played > 0
+          {date_cond} {league_cond}
+        GROUP BY bidx
+    """, base_params).fetchall()
+    labels = ["저온 <10°C", "선선 10~20°C", "온화 20~25°C", "더위 ≥25°C"]
+    bmap = {r["bidx"]: r for r in brows}
+    temp_buckets = [{"label": labels[i],
+                     "games": (bmap[i]["games"] if i in bmap else 0),
+                     "rating": (bmap[i]["rating"] if i in bmap else None),
+                     "gpm": (bmap[i]["gpm"] if i in bmap else None)} for i in range(4)]
 
     hot = conn.execute(f"""
         SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) name, m.team_id,
