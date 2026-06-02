@@ -4689,20 +4689,22 @@ def insights_top_performers():
                SUM(COALESCE(m.clearances,0)) as clr,
                SUM(COALESCE(m.aerial_won,0)) as aw, SUM(COALESCE(m.aerial_lost,0)) as al,
                SUM(COALESCE(m.duel_won,0)) as dw, SUM(COALESCE(m.duel_lost,0)) as dl,
-               AVG(m.rating) as avg_rating,
-               (SELECT m2.position FROM match_player_stats m2
-                WHERE m2.player_id=m.player_id {date_cond}
-                GROUP BY m2.position ORDER BY COUNT(*) DESC LIMIT 1) as main_pos,
-               (SELECT COUNT(*) FROM goal_events g
-                WHERE g.player_id=m.player_id AND g.is_penalty=1 AND g.is_own_goal=0
-                AND g.event_id IN (
-                    SELECT event_id FROM match_player_stats
-                    WHERE player_id=m.player_id {date_cond})) as pk_goals
-        FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
+               AVG(m.rating) as avg_rating, mp.position as main_pos
+        FROM match_player_stats m
+        LEFT JOIN players p ON m.player_id=p.id
+        LEFT JOIN (
+            SELECT player_id, position FROM (
+                SELECT player_id, position,
+                       ROW_NUMBER() OVER (PARTITION BY player_id ORDER BY COUNT(*) DESC) rn
+                FROM match_player_stats
+                WHERE minutes_played>0 {date_cond}
+                GROUP BY player_id, position
+            ) WHERE rn=1
+        ) mp ON mp.player_id = m.player_id
         WHERE m.position IN ('F','M','D') AND m.minutes_played>0 {date_cond} {league_cond}
         GROUP BY m.player_id HAVING games>=3 AND mins>=90
         ORDER BY mins DESC LIMIT 600
-    """, date_params + date_params + date_params + league_params).fetchall()
+    """, date_params + date_params + league_params).fetchall()
 
     def serialize_all(r):
         mins  = r["mins"] or 0
@@ -4711,8 +4713,6 @@ def insights_top_performers():
         return {**pinfo(r),
             "pos": r["main_pos"] or "",
             "goals": r["goals"] or 0,
-            "pk_goals": r["pk_goals"] or 0,
-            "np_goals": (r["goals"] or 0) - (r["pk_goals"] or 0),
             "assists": r["assists"] or 0,
             "attack_pts": (r["goals"] or 0) + (r["assists"] or 0),   # 공격기여 = 골+도움
             "xg": round(r["xg"] or 0, 2),
