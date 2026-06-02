@@ -71,7 +71,7 @@
 
   // 부문별 TOP 카드 정의 (각 부문 1위를 박스로) — key로 최댓값 리더 산출
   const CATEGORY_DEFS = [
-    { label: "최다 득점",  icon: "⚽", key: "goals",       fmt: v => `${v}골` },
+    { label: "최다 득점",  icon: "🔥", key: "goals",       fmt: v => `${v}골` },
     { label: "최다 도움",  icon: "🤝", key: "assists",     fmt: v => `${v}도움` },
     { label: "결정력",     icon: "🎯", key: "xg_diff",     fmt: v => `${v > 0 ? "+" : ""}${v}` },
     { label: "창출",       icon: "🧠", key: "create_score",fmt: v => `${v}` },
