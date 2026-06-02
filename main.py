@@ -4887,26 +4887,35 @@ def insights_activity():
         conds.append("strftime('%Y', datetime(e.date_ts, 'unixepoch', 'localtime')) = ?"); params.append(str(year))
     join = "JOIN events e ON h.event_id = e.id" if conds else ""
     where = (" AND " + " AND ".join(conds)) if conds else ""
+    # 무거운 110만행 집계는 순수 집계만 (선수당 상관 서브쿼리·players 조인 제거 → 4.3s→대폭 단축)
     rows = conn.execute(f"""
-        SELECT h.player_id, COALESCE(p.name_ko, p.name) name,
-               (SELECT m2.team_id FROM match_player_stats m2 WHERE m2.player_id = h.player_id LIMIT 1) team_sid,
-               COUNT(*) pts, COUNT(DISTINCT h.event_id) games,
+        SELECT h.player_id, COUNT(*) pts, COUNT(DISTINCT h.event_id) games,
                AVG(h.x) ax,
                AVG(h.x*h.x) - AVG(h.x)*AVG(h.x) varx,
                AVG(h.y*h.y) - AVG(h.y)*AVG(h.y) vary
         FROM heatmap_points h {join}
-        LEFT JOIN players p ON h.player_id = p.id
         WHERE 1=1 {where}
         GROUP BY h.player_id HAVING games >= 3 AND pts >= 300
     """, tuple(params)).fetchall()
     out = []
     for r in rows:
         spread = math.sqrt(max(0, r["varx"] or 0) + max(0, r["vary"] or 0))
-        out.append({"name": r["name"] or "", "team": _ko_team(r["team_sid"], ""),
-                    "games": r["games"], "spread": round(spread, 1), "advance": round(r["ax"] or 0, 1)})
+        out.append({"player_id": r["player_id"], "games": r["games"],
+                    "spread": round(spread, 1), "advance": round(r["ax"] or 0, 1)})
     out.sort(key=lambda x: -x["spread"])
+    top = out[:8]
+    # 이름·팀은 상위 8명만 해소 (전체 1천명 서브쿼리 대신)
+    for t in top:
+        pr = conn.execute("""
+            SELECT COALESCE(p.name_ko, p.name) name,
+                   (SELECT m2.team_id FROM match_player_stats m2 WHERE m2.player_id = ? LIMIT 1) tsid
+            FROM players p WHERE p.id = ?
+        """, (t["player_id"], t["player_id"])).fetchone()
+        t["name"] = (pr["name"] if pr else "") or ""
+        t["team"] = _ko_team(pr["tsid"], "") if pr else ""
+        del t["player_id"]
     conn.close()
-    return jsonify({"top": out[:8]})
+    return jsonify({"top": top})
 
 
 @app.route("/api/insights/card-rankings")
@@ -7761,14 +7770,14 @@ def _warm_cache():
         "http://127.0.0.1:5000/api/league-dashboard?league=K1",
         "http://127.0.0.1:5000/api/league-dashboard?league=K2",
         "http://127.0.0.1:5000/api/matches-by-date",
-        # 인사이트 드로어 (사용자 자주 진입)
-        "http://127.0.0.1:5000/api/insights/top-performers?league=K1",
-        "http://127.0.0.1:5000/api/insights/top-performers?league=K2",
-        "http://127.0.0.1:5000/api/insights/xg-efficiency?league=K1",
-        "http://127.0.0.1:5000/api/insights/forward-goals?league=K1",
-        "http://127.0.0.1:5000/api/insights/midfielder-pass?league=K1",
-        "http://127.0.0.1:5000/api/insights/defender-score?league=K1",
-        "http://127.0.0.1:5000/api/insights/card-rankings?league=K1",
+        # 인사이트 섹션 — 프런트 기본값(year=2026&league=all)과 정확히 일치시켜 콜드 방지.
+        # activity(히트맵)는 콜드 ~5s라 특히 워밍 필수.
+        "http://127.0.0.1:5000/api/insights/top-performers?year=2026&league=all",
+        "http://127.0.0.1:5000/api/insights/weather?year=2026&league=all",
+        "http://127.0.0.1:5000/api/insights/clutch?year=2026&league=all",
+        "http://127.0.0.1:5000/api/insights/form?year=2026&league=all",
+        "http://127.0.0.1:5000/api/insights/activity?year=2026&league=all",
+        "http://127.0.0.1:5000/api/insights/card-rankings?year=2026&league=all",
     ]
     _t.sleep(2)  # 서버 listen 대기 (3→2초)
     def _fetch(u):

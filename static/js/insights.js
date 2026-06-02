@@ -885,11 +885,11 @@
     fetch(`/api/insights/activity?${qs}`).then(r => r.json()).then(renderActivity).catch(() => {});
   }
 
-  /* ── 전체 로드 ── (xG 효율은 TOP 퍼포머 표에 컬럼으로 흡수됨) */
+  /* ── 전체 로드 ── (xG 효율은 TOP 퍼포머 표에 컬럼으로 흡수됨)
+     무거운 심화 패널(히트맵 등)은 메인 표·카드가 먼저 뜬 뒤 로드해 초기 버퍼 방지 */
   function loadAll() {
-    loadTopPerformers();
-    loadAdvanced();
-    loadCardRankings();
+    Promise.allSettled([loadTopPerformers(), loadCardRankings()])
+      .finally(() => loadAdvanced());
   }
 
   function init() {
