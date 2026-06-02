@@ -5892,6 +5892,8 @@ body.pr-expanded-lock {
 .ins-tab { background: transparent; border: none; border-bottom: 2px solid transparent; color: #8aa0b8; padding: 9px 16px; cursor: pointer; font-size: 0.86rem; font-weight: 700; transition: color .15s, border-color .15s; margin-bottom: -1px; }
 .ins-tab:hover { color: #cdd8e8; }
 .ins-tab.active { color: #7ecfff; border-bottom-color: #4ea4f8; }
+/* 탭 비활성 패널 숨김 — .hidden 전역 규칙이 없어 패널별로 명시 (이게 없으면 탭이 안 먹음) */
+#insights-grid .ins-block.hidden, [data-itab-panel].hidden { display: none; }
 /* 부문별 TOP 카드 — 각 부문 1위를 한눈에 (클릭 시 해당 지표 정렬) */
 .ins-cat-grid {
     display: grid;
