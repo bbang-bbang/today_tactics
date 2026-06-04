@@ -100,7 +100,7 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY") or _secrets.token_urlsafe(32)
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=True,           # HTTPS 전용 (프로덕션 today-tactics.co.kr)
+    SESSION_COOKIE_SECURE=True,           # HTTPS 전용 (프로덕션 www.today-football-tactics.xyz)
     SESSION_COOKIE_SAMESITE="Lax",
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
     MAX_CONTENT_LENGTH=512 * 1024,        # 요청 바디 최대 512 KB — POST /saves·/squads 디스크 채우기 방지

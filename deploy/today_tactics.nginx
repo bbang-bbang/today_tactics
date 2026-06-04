@@ -4,24 +4,53 @@ limit_req_zone $binary_remote_addr zone=tt_general:10m rate=10r/s;
 # trigger-update는 엄격 — IP당 분당 1회 (burst 2)
 limit_req_zone $binary_remote_addr zone=tt_trigger:1m rate=1r/m;
 
-# ── HTTP (80) → HTTPS (443) redirect + IP 직접 접근도 HTTPS로 강제 ─
+# Canonical 도메인 = www.today-football-tactics.xyz
+#   - apex(today-football-tactics.xyz), 구 도메인(today-tactics.co.kr/www), IP 직접 접근은 모두 301로 canonical에 통합.
+#   - 구 도메인 HTTPS redirect는 기존 certbot 인증서(today-tactics.co.kr)를 그대로 사용 (DNS가 이 서버를 가리키는 한 유효).
+
+# ── HTTP (80) → HTTPS canonical 강제 (모든 도메인 + IP 직접 접근) ─
 server {
     listen 80 default_server;
-    server_name today-tactics.co.kr www.today-tactics.co.kr _;
+    server_name today-football-tactics.xyz www.today-football-tactics.xyz today-tactics.co.kr www.today-tactics.co.kr _;
     server_tokens off;
-    # certbot challenge 경로는 평문 유지 (cert 갱신 시 필요)
+    # certbot challenge 경로는 평문 유지 (cert 발급/갱신 시 필요)
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
     location / {
-        return 301 https://today-tactics.co.kr$request_uri;
+        return 301 https://www.today-football-tactics.xyz$request_uri;
     }
 }
 
-# ── HTTPS (443) ─────────────────────────────────────────────
+# ── HTTPS (443) — 구 도메인 today-tactics.co.kr → 신 도메인 301 ─
+# (북마크·SEO 보존. 구 도메인 DNS가 이 서버를 가리키는 동안만 동작)
+server {
+    listen 443 ssl http2;
+    server_name today-tactics.co.kr www.today-tactics.co.kr;
+    server_tokens off;
+    ssl_certificate     /etc/letsencrypt/live/today-tactics.co.kr/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/today-tactics.co.kr/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+    return 301 https://www.today-football-tactics.xyz$request_uri;
+}
+
+# ── HTTPS (443) — 신 도메인 apex → www 301 ─
+server {
+    listen 443 ssl http2;
+    server_name today-football-tactics.xyz;
+    server_tokens off;
+    ssl_certificate     /etc/letsencrypt/live/today-football-tactics.xyz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/today-football-tactics.xyz/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+    return 301 https://www.today-football-tactics.xyz$request_uri;
+}
+
+# ── HTTPS (443) — canonical 본 서버 (www.today-football-tactics.xyz) ─
 server {
     listen 443 ssl http2 default_server;
-    server_name today-tactics.co.kr www.today-tactics.co.kr _;
+    server_name www.today-football-tactics.xyz _;
 
     # ── 압축 (P7×성능: 정적/JSON 70~80% 감소) ───────────────
     gzip on;
@@ -31,9 +60,9 @@ server {
     gzip_comp_level 6;
     gzip_types text/plain text/css text/javascript application/javascript application/json image/svg+xml;
 
-    # cert (이미 certbot으로 발급됨 — today-tactics.co.kr + www)
-    ssl_certificate     /etc/letsencrypt/live/today-tactics.co.kr/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/today-tactics.co.kr/privkey.pem;
+    # cert (certbot으로 today-football-tactics.xyz + www SAN 발급)
+    ssl_certificate     /etc/letsencrypt/live/today-football-tactics.xyz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/today-football-tactics.xyz/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
