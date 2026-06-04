@@ -8439,3 +8439,199 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ws-panel .tc-rank-tone-rose    { background: rgba(226,78,78,0.16);  color: #ff9ea2; border-color: rgba(226,78,78,0.35); }
 .ws-panel .tc-rank-tone-neutral { background: rgba(255,255,255,0.06); color: var(--tc-ink-soft); border-color: rgba(255,255,255,0.10); }
 .ws-panel .tc-rank-tone-na      { background: rgba(255,255,255,0.035); color: #8492a8; border-color: rgba(255,255,255,0.12); }
+
+/* ═══════════════════════════════════════════════════════════════
+   팀 분석 모달 (단일 팀 종합) — analytics.js / #team-analysis-modal
+   다크 테마 고정 (Chart.js 밝은 텍스트 ↔ 다크 패널)
+═══════════════════════════════════════════════════════════════ */
+.ta-modal-content {
+    width: 94vw;
+    max-width: 1080px;
+    max-height: 92vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px 24px 26px;
+    color: var(--text-primary);
+    background:
+        radial-gradient(ellipse 70% 60% at 88% 6%, rgba(120,90,200,0.16) 0%, transparent 55%),
+        radial-gradient(ellipse 70% 60% at 6% 96%, rgba(40,90,160,0.18) 0%, transparent 55%),
+        linear-gradient(135deg, #141d33 0%, #0e1628 100%);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 22px 60px rgba(0,0,0,0.55);
+}
+/* 헤더 */
+.ta-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+.ta-title {
+    font-size: 1.24rem;
+    margin: 0;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.ta-team-select {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    padding: 9px 13px;
+    font-size: 0.94rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.ta-team-select:hover { border-color: #4a82c7; }
+.ta-team-select:focus { outline: none; border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(96,165,250,0.22); }
+.ta-header #ta-close { margin-left: auto; }
+.ta-modal-content .year-filter-wrap { display: flex; gap: 6px; flex-wrap: wrap; }
+.ta-modal-content .year-filter-btn {
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 5px 11px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.ta-modal-content .year-filter-btn:hover { color: var(--text-primary); border-color: #4a82c7; }
+.ta-modal-content .year-filter-btn.active {
+    background: linear-gradient(135deg, #4a82c7, #60a5fa);
+    color: #fff; border-color: transparent;
+}
+
+/* 아이덴티티 + 요약 */
+.ta-identity { display: flex; align-items: center; gap: 14px; }
+.ta-emblem { width: 52px; height: 52px; object-fit: contain; filter: drop-shadow(0 3px 8px rgba(0,0,0,0.5)); }
+.ta-id-text { display: flex; flex-direction: column; gap: 3px; }
+.ta-team-name { font-size: 1.32rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.01em; }
+.ta-team-league { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; }
+.ta-form { display: flex; gap: 5px; margin-left: auto; }
+.ta-form-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 50%;
+    font-size: 0.68rem; font-weight: 800; color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 2px 6px rgba(0,0,0,0.35);
+}
+.ta-form-W { background: linear-gradient(145deg, #34d399, #10b981); }
+.ta-form-D { background: linear-gradient(145deg, #9aa6ba, #6b7689); }
+.ta-form-L { background: linear-gradient(145deg, #f87171, #ef4444); }
+.ta-form-empty { font-size: 0.78rem; color: var(--text-faint); }
+
+.ta-summary {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 9px;
+}
+.ta-stat {
+    background: rgba(255,255,255,0.035);
+    border: 1px solid var(--border-subtle);
+    border-radius: 11px;
+    padding: 11px 8px 9px;
+    text-align: center;
+}
+.ta-stat-val { font-size: 1.32rem; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.ta-stat-label { font-size: 0.68rem; color: var(--text-muted); font-weight: 700; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+.ta-stat-sub { font-size: 0.66rem; color: var(--text-faint); margin-top: 2px; }
+
+/* 탭 */
+.ta-tabs { display: flex; gap: 8px; }
+.ta-tab-btn {
+    flex: 1;
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.ta-tab-btn:hover { color: var(--text-primary); border-color: #4a82c7; }
+.ta-tab-btn.active {
+    background: linear-gradient(135deg, rgba(167,139,250,0.22), rgba(96,165,250,0.18));
+    color: #fff; border-color: #7c6df0;
+    box-shadow: 0 2px 12px rgba(124,109,240,0.25);
+}
+.ta-tab-panel { display: flex; flex-direction: column; gap: 14px; }
+/* .hidden은 전역 정의가 없어 컴포넌트별 명시 필요 */
+.ta-modal-content .ta-body.hidden,
+.ta-modal-content .ta-tab-panel.hidden,
+.ta-modal-content .ta-empty.hidden { display: none; }
+.ta-grid2 { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 14px; }
+@media (max-width: 820px) { .ta-grid2 { grid-template-columns: 1fr; } .ta-summary { grid-template-columns: repeat(3, 1fr); } }
+
+/* 재사용 .tc-panel 다크 오버라이드 (이 모달 스코프 한정) */
+.ta-modal-content .tc-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-left: 3px solid var(--tc-accent, var(--border-default));
+    border-radius: 13px;
+    padding: 13px 15px 15px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.30);
+    animation: none;
+}
+.ta-modal-content .tc-panel-label { color: var(--tc-accent, #8fb4e8); }
+.ta-modal-content .tc-hint { color: var(--text-faint); }
+.ta-modal-content .tc-rank-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.ta-modal-content .tc-rank-scope { font-size: 0.72rem; color: var(--text-faint); font-weight: 700; }
+.ta-modal-content .chart-wrap { position: relative; }
+.ta-modal-content .chart-empty { display: flex; align-items: center; justify-content: center; height: 100%; min-height: 80px; color: var(--text-faint); font-size: 0.86rem; }
+
+/* 홈/원정 테이블 (다크) */
+.ta-ha-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; color: var(--text-primary); }
+.ta-ha-table th, .ta-ha-table td { padding: 9px 6px; text-align: center; border-bottom: 1px solid var(--border-subtle); }
+.ta-ha-table th { color: #8fb4e8; font-weight: 800; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.6px; }
+.ta-ha-table tr:last-child td { border-bottom: none; }
+.ta-ha-side { font-weight: 700; text-align: left; }
+.ta-ha-pct { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* 상대팀별 표 */
+.ta-vs-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; color: var(--text-secondary); margin-top: 12px; }
+.ta-vs-table th { color: #8fb4e8; font-weight: 800; font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 5px; border-bottom: 1px solid var(--border-subtle); }
+.ta-vs-table td { padding: 6px 5px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05); font-variant-numeric: tabular-nums; }
+.ta-vs-table tr:last-child td { border-bottom: none; }
+.ta-vs-name { text-align: left; color: var(--text-primary); font-weight: 600; }
+.ta-wr-badge { display: inline-block; padding: 2px 9px; border-radius: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* 날씨별 승률 */
+.ta-weather-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 820px) { .ta-weather-grid { grid-template-columns: 1fr; } }
+.ta-wx-title { font-size: 0.78rem; font-weight: 800; color: var(--text-secondary); margin-bottom: 8px; }
+.ta-wx-row { display: grid; grid-template-columns: 70px 1fr auto; align-items: center; gap: 8px; margin-bottom: 7px; }
+.ta-wx-label { font-size: 0.74rem; color: var(--text-muted); font-weight: 600; }
+.ta-wx-bar-track { height: 9px; background: rgba(255,255,255,0.07); border-radius: 5px; overflow: hidden; }
+.ta-wx-bar { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
+.ta-wx-val { font-size: 0.72rem; color: var(--text-secondary); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ta-wx-val em { color: var(--text-faint); font-style: normal; font-weight: 500; }
+
+/* 스킬 지표 바 */
+.ta-metric-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 22px; }
+@media (max-width: 820px) { .ta-metric-bars { grid-template-columns: 1fr; } }
+.ta-mb-row { display: flex; flex-direction: column; gap: 5px; }
+.ta-mb-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ta-mb-label { font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; }
+.ta-mb-val { font-size: 0.96rem; color: var(--text-primary); font-weight: 800; font-variant-numeric: tabular-nums; }
+.ta-mb-track { position: relative; height: 10px; background: rgba(255,255,255,0.07); border-radius: 5px; }
+.ta-mb-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
+.ta-mb-avg { position: absolute; top: -2px; width: 2px; height: 14px; background: rgba(255,255,255,0.85); border-radius: 1px; transform: translateX(-50%); box-shadow: 0 0 0 1px rgba(0,0,0,0.4); }
+.ta-mb-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ta-rank-badge { font-size: 0.82rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ta-rank-badge small { font-size: 0.66rem; color: var(--text-faint); font-weight: 600; }
+.ta-rank-na { color: var(--text-faint); font-size: 0.7rem; font-weight: 600; }
+.ta-mb-avg-txt { font-size: 0.68rem; color: var(--text-faint); }
+
+.ta-empty { padding: 60px 20px; text-align: center; color: var(--text-muted); font-size: 0.95rem; }

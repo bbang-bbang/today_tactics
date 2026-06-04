@@ -1,41 +1,88 @@
-// analytics.js — 팀 분석 모달 (Chart.js 기반)
+// analytics.js — 단일 팀 종합 분석 대시보드
+// 백엔드 3종을 오케스트레이션:
+//   /api/team-analytics  : 상대팀별 전적 · 월별 승률 · 홈/원정 · 날씨별 승률 (결과 기반)
+//   /api/team-trend      : 경기별 득/실/결과/누적승점 시계열
+//   /api/league-rankings : 고급 11지표 + 리그 순위 (스킬 프로필 · 리그 평균 기준선)
 
 (function () {
-    // ── DOM refs ──────────────────────────────────────────────────
-    const modal      = document.getElementById("analytics-modal");
-    const backdrop   = modal.querySelector(".modal-backdrop");
-    const closeBtn   = document.getElementById("analytics-close");
-    const teamSelect = document.getElementById("analytics-team-select");
-    const tabBtns    = modal.querySelectorAll(".analytics-tab-btn");
-    const panels     = modal.querySelectorAll(".analytics-panel");
-    const titleEl    = document.getElementById("analytics-team-title");
+    const modal = document.getElementById("team-analysis-modal");
+    if (!modal) return;
 
-    let charts = {};
+    const backdrop   = modal.querySelector(".modal-backdrop");
+    const closeBtn   = document.getElementById("ta-close");
+    const teamSelect = document.getElementById("ta-team-select");
+    const yearWrap   = document.getElementById("ta-year-filter");
+    const bodyEl     = document.getElementById("ta-body");
+    const emptyEl    = document.getElementById("ta-empty");
+
+    let charts = {};            // canvasId → Chart 인스턴스
+    let teamsCache = null;      // /api/teams 결과
+    let teamMeta = {};          // id → {name, league, emblem, primary, short}
     let currentTeamId = null;
+    let currentLeague = null;
     let currentYear = "전체";
 
-    // ── 팀 목록 채우기 ────────────────────────────────────────────
-    let teamsLoaded = false;
+    // ── 유틸 ──────────────────────────────────────────────────────
+    function destroyChart(id) {
+        if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+    }
+    function winPct(w, g) { return g > 0 ? Math.round(w / g * 100) : 0; }
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+    function mean(arr) { return arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : 0; }
+
+    // 다크 배경 가독성 보정 (팀 컬러가 너무 어두우면 밝게)
+    function readableInk(hex) {
+        const m = /^#?([a-f0-9]{2})([a-f0-9]{2})([a-f0-9]{2})$/i.exec(hex || "");
+        if (!m) return "#cdd8e8";
+        let r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+        const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        if (lum < 120) {
+            const t = (120 - lum) / 120 * 0.7;
+            r = Math.round(r + (255 - r) * t);
+            g = Math.round(g + (255 - g) * t);
+            b = Math.round(b + (255 - b) * t);
+        }
+        return `rgb(${r},${g},${b})`;
+    }
+    function hexToRgba(hex, a) {
+        const m = /^#?([a-f0-9]{2})([a-f0-9]{2})([a-f0-9]{2})$/i.exec(hex || "");
+        if (!m) return `rgba(120,160,255,${a})`;
+        return `rgba(${parseInt(m[1],16)},${parseInt(m[2],16)},${parseInt(m[3],16)},${a})`;
+    }
+    // 승률 → 색 (0%=빨강 ~ 100%=초록)
+    function winColor(pct, alpha = 0.85) {
+        const r = Math.round(220 - pct * 1.2);
+        const g = Math.round(60 + pct * 1.6);
+        return `rgba(${r},${g},80,${alpha})`;
+    }
+
+    const BASE_PLUGINS = {
+        legend: { labels: { color: "#b0c4d8", font: { size: 11 }, padding: 12, usePointStyle: true, pointStyleWidth: 10 } },
+        tooltip: {
+            backgroundColor: "rgba(10,18,40,0.94)", borderColor: "rgba(100,160,255,0.28)",
+            borderWidth: 1, titleColor: "#7eb8ff", bodyColor: "#cdd8e8", padding: 10, cornerRadius: 8,
+        }
+    };
+
+    // ── 팀 셀렉트 채우기 ──────────────────────────────────────────
     function populateTeamSelect() {
-        if (teamsLoaded) return;
-        fetch("/api/teams").then(r => r.json()).then(teams => {
-            teamsLoaded = true;
+        if (teamsCache) return Promise.resolve();
+        return fetch("/api/teams").then(r => r.json()).then(teams => {
+            teamsCache = teams;
             const grouped = { K1: [], K2: [] };
             teams.forEach(t => {
+                teamMeta[t.id] = t;
                 if (grouped[t.league]) grouped[t.league].push(t);
             });
-            Object.values(grouped).forEach(arr =>
-                arr.sort((a, b) => a.name.localeCompare(b.name, "ko"))
-            );
-            teamSelect.innerHTML = '<option value="">팀 선택...</option>';
+            Object.values(grouped).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name, "ko")));
+            teamSelect.innerHTML = '<option value="">팀 선택…</option>';
             [["K1", "K리그1"], ["K2", "K리그2"]].forEach(([key, label]) => {
                 if (!grouped[key].length) return;
                 const og = document.createElement("optgroup");
                 og.label = label;
                 grouped[key].forEach(t => {
                     const opt = document.createElement("option");
-                    opt.value = t.id;
-                    opt.textContent = t.name;
+                    opt.value = t.id; opt.textContent = t.name;
                     og.appendChild(opt);
                 });
                 teamSelect.appendChild(og);
@@ -43,179 +90,446 @@
         });
     }
 
-    // ── 탭 전환 ──────────────────────────────────────────────────
-    tabBtns.forEach(btn => {
-        btn.addEventListener("click", () => {
-            tabBtns.forEach(b => b.classList.remove("active"));
-            panels.forEach(p => p.classList.add("hidden"));
-            btn.classList.add("active");
-            const panel = document.getElementById("analytics-panel-" + btn.dataset.tab);
-            if (panel) panel.classList.remove("hidden");
-        });
-    });
-
-    // ── 연도 필터 빌드 ────────────────────────────────────────────
-    function buildYearFilter(years, containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        container.innerHTML = "";
+    // ── 연도 필터 ─────────────────────────────────────────────────
+    function buildYearFilter(years) {
+        yearWrap.innerHTML = "";
         ["전체", ...years].forEach(y => {
             const btn = document.createElement("button");
             btn.className = "year-filter-btn" + (y === currentYear ? " active" : "");
             btn.textContent = y === "전체" ? "전체" : y + "년";
             btn.dataset.year = y;
             btn.addEventListener("click", () => {
+                if (currentYear === y) return;
                 currentYear = y;
-                modal.querySelectorAll(".year-filter-btn").forEach(b => {
-                    b.classList.toggle("active", b.dataset.year === y);
-                });
-                if (currentTeamId) loadAnalytics(currentTeamId);
+                yearWrap.querySelectorAll(".year-filter-btn").forEach(b => b.classList.toggle("active", b.dataset.year === y));
+                if (currentTeamId) loadAll();
             });
-            container.appendChild(btn);
+            yearWrap.appendChild(btn);
         });
     }
 
-    // ── 열기 ─────────────────────────────────────────────────────
+    // ── 열기/닫기 ─────────────────────────────────────────────────
     document.getElementById("btn-analytics").addEventListener("click", () => {
         modal.classList.remove("hidden");
         populateTeamSelect();
     });
-
     function closeModal() { modal.classList.add("hidden"); }
     closeBtn.addEventListener("click", closeModal);
     backdrop.addEventListener("click", closeModal);
+    document.addEventListener("keydown", e => {
+        if (e.key === "Escape" && !modal.classList.contains("hidden")) closeModal();
+    });
 
     teamSelect.addEventListener("change", () => {
         currentTeamId = teamSelect.value || null;
+        if (!currentTeamId) { bodyEl.classList.add("hidden"); emptyEl.classList.remove("hidden"); return; }
+        currentLeague = (teamMeta[currentTeamId] || {}).league || "K1";
         currentYear = "전체";
-        if (currentTeamId) loadAnalytics(currentTeamId);
+        loadAll();
     });
 
-    function loadAnalytics(teamId) {
-        titleEl.textContent = "불러오는 중...";
+    // ── 탭 ────────────────────────────────────────────────────────
+    modal.querySelectorAll(".ta-tab-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            modal.querySelectorAll(".ta-tab-btn").forEach(b => b.classList.remove("active"));
+            modal.querySelectorAll(".ta-tab-panel").forEach(p => p.classList.add("hidden"));
+            btn.classList.add("active");
+            const panel = document.getElementById("ta-panel-" + btn.dataset.tab);
+            if (panel) {
+                panel.classList.remove("hidden");
+                // 숨김 상태에서 만들어진 차트가 0px로 그려지는 문제 방지
+                Object.values(charts).forEach(c => { try { c.resize(); } catch (_) {} });
+            }
+        });
+    });
+
+    // ── 메인 로드 ─────────────────────────────────────────────────
+    function loadAll() {
+        bodyEl.classList.remove("hidden");
+        emptyEl.classList.add("hidden");
+        const meta = teamMeta[currentTeamId] || {};
+        document.getElementById("ta-team-name").textContent = "불러오는 중…";
+        document.getElementById("ta-team-league").textContent = "";
+
         const yp = currentYear !== "전체" ? "&year=" + currentYear : "";
-        fetch(`/api/team-analytics?teamId=${teamId}${yp}`).then(r => r.json()).then((data) => {
-            titleEl.textContent = data.team + " 분석";
-            const years = data.available_years || [];
-            buildYearFilter(years, "year-filter-global");
-            renderVsOpponents(data.vs_opponents || []);
+        Promise.all([
+            fetch(`/api/team-analytics?teamId=${currentTeamId}${yp}`).then(r => r.json()),
+            fetch(`/api/team-trend?teamId=${currentTeamId}${yp}`).then(r => r.json()),
+            fetch(`/api/league-rankings?league=${currentLeague}${yp}`).then(r => r.json()),
+        ]).then(([analytics, trend, rankings]) => {
+            buildYearFilter(analytics.available_years || []);
+            renderIdentity(meta, analytics, trend);
+            // 결과 분석
+            renderTrend(trend, meta);
+            renderMonth(analytics.by_month || []);
+            renderHomeAway(analytics.by_year_ha || {});
+            renderVsOpponents(analytics.vs_opponents || []);
+            renderWeather(analytics.weather || {});
+            // 스킬 프로필
+            renderSkill(rankings, meta);
+        }).catch(err => {
+            document.getElementById("ta-team-name").textContent = "데이터 로드 실패";
+            console.error("[team-analysis]", err);
         });
     }
 
-    // ── 헬퍼 ─────────────────────────────────────────────────────
-    function destroyChart(key) {
-        if (charts[key]) { charts[key].destroy(); delete charts[key]; }
-    }
-    function winPct(w, g) { return g > 0 ? Math.round(w / g * 100) : 0; }
+    // ── 아이덴티티 + 시즌 요약 ────────────────────────────────────
+    function renderIdentity(meta, analytics, trend) {
+        const emblem = document.getElementById("ta-emblem");
+        if (meta.emblem) {
+            emblem.src = `/static/img/emblems/${meta.emblem}`;
+            emblem.style.display = "";
+            emblem.onerror = () => { emblem.style.display = "none"; };
+        } else emblem.style.display = "none";
+        document.getElementById("ta-team-name").textContent = analytics.team || meta.name || "";
+        const leagueLabel = meta.league === "K1" ? "K리그1" : meta.league === "K2" ? "K리그2" : (meta.league || "");
+        document.getElementById("ta-team-league").textContent =
+            leagueLabel + (currentYear !== "전체" ? ` · ${currentYear}` : " · 전체 시즌");
 
-    // 승률에 따른 색상 (0%=빨강 ~ 100%=초록)
-    function winColor(pct, alpha = 0.85) {
-        const r = Math.round(220 - pct * 1.2);
-        const g = Math.round(60 + pct * 1.6);
-        const b = 80;
-        return `rgba(${r},${g},${b},${alpha})`;
-    }
+        // 시즌 누적 (trend.matches 기반 — 가장 신뢰도 높은 경기 단위)
+        const ms = trend.matches || [];
+        let w = 0, d = 0, l = 0, gf = 0, ga = 0;
+        ms.forEach(m => {
+            if (m.result === "W") w++; else if (m.result === "D") d++; else l++;
+            gf += m.gf; ga += m.ga;
+        });
+        const g = ms.length, pts = w * 3 + d;
+        const ppg = g ? (pts / g) : 0;
+        const summary = [
+            { label: "경기", val: g, sub: "" },
+            { label: "승점", val: pts, sub: `${ppg.toFixed(2)} PPG` },
+            { label: "전적", val: `${w}-${d}-${l}`, sub: `승률 ${winPct(w, g)}%`, wide: true },
+            { label: "득점", val: gf, sub: g ? `${(gf / g).toFixed(2)}/경기` : "" },
+            { label: "실점", val: ga, sub: g ? `${(ga / g).toFixed(2)}/경기` : "" },
+            { label: "득실차", val: (gf - ga >= 0 ? "+" : "") + (gf - ga), sub: "" },
+        ];
+        document.getElementById("ta-summary").innerHTML = summary.map(s => `
+            <div class="ta-stat${s.wide ? " ta-stat-wide" : ""}">
+                <div class="ta-stat-val">${s.val}</div>
+                <div class="ta-stat-label">${s.label}</div>
+                ${s.sub ? `<div class="ta-stat-sub">${s.sub}</div>` : ""}
+            </div>`).join("");
 
-    // 캔버스 세로 그라디언트
-    function vertGrad(ctx, top, bottom) {
-        const grad = ctx.createLinearGradient(0, 0, 0, 300);
-        grad.addColorStop(0, top);
-        grad.addColorStop(1, bottom);
-        return grad;
-    }
-
-    // 공통 Chart 기본 옵션
-    const BASE_OPTS = {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 500, easing: "easeOutQuart" },
-        plugins: {
-            legend: {
-                labels: { color: "#b0c4d8", font: { size: 11 }, padding: 14, usePointStyle: true, pointStyleWidth: 10 }
-            },
-            tooltip: {
-                backgroundColor: "rgba(10,18,40,0.92)",
-                borderColor: "rgba(100,160,255,0.25)",
-                borderWidth: 1,
-                titleColor: "#7eb8ff",
-                bodyColor: "#cdd8e8",
-                padding: 10,
-                cornerRadius: 8,
-            }
-        }
-    };
-
-    function mergeOpts(extra) {
-        return Object.assign({}, BASE_OPTS, extra,
-            { plugins: Object.assign({}, BASE_OPTS.plugins, extra.plugins || {}) });
+        // 최근 5경기 폼 (최신이 오른쪽)
+        const last5 = ms.slice(-5);
+        document.getElementById("ta-form").innerHTML = last5.length
+            ? last5.map(m => `<span class="ta-form-pill ta-form-${m.result}" title="${m.date} vs ${m.opponent} ${m.gf}:${m.ga}">${m.result}</span>`).join("")
+            : `<span class="ta-form-empty">기록 없음</span>`;
     }
 
-    // ── 1. 상대팀별 (수평 바) ──────────────────────────────────────
-    function renderVsOpponents(rows) {
-        destroyChart("vs");
-        const el = document.getElementById("chart-vs");
-        if (!rows.length) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>데이터 없음</p>"; return; }
-
-        rows = [...rows].sort((a, b) => winPct(a.w, a.games) - winPct(b.w, b.games));
-
-        const labels  = rows.map(r => r.name);
-        const wPct    = rows.map(r => winPct(r.w, r.games));
-        const dPct    = rows.map(r => winPct(r.d, r.games));
-        const lPct    = rows.map(r => winPct(r.l, r.games));
-        const barH    = Math.max(28, Math.min(42, 360 / rows.length));
-
-        // 차트 높이 동적 조절
-        el.closest(".chart-wrap").style.height = (rows.length * barH + 60) + "px";
-
-        charts["vs"] = new Chart(el, {
-            type: "bar",
+    // ── 결과 ① 시즌 득/실 트렌드 + 누적 승점 ─────────────────────
+    function renderTrend(trend, meta) {
+        destroyChart("ta-trend");
+        const el = document.getElementById("ta-trend");
+        const ms = trend.matches || [];
+        const scope = document.getElementById("ta-trend-scope");
+        if (scope) scope.textContent = ms.length ? `${ms.length}경기` : "";
+        if (!ms.length) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>데이터 없음</p>"; return; }
+        const ink = readableInk(meta.primary || "#4ea4f8");
+        const labels = ms.map((m, i) => `${i + 1}R`);
+        charts["ta-trend"] = new Chart(el, {
             data: {
                 labels,
                 datasets: [
-                    { label: "승", data: wPct, backgroundColor: rows.map(r => winColor(winPct(r.w,r.games))), borderRadius: { topLeft:0, topRight:4, bottomLeft:0, bottomRight:4 }, borderSkipped: false },
-                    { label: "무", data: dPct, backgroundColor: "rgba(120,130,150,0.6)", borderRadius: 0 },
-                    { label: "패", data: lPct, backgroundColor: "rgba(220,70,70,0.7)", borderRadius: { topLeft:4, topRight:0, bottomLeft:4, bottomRight:0 }, borderSkipped: false },
+                    { type: "bar", label: "누적 승점", data: ms.map(m => m.cum_pts), yAxisID: "yPts",
+                      backgroundColor: hexToRgba(meta.primary || "#4ea4f8", 0.18), borderRadius: 3, order: 3 },
+                    { type: "line", label: "득점", data: ms.map(m => m.gf), yAxisID: "yGoals",
+                      borderColor: ink, backgroundColor: ink, tension: 0.3, pointRadius: 2, borderWidth: 2.4, order: 1 },
+                    { type: "line", label: "실점", data: ms.map(m => m.ga), yAxisID: "yGoals",
+                      borderColor: "#f87171", backgroundColor: "#f87171", borderDash: [5, 4], tension: 0.3, pointRadius: 2, borderWidth: 2, order: 2 },
                 ]
             },
-            options: mergeOpts({
-                indexAxis: "y",
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
                 plugins: {
+                    ...BASE_PLUGINS,
                     tooltip: {
-                        ...BASE_OPTS.plugins.tooltip,
+                        ...BASE_PLUGINS.tooltip,
                         callbacks: {
-                            label(ctx) {
-                                return ctx.dataset.label + ": " + ctx.parsed.x + "%";
-                            },
-                            afterBody(ctx) {
-                                const r = rows[ctx[0].dataIndex];
-                                return [`${r.games}경기  ${r.w}승 ${r.d}무 ${r.l}패`, `득실차: +${r.gf-r.ga} (${r.gf}득 ${r.ga}실)`];
-                            }
+                            title: items => { const m = ms[items[0].dataIndex]; return `${m.date} ${m.is_home ? "vs" : "@"} ${m.opponent}`; },
+                            afterTitle: items => { const m = ms[items[0].dataIndex]; return `${m.gf}:${m.ga} (${m.result})`; },
                         }
                     }
                 },
                 scales: {
-                    x: { stacked: true, max: 100, ticks: { color: "#7a8fa8", callback: v => v + "%", font: { size: 10 } }, grid: { color: "rgba(255,255,255,0.06)" } },
-                    y: { stacked: true, ticks: { color: "#c0d0e0", font: { size: 11 } }, grid: { display: false } }
+                    x: { ticks: { color: "#7a8fa8", font: { size: 9 }, maxRotation: 0, autoSkipPadding: 16 }, grid: { display: false } },
+                    yGoals: { position: "left", beginAtZero: true, ticks: { color: "#9fb2c8", font: { size: 10 }, precision: 0 }, grid: { color: "rgba(255,255,255,0.06)" } },
+                    yPts: { position: "right", beginAtZero: true, ticks: { color: hexToRgba(meta.primary || "#4ea4f8", 0.9), font: { size: 10 } }, grid: { display: false } },
                 }
-            })
-        });
-
-        // 테이블
-        const tbl = document.getElementById("table-vs");
-        tbl.innerHTML = `<tr><th>상대팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득</th><th>실</th><th>승률</th></tr>`;
-        [...rows].reverse().forEach(r => {
-            const pct = winPct(r.w, r.games);
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td>${r.name}</td><td>${r.games}</td>
-                <td style="color:#7bed9f">${r.w}</td>
-                <td style="color:#aab">${r.d}</td>
-                <td style="color:#e05c5c">${r.l}</td>
-                <td>${r.gf}</td><td>${r.ga}</td>
-                <td><span class="wr-badge" style="background:${winColor(pct,0.25)};color:${winColor(pct,1)};border:1px solid ${winColor(pct,0.5)}">${pct}%</span></td>
-            `;
-            tbl.appendChild(tr);
+            }
         });
     }
 
+    // ── 결과 ② 월별 승률 ─────────────────────────────────────────
+    function renderMonth(rows) {
+        destroyChart("ta-month");
+        const el = document.getElementById("ta-month");
+        if (!rows.length) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>데이터 없음</p>"; return; }
+        const labels = rows.map(r => r.month + "월");
+        const pct = rows.map(r => winPct(r.w, r.games));
+        charts["ta-month"] = new Chart(el, {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [{ label: "승률", data: pct, backgroundColor: pct.map(p => winColor(p)), borderRadius: 4, maxBarThickness: 38 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    ...BASE_PLUGINS, legend: { display: false },
+                    tooltip: {
+                        ...BASE_PLUGINS.tooltip,
+                        callbacks: {
+                            label: c => `승률 ${c.parsed.y}%`,
+                            afterBody: items => { const r = rows[items[0].dataIndex]; return `${r.games}경기  ${r.w}승 ${r.d}무 ${r.l}패`; }
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: "#c0d0e0", font: { size: 11 } }, grid: { display: false } },
+                    y: { beginAtZero: true, max: 100, ticks: { color: "#7a8fa8", font: { size: 10 }, callback: v => v + "%" }, grid: { color: "rgba(255,255,255,0.06)" } }
+                }
+            }
+        });
+    }
+
+    // ── 결과 ③ 홈/원정 성적 (연도 합산) ───────────────────────────
+    function renderHomeAway(byYearHa) {
+        const agg = { home: { games: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0 }, away: { games: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0 } };
+        Object.values(byYearHa).forEach(yr => {
+            ["home", "away"].forEach(side => {
+                if (!yr[side]) return;
+                ["games", "w", "d", "l", "gf", "ga"].forEach(k => agg[side][k] += yr[side][k] || 0);
+            });
+        });
+        const pctBadge = p => `<span class="ta-ha-pct" style="color:${p >= 50 ? '#7bed9f' : p >= 30 ? '#ffd77a' : '#f87171'}">${p}%</span>`;
+        const row = (label, side) => {
+            const r = agg[side];
+            return `<tr>
+                <td class="ta-ha-side">${label}</td>
+                <td>${pctBadge(winPct(r.w, r.games))}</td>
+                <td>${r.w}-${r.d}-${r.l}</td>
+                <td>${r.games}</td>
+                <td>${r.gf}:${r.ga}</td>
+            </tr>`;
+        };
+        document.getElementById("ta-ha-table").innerHTML =
+            `<tr><th>구분</th><th>승률</th><th>전적</th><th>경기</th><th>득실</th></tr>` +
+            row("🏠 홈", "home") + row("✈ 원정", "away");
+    }
+
+    // ── 결과 ④ 상대팀별 전적 ──────────────────────────────────────
+    function renderVsOpponents(rows) {
+        destroyChart("ta-vs");
+        const wrap = document.getElementById("ta-vs-wrap");
+        const tbl = document.getElementById("ta-vs-table");
+        if (!rows.length) {
+            wrap.innerHTML = "<p class='chart-empty'>데이터 없음</p>"; tbl.innerHTML = ""; return;
+        }
+        if (!wrap.querySelector("canvas")) wrap.innerHTML = '<canvas id="ta-vs"></canvas>';
+        const el = document.getElementById("ta-vs");
+
+        const sorted = [...rows].sort((a, b) => winPct(a.w, a.games) - winPct(b.w, b.games));
+        const labels = sorted.map(r => r.name);
+        const barH = clamp(360 / sorted.length, 22, 40);
+        wrap.style.height = (sorted.length * barH + 56) + "px";
+
+        charts["ta-vs"] = new Chart(el, {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [
+                    { label: "승", data: sorted.map(r => winPct(r.w, r.games)), backgroundColor: sorted.map(r => winColor(winPct(r.w, r.games))) },
+                    { label: "무", data: sorted.map(r => winPct(r.d, r.games)), backgroundColor: "rgba(120,130,150,0.6)" },
+                    { label: "패", data: sorted.map(r => winPct(r.l, r.games)), backgroundColor: "rgba(220,70,70,0.7)" },
+                ]
+            },
+            options: {
+                indexAxis: "y", responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    ...BASE_PLUGINS,
+                    tooltip: {
+                        ...BASE_PLUGINS.tooltip,
+                        callbacks: {
+                            label: c => `${c.dataset.label}: ${c.parsed.x}%`,
+                            afterBody: items => { const r = sorted[items[0].dataIndex]; return [`${r.games}경기  ${r.w}승 ${r.d}무 ${r.l}패`, `득실 ${r.gf}:${r.ga} (${r.gf - r.ga >= 0 ? "+" : ""}${r.gf - r.ga})`]; }
+                        }
+                    }
+                },
+                scales: {
+                    x: { stacked: true, max: 100, ticks: { color: "#7a8fa8", font: { size: 10 }, callback: v => v + "%" }, grid: { color: "rgba(255,255,255,0.06)" } },
+                    y: { stacked: true, ticks: { color: "#c0d0e0", font: { size: 11 } }, grid: { display: false } }
+                }
+            }
+        });
+
+        tbl.innerHTML = `<tr><th>상대팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>승률</th></tr>` +
+            [...sorted].reverse().map(r => {
+                const p = winPct(r.w, r.games);
+                return `<tr>
+                    <td class="ta-vs-name">${r.name}</td><td>${r.games}</td>
+                    <td style="color:#7bed9f">${r.w}</td><td style="color:#aab">${r.d}</td><td style="color:#e05c5c">${r.l}</td>
+                    <td>${r.gf}:${r.ga}</td>
+                    <td><span class="ta-wr-badge" style="background:${winColor(p,0.22)};color:${winColor(p,1)};border:1px solid ${winColor(p,0.5)}">${p}%</span></td>
+                </tr>`;
+            }).join("");
+    }
+
+    // ── 결과 ⑤ 날씨별 승률 ───────────────────────────────────────
+    function renderWeather(weather) {
+        const groups = [
+            { title: "🌡 기온", rows: weather.by_temp || [] },
+            { title: "💧 습도", rows: weather.by_hum || [] },
+            { title: "🌬 풍속", rows: weather.by_wind || [] },
+        ];
+        const host = document.getElementById("ta-weather");
+        const hasAny = groups.some(g => g.rows.length);
+        if (!hasAny) { host.innerHTML = "<p class='chart-empty'>날씨 표본 없음</p>"; return; }
+        host.innerHTML = groups.map(g => {
+            if (!g.rows.length) return "";
+            const bars = g.rows.map(r => {
+                const p = winPct(r.w, r.games);
+                return `<div class="ta-wx-row">
+                    <span class="ta-wx-label">${r.label}</span>
+                    <div class="ta-wx-bar-track"><div class="ta-wx-bar" style="width:${p}%;background:${winColor(p)}"></div></div>
+                    <span class="ta-wx-val">${p}% <em>(${r.w}-${r.d}-${r.l})</em></span>
+                </div>`;
+            }).join("");
+            return `<div class="ta-wx-group"><div class="ta-wx-title">${g.title}</div>${bars}</div>`;
+        }).join("");
+    }
+
+    // ── 스킬 프로필 (레이더 + 지표 바) ────────────────────────────
+    function renderSkill(rankings, meta) {
+        destroyChart("ta-radar");
+        const metricsMeta = rankings.metrics || [];
+        const teams = rankings.teams || [];
+        const totals = rankings.totals || {};
+        const me = teams.find(t => t.id === currentTeamId);
+        const scope = document.getElementById("ta-skill-scope");
+        const radarWrap = document.getElementById("ta-radar").closest(".chart-wrap");
+        const barsHost = document.getElementById("ta-metric-bars");
+
+        if (!me || !me.eligible) {
+            if (scope) scope.textContent = "";
+            radarWrap.innerHTML = "<p class='chart-empty'>샘플 경기 부족 — 스킬 지표 집계 제외</p>";
+            barsHost.innerHTML = "";
+            return;
+        }
+        if (scope) scope.textContent = `${currentLeague} · ${me.matches}경기`;
+        if (!radarWrap.querySelector("canvas")) radarWrap.innerHTML = '<canvas id="ta-radar"></canvas>';
+
+        // 리그 평균값 (지표별, eligible 팀)
+        const leagueAvg = {};
+        metricsMeta.forEach(mt => {
+            const vals = teams.filter(t => t.eligible && t.values[mt.key] != null).map(t => t.values[mt.key]);
+            leagueAvg[mt.key] = vals.length ? mean(vals) : null;
+        });
+
+        // 순위 → 백분위 (1위=100, 꼴찌=0)
+        const pctlFromRank = (rank, total) => (total > 1 && rank) ? Math.round((total - rank) / (total - 1) * 100) : null;
+
+        // 레이더: 팀이 순위를 가진 지표만 축으로
+        const axes = metricsMeta.filter(mt => me.ranks[mt.key] && totals[mt.key] > 1);
+        if (axes.length >= 3) {
+            const labels = axes.map(mt => mt.label);
+            const teamPctl = axes.map(mt => pctlFromRank(me.ranks[mt.key], totals[mt.key]));
+            const ink = readableInk(meta.primary || "#7eb8ff");
+            const el = document.getElementById("ta-radar");
+            charts["ta-radar"] = new Chart(el, {
+                type: "radar",
+                data: {
+                    labels,
+                    datasets: [
+                        { label: meta.short || meta.name, data: teamPctl,
+                          borderColor: ink, backgroundColor: hexToRgba(meta.primary || "#7eb8ff", 0.22), pointBackgroundColor: ink,
+                          pointRadius: 4, pointHoverRadius: 6, borderWidth: 2.5 },
+                        { label: "리그 평균(50%)", data: axes.map(() => 50),
+                          borderColor: "rgba(170,180,200,0.65)", backgroundColor: "rgba(170,180,200,0.05)",
+                          pointRadius: 0, borderWidth: 1.4, borderDash: [5, 4] },
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: "#cdd8e8", font: { weight: "600" }, usePointStyle: true, padding: 12 } },
+                        tooltip: {
+                            ...BASE_PLUGINS.tooltip,
+                            callbacks: {
+                                title: items => axes[items[0].dataIndex].label,
+                                label: c => {
+                                    if (c.datasetIndex === 1) return "리그 평균 (50%)";
+                                    const mt = axes[c.dataIndex];
+                                    const v = me.values[mt.key];
+                                    return `${fmtMetric(v, mt.format)} · 리그 ${me.ranks[mt.key]}위/${totals[mt.key]} (백분위 ${c.parsed.r})`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            min: 0, max: 100,
+                            angleLines: { color: "rgba(255,255,255,0.12)" }, grid: { color: "rgba(255,255,255,0.10)" },
+                            pointLabels: { color: "#e2e8f0", font: { size: 11, weight: "700" } },
+                            ticks: { color: "#9aa7bd", backdropColor: "transparent", stepSize: 25, font: { size: 9 } }
+                        }
+                    }
+                }
+            });
+        } else {
+            radarWrap.innerHTML = "<p class='chart-empty'>레이더 표시에 필요한 지표가 부족합니다</p>";
+        }
+
+        // 지표 바: 값 · 리그 평균 대비 · 순위 뱃지
+        barsHost.innerHTML = metricsMeta.map(mt => {
+            const v = me.values[mt.key];
+            const rank = me.ranks[mt.key];
+            const total = totals[mt.key] || 0;
+            const avg = leagueAvg[mt.key];
+            const pctl = pctlFromRank(rank, total);
+            const avgPctl = (avg != null) ? valuePctl(avg, teams, mt) : 50;
+            const barColor = pctl == null ? "rgba(120,130,150,0.5)" : winColor(pctl, 0.85);
+            const rankBadge = rank
+                ? `<span class="ta-rank-badge" style="color:${pctl >= 66 ? '#7bed9f' : pctl >= 33 ? '#ffd77a' : '#f87171'}">${rank}<small>/${total}</small></span>`
+                : `<span class="ta-rank-badge ta-rank-na">표본부족</span>`;
+            return `<div class="ta-mb-row">
+                <div class="ta-mb-head">
+                    <span class="ta-mb-label">${mt.label}</span>
+                    <span class="ta-mb-val">${fmtMetric(v, mt.format)}</span>
+                </div>
+                <div class="ta-mb-track">
+                    <div class="ta-mb-fill" style="width:${pctl == null ? 0 : pctl}%;background:${barColor}"></div>
+                    <div class="ta-mb-avg" style="left:${avgPctl}%" title="리그 평균 ${fmtMetric(avg, mt.format)}"></div>
+                </div>
+                <div class="ta-mb-foot">
+                    ${rankBadge}
+                    <span class="ta-mb-avg-txt">리그 평균 ${fmtMetric(avg, mt.format)}</span>
+                </div>
+            </div>`;
+        }).join("");
+    }
+
+    // 값 v의 리그 내 백분위 (방향 고려) — 평균 마커용
+    function valuePctl(v, teams, mt) {
+        const vals = teams.filter(t => t.eligible && t.values[mt.key] != null).map(t => t.values[mt.key]);
+        const n = vals.length;
+        if (n < 2) return 50;
+        const higher = mt.direction === "higher";
+        let worse = 0;
+        vals.forEach(x => { if (higher ? x < v : x > v) worse++; });
+        return clamp(Math.round(worse / (n - 1) * 100), 0, 100);
+    }
+
+    // 지표 포맷
+    function fmtMetric(v, fmt) {
+        if (v == null) return "—";
+        switch (fmt) {
+            case "ratio2": return (+v).toFixed(2);
+            case "num2":   return (+v).toFixed(2);
+            case "num1":   return (+v).toFixed(1);
+            case "pct1":   return (+v).toFixed(1) + "%";
+            default:       return String(v);
+        }
+    }
 })();

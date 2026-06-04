@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=70">
+    <link rel="stylesheet" href="/static/css/style.css?v=71">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -292,7 +292,7 @@
                         <button id="btn-analytics" class="analytics-widget-btn" title="팀 분석 보고서">
                             <span class="aw-icon">📊</span>
                             <span class="aw-label">팀 분석</span>
-                            <span class="aw-sub">승률 · 월별 · 날씨</span>
+                            <span class="aw-sub">전적 · 트렌드 · 스킬</span>
                         </button>
                         <button id="btn-team-compare" class="analytics-widget-btn" title="두 팀 스탯 비교">
                             <span class="aw-icon">⚖️</span>
@@ -721,12 +721,96 @@
         </div>
     </div>
 
+    <!-- 팀 분석 모달 (단일 팀 종합) -->
+    <div id="team-analysis-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content ta-modal-content">
+            <div class="ta-header">
+                <h2 class="ta-title">📊 팀 분석</h2>
+                <select id="ta-team-select" class="ta-team-select"></select>
+                <div id="ta-year-filter" class="year-filter-wrap"></div>
+                <button id="ta-close" class="modal-btn cancel">닫기</button>
+            </div>
+
+            <div id="ta-body" class="ta-body hidden">
+                <!-- 아이덴티티 + 시즌 요약 -->
+                <div class="ta-identity">
+                    <img id="ta-emblem" class="ta-emblem" src="" alt="">
+                    <div class="ta-id-text">
+                        <div class="ta-team-name" id="ta-team-name"></div>
+                        <div class="ta-team-league" id="ta-team-league"></div>
+                    </div>
+                    <div class="ta-form" id="ta-form"></div>
+                </div>
+                <div class="ta-summary" id="ta-summary"></div>
+
+                <!-- 탭 -->
+                <div class="ta-tabs">
+                    <button class="ta-tab-btn active" data-tab="results">📋 결과 분석</button>
+                    <button class="ta-tab-btn" data-tab="skill">📡 스킬 프로필</button>
+                </div>
+
+                <!-- 결과 분석 -->
+                <div class="ta-tab-panel" id="ta-panel-results">
+                    <div class="tc-panel" style="--tc-accent:#fbbf24">
+                        <div class="tc-rank-header">
+                            <p class="tc-panel-label" style="margin:0">📈 시즌 득/실 트렌드</p>
+                            <span id="ta-trend-scope" class="tc-rank-scope"></span>
+                        </div>
+                        <div class="chart-wrap" style="height:240px"><canvas id="ta-trend"></canvas></div>
+                        <p class="tc-hint">실선 = 경기별 득점 · 점선 = 실점 · 막대 = 누적 승점</p>
+                    </div>
+                    <div class="ta-grid2">
+                        <div class="tc-panel" style="--tc-accent:#34d399">
+                            <p class="tc-panel-label">📅 월별 승률</p>
+                            <div class="chart-wrap" style="height:220px"><canvas id="ta-month"></canvas></div>
+                        </div>
+                        <div class="tc-panel" style="--tc-accent:#60a5fa">
+                            <p class="tc-panel-label">🏟 홈/원정 성적</p>
+                            <table class="tc-ha-table ta-ha-table" id="ta-ha-table"></table>
+                        </div>
+                    </div>
+                    <div class="tc-panel" style="--tc-accent:#a78bfa">
+                        <p class="tc-panel-label">🤝 상대팀별 전적</p>
+                        <div class="chart-wrap" id="ta-vs-wrap" style="height:300px"><canvas id="ta-vs"></canvas></div>
+                        <table class="ins-table ta-vs-table" id="ta-vs-table"></table>
+                    </div>
+                    <div class="tc-panel" style="--tc-accent:#f472b6">
+                        <p class="tc-panel-label">🌦 날씨별 승률</p>
+                        <div class="ta-weather-grid" id="ta-weather"></div>
+                        <p class="tc-hint">경기 당시 실측 기상(Open-Meteo) 기준 · 표본 있는 구간만 표시</p>
+                    </div>
+                </div>
+
+                <!-- 스킬 프로필 -->
+                <div class="ta-tab-panel hidden" id="ta-panel-skill">
+                    <div class="tc-panel" style="--tc-accent:#a78bfa">
+                        <div class="tc-rank-header">
+                            <p class="tc-panel-label" style="margin:0">📡 스킬 레이더 (리그 백분위)</p>
+                            <span id="ta-skill-scope" class="tc-rank-scope"></span>
+                        </div>
+                        <div class="chart-wrap" style="height:330px"><canvas id="ta-radar"></canvas></div>
+                        <p class="tc-hint">각 축 = 리그 내 백분위(100 = 리그 1위) · 점선 = 리그 평균(50%)</p>
+                    </div>
+                    <div class="tc-panel" style="--tc-accent:#60a5fa">
+                        <p class="tc-panel-label">📊 지표별 값 · 리그 순위 · 평균 대비</p>
+                        <div class="ta-metric-bars" id="ta-metric-bars"></div>
+                        <p class="tc-hint">막대 = 리그 평균 대비 위치 · 숫자 = 실측값 · 흰 눈금 = 리그 평균 · 뱃지 = 리그 N위</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ta-empty" class="ta-empty">팀을 선택하면 종합 분석이 표시됩니다.</div>
+        </div>
+    </div>
+
     <script src="/static/js/app.js?v=17"></script>
 
     <script src="/static/js/info.js?v=7"></script>
     <script src="/static/js/k2heatmap.js?v=2"></script>
     <script src="/static/js/banner_stats.js?v=3"></script>
     <script src="/static/js/team_compare.js?v=12"></script>
+    <script src="/static/js/analytics.js?v=1"></script>
     <script src="/static/js/prediction.js?v=59"></script>
 
     <!-- 선수 분석 모달 -->
