@@ -8635,3 +8635,37 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ta-mb-avg-txt { font-size: 0.68rem; color: var(--text-faint); }
 
 .ta-empty { padding: 60px 20px; text-align: center; color: var(--text-muted); font-size: 0.95rem; }
+
+/* ── '🛡 팀' 탭 모드 토글 (단일 팀 분석 ↔ 팀 비교) ── */
+.ws-team-modebar { display: flex; gap: 8px; margin-bottom: 14px; }
+.ws-team-mode {
+    flex: 0 0 auto;
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 9px 18px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.ws-team-mode:hover { color: var(--text-primary); border-color: #4a82c7; }
+.ws-team-mode.active {
+    background: linear-gradient(135deg, rgba(167,139,250,0.22), rgba(96,165,250,0.18));
+    color: #fff; border-color: #7c6df0;
+    box-shadow: 0 2px 12px rgba(124,109,240,0.25);
+}
+.ws-team-mode:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 인라인된 팀 분석 모달 — 컨테이너 chrome 제거(패널에 자연스럽게 흐르도록) */
+.ws-panel .ta-modal-content {
+    background: none;
+    box-shadow: none;
+    border: none;
+    padding: 0;
+    gap: 14px;
+    overflow: visible;
+}
+.ws-panel #ta-close { display: none; }
+.ws-panel .ta-header { flex-wrap: wrap; }

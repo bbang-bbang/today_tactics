@@ -113,11 +113,14 @@
         modal.classList.remove("hidden");
         populateTeamSelect();
     });
-    function closeModal() { modal.classList.add("hidden"); }
+    // 워크스페이스 '🛡 팀' 탭에 인라인된 경우엔 닫기/Esc/백드롭으로 숨기지 않음
+    // (모드 토글이 표시를 제어 — 인라인 상태에서 숨기면 빈 패널이 됨)
+    const isInlined = () => !!modal.closest(".ws-panel");
+    function closeModal() { if (!isInlined()) modal.classList.add("hidden"); }
     closeBtn.addEventListener("click", closeModal);
     backdrop.addEventListener("click", closeModal);
     document.addEventListener("keydown", e => {
-        if (e.key === "Escape" && !modal.classList.contains("hidden")) closeModal();
+        if (e.key === "Escape" && !modal.classList.contains("hidden") && !isInlined()) closeModal();
     });
 
     teamSelect.addEventListener("change", () => {

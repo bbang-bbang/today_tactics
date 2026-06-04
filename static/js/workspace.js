@@ -26,8 +26,8 @@
     // #main-row = 캔버스(#main-area) + 선수 개별분석(#player-report-section) 묶음 → 전술판 탭
     move("tactics", ["main-row"]);
     move("predict", ["prediction-section"]);
-    // 팀 탭: 팀 비교(두 팀 선택). (팀 분석=상대팀별 승률은 중복으로 제거됨)
-    move("team",    ["team-compare-modal"]);
+    // 팀 탭: 단일 팀 분석(team-analysis-modal) + 팀 비교(team-compare-modal) — 모드 토글로 전환
+    move("team",    ["team-analysis-modal", "team-compare-modal"]);
     move("player",  ["insights-section"]);
 
     // 비워진 구조 래퍼(#board-report-wrap)는 박스를 생성하지 않도록 처리(잔여 여백 제거)
@@ -43,8 +43,39 @@
         });
     }
 
-    // ── 3) 탭별 onShow 훅 ────────────────────────────────────────────
-    let _teamInit = false;
+    // ── 3) 팀 탭 모드 토글 (단일 팀 분석 ↔ 팀 비교) ──────────────────
+    // 인라인된 두 모달을 모드에 따라 보이기/숨기기. 최초 노출 시 기존 트리거를
+    // 1회 click 해 셀렉트/렌더를 초기화(각 모듈 로직 그대로 재사용).
+    let _teamMode = "analysis";
+    let _analysisInit = false, _compareInit = false;
+    function setTeamMode(mode) {
+        _teamMode = mode;
+        document.querySelectorAll("#ws-team .ws-team-mode").forEach((b) => {
+            const on = b.dataset.tmode === mode;
+            b.classList.toggle("active", on);
+            b.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        const ana = $("team-analysis-modal"), cmp = $("team-compare-modal");
+        if (mode === "compare") {
+            if (ana) ana.classList.add("hidden");
+            if (cmp) {
+                if (!_compareInit) { _compareInit = true; const c = $("btn-team-compare"); if (c) c.click(); }
+                else cmp.classList.remove("hidden");
+            }
+        } else {
+            if (cmp) cmp.classList.add("hidden");
+            if (ana) {
+                if (!_analysisInit) { _analysisInit = true; const a = $("btn-analytics"); if (a) a.click(); }
+                else ana.classList.remove("hidden");
+            }
+        }
+        requestAnimationFrame(() => resizeChartsIn(panels.team));
+    }
+    document.querySelectorAll("#ws-team .ws-team-mode").forEach((b) => {
+        b.addEventListener("click", () => setTeamMode(b.dataset.tmode));
+    });
+
+    // ── 4) 탭별 onShow 훅 ────────────────────────────────────────────
     const onShow = {
         tactics() {
             // 전술판 캔버스는 컨테이너 가시성에 의존 → 보일 때 재계산
@@ -54,15 +85,7 @@
             requestAnimationFrame(() => resizeChartsIn(panels.predict));
         },
         team() {
-            // 인라인된 팀 비교 콘텐츠 노출 + 최초 1회 팀 셀렉트 채우기(기존 트리거 재사용)
-            const m = $("team-compare-modal");
-            if (m) m.classList.remove("hidden");
-            if (!_teamInit) {
-                _teamInit = true;
-                const c = $("btn-team-compare");
-                if (c) c.click();
-            }
-            requestAnimationFrame(() => resizeChartsIn(panels.team));
+            setTeamMode(_teamMode);   // 현재 모드 콘텐츠 노출 + 최초 1회 초기화
         },
         player() {
             requestAnimationFrame(() => resizeChartsIn(panels.player));
