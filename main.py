@@ -1136,6 +1136,9 @@ def get_team_analytics():
         return jsonify({}), 404
 
     ss_id = team_info["sofascore_id"]
+    # 리그 기반 tournament_id (team-trend과 동일 — K1=410 / K2=777).
+    # 과거 777 하드코딩은 K1 팀에게 엉뚱한 대회를 보여줘 2026 결과가 비던 버그.
+    tid = 410 if team_info.get("league") == "K1" else 777
     db_path = DB_PATH
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
@@ -1143,10 +1146,10 @@ def get_team_analytics():
     # 사용 가능 연도 목록
     cur.execute("""
         SELECT DISTINCT strftime('%Y', datetime(date_ts,'unixepoch','localtime'))
-        FROM events WHERE tournament_id=777
+        FROM events WHERE tournament_id=?
           AND (home_team_id=? OR away_team_id=?)
         ORDER BY 1
-    """, (ss_id, ss_id))
+    """, (tid, ss_id, ss_id))
     available_years = [r[0] for r in cur.fetchall()]
 
     year_clause = "AND strftime('%Y', datetime(date_ts,'unixepoch','localtime')) = ?" if year else ""
@@ -1164,7 +1167,7 @@ def get_team_analytics():
                    SUM(CASE WHEN home_score = away_score THEN 1 ELSE 0 END) d,
                    SUM(CASE WHEN home_score < away_score THEN 1 ELSE 0 END) l,
                    SUM(home_score) gf, SUM(away_score) ga
-            FROM events WHERE tournament_id=777 AND home_team_id=? {yc}
+            FROM events WHERE tournament_id=? AND home_team_id=? AND home_score IS NOT NULL {yc}
             GROUP BY away_team_id
             UNION ALL
             SELECT home_team_id opp_id, home_team_name opp_name,
@@ -1173,11 +1176,11 @@ def get_team_analytics():
                    SUM(CASE WHEN home_score = away_score THEN 1 ELSE 0 END) d,
                    SUM(CASE WHEN away_score < home_score THEN 1 ELSE 0 END) l,
                    SUM(away_score) gf, SUM(home_score) ga
-            FROM events WHERE tournament_id=777 AND away_team_id=? {yc}
+            FROM events WHERE tournament_id=? AND away_team_id=? AND home_score IS NOT NULL {yc}
             GROUP BY home_team_id
         )
         GROUP BY opp_id ORDER BY games DESC, w DESC
-    """.format(yc=year_clause), (ss_id, *yp, ss_id, *yp))
+    """.format(yc=year_clause), (tid, ss_id, *yp, tid, ss_id, *yp))
     vs_rows = cur.fetchall()
     vs_opponents = [
         {"name": _ko_name_by_ss_id(r[0]) or r[1],
@@ -1196,7 +1199,7 @@ def get_team_analytics():
                    SUM(CASE WHEN home_score = away_score THEN 1 ELSE 0 END) d,
                    SUM(CASE WHEN home_score < away_score THEN 1 ELSE 0 END) l,
                    SUM(home_score) gf, SUM(away_score) ga
-            FROM events WHERE tournament_id=777 AND home_team_id=? {yc}
+            FROM events WHERE tournament_id=? AND home_team_id=? AND home_score IS NOT NULL {yc}
             GROUP BY mon
             UNION ALL
             SELECT CAST(strftime('%m', datetime(date_ts,'unixepoch','localtime')) AS INT) mon,
@@ -1205,11 +1208,11 @@ def get_team_analytics():
                    SUM(CASE WHEN home_score = away_score THEN 1 ELSE 0 END) d,
                    SUM(CASE WHEN away_score < home_score THEN 1 ELSE 0 END) l,
                    SUM(away_score) gf, SUM(home_score) ga
-            FROM events WHERE tournament_id=777 AND away_team_id=? {yc}
+            FROM events WHERE tournament_id=? AND away_team_id=? AND home_score IS NOT NULL {yc}
             GROUP BY mon
         )
         GROUP BY mon ORDER BY mon
-    """.format(yc=year_clause), (ss_id, *yp, ss_id, *yp))
+    """.format(yc=year_clause), (tid, ss_id, *yp, tid, ss_id, *yp))
     month_rows = cur.fetchall()
     by_month = [
         {"month": r[0], "games": r[1], "w": r[2], "d": r[3], "l": r[4],
@@ -1228,7 +1231,7 @@ def get_team_analytics():
                    SUM(CASE WHEN home_score = away_score THEN 1 ELSE 0 END) d,
                    SUM(CASE WHEN home_score < away_score THEN 1 ELSE 0 END) l,
                    SUM(home_score) gf, SUM(away_score) ga
-            FROM events WHERE tournament_id=777 AND home_team_id=? {yc}
+            FROM events WHERE tournament_id=? AND home_team_id=? AND home_score IS NOT NULL {yc}
             GROUP BY yr
             UNION ALL
             SELECT strftime('%Y', datetime(date_ts,'unixepoch','localtime')) yr,
@@ -1238,11 +1241,11 @@ def get_team_analytics():
                    SUM(CASE WHEN home_score = away_score THEN 1 ELSE 0 END) d,
                    SUM(CASE WHEN away_score < home_score THEN 1 ELSE 0 END) l,
                    SUM(away_score) gf, SUM(home_score) ga
-            FROM events WHERE tournament_id=777 AND away_team_id=? {yc}
+            FROM events WHERE tournament_id=? AND away_team_id=? AND home_score IS NOT NULL {yc}
             GROUP BY yr
         )
         GROUP BY yr, side ORDER BY yr, side
-    """.format(yc=year_clause), (ss_id, *yp, ss_id, *yp))
+    """.format(yc=year_clause), (tid, ss_id, *yp, tid, ss_id, *yp))
     ha_rows = cur.fetchall()
     by_year_ha = {}
     for yr, side, g, w, d, l, gf, ga in ha_rows:
@@ -1265,13 +1268,13 @@ def get_team_analytics():
             mps.temperature, mps.humidity, mps.wind_speed
         FROM events e
         JOIN match_player_stats mps ON e.id = mps.event_id
-        WHERE e.tournament_id = 777
+        WHERE e.tournament_id = ?
           AND mps.team_id = ?
           AND mps.temperature IS NOT NULL
           {yc_e}
         GROUP BY e.id
     """.format(yc_e="AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?" if year else "")
-    cur.execute(weather_sql, (ss_id, ss_id, *yp))
+    cur.execute(weather_sql, (ss_id, tid, ss_id, *yp))
     w_rows = cur.fetchall()
 
     def bucket_weather(rows, key_fn, labels):
@@ -1897,6 +1900,167 @@ def get_team_trend():
         "primary": team_info.get("primary"),
         "year":    year or "전체",
         "matches": matches,
+    })
+
+
+# ═══════════════════════════════════════════════════════════════
+# /api/team-insights — 단일 팀 심화 인사이트 (시간대 득실·선제골·xG누적·득점기여·규율)
+#   기존 team-analytics(결과)·team-trend(시계열)와 중복 없는 신규 지표.
+#   goal_events + match_player_stats 기반, 치른 경기(home_score NOT NULL)만 집계.
+# ═══════════════════════════════════════════════════════════════
+@app.route("/api/team-insights")
+@cached_response(ttl=3600)
+def get_team_insights():
+    team_id = request.args.get("teamId")
+    year    = request.args.get("year") or None
+    team_info = next((t for t in TEAMS if t["id"] == team_id), None)
+    if not team_info:
+        return jsonify({"error": "teamId required"}), 400
+
+    ss_id = team_info["sofascore_id"]
+    tid   = 410 if team_info.get("league") == "K1" else 777
+
+    empty = {
+        "team": team_info["name"], "team_id": team_id, "year": year or "전체",
+        "goal_timing": {"for": [0] * 6, "against": [0] * 6, "total": 0},
+        "first_goal": {"scored": {"w": 0, "d": 0, "l": 0}, "conceded": {"w": 0, "d": 0, "l": 0}},
+        "xg_cumulative": [], "scorers": [],
+        "discipline": {"games": 0, "fouls_pg": None, "fouled_pg": None, "yellow_pg": None, "reds": 0},
+    }
+    db_path = DB_PATH
+    if not os.path.exists(db_path):
+        return jsonify(empty)
+
+    yc_e = "AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?" if year else ""
+    yp   = [year] if year else []
+    conn = sqlite3.connect(db_path)
+    cur  = conn.cursor()
+
+    # ── 1) 득점·실점 시간대 분포 (15분 × 6버킷, 추가시간은 직전 버킷에) ──
+    gf_buckets = [0] * 6
+    ga_buckets = [0] * 6
+    timing_total = 0
+    try:
+        cur.execute(f"""
+            SELECT ge.minute + IFNULL(ge.added_time, 0) AS m,
+                   CASE WHEN ge.team_id = ? THEN 1 ELSE 0 END AS is_for
+            FROM goal_events ge
+            JOIN events e ON e.id = ge.event_id
+            WHERE e.tournament_id = ?
+              AND e.home_score IS NOT NULL
+              AND (e.home_team_id = ? OR e.away_team_id = ?)
+              {yc_e}
+        """, (ss_id, tid, ss_id, ss_id, *yp))
+        for m, is_for in cur.fetchall():
+            b = int((max(m or 1, 1) - 1) // 15)
+            b = 0 if b < 0 else 5 if b > 5 else b
+            (gf_buckets if is_for else ga_buckets)[b] += 1
+            timing_total += 1
+    except sqlite3.OperationalError:
+        pass  # goal_events 미존재 환경
+
+    # ── 2) 선제골 영향 (먼저 득점 vs 먼저 실점 → 경기 결과) ──
+    first_goal = {"scored": {"w": 0, "d": 0, "l": 0}, "conceded": {"w": 0, "d": 0, "l": 0}}
+    try:
+        cur.execute(f"""
+            SELECT ge.event_id, ge.team_id, ge.minute, IFNULL(ge.added_time, 0) AS at, ge.id,
+                   e.home_team_id, e.home_score, e.away_score
+            FROM goal_events ge
+            JOIN events e ON e.id = ge.event_id
+            WHERE e.tournament_id = ?
+              AND e.home_score IS NOT NULL
+              AND (e.home_team_id = ? OR e.away_team_id = ?)
+              {yc_e}
+            ORDER BY ge.event_id, ge.minute, at, ge.id
+        """, (tid, ss_id, ss_id, *yp))
+        seen = set()
+        for eid, gtid, mn, at, gid, h_id, hs, as_ in cur.fetchall():
+            if eid in seen:
+                continue  # 경기별 첫 골만
+            seen.add(eid)
+            we_home = (h_id == ss_id)
+            our = hs if we_home else as_
+            opp = as_ if we_home else hs
+            res = "w" if our > opp else "d" if our == opp else "l"
+            key = "scored" if gtid == ss_id else "conceded"
+            first_goal[key][res] += 1
+    except sqlite3.OperationalError:
+        pass
+
+    # ── 3) xG vs 실제 득점 (경기 누적) ──
+    xg_cumulative = []
+    cur.execute(f"""
+        SELECT e.id, e.date_ts,
+               SUM(mps.expected_goals) AS xg, SUM(mps.goals) AS goals
+        FROM match_player_stats mps
+        JOIN events e ON e.id = mps.event_id
+        WHERE mps.team_id = ?
+          AND e.tournament_id = ?
+          AND e.home_score IS NOT NULL
+          AND (e.home_team_id = ? OR e.away_team_id = ?)
+          {yc_e}
+        GROUP BY e.id
+        ORDER BY e.date_ts
+    """, (ss_id, tid, ss_id, ss_id, *yp))
+    cum_xg = 0.0
+    cum_g = 0
+    for i, (eid, ts, xg, goals) in enumerate(cur.fetchall(), start=1):
+        cum_xg += (xg or 0.0)
+        cum_g += (goals or 0)
+        xg_cumulative.append({"i": i, "xg": round(cum_xg, 2), "goals": cum_g})
+
+    # ── 4) 득점 기여 분포 (득점·도움 상위) ──
+    cur.execute(f"""
+        SELECT COALESCE(p.name_ko, p.name, '?') AS nm,
+               SUM(mps.goals) AS g, SUM(mps.assists) AS a
+        FROM match_player_stats mps
+        JOIN events e ON e.id = mps.event_id
+        LEFT JOIN players p ON p.id = mps.player_id
+        WHERE mps.team_id = ?
+          AND e.tournament_id = ?
+          AND e.home_score IS NOT NULL
+          AND (e.home_team_id = ? OR e.away_team_id = ?)
+          {yc_e}
+        GROUP BY mps.player_id
+        HAVING (SUM(mps.goals) + SUM(mps.assists)) > 0
+        ORDER BY g DESC, a DESC
+        LIMIT 8
+    """, (ss_id, tid, ss_id, ss_id, *yp))
+    scorers = [{"name": nm, "g": g or 0, "a": a or 0} for nm, g, a in cur.fetchall()]
+
+    # ── 5) 규율 (경기당 파울·피파울·경고, 누적 퇴장) ──
+    # 파울 미수집(NULL) 경기가 분모를 희석하지 않도록 fouls 데이터 있는 경기만 집계
+    cur.execute(f"""
+        SELECT COUNT(DISTINCT CASE WHEN mps.fouls IS NOT NULL THEN e.id END) AS games,
+               SUM(mps.fouls) AS fouls, SUM(mps.was_fouled) AS fouled,
+               SUM(mps.yellow_cards) AS yc, SUM(mps.red_cards) AS rc
+        FROM match_player_stats mps
+        JOIN events e ON e.id = mps.event_id
+        WHERE mps.team_id = ?
+          AND e.tournament_id = ?
+          AND e.home_score IS NOT NULL
+          AND (e.home_team_id = ? OR e.away_team_id = ?)
+          {yc_e}
+    """, (ss_id, tid, ss_id, ss_id, *yp))
+    dr = cur.fetchone() or (0, None, None, None, None)
+    dg = dr[0] or 0
+    # 경고/퇴장은 미수집(NULL)이면 0 오해 방지를 위해 None 유지
+    discipline = {
+        "games": dg,
+        "fouls_pg":  round(dr[1] / dg, 1) if (dg and dr[1] is not None) else None,
+        "fouled_pg": round(dr[2] / dg, 1) if (dg and dr[2] is not None) else None,
+        "yellow_pg": round(dr[3] / dg, 2) if (dg and dr[3] is not None) else None,
+        "reds":      dr[4] if dr[4] is not None else None,
+    }
+
+    conn.close()
+    return jsonify({
+        "team": team_info["name"], "team_id": team_id, "year": year or "전체",
+        "goal_timing": {"for": gf_buckets, "against": ga_buckets, "total": timing_total},
+        "first_goal": first_goal,
+        "xg_cumulative": xg_cumulative,
+        "scorers": scorers,
+        "discipline": discipline,
     })
 
 

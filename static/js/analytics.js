@@ -159,7 +159,8 @@
             fetch(`/api/team-analytics?teamId=${currentTeamId}${yp}`).then(r => r.json()),
             fetch(`/api/team-trend?teamId=${currentTeamId}${yp}`).then(r => r.json()),
             fetch(`/api/league-rankings?league=${currentLeague}${yp}`).then(r => r.json()),
-        ]).then(([analytics, trend, rankings]) => {
+            fetch(`/api/team-insights?teamId=${currentTeamId}${yp}`).then(r => r.json()).catch(() => ({})),
+        ]).then(([analytics, trend, rankings, insights]) => {
             buildYearFilter(analytics.available_years || []);
             renderIdentity(meta, analytics, trend, rankings);
             // 결과 분석
@@ -169,6 +170,8 @@
             renderHomeAway(analytics.by_year_ha || {});
             renderVsOpponents(analytics.vs_opponents || []);
             renderWeather(analytics.weather || {});
+            // 심화 인사이트
+            renderInsights(insights, meta);
             // 스킬 프로필
             renderSkill(rankings, meta);
         }).catch(err => {
@@ -442,6 +445,174 @@
             }).join("");
             return `<div class="ta-wx-group"><div class="ta-wx-title">${g.title}</div>${bars}</div>`;
         }).join("");
+    }
+
+    // ══ 심화 인사이트 ═══════════════════════════════════════════════
+    function renderInsights(ins, meta) {
+        ins = ins || {};
+        renderGoalTiming(ins.goal_timing || {}, meta);
+        renderFirstGoal(ins.first_goal || {});
+        renderXgCumulative(ins.xg_cumulative || [], meta);
+        renderScorers(ins.scorers || [], meta);
+        renderDiscipline(ins.discipline || {});
+    }
+
+    const TIMING_LABELS = ["0-15", "16-30", "31-45", "46-60", "61-75", "76+"];
+
+    // ① 득점·실점 시간대 (15분 × 6버킷)
+    function renderGoalTiming(gt, meta) {
+        destroyChart("ta-timing");
+        const el = document.getElementById("ta-timing");
+        const forA = gt.for || [], agA = gt.against || [];
+        if (!gt.total) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>골 데이터 없음</p>"; return; }
+        const ink = readableInk(meta.primary || "#4ea4f8");
+        charts["ta-timing"] = new Chart(el, {
+            type: "bar",
+            data: {
+                labels: TIMING_LABELS,
+                datasets: [
+                    { label: "득점", data: forA, backgroundColor: "rgba(52,211,153,0.85)", borderRadius: 3, maxBarThickness: 26 },
+                    { label: "실점", data: agA, backgroundColor: "rgba(240,90,80,0.8)", borderRadius: 3, maxBarThickness: 26 },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    ...BASE_PLUGINS,
+                    tooltip: { ...BASE_PLUGINS.tooltip, callbacks: { title: items => items[0].label + "분", label: c => `${c.dataset.label} ${c.parsed.y}골` } }
+                },
+                scales: {
+                    x: { ticks: { color: "#c0d0e0", font: { size: 10 } }, grid: { display: false } },
+                    y: { beginAtZero: true, ticks: { color: "#7a8fa8", font: { size: 10 }, precision: 0, stepSize: 1 }, grid: { color: "rgba(255,255,255,0.06)" } }
+                }
+            }
+        });
+    }
+
+    // ② 선제골 영향 (선제 득점 시 / 선제 실점 시 → W/D/L)
+    function renderFirstGoal(fg) {
+        destroyChart("ta-firstgoal");
+        const el = document.getElementById("ta-firstgoal");
+        const s = fg.scored || { w: 0, d: 0, l: 0 }, c = fg.conceded || { w: 0, d: 0, l: 0 };
+        const totalN = s.w + s.d + s.l + c.w + c.d + c.l;
+        if (!totalN) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>선제골 데이터 없음</p>"; return; }
+        charts["ta-firstgoal"] = new Chart(el, {
+            type: "bar",
+            data: {
+                labels: ["선제 득점 시", "선제 실점 시"],
+                datasets: [
+                    { label: "승", data: [s.w, c.w], backgroundColor: "rgba(52,211,153,0.88)" },
+                    { label: "무", data: [s.d, c.d], backgroundColor: "rgba(150,160,180,0.6)" },
+                    { label: "패", data: [s.l, c.l], backgroundColor: "rgba(240,90,80,0.82)" },
+                ]
+            },
+            options: {
+                indexAxis: "y", responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    ...BASE_PLUGINS,
+                    tooltip: {
+                        ...BASE_PLUGINS.tooltip,
+                        callbacks: {
+                            label: c => `${c.dataset.label} ${c.parsed.x}경기`,
+                            afterBody: items => {
+                                const col = items[0].dataIndex === 0 ? s : c;
+                                const g = col.w + col.d + col.l;
+                                return g ? `승률 ${Math.round(col.w / g * 100)}%` : "";
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { stacked: true, beginAtZero: true, ticks: { color: "#7a8fa8", font: { size: 10 }, precision: 0, stepSize: 1 }, grid: { color: "rgba(255,255,255,0.06)" } },
+                    y: { stacked: true, ticks: { color: "#c0d0e0", font: { size: 11 } }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // ③ xG vs 실제 득점 (누적 라인)
+    function renderXgCumulative(rows, meta) {
+        destroyChart("ta-xg");
+        const el = document.getElementById("ta-xg");
+        const scope = document.getElementById("ta-xg-scope");
+        if (!rows.length) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>xG 데이터 없음</p>"; if (scope) scope.textContent = ""; return; }
+        const last = rows[rows.length - 1];
+        const diff = (last.goals - last.xg);
+        if (scope) scope.textContent = `실득점 ${last.goals} vs xG ${last.xg.toFixed(1)} (${diff >= 0 ? "+" : ""}${diff.toFixed(1)})`;
+        const ink = readableInk(meta.primary || "#34d399");
+        charts["ta-xg"] = new Chart(el, {
+            data: {
+                labels: rows.map(r => `${r.i}R`),
+                datasets: [
+                    { type: "line", label: "실제 득점(누적)", data: rows.map(r => r.goals), borderColor: ink, backgroundColor: ink, tension: 0.25, pointRadius: 0, borderWidth: 2.6 },
+                    { type: "line", label: "xG(누적)", data: rows.map(r => r.xg), borderColor: "#fbbf24", backgroundColor: "rgba(251,191,36,0.12)", borderDash: [5, 4], tension: 0.25, pointRadius: 0, borderWidth: 2, fill: false },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    ...BASE_PLUGINS,
+                    tooltip: { ...BASE_PLUGINS.tooltip, callbacks: { label: c => `${c.dataset.label}: ${(+c.parsed.y).toFixed(1)}` } }
+                },
+                scales: {
+                    x: { ticks: { color: "#7a8fa8", font: { size: 9 }, maxRotation: 0, autoSkipPadding: 16 }, grid: { display: false } },
+                    y: { beginAtZero: true, ticks: { color: "#9fb2c8", font: { size: 10 } }, grid: { color: "rgba(255,255,255,0.06)" } }
+                }
+            }
+        });
+    }
+
+    // ④ 득점 기여 분포 (선수별 득점+도움, 가로 스택)
+    function renderScorers(rows, meta) {
+        destroyChart("ta-scorers");
+        const wrap = document.getElementById("ta-scorers-wrap");
+        if (!rows.length) { wrap.innerHTML = "<p class='chart-empty'>득점 기록 없음</p>"; return; }
+        if (!wrap.querySelector("canvas")) wrap.innerHTML = '<canvas id="ta-scorers"></canvas>';
+        const el = document.getElementById("ta-scorers");
+        const barH = clamp(220 / rows.length, 20, 34);
+        wrap.style.height = (rows.length * barH + 46) + "px";
+        const ink = readableInk(meta.primary || "#a78bfa");
+        charts["ta-scorers"] = new Chart(el, {
+            type: "bar",
+            data: {
+                labels: rows.map(r => r.name),
+                datasets: [
+                    { label: "득점", data: rows.map(r => r.g), backgroundColor: hexToRgba(meta.primary || "#a78bfa", 0.92) },
+                    { label: "도움", data: rows.map(r => r.a), backgroundColor: hexToRgba(meta.primary || "#a78bfa", 0.4) },
+                ]
+            },
+            options: {
+                indexAxis: "y", responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    ...BASE_PLUGINS,
+                    tooltip: { ...BASE_PLUGINS.tooltip, callbacks: { label: c => `${c.dataset.label} ${c.parsed.x}`, afterBody: items => { const r = rows[items[0].dataIndex]; return `공격P ${r.g + r.a}`; } } }
+                },
+                scales: {
+                    x: { stacked: true, beginAtZero: true, ticks: { color: "#7a8fa8", font: { size: 10 }, precision: 0, stepSize: 1 }, grid: { color: "rgba(255,255,255,0.06)" } },
+                    y: { stacked: true, ticks: { color: "#dbe4f0", font: { size: 11, weight: "600" } }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // ⑤ 파울 성향 (경기당 파울 vs 피파울)
+    function renderDiscipline(d) {
+        const host = document.getElementById("ta-discipline");
+        if (!d.games || d.fouls_pg == null) { host.innerHTML = "<p class='chart-empty'>파울 데이터 없음</p>"; return; }
+        const f = d.fouls_pg, fd = d.fouled_pg != null ? d.fouled_pg : 0;
+        const mx = Math.max(f, fd, 1);
+        const row = (label, val, color) => `
+            <div class="ta-foul-row">
+                <span class="ta-foul-label">${label}</span>
+                <div class="ta-foul-track"><div class="ta-foul-bar" style="width:${Math.round(val / mx * 100)}%;background:${color}"></div></div>
+                <span class="ta-foul-val">${val.toFixed(1)}</span>
+            </div>`;
+        const net = (fd - f);
+        host.innerHTML =
+            row("내 파울", f, "rgba(240,130,90,0.85)") +
+            row("피파울", fd, "rgba(96,165,250,0.85)") +
+            `<div class="ta-foul-note">${net >= 0 ? `피파울이 경기당 ${net.toFixed(1)}회 많음 — 상대 반칙을 더 유도` : `내 파울이 경기당 ${(-net).toFixed(1)}회 많음 — 거친 편`} · ${d.games}경기</div>`;
     }
 
     // ── 스킬 프로필 (레이더 + 지표 바) ────────────────────────────

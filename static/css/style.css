@@ -8636,6 +8636,15 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ta-rank-na { color: var(--text-faint); font-size: 0.7rem; font-weight: 600; }
 .ta-mb-avg-txt { font-size: 0.68rem; color: var(--text-faint); }
 
+/* 심화 인사이트 — 파울 성향 */
+#ta-discipline { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; }
+.ta-foul-row { display: flex; align-items: center; gap: 10px; }
+.ta-foul-label { flex: 0 0 60px; font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; }
+.ta-foul-track { flex: 1; height: 14px; background: rgba(255,255,255,0.06); border-radius: 7px; overflow: hidden; }
+.ta-foul-bar { height: 100%; border-radius: 7px; transition: width 0.5s ease; }
+.ta-foul-val { flex: 0 0 40px; text-align: right; font-size: 0.9rem; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.ta-foul-note { font-size: 0.72rem; color: var(--text-faint); margin-top: 4px; line-height: 1.5; }
+
 .ta-empty { padding: 60px 20px; text-align: center; color: var(--text-muted); font-size: 0.95rem; }
 
 /* ── '🛡 팀' 탭 모드 토글 (단일 팀 분석 ↔ 팀 비교) ── */
