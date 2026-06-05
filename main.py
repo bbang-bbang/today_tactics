@@ -1925,7 +1925,6 @@ def get_team_insights():
         "goal_timing": {"for": [0] * 6, "against": [0] * 6, "total": 0},
         "first_goal": {"scored": {"w": 0, "d": 0, "l": 0}, "conceded": {"w": 0, "d": 0, "l": 0}},
         "xg_cumulative": [], "scorers": [],
-        "discipline": {"games": 0, "fouls_pg": None, "fouled_pg": None, "yellow_pg": None, "reds": 0},
     }
     db_path = DB_PATH
     if not os.path.exists(db_path):
@@ -2028,31 +2027,6 @@ def get_team_insights():
     """, (ss_id, tid, ss_id, ss_id, *yp))
     scorers = [{"name": nm, "g": g or 0, "a": a or 0} for nm, g, a in cur.fetchall()]
 
-    # ── 5) 규율 (경기당 파울·피파울·경고, 누적 퇴장) ──
-    # 파울 미수집(NULL) 경기가 분모를 희석하지 않도록 fouls 데이터 있는 경기만 집계
-    cur.execute(f"""
-        SELECT COUNT(DISTINCT CASE WHEN mps.fouls IS NOT NULL THEN e.id END) AS games,
-               SUM(mps.fouls) AS fouls, SUM(mps.was_fouled) AS fouled,
-               SUM(mps.yellow_cards) AS yc, SUM(mps.red_cards) AS rc
-        FROM match_player_stats mps
-        JOIN events e ON e.id = mps.event_id
-        WHERE mps.team_id = ?
-          AND e.tournament_id = ?
-          AND e.home_score IS NOT NULL
-          AND (e.home_team_id = ? OR e.away_team_id = ?)
-          {yc_e}
-    """, (ss_id, tid, ss_id, ss_id, *yp))
-    dr = cur.fetchone() or (0, None, None, None, None)
-    dg = dr[0] or 0
-    # 경고/퇴장은 미수집(NULL)이면 0 오해 방지를 위해 None 유지
-    discipline = {
-        "games": dg,
-        "fouls_pg":  round(dr[1] / dg, 1) if (dg and dr[1] is not None) else None,
-        "fouled_pg": round(dr[2] / dg, 1) if (dg and dr[2] is not None) else None,
-        "yellow_pg": round(dr[3] / dg, 2) if (dg and dr[3] is not None) else None,
-        "reds":      dr[4] if dr[4] is not None else None,
-    }
-
     conn.close()
     return jsonify({
         "team": team_info["name"], "team_id": team_id, "year": year or "전체",
@@ -2060,7 +2034,6 @@ def get_team_insights():
         "first_goal": first_goal,
         "xg_cumulative": xg_cumulative,
         "scorers": scorers,
-        "discipline": discipline,
     })
 
 

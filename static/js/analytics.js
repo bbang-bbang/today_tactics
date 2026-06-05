@@ -454,7 +454,6 @@
         renderFirstGoal(ins.first_goal || {});
         renderXgCumulative(ins.xg_cumulative || [], meta);
         renderScorers(ins.scorers || [], meta);
-        renderDiscipline(ins.discipline || {});
     }
 
     const TIMING_LABELS = ["0-15", "16-30", "31-45", "46-60", "61-75", "76+"];
@@ -594,25 +593,6 @@
                 }
             }
         });
-    }
-
-    // ⑤ 파울 성향 (경기당 파울 vs 피파울)
-    function renderDiscipline(d) {
-        const host = document.getElementById("ta-discipline");
-        if (!d.games || d.fouls_pg == null) { host.innerHTML = "<p class='chart-empty'>파울 데이터 없음</p>"; return; }
-        const f = d.fouls_pg, fd = d.fouled_pg != null ? d.fouled_pg : 0;
-        const mx = Math.max(f, fd, 1);
-        const row = (label, val, color) => `
-            <div class="ta-foul-row">
-                <span class="ta-foul-label">${label}</span>
-                <div class="ta-foul-track"><div class="ta-foul-bar" style="width:${Math.round(val / mx * 100)}%;background:${color}"></div></div>
-                <span class="ta-foul-val">${val.toFixed(1)}</span>
-            </div>`;
-        const net = (fd - f);
-        host.innerHTML =
-            row("내 파울", f, "rgba(240,130,90,0.85)") +
-            row("피파울", fd, "rgba(96,165,250,0.85)") +
-            `<div class="ta-foul-note">${net >= 0 ? `피파울이 경기당 ${net.toFixed(1)}회 많음 — 상대 반칙을 더 유도` : `내 파울이 경기당 ${(-net).toFixed(1)}회 많음 — 거친 편`} · ${d.games}경기</div>`;
     }
 
     // ── 스킬 프로필 (레이더 + 지표 바) ────────────────────────────
