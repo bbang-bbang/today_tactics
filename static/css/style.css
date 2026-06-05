@@ -8545,6 +8545,8 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ta-stat-val { font-size: 1.32rem; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .ta-stat-label { font-size: 0.68rem; color: var(--text-muted); font-weight: 700; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
 .ta-stat-sub { font-size: 0.66rem; color: var(--text-faint); margin-top: 2px; }
+.ta-stat-rank { font-size: 0.66rem; font-weight: 800; margin-top: 3px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.ta-stat-rank small { font-weight: 600; font-size: 0.85em; opacity: 0.75; }
 
 /* 탭 */
 .ta-tabs { display: flex; gap: 8px; }

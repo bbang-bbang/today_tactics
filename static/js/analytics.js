@@ -161,9 +161,10 @@
             fetch(`/api/league-rankings?league=${currentLeague}${yp}`).then(r => r.json()),
         ]).then(([analytics, trend, rankings]) => {
             buildYearFilter(analytics.available_years || []);
-            renderIdentity(meta, analytics, trend);
+            renderIdentity(meta, analytics, trend, rankings);
             // 결과 분석
             renderTrend(trend, meta);
+            renderMargin(trend, meta);
             renderMonth(analytics.by_month || []);
             renderHomeAway(analytics.by_year_ha || {});
             renderVsOpponents(analytics.vs_opponents || []);
@@ -176,8 +177,26 @@
         });
     }
 
+    // 리그 순위 조회 (rankings 페이로드 → {rank, total, pctl} | null)
+    function leagueRank(rankings, key) {
+        if (!rankings) return null;
+        const me = (rankings.teams || []).find(t => t.id === currentTeamId);
+        const rank = me && me.ranks ? me.ranks[key] : null;
+        const total = (rankings.totals || {})[key] || 0;
+        if (!rank || total < 2) return null;
+        return { rank, total, pctl: Math.round((total - rank) / (total - 1) * 100) };
+    }
+    // 순위 → 색 (상위=초록 / 중위=노랑 / 하위=빨강)
+    function rankColor(pctl) {
+        return pctl >= 66 ? "#7bed9f" : pctl >= 33 ? "#ffd77a" : "#f87171";
+    }
+    function rankChip(r) {
+        if (!r) return "";
+        return `<div class="ta-stat-rank" style="color:${rankColor(r.pctl)}">리그 ${r.rank}<small>/${r.total}위</small></div>`;
+    }
+
     // ── 아이덴티티 + 시즌 요약 ────────────────────────────────────
-    function renderIdentity(meta, analytics, trend) {
+    function renderIdentity(meta, analytics, trend, rankings) {
         const emblem = document.getElementById("ta-emblem");
         if (meta.emblem) {
             emblem.src = `/static/img/emblems/${meta.emblem}`;
@@ -198,12 +217,13 @@
         });
         const g = ms.length, pts = w * 3 + d;
         const ppg = g ? (pts / g) : 0;
+        // 경기당 득점/실점/폼은 리그 순위 칩으로 "전체 중 몇 위" 즉시 전달
         const summary = [
             { label: "경기", val: g, sub: "" },
             { label: "승점", val: pts, sub: `${ppg.toFixed(2)} PPG` },
             { label: "전적", val: `${w}-${d}-${l}`, sub: `승률 ${winPct(w, g)}%`, wide: true },
-            { label: "득점", val: gf, sub: g ? `${(gf / g).toFixed(2)}/경기` : "" },
-            { label: "실점", val: ga, sub: g ? `${(ga / g).toFixed(2)}/경기` : "" },
+            { label: "득점", val: gf, sub: g ? `${(gf / g).toFixed(2)}/경기` : "", rank: leagueRank(rankings, "gf_per_game") },
+            { label: "실점", val: ga, sub: g ? `${(ga / g).toFixed(2)}/경기` : "", rank: leagueRank(rankings, "ga_per_game") },
             { label: "득실차", val: (gf - ga >= 0 ? "+" : "") + (gf - ga), sub: "" },
         ];
         document.getElementById("ta-summary").innerHTML = summary.map(s => `
@@ -211,6 +231,7 @@
                 <div class="ta-stat-val">${s.val}</div>
                 <div class="ta-stat-label">${s.label}</div>
                 ${s.sub ? `<div class="ta-stat-sub">${s.sub}</div>` : ""}
+                ${rankChip(s.rank)}
             </div>`).join("");
 
         // 최근 5경기 폼 (최신이 오른쪽)
@@ -259,6 +280,63 @@
                     x: { ticks: { color: "#7a8fa8", font: { size: 9 }, maxRotation: 0, autoSkipPadding: 16 }, grid: { display: false } },
                     yGoals: { position: "left", beginAtZero: true, ticks: { color: "#9fb2c8", font: { size: 10 }, precision: 0 }, grid: { color: "rgba(255,255,255,0.06)" } },
                     yPts: { position: "right", beginAtZero: true, ticks: { color: hexToRgba(meta.primary || "#4ea4f8", 0.9), font: { size: 10 } }, grid: { display: false } },
+                }
+            }
+        });
+    }
+
+    // ── 결과 ①-b 득실 마진 분포 (점수차별 경기 수) ───────────────
+    function renderMargin(trend, meta) {
+        destroyChart("ta-margin");
+        const el = document.getElementById("ta-margin");
+        const ms = trend.matches || [];
+        const scope = document.getElementById("ta-margin-scope");
+        if (!ms.length) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>데이터 없음</p>"; if (scope) scope.textContent = ""; return; }
+
+        // 점수차 → 7버킷: 대승(3+) · 2점차승 · 1점차승 · 무 · 1점차패 · 2점차패 · 대패(3+)
+        const labels = ["3+점차\n승", "2점차\n승", "1점차\n승", "무", "1점차\n패", "2점차\n패", "3+점차\n패"];
+        const counts = [0, 0, 0, 0, 0, 0, 0];
+        ms.forEach(m => {
+            const d = m.gf - m.ga;
+            const idx = d >= 3 ? 0 : d === 2 ? 1 : d === 1 ? 2 : d === 0 ? 3 : d === -1 ? 4 : d === -2 ? 5 : 6;
+            counts[idx]++;
+        });
+        const colors = [
+            "rgba(16,185,129,0.95)", "rgba(52,211,153,0.85)", "rgba(110,231,183,0.7)",
+            "rgba(150,160,180,0.55)",
+            "rgba(248,170,120,0.78)", "rgba(240,110,90,0.85)", "rgba(220,60,60,0.95)",
+        ];
+        const total = ms.length;
+        const wins = counts[0] + counts[1] + counts[2];
+        const losses = counts[4] + counts[5] + counts[6];
+        const big = counts[0], narrow = counts[2];
+        if (scope) {
+            scope.textContent = wins >= losses
+                ? (big > narrow ? "압도형 — 대승 多" : narrow >= big && narrow > 0 ? "살얼음형 — 1점차 승 多" : "")
+                : (counts[6] > counts[4] ? "취약 — 대패 多" : "");
+        }
+
+        charts["ta-margin"] = new Chart(el, {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [{ label: "경기 수", data: counts, backgroundColor: colors, borderRadius: 4, maxBarThickness: 44 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    ...BASE_PLUGINS, legend: { display: false },
+                    tooltip: {
+                        ...BASE_PLUGINS.tooltip,
+                        callbacks: {
+                            title: items => items[0].label.replace(/\n/g, " "),
+                            label: c => `${c.parsed.y}경기 (${total ? Math.round(c.parsed.y / total * 100) : 0}%)`
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: "#c0d0e0", font: { size: 10 } }, grid: { display: false } },
+                    y: { beginAtZero: true, ticks: { color: "#7a8fa8", font: { size: 10 }, precision: 0, stepSize: 1 }, grid: { color: "rgba(255,255,255,0.06)" } }
                 }
             }
         });
@@ -324,51 +402,14 @@
 
     // ── 결과 ④ 상대팀별 전적 ──────────────────────────────────────
     function renderVsOpponents(rows) {
-        destroyChart("ta-vs");
-        const wrap = document.getElementById("ta-vs-wrap");
         const tbl = document.getElementById("ta-vs-table");
-        if (!rows.length) {
-            wrap.innerHTML = "<p class='chart-empty'>데이터 없음</p>"; tbl.innerHTML = ""; return;
-        }
-        if (!wrap.querySelector("canvas")) wrap.innerHTML = '<canvas id="ta-vs"></canvas>';
-        const el = document.getElementById("ta-vs");
+        if (!rows.length) { tbl.innerHTML = "<tr><td class='chart-empty'>데이터 없음</td></tr>"; return; }
 
-        const sorted = [...rows].sort((a, b) => winPct(a.w, a.games) - winPct(b.w, b.games));
-        const labels = sorted.map(r => r.name);
-        const barH = clamp(360 / sorted.length, 22, 40);
-        wrap.style.height = (sorted.length * barH + 56) + "px";
-
-        charts["ta-vs"] = new Chart(el, {
-            type: "bar",
-            data: {
-                labels,
-                datasets: [
-                    { label: "승", data: sorted.map(r => winPct(r.w, r.games)), backgroundColor: sorted.map(r => winColor(winPct(r.w, r.games))) },
-                    { label: "무", data: sorted.map(r => winPct(r.d, r.games)), backgroundColor: "rgba(120,130,150,0.6)" },
-                    { label: "패", data: sorted.map(r => winPct(r.l, r.games)), backgroundColor: "rgba(220,70,70,0.7)" },
-                ]
-            },
-            options: {
-                indexAxis: "y", responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    ...BASE_PLUGINS,
-                    tooltip: {
-                        ...BASE_PLUGINS.tooltip,
-                        callbacks: {
-                            label: c => `${c.dataset.label}: ${c.parsed.x}%`,
-                            afterBody: items => { const r = sorted[items[0].dataIndex]; return [`${r.games}경기  ${r.w}승 ${r.d}무 ${r.l}패`, `득실 ${r.gf}:${r.ga} (${r.gf - r.ga >= 0 ? "+" : ""}${r.gf - r.ga})`]; }
-                        }
-                    }
-                },
-                scales: {
-                    x: { stacked: true, max: 100, ticks: { color: "#7a8fa8", font: { size: 10 }, callback: v => v + "%" }, grid: { color: "rgba(255,255,255,0.06)" } },
-                    y: { stacked: true, ticks: { color: "#c0d0e0", font: { size: 11 } }, grid: { display: false } }
-                }
-            }
-        });
+        // 승률 높은 상대 → 낮은 순 (만만한 상대가 위)
+        const sorted = [...rows].sort((a, b) => winPct(b.w, b.games) - winPct(a.w, a.games));
 
         tbl.innerHTML = `<tr><th>상대팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>승률</th></tr>` +
-            [...sorted].reverse().map(r => {
+            sorted.map(r => {
                 const p = winPct(r.w, r.games);
                 return `<tr>
                     <td class="ta-vs-name">${r.name}</td><td>${r.games}</td>
