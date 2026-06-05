@@ -495,6 +495,27 @@
         const s = fg.scored || { w: 0, d: 0, l: 0 }, c = fg.conceded || { w: 0, d: 0, l: 0 };
         const totalN = s.w + s.d + s.l + c.w + c.d + c.l;
         if (!totalN) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>선제골 데이터 없음</p>"; return; }
+        const rowsFG = [
+            { idx: 0, w: s.w, g: s.w + s.d + s.l },
+            { idx: 1, w: c.w, g: c.w + c.d + c.l },
+        ];
+        // 막대 끝에 승률 % 라벨 (외부 플러그인 없이 인라인)
+        const winLabelPlugin = {
+            id: "fgWinLabel",
+            afterDatasetsDraw(chart) {
+                const { ctx, scales: { x, y } } = chart;
+                ctx.save();
+                ctx.font = "800 12px 'Pretendard', system-ui, sans-serif";
+                ctx.textBaseline = "middle";
+                rowsFG.forEach(r => {
+                    if (!r.g) return;
+                    const pct = Math.round(r.w / r.g * 100);
+                    ctx.fillStyle = pct >= 50 ? "#7bed9f" : pct >= 30 ? "#ffd77a" : "#f87171";
+                    ctx.fillText(`승률 ${pct}%`, x.getPixelForValue(r.g) + 8, y.getPixelForValue(r.idx));
+                });
+                ctx.restore();
+            }
+        };
         charts["ta-firstgoal"] = new Chart(el, {
             type: "bar",
             data: {
@@ -505,8 +526,10 @@
                     { label: "패", data: [s.l, c.l], backgroundColor: "rgba(240,90,80,0.82)" },
                 ]
             },
+            plugins: [winLabelPlugin],
             options: {
                 indexAxis: "y", responsive: true, maintainAspectRatio: false,
+                layout: { padding: { right: 56 } },   // 승률 라벨 공간 확보
                 plugins: {
                     ...BASE_PLUGINS,
                     tooltip: {
