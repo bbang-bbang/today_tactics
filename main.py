@@ -5020,43 +5020,6 @@ def insights_clutch():
     return jsonify({"late_top": late_top, "decisive_top": decisive_top, "timeline": timeline})
 
 
-@app.route("/api/insights/form")
-@cached_response(ttl=1800)
-def insights_form():
-    """폼 트렌드 — 최근 5경기 평점 vs 시즌 평점 (상승/하락세)."""
-    year = request.args.get("year", "2026")
-    league = request.args.get("league", "all")
-    date_cond, date_params = _year_date_params(year)
-    league_cond, league_params = _league_team_filter(league)
-    conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
-    rows = conn.execute(f"""
-        WITH rated AS (
-            SELECT m.player_id, m.team_id, m.rating,
-                   ROW_NUMBER() OVER (PARTITION BY m.player_id ORDER BY m.match_date DESC) rn,
-                   AVG(m.rating) OVER (PARTITION BY m.player_id) season_avg,
-                   COUNT(*) OVER (PARTITION BY m.player_id) games
-            FROM match_player_stats m
-            WHERE m.rating IS NOT NULL AND m.minutes_played > 0 {date_cond} {league_cond}
-        )
-        SELECT r.player_id, COALESCE(p.name_ko, p.name) name, r.team_id,
-               MAX(r.games) games, ROUND(AVG(r.season_avg), 2) season_avg,
-               ROUND(AVG(CASE WHEN r.rn <= 5 THEN r.rating END), 2) last5
-        FROM rated r LEFT JOIN players p ON r.player_id = p.id
-        GROUP BY r.player_id HAVING games >= 6
-    """, tuple(date_params) + tuple(league_params)).fetchall()
-    items = []
-    for r in rows:
-        if r["last5"] is None or r["season_avg"] is None:
-            continue
-        items.append({"name": r["name"] or "", "team": _ko_team(r["team_id"], ""),
-                      "season_avg": r["season_avg"], "last5": r["last5"],
-                      "delta": round(r["last5"] - r["season_avg"], 2), "games": r["games"]})
-    rising = sorted([x for x in items if x["delta"] > 0], key=lambda x: -x["delta"])[:6]
-    falling = sorted([x for x in items if x["delta"] < 0], key=lambda x: x["delta"])[:6]
-    conn.close()
-    return jsonify({"rising": rising, "falling": falling})
-
-
 @app.route("/api/insights/shooting")
 @cached_response(ttl=1800)
 def insights_shooting():
@@ -8158,7 +8121,6 @@ def _warm_cache():
         "http://127.0.0.1:5000/api/insights/top-performers?year=2026&league=all",
         "http://127.0.0.1:5000/api/insights/weather?year=2026&league=all",
         "http://127.0.0.1:5000/api/insights/clutch?year=2026&league=all",
-        "http://127.0.0.1:5000/api/insights/form?year=2026&league=all",
         "http://127.0.0.1:5000/api/insights/card-rankings?year=2026&league=all",
     ]
     _t.sleep(2)  # 서버 listen 대기 (3→2초)
