@@ -5275,47 +5275,6 @@ def insights_substitution():
                     "avg_first": avg_first, "injury_subs": inj})
 
 
-@app.route("/api/team-formation")
-@cached_response(ttl=1800)
-def team_formation():
-    """팀 실제 평균 포메이션 — match_avg_positions에서 팀 주전(선발) 선수의 시즌 평균 위치.
-    좌표는 팀 공격 방향 기준 정규화(x=자기 골문 0 → 공격 100, y=좌우 폭 0~100). x,y는 0~1로 반환."""
-    team_id = request.args.get("teamId")
-    year = request.args.get("year")
-    try:
-        team_id = int(team_id)
-    except (TypeError, ValueError):
-        return jsonify({"players": [], "formation": ""})
-    conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
-    params = [team_id]
-    year_cond = ""
-    if year and year not in ("전체", "all"):
-        year_cond = " AND strftime('%Y', datetime(e.date_ts, 'unixepoch', 'localtime')) = ?"
-        params.append(str(year))
-    rows = conn.execute(f"""
-        SELECT COALESCE(p.name_ko, p.name) name, p.position pos,
-               AVG(a.x) ax, AVG(a.y) ay, COUNT(DISTINCT a.event_id) apps
-        FROM match_avg_positions a
-        JOIN events e ON e.id = a.event_id
-        LEFT JOIN players p ON p.id = a.player_id
-        WHERE a.is_substitute = 0
-          AND (CASE WHEN a.is_home = 1 THEN e.home_team_id ELSE e.away_team_id END) = ?
-          {year_cond}
-        GROUP BY a.player_id HAVING apps >= 3
-        ORDER BY apps DESC, name LIMIT 11
-    """, tuple(params)).fetchall()
-    players = [{"name": r["name"] or "", "pos": r["pos"] or "",
-                "x": round((r["ax"] or 0) / 100.0, 4),
-                "y": round((r["ay"] or 0) / 100.0, 4),
-                "apps": r["apps"]} for r in rows]
-    # 라인별 인원으로 포메이션 라벨 추정 (GK 제외 D-M-F)
-    from collections import Counter
-    cnt = Counter(pl["pos"] for pl in players if pl["pos"] in ("D", "M", "F"))
-    formation = "-".join(str(cnt[k]) for k in ("D", "M", "F") if cnt.get(k)) if cnt else ""
-    conn.close()
-    return jsonify({"players": players, "formation": formation})
-
-
 @app.route("/api/insights/card-rankings")
 @cached_response(ttl=1800)
 def insights_card_rankings():

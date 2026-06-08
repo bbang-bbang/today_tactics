@@ -5971,15 +5971,6 @@ body.pr-expanded-lock {
 .ins-cv-bar { height: 100%; min-width: 3px; border-radius: 5px; background: linear-gradient(90deg, #6fb4ff, #3d7fd6); transition: width .5s cubic-bezier(.22,1,.36,1); }
 .ins-cv-pct { font-size: 0.78rem; font-weight: 800; color: #7ecfff; text-align: right; font-variant-numeric: tabular-nums; }
 .ins-cv-sub { font-size: 0.66rem; color: #8aa0b8; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* 실제 평균 포메이션 — CSS 피치 + 절대배치 점 (Canvas 미사용) */
-.ta-formation { position: relative; }
-.taf-pitch { position: relative; width: 100%; max-width: 330px; margin: 6px auto 2px; aspect-ratio: 68 / 100; background: linear-gradient(0deg, #1c7340 0%, #2a9655 100%); border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; overflow: hidden; }
-.taf-pitch::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(255,255,255,0.28); }
-.taf-pitch::after { content: ""; position: absolute; left: 50%; top: 50%; width: 24%; aspect-ratio: 1; transform: translate(-50%,-50%); border: 1px solid rgba(255,255,255,0.28); border-radius: 50%; }
-.taf-dot { position: absolute; transform: translate(-50%,-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: auto; }
-.taf-mark { width: 15px; height: 15px; border-radius: 50%; background: var(--taf-c, #4ea4f8); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.55); }
-.taf-name { font-size: 0.6rem; font-weight: 600; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); white-space: nowrap; }
-.taf-empty { padding: 22px 10px; text-align: center; color: #8aa0b8; font-size: 0.8rem; }
 @media (max-width: 760px) { .ins-adv-grid { grid-template-columns: 1fr; } }
 /* 산식/근거 캡션 — 신빙성 표시 */
 .ins-method { margin-top: 9px; padding-top: 7px; border-top: 1px dashed rgba(255,255,255,0.10); font-size: 0.68rem; color: #8090a6; line-height: 1.5; }

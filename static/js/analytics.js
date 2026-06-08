@@ -160,8 +160,7 @@
             fetch(`/api/team-trend?teamId=${currentTeamId}${yp}`).then(r => r.json()),
             fetch(`/api/league-rankings?league=${currentLeague}${yp}`).then(r => r.json()),
             fetch(`/api/team-insights?teamId=${currentTeamId}${yp}`).then(r => r.json()).catch(() => ({})),
-            fetch(`/api/team-formation?teamId=${currentTeamId}${yp}`).then(r => r.json()).catch(() => ({})),
-        ]).then(([analytics, trend, rankings, insights, formation]) => {
+        ]).then(([analytics, trend, rankings, insights]) => {
             buildYearFilter(analytics.available_years || []);
             renderIdentity(meta, analytics, trend, rankings);
             // 결과 분석
@@ -172,7 +171,6 @@
             renderVsOpponents(analytics.vs_opponents || []);
             renderWeather(analytics.weather || {});
             // 심화 인사이트
-            renderFormation(formation, meta);
             renderInsights(insights, meta);
             // 스킬 프로필
             renderSkill(rankings, meta);
@@ -180,29 +178,6 @@
             document.getElementById("ta-team-name").textContent = "데이터 로드 실패";
             console.error("[team-analysis]", err);
         });
-    }
-
-    // ── 실제 평균 포메이션 (match_avg_positions) ──────────────────
-    function renderFormation(data, meta) {
-        const el = document.getElementById("ta-formation-pitch"); if (!el) return;
-        const label = document.getElementById("ta-formation-label");
-        const players = (data && data.players) || [];
-        const color = (meta && (meta.primary || meta.color)) || "#4ea4f8";
-        if (!players.length) {
-            el.innerHTML = '<div class="taf-empty">평균 위치 데이터 없음</div>';
-            if (label) label.textContent = "";
-            return;
-        }
-        const POS_KO = { G: "GK", D: "수비", M: "미드", F: "공격" };
-        const dots = players.map(p => {
-            const top = (100 - p.x * 100);   // x=0(자기 골문) → 하단
-            const left = p.y * 100;
-            const nm = (p.name || "").length > 5 ? p.name.slice(0, 5) : (p.name || "");
-            return `<div class="taf-dot" style="top:${top.toFixed(1)}%;left:${left.toFixed(1)}%;--taf-c:${color}" title="${p.name} · ${POS_KO[p.pos] || p.pos} · ${p.apps}경기 선발">
-                <span class="taf-mark"></span><span class="taf-name">${nm}</span></div>`;
-        }).join("");
-        el.innerHTML = `<div class="taf-pitch">${dots}</div>`;
-        if (label) label.textContent = data.formation ? `주력 ${data.formation}` : "";
     }
 
     // 리그 순위 조회 (rankings 페이로드 → {rank, total, pctl} | null)
