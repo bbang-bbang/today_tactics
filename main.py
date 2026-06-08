@@ -5104,6 +5104,90 @@ def insights_activity():
     return jsonify({"top": top})
 
 
+@app.route("/api/insights/shooting")
+@cached_response(ttl=1800)
+def insights_shooting():
+    """슈팅 인사이트 — match_shotmap 기반. 결과 깔때기 + 상황(오픈/세트피스)·바디파트·
+    거리존별 결정률. 기존 인사이트(누적 스탯)와 달리 슛 위치·상황 등 shotmap 고유 차원만 사용.
+    x = 골문과의 거리(검증: goal 평균 x 최소). year + league 필터 지원."""
+    year = request.args.get("year", "2026")
+    league = request.args.get("league", "all")
+    tid = _league_tid(league)
+    conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+    conds = []; params = []
+    if tid is not None:
+        conds.append("e.tournament_id = ?"); params.append(tid)
+    if year and year != "all":
+        conds.append("strftime('%Y', datetime(e.date_ts, 'unixepoch', 'localtime')) = ?")
+        params.append(str(year))
+    where = (" AND " + " AND ".join(conds)) if conds else ""
+    base = f"FROM match_shotmap s JOIN events e ON e.id = s.event_id WHERE 1=1 {where}"
+    P = tuple(params)
+
+    def pct(g, n):
+        return round(100.0 * g / n, 1) if n else 0.0
+
+    # A. 결과 깔때기 (시도 → 유효(goal+save) → 득점)
+    t = conn.execute(f"""
+        SELECT COUNT(*) shots,
+               SUM(CASE WHEN s.outcome IN ('goal','save') THEN 1 ELSE 0 END) on_target,
+               SUM(CASE WHEN s.outcome = 'goal' THEN 1 ELSE 0 END) goals
+        {base}
+    """, P).fetchone()
+    shots = t["shots"] or 0
+    on_t = t["on_target"] or 0
+    goals = t["goals"] or 0
+    funnel = {"shots": shots, "on_target": on_t, "goals": goals,
+              "on_target_pct": pct(on_t, shots), "conversion_pct": pct(goals, shots)}
+
+    # B. 상황별 — 오픈 플레이 vs 세트피스
+    srows = conn.execute(f"""
+        SELECT CASE WHEN s.situation IN ('corner','set-piece','free-kick','throw-in-set-piece','penalty')
+                    THEN 'setpiece' ELSE 'openplay' END grp,
+               COUNT(*) shots, SUM(CASE WHEN s.outcome='goal' THEN 1 ELSE 0 END) goals
+        {base} GROUP BY grp
+    """, P).fetchall()
+    smap = {r["grp"]: r for r in srows}
+    situation = [{"label": lab,
+                  "shots": (smap[k]["shots"] if k in smap else 0),
+                  "goals": (smap[k]["goals"] if k in smap else 0),
+                  "conversion_pct": pct(smap[k]["goals"] if k in smap else 0,
+                                        smap[k]["shots"] if k in smap else 0)}
+                 for k, lab in (("openplay", "오픈 플레이"), ("setpiece", "세트피스"))]
+
+    # C. 바디파트별
+    brows = conn.execute(f"""
+        SELECT s.body_part bp, COUNT(*) shots, SUM(CASE WHEN s.outcome='goal' THEN 1 ELSE 0 END) goals
+        {base} GROUP BY s.body_part
+    """, P).fetchall()
+    bmap = {r["bp"]: r for r in brows}
+    body_part = [{"label": lab,
+                  "shots": (bmap[k]["shots"] if k in bmap else 0),
+                  "goals": (bmap[k]["goals"] if k in bmap else 0),
+                  "conversion_pct": pct(bmap[k]["goals"] if k in bmap else 0,
+                                        bmap[k]["shots"] if k in bmap else 0)}
+                 for k, lab in (("right-foot", "오른발"), ("left-foot", "왼발"), ("head", "머리"))]
+
+    # D. 거리존별 (s.x = 골문과의 거리)
+    zrows = conn.execute(f"""
+        SELECT CASE WHEN s.x < 11 THEN 0 WHEN s.x < 18 THEN 1 WHEN s.x < 30 THEN 2 ELSE 3 END z,
+               COUNT(*) shots, SUM(CASE WHEN s.outcome='goal' THEN 1 ELSE 0 END) goals
+        {base} GROUP BY z
+    """, P).fetchall()
+    z_lab = ["근거리 ~11m", "박스권 11~18m", "중거리 18~30m", "장거리 30m+"]
+    zmap = {r["z"]: r for r in zrows}
+    zone = [{"label": z_lab[i],
+             "shots": (zmap[i]["shots"] if i in zmap else 0),
+             "goals": (zmap[i]["goals"] if i in zmap else 0),
+             "conversion_pct": pct(zmap[i]["goals"] if i in zmap else 0,
+                                   zmap[i]["shots"] if i in zmap else 0)}
+            for i in range(4)]
+
+    conn.close()
+    return jsonify({"funnel": funnel, "situation": situation,
+                    "body_part": body_part, "zone": zone})
+
+
 @app.route("/api/insights/card-rankings")
 @cached_response(ttl=1800)
 def insights_card_rankings():

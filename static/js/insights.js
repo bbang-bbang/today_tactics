@@ -905,12 +905,35 @@
       `<div class="ins-adv-sub-h">🏃 활동 범위 (히트맵 분산 — 클수록 넓게 커버)</div><ol class="ins-adv-list">${top || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
        <div class="ins-method">근거 — 히트맵 좌표 분산 √(가로²+세로²) · 3경기·300좌표 이상 · 위치 다양성↑ = 활동량↑</div>`;
   }
+  function renderShooting(d) {
+    const el = document.getElementById("ins-shooting-body"); if (!el) return;
+    const f = d.funnel || {};
+    if (!f.shots) { el.innerHTML = '<div class="ins-adv-empty">데이터 없음</div>'; return; }
+    const stage = (lbl, val, pct, cls) =>
+      `<div class="ins-funnel-stage ${cls}"><span class="ins-funnel-val">${val.toLocaleString()}</span><span class="ins-funnel-lbl">${lbl}</span>${pct != null ? `<span class="ins-funnel-pct">${pct}%</span>` : ""}</div>`;
+    const funnel =
+      `<div class="ins-funnel">${stage("슛 시도", f.shots, null, "f1")}<span class="ins-funnel-arr">›</span>${stage("유효슛", f.on_target, f.on_target_pct, "f2")}<span class="ins-funnel-arr">›</span>${stage("득점", f.goals, f.conversion_pct, "f3")}</div>`;
+    const breakdown = (title, arr) => {
+      const mx = Math.max(...arr.map(x => x.conversion_pct), 1);
+      const rows = arr.map(x =>
+        `<tr><td>${x.label}</td><td>${x.shots.toLocaleString()}</td><td>${x.goals}</td>
+         <td class="ins-conv"><span class="ins-conv-bar" style="width:${Math.round(x.conversion_pct / mx * 100)}%"></span><b>${x.conversion_pct}%</b></td></tr>`).join("");
+      return `<div class="ins-adv-sub-h">${title}</div>
+        <table class="ins-adv-tbl ins-shoot-tbl"><thead><tr><th>구분</th><th>슛</th><th>골</th><th>결정률</th></tr></thead><tbody>${rows}</tbody></table>`;
+    };
+    el.innerHTML = funnel
+      + breakdown("⚙️ 상황별", d.situation || [])
+      + breakdown("🦶 부위별", d.body_part || [])
+      + breakdown("📍 거리존별", d.zone || [])
+      + `<div class="ins-method">근거 — SofaScore 슈팅맵 ${f.shots.toLocaleString()}개 · 유효슛=득점+선방 유발 · 결정률=골/슛 · 거리=골문과의 거리(좌표 검증)</div>`;
+  }
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(() => {});
     fetch(`/api/insights/clutch?${qs}`).then(r => r.json()).then(renderClutch).catch(() => {});
     fetch(`/api/insights/form?${qs}`).then(r => r.json()).then(renderForm).catch(() => {});
     fetch(`/api/insights/activity?${qs}`).then(r => r.json()).then(renderActivity).catch(() => {});
+    fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(() => {});
   }
 
   /* ── 인사이트 탭 (랭킹 / 심화 / 규율) — 활성 탭만 지연 로드 ── */

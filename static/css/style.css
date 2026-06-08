@@ -5952,6 +5952,22 @@ body.pr-expanded-lock {
 .ins-tl-sg b { color: #e8f0fb; font-weight: 800; }
 .ins-tl-sg-peak b { color: #ffc870; }
 .ins-clutch-hint { font-size: 0.66rem; font-weight: 600; color: #8aa0b8; margin-left: 6px; }
+/* 슈팅 인사이트 — 결과 깔때기 + 결정률 바 (블루=일반, 오렌지=득점 강조, 기존 인사이트 컬러 시스템 준수) */
+.ins-funnel { display: flex; align-items: stretch; gap: 4px; margin: 4px 0 6px; }
+.ins-funnel-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 4px; border-radius: 7px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
+.ins-funnel-stage.f1 { background: rgba(110,180,255,0.10); }
+.ins-funnel-stage.f2 { background: rgba(110,180,255,0.16); }
+.ins-funnel-stage.f3 { background: linear-gradient(180deg, rgba(255,178,77,0.20), rgba(240,138,46,0.14)); border-color: rgba(240,138,46,0.35); }
+.ins-funnel-val { font-size: 1.02rem; font-weight: 800; color: #eaf2fc; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.ins-funnel-stage.f3 .ins-funnel-val { color: #ffc870; }
+.ins-funnel-lbl { font-size: 0.62rem; color: #9fb4cc; margin-top: 2px; }
+.ins-funnel-pct { font-size: 0.64rem; font-weight: 700; color: #7ecfff; margin-top: 3px; }
+.ins-funnel-stage.f3 .ins-funnel-pct { color: #ffb24d; }
+.ins-funnel-arr { align-self: center; color: #5a708c; font-size: 1.1rem; font-weight: 700; }
+.ins-shoot-tbl td { vertical-align: middle; }
+.ins-conv { position: relative; min-width: 92px; white-space: nowrap; }
+.ins-conv-bar { display: inline-block; height: 7px; border-radius: 4px; background: linear-gradient(90deg, #6fb4ff, #3d7fd6); vertical-align: middle; margin-right: 6px; min-width: 2px; transition: width .5s cubic-bezier(.22,1,.36,1); }
+.ins-conv b { color: #e8f0fb; font-variant-numeric: tabular-nums; font-size: 0.74rem; }
 @media (max-width: 760px) { .ins-adv-grid { grid-template-columns: 1fr; } }
 /* 산식/근거 캡션 — 신빙성 표시 */
 .ins-method { margin-top: 9px; padding-top: 7px; border-top: 1px dashed rgba(255,255,255,0.10); font-size: 0.68rem; color: #8090a6; line-height: 1.5; }
