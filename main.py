@@ -5282,12 +5282,15 @@ def team_formation():
     좌표는 팀 공격 방향 기준 정규화(x=자기 골문 0 → 공격 100, y=좌우 폭 0~100). x,y는 0~1로 반환."""
     team_id = request.args.get("teamId")
     year = request.args.get("year")
-    try:
-        team_id = int(team_id)
-    except (TypeError, ValueError):
+    # 프론트는 문자열 팀키(예: gangwon)를 보냄 → TEAMS 메타에서 SofaScore 숫자 id로 매핑
+    # (team-analytics와 동일). events/match_avg_positions는 SofaScore team_id 기준.
+    team_info = next((t for t in TEAMS if t["id"] == team_id), None)
+    if not team_info:
         return jsonify({"players": [], "formation": ""})
+    ss_id = team_info["sofascore_id"]
+    tid = 410 if team_info.get("league") == "K1" else 777
     conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
-    params = [team_id]
+    params = [tid, ss_id]
     year_cond = ""
     if year and year not in ("전체", "all"):
         year_cond = " AND strftime('%Y', datetime(e.date_ts, 'unixepoch', 'localtime')) = ?"
@@ -5298,7 +5301,7 @@ def team_formation():
         FROM match_avg_positions a
         JOIN events e ON e.id = a.event_id
         LEFT JOIN players p ON p.id = a.player_id
-        WHERE a.is_substitute = 0
+        WHERE a.is_substitute = 0 AND e.tournament_id = ?
           AND (CASE WHEN a.is_home = 1 THEN e.home_team_id ELSE e.away_team_id END) = ?
           {year_cond}
         GROUP BY a.player_id HAVING apps >= 3
