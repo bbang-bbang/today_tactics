@@ -30,6 +30,7 @@ Thumbs.db
 
 # SSH keys
 *.pem
+*.pem.pub
 *.key
 ci_deploy_key
 ci_deploy_key.pub
