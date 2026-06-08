@@ -5275,6 +5275,51 @@ def insights_substitution():
                     "avg_first": avg_first, "injury_subs": inj})
 
 
+@app.route("/api/insights/goalkeeper")
+@cached_response(ttl=1800)
+def insights_goalkeeper():
+    """수문장 — 골키퍼 선방·클린시트·선방률. 실점은 경기 최종 스코어로 유도
+    (goals_conceded 컬럼 미수집 → 홈 GK는 away_score, 원정 GK는 home_score).
+    주전(60분+) 5경기↑. year + league 필터 지원."""
+    year = request.args.get("year", "2026")
+    league = request.args.get("league", "all")
+    tid = _league_tid(league)
+    conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+    conds = ["p.position = 'G'", "m.minutes_played >= 60", "e.home_score IS NOT NULL"]
+    params = []
+    if tid is not None:
+        conds.append("e.tournament_id = ?"); params.append(tid)
+    if year and year != "all":
+        conds.append("strftime('%Y', datetime(e.date_ts, 'unixepoch', 'localtime')) = ?")
+        params.append(str(year))
+    where = " AND ".join(conds)
+    conc = "(CASE WHEN m.is_home = 1 THEN e.away_score ELSE e.home_score END)"
+    rows = conn.execute(f"""
+        SELECT m.player_id, COALESCE(p.name_ko, p.name) name, m.team_id,
+               COUNT(*) games, SUM(COALESCE(m.saves, 0)) saves, SUM({conc}) conceded,
+               SUM(CASE WHEN {conc} = 0 THEN 1 ELSE 0 END) clean_sheets
+        FROM match_player_stats m
+        JOIN players p ON p.id = m.player_id
+        JOIN events e ON e.id = m.event_id
+        WHERE {where}
+        GROUP BY m.player_id HAVING games >= 5
+    """, tuple(params)).fetchall()
+    gks = []
+    for r in rows:
+        sv = r["saves"] or 0
+        ga = r["conceded"] or 0
+        save_pct = round(100.0 * sv / (sv + ga), 1) if (sv + ga) > 0 else 0.0
+        gks.append({"name": r["name"] or "", "team": _ko_team(r["team_id"], ""),
+                    "games": r["games"], "saves": sv, "conceded": ga,
+                    "clean_sheets": r["clean_sheets"], "save_pct": save_pct})
+    saves_top = sorted(gks, key=lambda x: -x["saves"])[:6]
+    clean_sheets_top = sorted(gks, key=lambda x: (-x["clean_sheets"], -x["save_pct"]))[:6]
+    save_pct_top = sorted([g for g in gks if g["games"] >= 10], key=lambda x: -x["save_pct"])[:6]
+    conn.close()
+    return jsonify({"saves_top": saves_top, "clean_sheets_top": clean_sheets_top,
+                    "save_pct_top": save_pct_top})
+
+
 @app.route("/api/insights/card-rankings")
 @cached_response(ttl=1800)
 def insights_card_rankings():

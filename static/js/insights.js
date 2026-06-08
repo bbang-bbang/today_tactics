@@ -969,6 +969,20 @@
        <ol class="ins-adv-list">${fq || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
        <div class="ins-method">근거 — 슈퍼서브=교체 투입 분 이후 본인 득점 · 시점=리그 전체 교체 분포 · 부상 교체 ${d.injury_subs || 0}건</div>`;
   }
+  function renderGoalkeeper(d) {
+    const el = document.getElementById("ins-gk-body"); if (!el) return;
+    const row = (p, i, metric, sub) =>
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}${sub ? " · " + sub : ""}</span><b>${metric}</b></li>`;
+    const sv = (d.saves_top || []).slice(0, 5).map((p, i) => row(p, i, `${p.saves}선방`, `${p.games}경기·CS${p.clean_sheets}`)).join("");
+    const cs = (d.clean_sheets_top || []).slice(0, 5).map((p, i) => row(p, i, `CS ${p.clean_sheets}`, `${p.games}경기`)).join("");
+    const pct = (d.save_pct_top || []).slice(0, 5).map((p, i) => row(p, i, `${p.save_pct}%`, `선방${p.saves}/실점${p.conceded}`)).join("");
+    const empty = '<li class="ins-adv-empty">데이터 없음</li>';
+    el.innerHTML =
+      `<div class="ins-adv-sub-h">🧤 선방 TOP</div><ol class="ins-adv-list">${sv || empty}</ol>
+       <div class="ins-adv-sub-h">🛡 클린시트 TOP</div><ol class="ins-adv-list">${cs || empty}</ol>
+       <div class="ins-adv-sub-h">🎯 선방률 TOP <span class="ins-clutch-hint">10경기+</span></div><ol class="ins-adv-list">${pct || empty}</ol>
+       <div class="ins-method">근거 — 선방=세이브 합 · 실점=경기 최종 스코어(상대 득점) · CS=무실점 경기 · 선방률=선방/(선방+실점) · 주전(60분+) 5경기↑</div>`;
+  }
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(() => {});
@@ -977,6 +991,7 @@
     fetch(`/api/insights/activity?${qs}`).then(r => r.json()).then(renderActivity).catch(() => {});
     fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(() => {});
     fetch(`/api/insights/substitution?${qs}`).then(r => r.json()).then(renderSubstitution).catch(() => {});
+    fetch(`/api/insights/goalkeeper?${qs}`).then(r => r.json()).then(renderGoalkeeper).catch(() => {});
   }
 
   /* ── 인사이트 탭 (랭킹 / 심화 / 규율) — 활성 탭만 지연 로드 ── */
