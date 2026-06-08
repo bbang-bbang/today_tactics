@@ -942,6 +942,32 @@
       + block("📍 거리존별 결정률", d.zone || [])
       + `<div class="ins-method">근거 — 슈팅맵 ${f.shots.toLocaleString()}개 · 유효슛=득점+선방 유발 · 결정률=골/슛 · 막대=세 항목 공통 스케일</div>`;
   }
+  function renderSubstitution(d) {
+    const el = document.getElementById("ins-sub-body"); if (!el) return;
+    const ss = (d.supersub || []).slice(0, 5).map((p, i) =>
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.goals}골</b></li>`).join("");
+    const fq = (d.frequent || []).slice(0, 5).map((p, i) =>
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.count}회</b></li>`).join("");
+    const tl = d.timeline || [];
+    const max = Math.max(...tl.map(t => t.count), 1);
+    const total = tl.reduce((s, t) => s + t.count, 0) || 1;
+    const bars = tl.map(t => {
+      const h = Math.round(t.count / max * 100);
+      const share = Math.round(t.count / total * 100);
+      return `<div class="ins-tl-col" title="${t.bucket}분 · ${t.count}회 (${share}%)">
+        <span class="ins-tl-val">${t.count}</span>
+        <div class="ins-tl-track"><div class="ins-tl-bar" style="height:${h}%"></div></div>
+        <span class="ins-tl-lbl">${t.bucket}<span class="ins-tl-share">${share}%</span></span></div>`;
+    }).join("");
+    el.innerHTML =
+      `<div class="ins-adv-sub-h">🃏 슈퍼서브 <span class="ins-clutch-hint">교체 투입 후 득점</span></div>
+       <ol class="ins-adv-list">${ss || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
+       <div class="ins-adv-sub-h">⏱ 교체 시점 분포 ${d.avg_first ? `<span class="ins-tl-total">평균 첫 교체 ${d.avg_first}분</span>` : ""}</div>
+       <div class="ins-tl">${bars}</div>
+       <div class="ins-adv-sub-h">🔁 최다 교체 투입</div>
+       <ol class="ins-adv-list">${fq || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
+       <div class="ins-method">근거 — 슈퍼서브=교체 투입 분 이후 본인 득점 · 시점=리그 전체 교체 분포 · 부상 교체 ${d.injury_subs || 0}건</div>`;
+  }
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(() => {});
@@ -949,6 +975,7 @@
     fetch(`/api/insights/form?${qs}`).then(r => r.json()).then(renderForm).catch(() => {});
     fetch(`/api/insights/activity?${qs}`).then(r => r.json()).then(renderActivity).catch(() => {});
     fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(() => {});
+    fetch(`/api/insights/substitution?${qs}`).then(r => r.json()).then(renderSubstitution).catch(() => {});
   }
 
   /* ── 인사이트 탭 (랭킹 / 심화 / 규율) — 활성 탭만 지연 로드 ── */

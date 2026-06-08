@@ -5188,6 +5188,77 @@ def insights_shooting():
                     "body_part": body_part, "zone": zone})
 
 
+@app.route("/api/insights/substitution")
+@cached_response(ttl=1800)
+def insights_substitution():
+    """교체 영향 — sub_events 기반. 슈퍼서브(교체 투입 분 이후 본인 득점) + 교체 시점 분포
+    + 최다 투입 + 평균 첫 교체 + 부상 교체 수. year + league 필터 지원."""
+    year = request.args.get("year", "2026")
+    league = request.args.get("league", "all")
+    tid = _league_tid(league)
+    conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+    conds = []; params = []
+    if tid is not None:
+        conds.append("e.tournament_id = ?"); params.append(tid)
+    if year and year != "all":
+        conds.append("strftime('%Y', datetime(e.date_ts, 'unixepoch', 'localtime')) = ?")
+        params.append(str(year))
+    where = (" AND " + " AND ".join(conds)) if conds else ""
+    P = tuple(params)
+
+    # 슈퍼서브 — 교체 투입(player_in) 분 이후 본인 득점
+    ss = conn.execute(f"""
+        SELECT s.player_in_id pid, COALESCE(p.name_ko, s.player_in_name) name, s.team_id, COUNT(*) goals
+        FROM sub_events s
+        JOIN goal_events g ON g.event_id = s.event_id AND g.player_id = s.player_in_id
+             AND g.is_own_goal = 0 AND g.minute >= s.minute
+        JOIN events e ON e.id = s.event_id
+        LEFT JOIN players p ON p.id = s.player_in_id
+        WHERE 1=1 {where}
+        GROUP BY s.player_in_id ORDER BY goals DESC, name LIMIT 8
+    """, P).fetchall()
+    supersub = [{"name": r["name"] or "", "team": _ko_team(r["team_id"], ""), "goals": r["goals"]} for r in ss]
+
+    # 교체 시점 분포
+    dist = conn.execute(f"""
+        SELECT CASE WHEN s.minute < 46 THEN '~45' WHEN s.minute < 60 THEN '46-60'
+                    WHEN s.minute < 75 THEN '61-75' WHEN s.minute < 90 THEN '76-90'
+                    ELSE '90+' END bucket, COUNT(*) cnt
+        FROM sub_events s JOIN events e ON e.id = s.event_id
+        WHERE 1=1 {where} GROUP BY bucket
+    """, P).fetchall()
+    order = ['~45', '46-60', '61-75', '76-90', '90+']
+    dmap = {r["bucket"]: r["cnt"] for r in dist}
+    timeline = [{"bucket": b, "count": dmap.get(b, 0)} for b in order]
+
+    # 최다 교체 투입
+    fq = conn.execute(f"""
+        SELECT COALESCE(p.name_ko, s.player_in_name) name, s.team_id, COUNT(*) cnt
+        FROM sub_events s JOIN events e ON e.id = s.event_id
+        LEFT JOIN players p ON p.id = s.player_in_id
+        WHERE 1=1 {where} GROUP BY s.player_in_id ORDER BY cnt DESC, name LIMIT 6
+    """, P).fetchall()
+    frequent = [{"name": r["name"] or "", "team": _ko_team(r["team_id"], ""), "count": r["cnt"]} for r in fq]
+
+    # 평균 첫 교체 시점 (경기·팀별 첫 교체 분의 평균) + 부상 교체 수
+    af = conn.execute(f"""
+        SELECT ROUND(AVG(first_min), 1) FROM (
+            SELECT MIN(s.minute) first_min
+            FROM sub_events s JOIN events e ON e.id = s.event_id
+            WHERE 1=1 {where} GROUP BY s.event_id, s.team_id
+        )
+    """, P).fetchone()
+    avg_first = af[0] if af and af[0] is not None else None
+    inj = conn.execute(f"""
+        SELECT COUNT(*) FROM sub_events s JOIN events e ON e.id = s.event_id
+        WHERE s.injury IS NOT NULL AND s.injury <> 0 {where}
+    """, P).fetchone()[0]
+
+    conn.close()
+    return jsonify({"supersub": supersub, "timeline": timeline, "frequent": frequent,
+                    "avg_first": avg_first, "injury_subs": inj})
+
+
 @app.route("/api/insights/card-rankings")
 @cached_response(ttl=1800)
 def insights_card_rankings():
