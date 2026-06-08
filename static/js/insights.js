@@ -897,15 +897,6 @@
        <div class="ins-adv-sub-h">📉 폼 하락</div><ol class="ins-adv-list">${dn || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
        <div class="ins-method">근거 — 최근 5경기 평균 평점 − 시즌 평균 평점 (6경기 이상 출전) · +상승/−하락</div>`;
   }
-  function renderActivity(d) {
-    const el = document.getElementById("ins-activity-body"); if (!el) return;
-    const top = (d.top || []).slice(0, 6).map((p, i) =>
-      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.pos_ko ? p.pos_ko + " · " : ""}${p.team} · ${p.games}경기</span><b>${p.spread}</b></li>`).join("");
-    el.innerHTML =
-      `<div class="ins-adv-sub-h">🏃 활동 범위 <span class="ins-clutch-hint">같은 포지션 평균 대비 넓은 순</span></div>
-       <ol class="ins-adv-list">${top || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
-       <div class="ins-method">근거 — 히트맵 좌표 분산 √(가로²+세로²)을 같은 포지션 평균 대비 정규화(z) · GK 제외 · 3경기·300좌표↑ · 값=활동 범위(클수록 넓음)</div>`;
-  }
   function renderShooting(d) {
     const el = document.getElementById("ins-shooting-body"); if (!el) return;
     const f = d.funnel || {};
@@ -1000,7 +991,6 @@
     fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(() => {});
     fetch(`/api/insights/clutch?${qs}`).then(r => r.json()).then(renderClutch).catch(() => {});
     fetch(`/api/insights/form?${qs}`).then(r => r.json()).then(renderForm).catch(() => {});
-    fetch(`/api/insights/activity?${qs}`).then(r => r.json()).then(renderActivity).catch(() => {});
     fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(() => {});
     fetch(`/api/insights/substitution?${qs}`).then(r => r.json()).then(renderSubstitution).catch(() => {});
     fetch(`/api/insights/goalkeeper?${qs}`).then(r => r.json()).then(renderGoalkeeper).catch(() => {});
