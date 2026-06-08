@@ -900,10 +900,11 @@
   function renderActivity(d) {
     const el = document.getElementById("ins-activity-body"); if (!el) return;
     const top = (d.top || []).slice(0, 6).map((p, i) =>
-      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.spread}</b></li>`).join("");
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.pos_ko ? p.pos_ko + " · " : ""}${p.team} · ${p.games}경기</span><b>${p.spread}</b></li>`).join("");
     el.innerHTML =
-      `<div class="ins-adv-sub-h">🏃 활동 범위 (히트맵 분산 — 클수록 넓게 커버)</div><ol class="ins-adv-list">${top || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
-       <div class="ins-method">근거 — 히트맵 좌표 분산 √(가로²+세로²) · 3경기·300좌표 이상 · 위치 다양성↑ = 활동량↑</div>`;
+      `<div class="ins-adv-sub-h">🏃 활동 범위 <span class="ins-clutch-hint">같은 포지션 평균 대비 넓은 순</span></div>
+       <ol class="ins-adv-list">${top || '<li class="ins-adv-empty">데이터 없음</li>'}</ol>
+       <div class="ins-method">근거 — 히트맵 좌표 분산 √(가로²+세로²)을 같은 포지션 평균 대비 정규화(z) · GK 제외 · 3경기·300좌표↑ · 값=활동 범위(클수록 넓음)</div>`;
   }
   function renderShooting(d) {
     const el = document.getElementById("ins-shooting-body"); if (!el) return;

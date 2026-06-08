@@ -5060,8 +5060,10 @@ def insights_form():
 @app.route("/api/insights/activity")
 @cached_response(ttl=1800)
 def insights_activity():
-    """활동량·동선 — 히트맵 좌표 분산(활동 범위) + 평균 전진성."""
+    """활동량·동선 — 히트맵 좌표 분산(활동 범위)을 '같은 포지션 평균 대비'로 정규화(z-score)해
+    포지션 교란을 보정한 순위. GK 제외(필드 활동량 아님). 전진성(평균 x)도 함께 제공."""
     import math
+    from collections import defaultdict
     year = request.args.get("year", "2026")
     league = request.args.get("league", "all")
     tid = _league_tid(league)
@@ -5071,35 +5073,49 @@ def insights_activity():
         conds.append("e.tournament_id = ?"); params.append(tid)
     if year and year != "all":
         conds.append("strftime('%Y', datetime(e.date_ts, 'unixepoch', 'localtime')) = ?"); params.append(str(year))
-    join = "JOIN events e ON h.event_id = e.id" if conds else ""
     where = (" AND " + " AND ".join(conds)) if conds else ""
-    # 무거운 110만행 집계는 순수 집계만 (선수당 상관 서브쿼리·players 조인 제거 → 4.3s→대폭 단축)
+    # 무거운 110만행 집계는 서브쿼리에서 GROUP BY/HAVING으로 수백명까지 줄인 뒤
+    # players 조인(포지션·이름) — HAVING 이후라 조인 비용 작음. GK는 제외.
     rows = conn.execute(f"""
-        SELECT h.player_id, COUNT(*) pts, COUNT(DISTINCT h.event_id) games,
-               AVG(h.x) ax,
-               AVG(h.x*h.x) - AVG(h.x)*AVG(h.x) varx,
-               AVG(h.y*h.y) - AVG(h.y)*AVG(h.y) vary
-        FROM heatmap_points h {join}
-        WHERE 1=1 {where}
-        GROUP BY h.player_id HAVING games >= 3 AND pts >= 300
+        SELECT t.player_id, t.games, t.ax, t.varx, t.vary,
+               p.position pos, COALESCE(p.name_ko, p.name) name
+        FROM (
+            SELECT h.player_id, COUNT(*) pts, COUNT(DISTINCT h.event_id) games,
+                   AVG(h.x) ax,
+                   AVG(h.x*h.x) - AVG(h.x)*AVG(h.x) varx,
+                   AVG(h.y*h.y) - AVG(h.y)*AVG(h.y) vary
+            FROM heatmap_points h JOIN events e ON h.event_id = e.id
+            WHERE 1=1 {where}
+            GROUP BY h.player_id HAVING games >= 3 AND pts >= 300
+        ) t JOIN players p ON p.id = t.player_id
+        WHERE p.position IS NOT NULL AND p.position <> 'G'
     """, tuple(params)).fetchall()
-    out = []
+    # 포지션별 평균·표준편차로 정규화(z) — 측면/수비가 자연히 넓은 교란 보정
+    recs = []; by_pos = defaultdict(list)
     for r in rows:
         spread = math.sqrt(max(0, r["varx"] or 0) + max(0, r["vary"] or 0))
-        out.append({"player_id": r["player_id"], "games": r["games"],
-                    "spread": round(spread, 1), "advance": round(r["ax"] or 0, 1)})
-    out.sort(key=lambda x: -x["spread"])
-    top = out[:8]
-    # 이름·팀은 상위 8명만 해소 (전체 1천명 서브쿼리 대신)
+        recs.append({"player_id": r["player_id"], "name": r["name"] or "", "pos": r["pos"],
+                     "games": r["games"], "spread": round(spread, 1),
+                     "advance": round(r["ax"] or 0, 1), "_raw": spread})
+        by_pos[r["pos"]].append(spread)
+    pos_stat = {}
+    for pos, arr in by_pos.items():
+        m = sum(arr) / len(arr)
+        sd = math.sqrt(sum((v - m) ** 2 for v in arr) / len(arr))
+        pos_stat[pos] = (m, sd or 1.0)
+    for rec in recs:
+        m, sd = pos_stat[rec["pos"]]
+        rec["z"] = round((rec["_raw"] - m) / sd, 2)
+    recs.sort(key=lambda x: -x["z"])
+    top = recs[:8]
+    POS_KO = {"D": "수비", "M": "미드", "F": "공격"}
     for t in top:
-        pr = conn.execute("""
-            SELECT COALESCE(p.name_ko, p.name) name,
-                   (SELECT m2.team_id FROM match_player_stats m2 WHERE m2.player_id = ? LIMIT 1) tsid
-            FROM players p WHERE p.id = ?
-        """, (t["player_id"], t["player_id"])).fetchone()
-        t["name"] = (pr["name"] if pr else "") or ""
-        t["team"] = _ko_team(pr["tsid"], "") if pr else ""
-        del t["player_id"]
+        ts = conn.execute(
+            "SELECT team_id FROM match_player_stats WHERE player_id = ? LIMIT 1",
+            (t["player_id"],)).fetchone()
+        t["team"] = _ko_team(ts["team_id"], "") if ts else ""
+        t["pos_ko"] = POS_KO.get(t["pos"], t["pos"] or "")
+        del t["player_id"]; del t["_raw"]
     conn.close()
     return jsonify({"top": top})
 
