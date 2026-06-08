@@ -909,23 +909,38 @@
     const el = document.getElementById("ins-shooting-body"); if (!el) return;
     const f = d.funnel || {};
     if (!f.shots) { el.innerHTML = '<div class="ins-adv-empty">데이터 없음</div>'; return; }
-    const stage = (lbl, val, pct, cls) =>
-      `<div class="ins-funnel-stage ${cls}"><span class="ins-funnel-val">${val.toLocaleString()}</span><span class="ins-funnel-lbl">${lbl}</span>${pct != null ? `<span class="ins-funnel-pct">${pct}%</span>` : ""}</div>`;
-    const funnel =
-      `<div class="ins-funnel">${stage("슛 시도", f.shots, null, "f1")}<span class="ins-funnel-arr">›</span>${stage("유효슛", f.on_target, f.on_target_pct, "f2")}<span class="ins-funnel-arr">›</span>${stage("득점", f.goals, f.conversion_pct, "f3")}</div>`;
-    const breakdown = (title, arr) => {
-      const mx = Math.max(...arr.map(x => x.conversion_pct), 1);
+
+    // 깔때기 — 시도 대비 비율로 줄어드는 가로 막대 3단 (시도=100%)
+    const pctOf = v => f.shots ? Math.round(v / f.shots * 100) : 0;
+    const frow = (lbl, val, w, tag, cls) =>
+      `<div class="ins-fn-row"><span class="ins-fn-lbl">${lbl}</span>
+        <div class="ins-fn-track"><div class="ins-fn-bar ${cls}" style="width:${w}%"></div></div>
+        <span class="ins-fn-val">${val.toLocaleString()}${tag ? `<small>${tag}</small>` : ""}</span></div>`;
+    const funnel = `<div class="ins-fn">
+      ${frow("슛 시도", f.shots, 100, "", "b1")}
+      ${frow("유효슛", f.on_target, pctOf(f.on_target), `${f.on_target_pct}%`, "b2")}
+      ${frow("득점", f.goals, pctOf(f.goals), `${f.conversion_pct}%`, "b3")}</div>`;
+
+    // 결정률 막대 — 세 항목 공통 스케일(전역 최대)로 비교 가능
+    const all = [...(d.situation || []), ...(d.body_part || []), ...(d.zone || [])];
+    const gmax = Math.max(...all.map(x => x.conversion_pct), 1);
+    const block = (title, arr) => {
       const rows = arr.map(x =>
-        `<tr><td>${x.label}</td><td>${x.shots.toLocaleString()}</td><td>${x.goals}</td>
-         <td class="ins-conv"><span class="ins-conv-bar" style="width:${Math.round(x.conversion_pct / mx * 100)}%"></span><b>${x.conversion_pct}%</b></td></tr>`).join("");
-      return `<div class="ins-adv-sub-h">${title}</div>
-        <table class="ins-adv-tbl ins-shoot-tbl"><thead><tr><th>구분</th><th>슛</th><th>골</th><th>결정률</th></tr></thead><tbody>${rows}</tbody></table>`;
+        `<div class="ins-cv-row">
+          <span class="ins-cv-lbl">${x.label}</span>
+          <div class="ins-cv-track"><div class="ins-cv-bar" style="width:${Math.round(x.conversion_pct / gmax * 100)}%"></div></div>
+          <span class="ins-cv-pct">${x.conversion_pct}%</span>
+          <span class="ins-cv-sub">${x.goals}골 / ${x.shots.toLocaleString()}슛</span>
+        </div>`).join("");
+      return `<div class="ins-adv-sub-h">${title}</div><div class="ins-cv">${rows}</div>`;
     };
-    el.innerHTML = funnel
-      + breakdown("⚙️ 상황별", d.situation || [])
-      + breakdown("🦶 부위별", d.body_part || [])
-      + breakdown("📍 거리존별", d.zone || [])
-      + `<div class="ins-method">근거 — SofaScore 슈팅맵 ${f.shots.toLocaleString()}개 · 유효슛=득점+선방 유발 · 결정률=골/슛 · 거리=골문과의 거리(좌표 검증)</div>`;
+
+    el.innerHTML =
+      `<div class="ins-adv-sub-h">슛 → 득점 전환</div>` + funnel
+      + block("⚙️ 상황별 결정률", d.situation || [])
+      + block("🦶 부위별 결정률", d.body_part || [])
+      + block("📍 거리존별 결정률", d.zone || [])
+      + `<div class="ins-method">근거 — 슈팅맵 ${f.shots.toLocaleString()}개 · 유효슛=득점+선방 유발 · 결정률=골/슛 · 막대=세 항목 공통 스케일</div>`;
   }
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
