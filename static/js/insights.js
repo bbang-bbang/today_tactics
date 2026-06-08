@@ -983,6 +983,18 @@
        <div class="ins-adv-sub-h">🎯 선방률 TOP <span class="ins-clutch-hint">10경기+</span></div><ol class="ins-adv-list">${pct || empty}</ol>
        <div class="ins-method">근거 — 선방=세이브 합 · 실점=경기 최종 스코어(상대 득점) · CS=무실점 경기 · 선방률=선방/(선방+실점) · 주전(60분+) 5경기↑</div>`;
   }
+  function renderDuels(d) {
+    const el = document.getElementById("ins-duel-body"); if (!el) return;
+    const row = (p, i, metric, sub) =>
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}${sub ? " · " + sub : ""}</span><b>${metric}</b></li>`;
+    const empty = '<li class="ins-adv-empty">데이터 없음</li>';
+    const dr = (d.dribble_top || []).slice(0, 5).map((p, i) => row(p, i, `${p.success}회`, `성공률 ${p.rate}%`)).join("");
+    const ae = (d.aerial_top || []).slice(0, 5).map((p, i) => row(p, i, `${p.won}승`, `승률 ${p.rate}%`)).join("");
+    el.innerHTML =
+      `<div class="ins-adv-sub-h">🏃 돌파 (드리블 성공) <span class="ins-clutch-hint">시도 20+</span></div><ol class="ins-adv-list">${dr || empty}</ol>
+       <div class="ins-adv-sub-h">🛫 공중 지배 <span class="ins-clutch-hint">공중볼 30+</span></div><ol class="ins-adv-list">${ae || empty}</ol>
+       <div class="ins-method">근거 — 돌파=드리블 성공 합 · 공중=공중볼 경합 승 · 성공률/승률 병기 · 최소 표본 필터(드리블 20·공중 30)</div>`;
+  }
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(() => {});
@@ -992,6 +1004,7 @@
     fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(() => {});
     fetch(`/api/insights/substitution?${qs}`).then(r => r.json()).then(renderSubstitution).catch(() => {});
     fetch(`/api/insights/goalkeeper?${qs}`).then(r => r.json()).then(renderGoalkeeper).catch(() => {});
+    fetch(`/api/insights/duels?${qs}`).then(r => r.json()).then(renderDuels).catch(() => {});
   }
 
   /* ── 인사이트 탭 (랭킹 / 심화 / 규율) — 활성 탭만 지연 로드 ── */

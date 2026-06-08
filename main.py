@@ -5320,6 +5320,50 @@ def insights_goalkeeper():
                     "save_pct_top": save_pct_top})
 
 
+@app.route("/api/insights/duels")
+@cached_response(ttl=1800)
+def insights_duels():
+    """듀얼 지배 — 돌파(드리블 성공)와 공중볼 승리. match_player_stats 기반.
+    year + league 필터 지원."""
+    year = request.args.get("year", "2026")
+    league = request.args.get("league", "all")
+    date_cond, date_params = _year_date_params(year)
+    league_cond, league_params = _league_team_filter(league)
+    base_params = tuple(date_params) + tuple(league_params)
+    conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+
+    def pct(a, b):
+        return round(100.0 * a / b, 1) if b else 0.0
+
+    dr = conn.execute(f"""
+        SELECT COALESCE(p.name_ko, p.name) name, m.team_id,
+               SUM(COALESCE(m.successful_dribbles, 0)) suc,
+               SUM(COALESCE(m.attempted_dribbles, 0)) att
+        FROM match_player_stats m LEFT JOIN players p ON p.id = m.player_id
+        WHERE m.minutes_played > 0 {date_cond} {league_cond}
+        GROUP BY m.player_id HAVING att >= 20
+        ORDER BY suc DESC LIMIT 6
+    """, base_params).fetchall()
+    dribble_top = [{"name": r["name"] or "", "team": _ko_team(r["team_id"], ""),
+                    "success": r["suc"], "attempts": r["att"], "rate": pct(r["suc"], r["att"])}
+                   for r in dr]
+
+    ae = conn.execute(f"""
+        SELECT COALESCE(p.name_ko, p.name) name, m.team_id,
+               SUM(COALESCE(m.aerial_won, 0)) won, SUM(COALESCE(m.aerial_lost, 0)) lost
+        FROM match_player_stats m LEFT JOIN players p ON p.id = m.player_id
+        WHERE m.minutes_played > 0 {date_cond} {league_cond}
+        GROUP BY m.player_id HAVING (won + lost) >= 30
+        ORDER BY won DESC LIMIT 6
+    """, base_params).fetchall()
+    aerial_top = [{"name": r["name"] or "", "team": _ko_team(r["team_id"], ""),
+                   "won": r["won"], "total": (r["won"] + r["lost"]),
+                   "rate": pct(r["won"], r["won"] + r["lost"])} for r in ae]
+
+    conn.close()
+    return jsonify({"dribble_top": dribble_top, "aerial_top": aerial_top})
+
+
 @app.route("/api/insights/card-rankings")
 @cached_response(ttl=1800)
 def insights_card_rankings():
