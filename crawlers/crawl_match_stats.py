@@ -85,6 +85,9 @@ def init_db(conn):
             duel_lost               INTEGER,
             aerial_won              INTEGER,
             aerial_lost             INTEGER,
+            won_tackle              INTEGER,
+            ball_recovery           INTEGER,
+            challenge_lost          INTEGER,
 
             -- 기타
             was_fouled              INTEGER,
@@ -190,6 +193,9 @@ def parse_stats(s):
         "duel_lost":            g("duelLost"),
         "aerial_won":           g("aerialWon"),
         "aerial_lost":          g("aerialLost"),
+        "won_tackle":           g("wonTackle"),
+        "ball_recovery":        g("ballRecovery"),
+        "challenge_lost":       g("challengeLost"),
         "was_fouled":           g("wasFouled"),
         "fouls":                g("fouls"),
         "yellow_cards":         g("yellowCard"),
