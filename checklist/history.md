@@ -27,6 +27,11 @@
 - **won_tackle 미사용 결정**: `tackles>0`인데 won_tackle NULL이 2026 17%(전체 20%) → 성공태클 교체 시 손실 큼 → totalTackle 유지.
 - 검증(prod 라이브 2026): 수비P 상위10 = 수비수7+미드3, 에드가 5.3(236위/380). 반영 4곳(main.py 3 + insights.js, index.html v35→v36).
 
+### 인사이트 리더보드 표본 기준 강화 (커밋 `e08f5ec`)
+- **문제**: per-90 합성지표(수비P·몸싸움P·창출P) 리더보드가 `mins≥90`(≈1경기)이라 소표본 왜곡. 전체 통과자의 35%(209/589)가 mins<450. 예) 몸싸움P 1위=기티스 7경기 284분, 수비P 5위=4경기 106분.
+- **수정**: 자격을 `games≥5 AND mins≥450`(5경기, per-90 안정화)으로 상향 — top-performers(전체비교+부문카드) / defender-score. insights.js 안내문구 + index.html v36→v37.
+- **검증(prod 라이브)**: 통과 589→380, 최소 경기수 5. 몸싸움P 1위 기티스(284분)→에드가(509분/13경기). 상위 전원 견고 표본.
+
 ---
 
 ## 2026-06-01 | 전문가 패널 보안 강화 세션 — 전체 요약
@@ -3592,3 +3597,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-09 15:41:14 | for i in $(seq 1 8); do h=$(ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=15 rocky@<PROD_IP> 'cd /opt/today_tactics && git rev-parse --short HEAD' 2>/dev/null | tr -d "[:space:]"); echo "try $i: prod HEAD=$h"; if [ "$h" = "36834b3" ]; then echo "SYNCED"; break; fi; sleep 8; done
 - 2026-06-09 15:41:30 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=30 rocky@<PROD_IP> 'cd /opt/today_tactics && venv/bin/python3 crawlers/backfill_duel_detail.py' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*|Could not create"
 - 2026-06-09 15:52:18 | for i in $(seq 1 8); do h=$(ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=15 rocky@<PROD_IP> 'cd /opt/today_tactics && git rev-parse --short HEAD' 2>/dev/null | tr -d "[:space:]"); if [ "$h" = "f86bb0d" ]; then echo "SYNCED at try $i"; break; fi; echo "try $i: $h"; sleep 8; done
+- 2026-06-09 16:01:18 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=20 rocky@<PROD_IP> 'cd /opt/today_tactics && echo "=== PROD git ===" && git log --oneline -3 && echo "HEAD=$(git rev-parse --short HEAD) origin=$(git rev-parse --short origin/main) dirty=$(git status --short | wc -l)" && echo "SERVICE=$(systemctl is-active today_tactics) HEALTH=$(curl -sf -o /dev/null -w %{http_code} http://127.0.0.1:5000/)"' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*|Could not create"
