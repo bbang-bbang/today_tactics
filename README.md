@@ -107,12 +107,12 @@ backfill 스크립트
 | 테이블 | 주요 컬럼 | 현재 레코드 수 |
 |--------|----------|--------------|
 | `teams` | id, name, league, tournament_id, season_id | K리그1/2/3 전 팀 |
-| `players` | id, team_id, name, name_ko, position, height | 1,125명 |
+| `players` | id, team_id, name, name_ko, position, height | 1,747명 |
 | `player_stats` | player_id, tournament_id, season_id, rating, goals... | 시즌 누적 스탯 |
-| `events` | id, home/away_team, date_ts, score, venue_* | 1,015경기 |
-| `heatmap_points` | player_id, event_id, x, y | 955,530점 |
-| `match_player_stats` | event_id, player_id, is_home, result, rating, 35개 스탯 + 날씨 | 19,822건 |
-| `goal_events` | player_id, event_id, minute, type | 1,442건 |
+| `events` | id, home/away_team, date_ts, score, venue_* | 2,862경기 |
+| `heatmap_points` | player_id, event_id, x, y | 1,134,337점 |
+| `match_player_stats` | event_id, player_id, is_home, result, rating, 35개 스탯 + 날씨 | 69,622건 |
+| `goal_events` | player_id, event_id, minute, type | 4,959건 |
 
 ### `match_player_stats` 주요 필드
 - `is_home`: 1=홈, 0=원정
@@ -123,16 +123,16 @@ backfill 스크립트
 
 ---
 
-## 수집 현황 (2026-04-15 기준)
+## 수집 현황 (2026-06-09 기준)
 
 | 항목 | 수치 |
 |------|------|
-| 2026 시즌 경기 결과 | 196건 (최신 경기일: 2026-04-12) |
-| 히트맵 좌표 | 955,530점 |
-| 수집 경기 수 | 1,015경기 |
-| 경기별 선수 스탯 | 19,822건 |
-| 골 이벤트 | 1,442건 |
-| 등록 선수 수 | 1,125명 |
+| 2026 시즌 경기 결과 (K1+K2) | 210경기 (최신 경기일: 2026-06-07) |
+| 히트맵 좌표 | 1,134,337점 |
+| 수집 경기 수 | 2,862경기 |
+| 경기별 선수 스탯 | 69,622건 |
+| 골 이벤트 | 4,959건 |
+| 등록 선수 수 | 1,747명 |
 
 ---
 
