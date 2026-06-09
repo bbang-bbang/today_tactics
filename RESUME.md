@@ -1,19 +1,20 @@
 # RESUME — 다른 PC / 새 세션에서 작업 재개 가이드
 
 > 이 파일 + `checklist/work-log-*.md` + git 커밋 기록만 보고 작업을 이어갈 수 있도록 정리.
-> 최종 갱신: 2026-06-05 (work-log: `checklist/work-log-2026-06-05.md`)
+> 최종 갱신: 2026-06-09 (history: `checklist/history.md` 2026-06-09 섹션)
 
 ---
 
-## 1. 현재 상태 (2026-06-05 종료 시점)
-- **브랜치/HEAD**: `main` — 이번 세션 4커밋 `b202619`(가독성) → `ee963fb`(팀 아이콘) → `1819fb0`(심화 인사이트+버그수정) → `fe63b9d`(파울 프루닝) + 본 문서 커밋. **origin push 완료**, 작업트리 clean. **운영 git pull 동기화 완료**(작업트리 clean — 2026-06-04의 scp/git 불일치 우려 해소).
-- **이번 세션 핵심 3가지**:
-  1. **🐛 team-analytics K1 버그 수정** — `tournament_id=777` 하드코딩으로 K1 팀에 엉뚱한 대회 표시되던 것(사용자가 느낀 "K1 데이터 이상"의 실제 원인) → 410/777 분기 + `home_score IS NOT NULL` 필터 추가. 상세 §9.
-  2. **심화 인사이트 탭 신규** — `/api/team-insights` + '📈 심화 인사이트' 탭 4종(시간대·선제골·xG누적·득점기여). 상세 §10.
-  3. **팀 분석 가독성 개선** — 상대전적 차트 단일화, 요약카드 리그순위 칩, 득실 마진 분포 차트.
-- **정적 자산 최신 버전**: `style.css?v=75`, `analytics.js?v=5` (이번 세션 변경분). 그 외 `workspace.js?v=5`, `insights.js?v=27`, `prediction.js?v=59`, `team_compare.js?v=12` 유지. 변경 시 `templates/index.html`의 `?v=` 동반 증가 필수.
-- **운영**: https://www.today-football-tactics.xyz 라이브. 이번 세션 배포는 **서버 `git fetch && git reset --hard origin/main` + `systemctl restart today_tactics`** (git pull 방식 — 정합성 유지). 라이브 검증 완료.
-- **데이터**: 서버가 **매주 월 05:00 cron `update_data.py` 자체 수집**. K1 **R1~R15(90경기) 완비**(점수·선수스탯·히트맵 90/90). **R16은 2026-07-04 재개**(2026 월드컵 6/11~7/19 휴식기) → 05-17~07-04 경기 없음, 미수집 아님. K2도 동일 휴식기.
+## 1. 현재 상태 (2026-06-09 종료 시점)
+- **브랜치/HEAD**: `main` `03d209c`. **origin push + 운영 git 동기화 완료**(로컬=origin=prod 일치, prod dirty 0 · 서비스 active · 헬스 200). 로컬 작업트리는 `checklist/history.md`에 자동로그(마스킹 훅) 한두 줄이 수시로 쌓여 dirty할 수 있음(감사 로그 — 배포 무관).
+- **이번 세션 핵심 (커밋 9개, history.md 2026-06-09 요약표 참조)**:
+  1. **K2 미수집 8경기 수집** (6/5~6/7): 로컬 DB가 5/31 정체 → `playwright`+chromium 설치 후 `update_data.py` STEP 0~16 완주. prod는 자체수집으로 대부분 보유, 천안–수원FC 히트맵만 보강. 2026 전수감사 누락 0.
+  2. **수비P 지표 재설계**: 구 공식이 공중볼·듀얼 포함+이중계상으로 공격수가 수비 상위 점령 → **수비P(순수 수비행동) / 몸싸움P(듀얼)** 2지표로 분리.
+  3. **수비 세부 3컬럼 백필**(`won_tackle`·`ball_recovery`·`challenge_lost`, raw_json 추출) + **수비P 정밀화**(볼회수×0.5−피드리블). won_tackle은 커버리지 17% NULL로 미사용(totalTackle 유지).
+  4. **인사이트 리더보드 표본 강화**: per-90 자격을 `mins≥90→450`(5경기)로 상향 — 소표본 왜곡(몸싸움P 1위가 284분 선수 등) 제거.
+- **정적 자산 최신 버전**: `insights.js?v=37` (이번 세션 변경분). 그 외 변경 시 `templates/index.html`의 `?v=` 동반 증가 필수.
+- **운영**: https://www.today-football-tactics.xyz 라이브. 배포는 **`git push origin main` → GitHub Actions가 forced-command `ci_deploy.sh`(fetch+reset+restart+health) 자동 실행**. prod에서 직접 크롤러/백필 실행 시 `venv/bin/python3` 사용(시스템 python3엔 playwright 없음).
+- **데이터**: 서버가 주기 cron `update_data.py` 자체 수집. **K2 6/7까지 완비**, K1 5/17까지. **다음 라운드 2026-07-04 재개**(월드컵 휴식기) → 그 사이 경기 없음(미수집 아님). 수비 세부 3컬럼은 로컬+prod DB 모두 백필 완료.
 - **⚠️ 남은 미완 1건**: 새 도메인 **OAuth 콘솔 redirect URI 등록 안 됨 → 로그인만 깨진 상태**(사이트 본체·데이터는 정상). §7 참조.
 
 ## 2. 새 PC 환경 세팅 (git에 없는 것 = gitignore)
@@ -21,9 +22,10 @@ git clone/pull 후 아래를 별도로 확보해야 **로컬 실행/배포** 가
 
 | 항목 | 비고 | 확보 방법 |
 |------|------|-----------|
-| `players.db` (~190MB) | SQLite DB (gitignored) | 서버 `/opt/today_tactics/players.db` 또는 일일 백업(03시)에서 scp / 또는 `python update_data.py` 재수집 |
-| `today-project.pem` | 가비아 SSH 키 (gitignored) | 안전 보관처에서 복사 → `~/.ssh/`에 두고 권한 제한 |
-| Python venv | (gitignored) | `python -m venv venv && pip install -r requirements.txt` |
+| `players.db` (~200MB) | SQLite DB (gitignored). **prod DB가 최신** — K2 6/7까지 + 수비 세부 3컬럼(won_tackle/ball_recovery/challenge_lost) 백필 포함 | `scp -i ~/.ssh/today-project.pem rocky@1.201.126.200:/opt/today_tactics/players.db .` (권장) / 또는 `python update_data.py` 재수집(오래 걸림) |
+| `today-project.pem` (+ `.pub` 사이드카) | 가비아 SSH 키 (gitignored). Windows ssh는 `.pub` 없으면 키 제시 실패 | 안전 보관처에서 복사 → `~/.ssh/`에 두고 `icacls`로 권한 제한. 없으면 `ssh-keygen -y -f <key> > <key>.pub` |
+| Python venv + 의존성 | (gitignored) | `python -m venv venv && pip install -r requirements.txt` |
+| Playwright chromium | 크롤러/`update_data.py` 실행 시 필수 | `playwright install chromium` (이 PC도 이번 세션에 설치함) |
 | `.update_secret_local.txt` | update 트리거 시크릿 (gitignored) | 필요 시 재생성 |
 | `saves/`, `squads/{team}_2026.json` 일부 | 사용자 저장물 (gitignored) | 없어도 앱 기동 가능 |
 
