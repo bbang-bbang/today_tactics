@@ -6702,6 +6702,14 @@
     "team_name": "충북청주",
     "players": [
       {
+        "number": 31,
+        "name": "공태윤",
+        "position": "GK",
+        "height": 182,
+        "weight": 70,
+        "dob": "2008/01/07"
+      },
+      {
         "number": 1,
         "name": "노동건",
         "position": "GK",
