@@ -65,7 +65,7 @@
       { label: "도움", key: "assists" },
       { label: "공격P", key: "attack_pts", primary: true, tip: "공격 기여 = 골 + 도움" },
       { label: "창출P", key: "create_score", tip: "창출 = (키패스 + 도움×2) / 90분" },
-      { label: "수비P", key: "def_score", tip: "수비 = (태클 + 인터셉트×1.5 + 클리어 + 슈팅차단) / 90분 — 순수 수비행동" },
+      { label: "수비P", key: "def_score", tip: "수비 = (태클 + 인터셉트×1.5 + 클리어 + 슈팅차단 + 볼회수×0.5 − 피드리블) / 90분 — 순수 수비행동" },
       { label: "몸싸움P", key: "duel_score", tip: "몸싸움 = (지상+공중 듀얼 승) / 90분 — 타깃형 공격수·센터백 등 피지컬 지배력" },
       RATING],
   };
@@ -296,7 +296,7 @@
          <ul class="ins-formula-list">
            ${fRow("공격P", "골 + 도움", aAtk)}
            ${fRow("창출P", "(키패스 + 도움×2) ÷ 90분", aCre)}
-           ${fRow("수비P", "(태클 + 인터셉트×1.5 + 클리어 + 슈팅차단) ÷ 90분", aDef)}
+           ${fRow("수비P", "(태클 + 인터셉트×1.5 + 클리어 + 슈팅차단 + 볼회수×0.5 − 피드리블) ÷ 90분", aDef)}
            ${fRow("몸싸움P", "(지상+공중 듀얼 승) ÷ 90분", aDuel)}
          </ul>
          <div class="ins-formula-sub">표본 3경기·90분↑ · 평균은 현재 표(리그·포지션) 기준 · 선수 행 클릭 시 xG·패스% 등 원자료</div>

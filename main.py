@@ -4824,6 +4824,7 @@ def insights_top_performers():
                SUM(COALESCE(m.key_passes,0)) as kp,
                SUM(COALESCE(m.tackles,0)) as tkl, SUM(COALESCE(m.interceptions,0)) as intc,
                SUM(COALESCE(m.clearances,0)) as clr, SUM(COALESCE(m.blocked_shots,0)) as blk,
+               SUM(COALESCE(m.ball_recovery,0)) as brc, SUM(COALESCE(m.challenge_lost,0)) as chl,
                SUM(COALESCE(m.aerial_won,0)) as aw, SUM(COALESCE(m.aerial_lost,0)) as al,
                SUM(COALESCE(m.duel_won,0)) as dw, SUM(COALESCE(m.duel_lost,0)) as dl,
                AVG(m.rating) as avg_rating, mp.position as main_pos
@@ -4866,9 +4867,10 @@ def insights_top_performers():
             "duel_pct": round((r["dw"] or 0) / duel_tot * 100) if duel_tot else None,
             # ── 파생 비교 점수 (90분 환산 합성 지표 — 포지션 무관 비교용) ──
             "create_score": round(((r["kp"] or 0) + (r["assists"] or 0) * 2) / mins * 90, 2) if mins else None,   # 창출P: 키패스 + 도움×2
-            # 수비P: 순수 수비행동만(태클+인터셉트×1.5+클리어+슈팅차단). 공중볼/듀얼은 역할의존적이라 제외 → 몸싸움P로 분리.
+            # 수비P: 순수 수비행동(태클+인터셉트×1.5+클리어+슈팅차단+볼회수×0.5−피드리블). 공중볼/듀얼은 역할의존적이라 제외 → 몸싸움P로 분리.
+            #   ball_recovery는 빈도가 높아 ×0.5, challenge_lost(피드리블)는 감점. won_tackle은 커버리지 결함(17%↑ NULL)으로 미사용.
             "def_score": round(((r["tkl"] or 0) + (r["intc"] or 0) * 1.5 + (r["clr"] or 0)
-                                 + (r["blk"] or 0)) / mins * 90, 1) if mins else None,
+                                 + (r["blk"] or 0) + (r["brc"] or 0) * 0.5 - (r["chl"] or 0)) / mins * 90, 1) if mins else None,
             # 몸싸움P: 지상+공중 듀얼 승(=duel_won, 공중볼 포함) / 90분. 타깃형 공격수의 몸싸움 지배력 표현용.
             "duel_score": round((r["dw"] or 0) / mins * 90, 1) if mins else None,
             "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
@@ -5554,12 +5556,13 @@ def insights_defender_score():
                COUNT(*) as games, SUM(m.minutes_played) as mins,
                SUM(m.tackles) as tkl, SUM(COALESCE(m.interceptions,0)) as intc,
                SUM(m.clearances) as clr, SUM(COALESCE(m.blocked_shots,0)) as blk,
+               SUM(COALESCE(m.ball_recovery,0)) as brc, SUM(COALESCE(m.challenge_lost,0)) as chl,
                SUM(m.aerial_won) as aer,
                SUM(m.duel_won) as duel, AVG(m.rating) as avg_rating
         FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
         WHERE m.position='D' AND m.minutes_played>0 {date_cond}
         GROUP BY m.player_id HAVING games>=3 AND mins>=90
-        ORDER BY (tkl + intc*1.5 + clr + blk) / mins DESC LIMIT 25
+        ORDER BY (tkl + intc*1.5 + clr + blk + brc*0.5 - chl) / mins DESC LIMIT 25
     """, date_params).fetchall()
     conn.close()
     return jsonify([{
@@ -5569,11 +5572,12 @@ def insights_defender_score():
         "games": r["games"], "mins": r["mins"],
         "tackles": r["tkl"] or 0, "interceptions": r["intc"] or 0,
         "clearances": r["clr"] or 0, "blocked_shots": r["blk"] or 0,
+        "ball_recovery": r["brc"] or 0, "challenge_lost": r["chl"] or 0,
         "aerial_won": r["aer"] or 0, "duel_won": r["duel"] or 0,
-        # 수비P: 순수 수비행동만(태클+인터셉트×1.5+클리어+슈팅차단). 공중볼/듀얼 제외.
+        # 수비P: 순수 수비행동(태클+인터셉트×1.5+클리어+슈팅차단+볼회수×0.5−피드리블). 공중볼/듀얼 제외.
         "def_score": round(
             ((r["tkl"] or 0) + (r["intc"] or 0)*1.5 + (r["clr"] or 0)
-             + (r["blk"] or 0)) / r["mins"] * 90, 2),
+             + (r["blk"] or 0) + (r["brc"] or 0)*0.5 - (r["chl"] or 0)) / r["mins"] * 90, 2),
         "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
     } for r in rows])
 
@@ -5632,6 +5636,8 @@ def insights_player_detail():
                m.key_passes, m.assists,
                m.tackles, COALESCE(m.interceptions, 0) as interceptions,
                m.clearances, COALESCE(m.blocked_shots, 0) as blocked_shots,
+               COALESCE(m.ball_recovery, 0) as ball_recovery,
+               COALESCE(m.challenge_lost, 0) as challenge_lost,
                m.aerial_won, m.duel_won,
                m.total_shots, m.shots_on_target
         FROM match_player_stats m
@@ -5645,10 +5651,11 @@ def insights_player_detail():
         opp_id   = r["away_team_id"] if r["is_home"] else r["home_team_id"]
         opp_name = r["away_team_name"] if r["is_home"] else r["home_team_name"]
         score    = f"{r['home_score']}-{r['away_score']}"
-        # 수비P: 순수 수비행동만(태클+인터셉트×1.5+클리어+슈팅차단). 공중볼/듀얼 제외.
+        # 수비P: 순수 수비행동(태클+인터셉트×1.5+클리어+슈팅차단+볼회수×0.5−피드리블). 공중볼/듀얼 제외.
         def_score = round(
             ((r["tackles"] or 0) + (r["interceptions"] or 0)*1.5
-             + (r["clearances"] or 0) + (r["blocked_shots"] or 0))
+             + (r["clearances"] or 0) + (r["blocked_shots"] or 0)
+             + (r["ball_recovery"] or 0)*0.5 - (r["challenge_lost"] or 0))
             / r["minutes_played"] * 90, 2
         ) if r["minutes_played"] else 0
         matches.append({
