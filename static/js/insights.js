@@ -299,7 +299,7 @@
            ${fRow("수비P", "(태클 + 인터셉트×1.5 + 클리어 + 슈팅차단 + 볼회수×0.5 − 피드리블) ÷ 90분", aDef)}
            ${fRow("몸싸움P", "(지상+공중 듀얼 승) ÷ 90분", aDuel)}
          </ul>
-         <div class="ins-formula-sub">표본 3경기·90분↑ · 평균은 현재 표(리그·포지션) 기준 · 선수 행 클릭 시 xG·패스% 등 원자료</div>
+         <div class="ins-formula-sub">표본 5경기·450분↑(per-90 안정화) · 평균은 현재 표(리그·포지션) 기준 · 선수 행 클릭 시 xG·패스% 등 원자료</div>
        </div>`;
     body.innerHTML =
       `${formulaNote}<div class="ins-top-scroll"><table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table></div>${moreBtn}`;

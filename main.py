@@ -4840,7 +4840,7 @@ def insights_top_performers():
             ) WHERE rn=1
         ) mp ON mp.player_id = m.player_id
         WHERE m.position IN ('F','M','D') AND m.minutes_played>0 {date_cond} {league_cond}
-        GROUP BY m.player_id HAVING games>=3 AND mins>=90
+        GROUP BY m.player_id HAVING games>=5 AND mins>=450
         ORDER BY mins DESC LIMIT 600
     """, date_params + date_params + league_params).fetchall()
 
@@ -5561,7 +5561,7 @@ def insights_defender_score():
                SUM(m.duel_won) as duel, AVG(m.rating) as avg_rating
         FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
         WHERE m.position='D' AND m.minutes_played>0 {date_cond}
-        GROUP BY m.player_id HAVING games>=3 AND mins>=90
+        GROUP BY m.player_id HAVING games>=5 AND mins>=450
         ORDER BY (tkl + intc*1.5 + clr + blk + brc*0.5 - chl) / mins DESC LIMIT 25
     """, date_params).fetchall()
     conn.close()
