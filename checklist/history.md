@@ -6,6 +6,22 @@
 
 ## 2026-06-09 | K2 미수집 8경기 수집 + def_score(수비P) 지표 재설계
 
+### 이번 세션 커밋 (8개)
+
+| 커밋 | 내용 |
+|------|------|
+| `599973b` | K2 R5~R7 8경기 수집 (결과·선수스탯·히트맵·라인업·날씨) |
+| `184a504` | README 수치 최신화(2026-06-09) + history 6/9 기록 |
+| `c1be6e2` | 수비P 재설계 — 순수 수비행동 + 몸싸움P 분리 (공중볼/듀얼 이중계상 제거) |
+| `36834b3` | 수비 세부지표(won_tackle/ball_recovery/challenge_lost) 백필 + 크롤러 매핑 |
+| `f86bb0d` | 수비P 정밀화 — 볼회수(×0.5)·피드리블(감점) 반영 |
+| `4f5c1aa` | history 정밀화 기록 |
+| `e08f5ec` | 인사이트 리더보드 표본 기준 강화 (mins≥90→450, 5경기) |
+| `f5adfed` | history 표본 기준 강화 기록 |
+
+> DB(`players.db`)는 gitignored — 코드/JSON/문서만 커밋. K2 8경기 수집·수비 세부 3컬럼 백필은 로컬+운영 DB에 직접 적용(외부 커밋 없음).
+> 변경 파일 누계: `main.py`(수비P 산식 3곳·표본 HAVING 2곳), `static/js/insights.js`(컬럼·카드·툴팁·표본문구), `templates/index.html`(insights.js v34→v37), `crawlers/`(backfill_duel_detail 신규 + backfill_k1_mps·crawl_match_stats 매핑), `data/*.json`, `README.md`, `checklist/history.md`.
+
 ### 작업 요약
 - **K리그2 6/5~6/7 8경기 수집** (대구-파주 등 3 / 6.6 2 / 6.7 3): 로컬 DB가 5/31에서 정체돼 미수집이던 상태.
   로컬에 `playwright`+chromium 설치 후 `update_data.py` STEP 0~16 전체 완주 → 결과·선수스탯(38~40명)·히트맵(1.2~1.5K pts/경기)·라인업·평균위치·슈팅맵·골/카드·경기장·날씨·포메이션 전부 수집.
@@ -3598,3 +3614,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-09 15:41:30 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=30 rocky@<PROD_IP> 'cd /opt/today_tactics && venv/bin/python3 crawlers/backfill_duel_detail.py' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*|Could not create"
 - 2026-06-09 15:52:18 | for i in $(seq 1 8); do h=$(ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=15 rocky@<PROD_IP> 'cd /opt/today_tactics && git rev-parse --short HEAD' 2>/dev/null | tr -d "[:space:]"); if [ "$h" = "f86bb0d" ]; then echo "SYNCED at try $i"; break; fi; echo "try $i: $h"; sleep 8; done
 - 2026-06-09 16:01:18 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=20 rocky@<PROD_IP> 'cd /opt/today_tactics && echo "=== PROD git ===" && git log --oneline -3 && echo "HEAD=$(git rev-parse --short HEAD) origin=$(git rev-parse --short origin/main) dirty=$(git status --short | wc -l)" && echo "SERVICE=$(systemctl is-active today_tactics) HEALTH=$(curl -sf -o /dev/null -w %{http_code} http://127.0.0.1:5000/)"' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*|Could not create"
+- 2026-06-09 17:31:33 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=20 rocky@<PROD_IP> 'cd /opt/today_tactics && echo "=== PROD ===" && git log --oneline -3 && echo "HEAD=$(git rev-parse --short HEAD) origin=$(git rev-parse --short origin/main) dirty=$(git status --short | wc -l)" && echo "SERVICE=$(systemctl is-active today_tactics) HEALTH=$(curl -sf -o /dev/null -w %{http_code} http://127.0.0.1:5000/)"' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*|Could not create"
