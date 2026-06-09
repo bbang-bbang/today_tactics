@@ -4,7 +4,7 @@
 
 ---
 
-## 2026-06-09 | K2 미수집 8경기 수집 + def_score(수비P) 지표 결함 발견
+## 2026-06-09 | K2 미수집 8경기 수집 + def_score(수비P) 지표 재설계
 
 ### 작업 요약
 - **K리그2 6/5~6/7 8경기 수집** (대구-파주 등 3 / 6.6 2 / 6.7 3): 로컬 DB가 5/31에서 정체돼 미수집이던 상태.
@@ -14,12 +14,14 @@
   2026시즌 전수 감사: 치러진 210경기(L1 90+L2 120) 선수스탯·히트맵·경기장·날씨 누락 **0건**. (다음 라운드 7/4 — 현재 휴식기)
 - **README 수치 최신화**: DB 스키마/수집현황을 2026-06-09 기준으로 갱신(players 1,747 · events 2,862 · heatmap 1,134,337 · mps 69,622 · goal 4,959).
 
-### def_score(수비P) 지표 결함 — **미수정, 논의 필요**
-- 공식: `(태클 + 인터셉트×1.5 + 클리어 + 공중볼승 + 듀얼승) / 90` — `main.py` L4869·L5569·L5642 + `insights.js`(수비P 컬럼).
-- **문제①**: 공중볼승·듀얼승 포함 → 타깃형 공격수가 "수비P" 상위 점령. 대구 에드가 기준 태클+인터셉트+클리어는 **14%**뿐, 공중볼(35%)+듀얼(51%)=**86%**.
-- **문제②**: `duel_won`(총 듀얼 승)에 공중볼 경합이 이미 포함 → `aerial_won` 추가 합산은 **이중계상**.
-- 결과: 수비P 상위 12명 중 다수가 공격수(F: 펠리피 실바·비요른 욘센·홀름베르트 등) — 지표 타당성 훼손.
-- **후속 후보**: def_score를 순수 수비행동(태클+인터셉트+클리어+슈팅차단) 기반으로 재설계하거나, 공중/몸싸움을 별도 "physical/duel" 지표로 분리 + 이중계상 제거.
+### def_score(수비P) 지표 결함 → 재설계 **완료**
+- **구 공식 문제**: `(태클+인터셉트×1.5+클리어+공중볼승+듀얼승)/90` — ① 공중볼·듀얼 포함 → 타깃형 공격수가 수비P 상위 점령(에드가 실수비 14%, 공중35%+듀얼51%=86%). ② `duel_won`에 공중볼 이미 포함인데 `aerial_won` 또 합산 → 이중계상(37,955행 검증 0 violation으로 aerial⊂duel 확정). ③ SofaScore 원본엔 공/수 듀얼 분리 필드 없음(raw_json 확인) → "수비 듀얼만" 추출 불가.
+- **수정**: 두 개의 정직한 지표로 분리.
+  - **수비P** = `(태클+인터셉트×1.5+클리어+슈팅차단)/90` — 순수 수비행동(포지션 무관). 공격수는 자연히 하위(정상).
+  - **몸싸움P**(신규) = `(지상+공중 듀얼 승=duel_won)/90` — 타깃맨·센터백의 피지컬 지배력.
+- **적용**: `main.py` 3곳(전체비교 `result["all"]` / `/api/insights/defender-score` 공식+ORDER BY / `/api/insights/player-detail` 경기별, blocked_shots SELECT 추가) + `static/js/insights.js`(컬럼·카드·드로어 툴팁) + `index.html` insights.js v34→v35.
+- **검증(prod DB)**: 새 수비P 상위 10 = **전원 수비수(D)**. 에드가 수비P 19.0→**3.02(662위/1009)**, 몸싸움P **9.64(15위)**. 몸싸움P 상위 = 공격수/미드(펠리피 실바·비요른 욘센 등).
+- 향후: `ball_recovery`·`won_tackle`·`challenge_lost`를 raw_json 백필하면 수비P 정밀도 추가 향상 가능(미적용).
 
 ---
 
@@ -3579,3 +3581,6 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-09 13:11:07 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=20 rocky@<PROD_IP> 'cd /opt/today_tactics && nm=$(python3 -c "import sqlite3;c=sqlite3.connect(\"players.db\");pid=c.execute(\"SELECT player_id FROM heatmap_points WHERE event_id=15403899 LIMIT 1\").fetchone()[0];print(c.execute(\"SELECT COALESCE(name_ko,name) FROM players WHERE id=?\",(pid,)).fetchone()[0])") && echo "player=$nm" && curl -s -G -o /tmp/hm.json -w "HTTP=%{http_code} bytes=%{size_download}\n" "http://127.0.0.1:5000/api/heatmap" --data-urlencode "name=$nm" --data-urlencode "eventId=15403899" && python3 -c "import json;d=json.load(open(\"/tmp/hm.json\"));print(\"points:\",len(d.get(\"points\",[])),\"found:\",d.get(\"found\"))"' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*"
 - 2026-06-09 13:11:28 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=20 rocky@<PROD_IP> 'cd /opt/today_tactics && python3 -c " / import sqlite3 / c=sqlite3.connect(\"players.db\") / rows=c.execute(\"SELECT player_id, COUNT(*) n FROM heatmap_points WHERE event_id=15403899 GROUP BY player_id ORDER BY n DESC LIMIT 3\").fetchall() / for pid,n in rows: /     nm=c.execute(\"SELECT COALESCE(name_ko,name) FROM players WHERE id=?\",(pid,)).fetchone() /     dup=c.execute(\"SELECT COUNT(*) FROM players WHERE COALESCE(name_ko,name)=?\",(nm[0] if nm else \"\",)).fetchone()[0] /     print(pid, nm[0] if nm else \"?\", \"pts=%d\"%n, \"dup_names=%d\"%dup) / "' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*"
 - 2026-06-09 15:01:43 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=20 rocky@<PROD_IP> 'cd /opt/today_tactics && echo "=== PROD git ===" && git log --oneline -1 && echo "HEAD: $(git rev-parse HEAD)" && echo "origin/main: $(git rev-parse origin/main 2>/dev/null)" && echo "dirty: $(git status --short | wc -l) files" && echo "SERVICE: $(systemctl is-active today_tactics)" && echo "HEALTH: $(curl -sf -o /dev/null -w %{http_code} http://127.0.0.1:5000/)"' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*"
+- 2026-06-09 15:11:04 | for i in 1 2 3 4 5 6; do h=$(ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=15 rocky@<PROD_IP> 'cd /opt/today_tactics && git rev-parse --short HEAD' 2>/dev/null | tr -d "[:space:]"); echo "try $i: prod HEAD=$h"; if [ "$h" = "184a504" ]; then echo "SYNCED"; break; fi; sleep 10; done
+- 2026-06-09 15:15:32 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=20 rocky@<PROD_IP> 'cd /opt/today_tactics && python3 -c " / import sqlite3 / c=sqlite3.connect(\"players.db\") / cols=[r[1] for r in c.execute(\"PRAGMA table_info(match_player_stats)\").fetchall()] / duelish=[x for x in cols if any(k in x.lower() for k in [\"duel\",\"aerial\",\"ground\",\"challenge\",\"tackle\",\"dribbl\",\"contest\"])] / print(\"duel/aerial-ish cols:\", duelish) / print() / print(\"ALL cols (%d):\"%len(cols)) / print(cols) / "' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*|Could not create"
+- 2026-06-09 15:15:56 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=20 rocky@<PROD_IP> 'cd /opt/today_tactics && python3 -c " / import sqlite3, json / c=sqlite3.connect(\"players.db\") / # grab a raw_json sample with content / row=c.execute(\"SELECT player_name, raw_json FROM match_player_stats WHERE raw_json IS NOT NULL AND length(raw_json)>50 ORDER BY id DESC LIMIT 1\").fetchone() / print(\"sample player:\", row[0]) / d=json.loads(row[1]) / # raw_json might be the statistics dict directly or nested / keys=list(d.keys()) / print(\"top-level keys (%d):\"%len(keys)) / print(keys) / print() / # find duel/aerial/duel-related keys anywhere / def walk(o,prefix=\"\"): /     out=[] /     if isinstance(o,dict): /         for k,v in o.items(): /             if any(t in k.lower() for t in [\"duel\",\"aerial\",\"ground\",\"challenge\",\"contest\",\"dispossess\",\"tackle\",\"defens\",\"offens\",\"attack\"]): /                 out.append((prefix+k, v)) /             out+=walk(v,prefix+k+\".\") /     return out / hits=walk(d) / print(\"duel/attack/defense-related keys in raw_json:\") / for k,v in hits: print(\"  %s = %s\"%(k,v)) / "' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*|Could not create"

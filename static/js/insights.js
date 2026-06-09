@@ -65,7 +65,8 @@
       { label: "도움", key: "assists" },
       { label: "공격P", key: "attack_pts", primary: true, tip: "공격 기여 = 골 + 도움" },
       { label: "창출P", key: "create_score", tip: "창출 = (키패스 + 도움×2) / 90분" },
-      { label: "수비P", key: "def_score", tip: "수비 = (태클 + 인터셉트×1.5 + 클리어 + 공중볼승 + 듀얼승) / 90분" },
+      { label: "수비P", key: "def_score", tip: "수비 = (태클 + 인터셉트×1.5 + 클리어 + 슈팅차단) / 90분 — 순수 수비행동" },
+      { label: "몸싸움P", key: "duel_score", tip: "몸싸움 = (지상+공중 듀얼 승) / 90분 — 타깃형 공격수·센터백 등 피지컬 지배력" },
       RATING],
   };
 
@@ -76,6 +77,7 @@
     { label: "결정력",     icon: "🎯", key: "xg_diff",     fmt: v => `${v > 0 ? "+" : ""}${v}` },
     { label: "창출",       icon: "🧠", key: "create_score",fmt: v => `${v}` },
     { label: "수비",       icon: "🛡️", key: "def_score",   fmt: v => `${v}` },
+    { label: "몸싸움",     icon: "💪", key: "duel_score",  fmt: v => `${v}` },
     { label: "평점",       icon: "⭐", key: "rating",      fmt: v => `${v}` },
   ];
 
@@ -285,7 +287,7 @@
       const v = raw.map(r => r[k]).filter(x => x != null);
       return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
     };
-    const aAtk = avg("attack_pts").toFixed(1), aCre = avg("create_score").toFixed(1), aDef = avg("def_score").toFixed(1);
+    const aAtk = avg("attack_pts").toFixed(1), aCre = avg("create_score").toFixed(1), aDef = avg("def_score").toFixed(1), aDuel = avg("duel_score").toFixed(1);
     const fRow = (name, formula, avgv) =>
       `<li><span class="ins-fm-name">${name}</span><span class="ins-fm-eq">${formula}</span><span class="ins-formula-avg">평균 ${avgv}</span></li>`;
     const formulaNote =
@@ -294,7 +296,8 @@
          <ul class="ins-formula-list">
            ${fRow("공격P", "골 + 도움", aAtk)}
            ${fRow("창출P", "(키패스 + 도움×2) ÷ 90분", aCre)}
-           ${fRow("수비P", "(태클 + 인터셉트×1.5 + 클리어 + 공중볼승 + 듀얼승) ÷ 90분", aDef)}
+           ${fRow("수비P", "(태클 + 인터셉트×1.5 + 클리어 + 슈팅차단) ÷ 90분", aDef)}
+           ${fRow("몸싸움P", "(지상+공중 듀얼 승) ÷ 90분", aDuel)}
          </ul>
          <div class="ins-formula-sub">표본 3경기·90분↑ · 평균은 현재 표(리그·포지션) 기준 · 선수 행 클릭 시 xG·패스% 등 원자료</div>
        </div>`;
