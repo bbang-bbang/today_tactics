@@ -4635,20 +4635,24 @@ def _heatmap_teams_for_league(tournament_id, league_label=None):
 
 def _heatmap_players_for_team(team_id, tournament_id):
     conn = sqlite3.connect(DB_PATH)
+    # games = 히트맵 보유 경기수. HAVING games>0 → 히트맵 데이터 없는 선수(예: 일부 백업 GK) 제외
+    # (mps엔 있으나 heatmap_points 없는 선수를 누르면 빈 히트맵이 떠서 목록에서 빼는 게 맞음)
     rows = conn.execute("""
         SELECT mps.player_id,
                COALESCE(p.name_ko, NULLIF(mps.player_name,''), p.name) AS name,
                COALESCE(mps.position, p.position) AS pos,
-               COUNT(DISTINCT mps.event_id) as games,
+               (SELECT COUNT(DISTINCT hp.event_id)
+                  FROM heatmap_points hp JOIN events e2 ON e2.id = hp.event_id
+                  WHERE hp.player_id = mps.player_id AND e2.tournament_id = ?) AS games,
                ROUND(AVG(mps.rating), 2) as avg_rating
         FROM match_player_stats mps
         JOIN events e ON mps.event_id = e.id
         LEFT JOIN players p ON mps.player_id = p.id
         WHERE mps.team_id = ? AND e.tournament_id = ?
         GROUP BY mps.player_id
-        HAVING name IS NOT NULL
+        HAVING name IS NOT NULL AND games > 0
         ORDER BY games DESC, name
-    """, (team_id, tournament_id)).fetchall()
+    """, (tournament_id, team_id, tournament_id)).fetchall()
     conn.close()
     return [{
         "playerId": r[0], "name": r[1], "position": r[2],

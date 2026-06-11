@@ -2899,8 +2899,9 @@ body {
     position: relative;
     border-radius: 8px;
     overflow: hidden;
+    max-width: 500px;   /* 인라인 탭에서 경기장·히트맵이 과도하게 커지지 않게 제한 (native 600x390) */
 }
-#k2-heatmap-canvas { display: block; width: 100%; border-radius: 8px; }
+#k2-heatmap-canvas { display: block; width: 100%; height: auto; border-radius: 8px; }
 .k2-loading {
     position: absolute;
     inset: 0;
