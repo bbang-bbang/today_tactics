@@ -4607,23 +4607,28 @@ def _league_tid(league_raw):
     return LEAGUE_TOURNAMENT_ID.get(key)
 
 
-def _heatmap_teams_for_league(tournament_id):
+def _heatmap_teams_for_league(tournament_id, league_label=None):
+    """히트맵 팀 그리드 — 현 시즌 해당 리그(TEAMS.league) 소속 팀만.
+    과거에 강등/승격으로 이 토너먼트에 등장했던 팀은 제외(현재 리그 기준 정리).
+    데이터(mps) 보유 팀으로 교차해 빈 팀 노출 방지."""
     conn = sqlite3.connect(DB_PATH)
+    # (구) team_id != 7652(수원삼성) 제외 제거 — 수원삼성은 현 2026 K2 정식 팀.
+    # 교차 리그 잔재는 아래 TEAMS.league 필터가 처리하므로 데이터 보유 팀만 모으면 충분.
     rows = conn.execute("""
         SELECT DISTINCT mps.team_id
         FROM match_player_stats mps
         JOIN events e ON mps.event_id = e.id
-        WHERE e.tournament_id = ? AND mps.team_id != 7652
-        ORDER BY mps.team_id
+        WHERE e.tournament_id = ?
     """, (tournament_id,)).fetchall()
     conn.close()
-    team_map = {t["sofascore_id"]: t for t in TEAMS}
-    result = []
-    for (tid,) in rows:
-        t = team_map.get(tid)
-        if t:
-            result.append({"id": t["id"], "sofascore_id": tid, "name": t["name"],
-                           "short": t["short"], "emblem": t["emblem"], "primary": t["primary"]})
+    have_data = {r[0] for r in rows}
+    result = [
+        {"id": t["id"], "sofascore_id": t["sofascore_id"], "name": t["name"],
+         "short": t["short"], "emblem": t["emblem"], "primary": t["primary"]}
+        for t in TEAMS
+        if (league_label is None or t.get("league") == league_label)
+        and t["sofascore_id"] in have_data
+    ]
     result.sort(key=lambda x: x["name"])
     return result
 
@@ -4732,10 +4737,10 @@ def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id, venu
 
 @app.route("/api/kleague2/teams")
 def get_kleague2_teams():
-    """히트맵 데이터가 있는 K리그2 팀 목록 (수원 삼성 제외)"""
+    """현 시즌 K리그2 팀 목록 (TEAMS.league=K2, 데이터 보유 — 수원삼성 포함)"""
     if not os.path.exists(DB_PATH):
         return jsonify([])
-    return jsonify(_heatmap_teams_for_league(LEAGUE_TOURNAMENT_ID["k2"]))
+    return jsonify(_heatmap_teams_for_league(LEAGUE_TOURNAMENT_ID["k2"], "K2"))
 
 
 @app.route("/api/kleague1/teams")
@@ -4743,7 +4748,7 @@ def get_kleague1_teams():
     """히트맵 데이터가 있는 K리그1 팀 목록"""
     if not os.path.exists(DB_PATH):
         return jsonify([])
-    return jsonify(_heatmap_teams_for_league(LEAGUE_TOURNAMENT_ID["k1"]))
+    return jsonify(_heatmap_teams_for_league(LEAGUE_TOURNAMENT_ID["k1"], "K1"))
 
 
 @app.route("/api/kleague2/players")
