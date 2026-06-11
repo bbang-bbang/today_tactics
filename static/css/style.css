@@ -2803,8 +2803,16 @@ body {
 .k2-year-filter {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 6px;
     margin: 8px 0 2px;
+}
+.k2-year-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #9aa;
+    letter-spacing: -0.01em;
+    margin-right: 2px;
 }
 .k2-year-btn {
     appearance: none;

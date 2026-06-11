@@ -569,8 +569,13 @@
     function renderYearFilter() {
         if (!yearFilter) return;
         yearFilter.innerHTML = "";
-        if (currentSeasons.length <= 1) { yearFilter.style.display = "none"; return; }
+        if (currentSeasons.length < 1) { yearFilter.style.display = "none"; return; }  // 데이터 없을 때만 숨김
         yearFilter.style.display = "";
+        // 라벨: 시즌 필터임을 명시
+        const lbl = document.createElement("span");
+        lbl.className = "k2-year-label";
+        lbl.textContent = "시즌";
+        yearFilter.appendChild(lbl);
         ["전체", ...currentSeasons].forEach(y => {
             const isAll = (y === "전체");
             const btn = document.createElement("button");
