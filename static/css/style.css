@@ -2827,6 +2827,10 @@ body {
     box-shadow: 0 8px 24px rgba(0,0,0,0.45);
 }
 .k2-quick-results.hidden { display: none; }
+/* 히트맵 단계 전환 — 전역 .hidden 규칙이 없어 step별 명시 (showStep 상호배타) */
+#k2-step-team.hidden,
+#k2-step-player.hidden,
+#k2-step-heatmap.hidden { display: none; }
 .k2-quick-item {
     display: flex;
     align-items: center;
@@ -8459,6 +8463,9 @@ body.pr-expanded-lock {
 /* 인라인 시 모달 내부 "닫기" 버튼은 불필요(탭이 가시성 관리) */
 .ws-panel .modal-content > .analytics-header #analytics-close,
 .ws-panel #tc-close { display: none; }
+/* 히트맵 인라인: 닫기 액션바 숨김 + 폭 채우기 */
+#ws-heatmap .modal-actions { display: none; }
+#ws-heatmap .k2-heatmap-content { width: 100%; }
 
 /* 팀 선택 통합: 팀 분석 자체 드롭다운 숨김(팀 비교의 팀 A가 구동) */
 .ws-panel #analytics-team-select { display: none; }

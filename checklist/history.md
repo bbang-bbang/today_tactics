@@ -39,6 +39,13 @@
 - **년도 필터 추가**(핵심): `_heatmap_points_for_player`·`_position_heatmap`에 `year` 파라미터 + `_year_range` 시즌 필터. **시즌 혼합 결함 해결** — 응답에 `seasons` 목록 추가, 프론트 년도 버튼(다중 시즌 선수만 노출). 비교 오버레이도 같은 시즌 재요청. 검증: 홍정호 전체 9030pts(6시즌)→2025만 2094·2023만 1244, position D 전체 81365→2026만 56512.
 - **검색 우선**: 모달 열면 통합검색 자동 포커스. `index.html` v=4→5. qa_check **31/31 PASS**.
 
+### 최종 — 레이아웃 재배치: 히트맵을 5번째 워크스페이스 탭으로 (팝업 제거)
+- **PM 재판단**: "팝업이라 따로 논다"는 피드백 → 앱에 이미 워크스페이스 탭(전술판·경기예측·팀·선수) + 모달→패널 인라인화 패턴(`workspace.js`)이 있어 **대수술 아님**. 🔥 히트맵을 **5번째 탭**으로 승격.
+- **변경**: `index.html` 탭 버튼+`#ws-heatmap` 패널 추가, 전술판 툴바 `btn-k2-heatmap` 제거. `workspace.js` `move("heatmap",["k2-heatmap-modal"])` + onShow에서 `window.initK2HeatmapView()` 최초 1회 init. `k2heatmap.js` btnOpen 가드+init 함수 노출. CSS: 인라인 닫기/액션 숨김.
+- **버그 수정**(브라우저 검증 중 발견): 전역 `.hidden` 규칙 부재로 인라인 시 step(team/player/heatmap) 3개가 동시 노출 → `#k2-step-*.hidden{display:none}` 명시 추가. (모달 시절 잠재 결함이었을 수 있음)
+- **브라우저 검증(Playwright)**: 탭 클릭→패널 표시·모달 패널이동·통합검색(API 200,2건)·선수진입·비교(포지션평균)→범례+인사이트 배너 표시, step 상호배타, **pageerror 0**. (404는 빈 엠블럼 1건, 무해)
+- `index.html` k2heatmap v5→6·workspace v5→6·style v76→77. qa_check **31/31 PASS**.
+
 ---
 
 ## 2026-06-11 | PM 주도 — 데이터 정합성 재감사 + backlog stale 정리

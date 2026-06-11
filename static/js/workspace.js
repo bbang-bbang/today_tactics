@@ -15,6 +15,7 @@
         predict: $("ws-predict"),
         team:    $("ws-team"),
         player:  $("ws-player"),
+        heatmap: $("ws-heatmap"),
     };
     if (!panels.tactics) return; // 셸 미존재 시 무동작(레거시 안전)
 
@@ -29,6 +30,7 @@
     // 팀 탭: 단일 팀 분석(team-analysis-modal) + 팀 비교(team-compare-modal) — 모드 토글로 전환
     move("team",    ["team-analysis-modal", "team-compare-modal"]);
     move("player",  ["insights-section"]);
+    move("heatmap", ["k2-heatmap-modal"]);
 
     // 비워진 구조 래퍼(#board-report-wrap)는 박스를 생성하지 않도록 처리(잔여 여백 제거)
     const _wrap = $("board-report-wrap");
@@ -89,6 +91,10 @@
         },
         player() {
             requestAnimationFrame(() => resizeChartsIn(panels.player));
+        },
+        heatmap() {
+            // 인라인 히트맵 뷰 최초 노출 시 초기화(팀 그리드 로드 + 검색 포커스)
+            if (window.initK2HeatmapView) window.initK2HeatmapView();
         },
     };
 

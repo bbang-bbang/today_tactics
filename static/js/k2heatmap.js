@@ -53,15 +53,23 @@
     const apiBase = () => `/api/kleague${currentLeague === "k1" ? "1" : "2"}`;
 
     // ── 열기/닫기 ──────────────────────────────────────────
-    btnOpen.addEventListener("click", () => {
+    // 히트맵 뷰 초기화 (팀 그리드 로드 + 검색 포커스). 워크스페이스 탭 최초 노출 시 호출.
+    let _viewInited = false;
+    function initView() {
         modal.classList.remove("hidden");
-        showStep("team");
-        loadTeams();
-        // 검색 우선 — 선수명으로 바로 조회 유도
+        if (!_viewInited) {
+            _viewInited = true;
+            showStep("team");
+            loadTeams();
+        }
         if (quickSearch) setTimeout(() => quickSearch.focus(), 60);
-    });
+    }
+    // 워크스페이스(workspace.js)에서 탭 노출 시 호출 — 레거시 버튼(btnOpen)도 있으면 지원
+    window.initK2HeatmapView = initView;
+    if (btnOpen) btnOpen.addEventListener("click", initView);
+    // 인라인 패널에서는 backdrop/닫기 버튼이 CSS로 숨겨짐 — 존재 시에만 바인딩(레거시 모달 호환)
     [btnClose, backdrop].forEach(el =>
-        el.addEventListener("click", () => modal.classList.add("hidden"))
+        el && el.addEventListener("click", () => modal.classList.add("hidden"))
     );
     backTeam.addEventListener("click",   () => showStep("team"));
     backPlayer.addEventListener("click", () => showStep("player"));
