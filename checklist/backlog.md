@@ -6,9 +6,13 @@
 
 ## 🔴 P1 — 가치 큰 단기 작업
 
-### [ ] Google OAuth 발급 + LOGIN_REQUIRED=1 활성화 — 2026-06-01 진행 중
+### [ ] (보류) Google OAuth 발급 + LOGIN_REQUIRED=1 활성화 — 2026-06-11 보류 결정
 
-**상태**: Google Cloud Console에서 OAuth 앱 등록 대기 중
+**상태**: ⏸ **보류** — 트래픽/개인화 필요 시 재개. PM 판단(6/11):
+- 핵심 보안(SECRET_KEY 고정·CSP·cache-invalidate 차단·MAX_CONTENT_LENGTH 등)은 6/1에 이미 완료. 공격면은 막혀 있음.
+- OAuth가 막는 건 "익명 사용자의 saves/squads 생성·수정·삭제"(무결성·스팸 수준) 뿐 — 데이터 유출/서버 탈취 급 리스크 아님.
+- **재개 조건**: ① 저장본 스팸·장난 흔적이 실제로 관측됨 ② 사용자별 "내 전술판" 개인화 기능이 필요해짐.
+- **저비용 대안**(원하면): 쓰기 API에 단순 공유 토큰 게이트만 적용(Google Console 불필요, ~10분).
 
 **필요한 것**:
 - [Google Cloud Console](https://console.cloud.google.com) → OAuth 2.0 클라이언트 ID 발급
