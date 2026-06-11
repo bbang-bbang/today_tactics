@@ -157,17 +157,18 @@
         positions.forEach(pos => {
             if (!grouped[pos].length) return;
             const label = { G:"GK", D:"DF", M:"MF", F:"FW" }[pos];
+            const pc = "pos-" + pos.toLowerCase();
             const header = document.createElement("div");
-            header.className = "k2-pos-header";
-            header.textContent = label;
+            header.className = "k2-pos-header " + pc;
+            header.innerHTML = `${label}<span class="k2-pos-count">${grouped[pos].length}</span>`;
             playerList.appendChild(header);
 
             grouped[pos].forEach(p => {
                 const el = document.createElement("div");
-                el.className = "k2-player-row";
+                el.className = "k2-player-row " + pc;
                 el.innerHTML = `
                     <span class="k2-player-name">${p.name}</span>
-                    <span class="k2-player-meta">${p.games}경기 ${p.avgRating ? "⭐"+p.avgRating : ""}</span>`;
+                    <span class="k2-player-meta">${p.avgRating ? `<b class="k2-rt">⭐ ${p.avgRating}</b>` : ""}<span class="k2-gm">${p.games}경기</span></span>`;
                 el.addEventListener("click", () => selectPlayer(p));
                 playerList.appendChild(el);
                 _allPlayerRows.push({ el, name: p.name, pos });

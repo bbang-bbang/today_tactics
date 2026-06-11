@@ -2682,25 +2682,62 @@ body {
     font-weight: 600;
 }
 .k2-pos-header {
-    font-size: 11px;
-    color: #888;
-    padding: 4px 0 2px;
-    border-bottom: 1px solid #333;
-    margin-top: 6px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: #cdd6e0;
+    padding: 7px 10px 6px;
+    margin-top: 10px;
+    background: #141a24;
+    border-bottom: 2px solid #2a3340;
 }
-.k2-player-list { max-height: 280px; overflow-y: auto; }
+.k2-pos-header:first-child { margin-top: 0; }
+.k2-pos-header .k2-pos-count {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #8a98a8;
+    background: rgba(255,255,255,0.07);
+    border-radius: 999px;
+    padding: 1px 7px;
+}
+/* 포지션 색상 — 헤더 텍스트 + 좌측 강조선 */
+.k2-pos-header.pos-g { color: #fbbf24; border-bottom-color: rgba(251,191,36,0.5); }
+.k2-pos-header.pos-d { color: #60a5fa; border-bottom-color: rgba(96,165,250,0.5); }
+.k2-pos-header.pos-m { color: #34d399; border-bottom-color: rgba(52,211,153,0.5); }
+.k2-pos-header.pos-f { color: #f87171; border-bottom-color: rgba(248,113,113,0.5); }
+
+.k2-player-list { max-height: 420px; overflow-y: auto; }
 .k2-player-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 7px 10px;
-    border-radius: 5px;
+    gap: 10px;
+    padding: 9px 10px 9px 13px;
+    border-left: 3px solid transparent;
+    border-bottom: 1px solid rgba(255,255,255,0.055);
     cursor: pointer;
-    transition: background 0.12s;
+    transition: background 0.12s ease-in-out, border-left-color 0.12s ease-in-out;
 }
-.k2-player-row:hover { background: #2a2f45; }
-.k2-player-name { font-size: 13px; }
-.k2-player-meta { font-size: 11px; color: #888; }
+.k2-player-row.pos-g { border-left-color: rgba(251,191,36,0.35); }
+.k2-player-row.pos-d { border-left-color: rgba(96,165,250,0.35); }
+.k2-player-row.pos-m { border-left-color: rgba(52,211,153,0.35); }
+.k2-player-row.pos-f { border-left-color: rgba(248,113,113,0.35); }
+.k2-player-row:hover { background: #232c3d; border-left-width: 4px; }
+.k2-player-row.pos-g:hover { border-left-color: #fbbf24; }
+.k2-player-row.pos-d:hover { border-left-color: #60a5fa; }
+.k2-player-row.pos-m:hover { border-left-color: #34d399; }
+.k2-player-row.pos-f:hover { border-left-color: #f87171; }
+.k2-player-row:focus-visible { outline: 2px solid #6ea8ff; outline-offset: -2px; }
+.k2-player-name { font-size: 14px; font-weight: 600; color: #eef3f8; letter-spacing: -0.01em; }
+.k2-player-meta { font-size: 12px; color: #9aa7b5; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.k2-player-meta .k2-rt { color: #ffd24a; font-weight: 700; }
+.k2-player-meta .k2-gm { color: #8a98a8; }
 /* ── 히트맵 비교 오버레이 컨트롤 ── */
 .k2-compare-bar {
     display: flex;
