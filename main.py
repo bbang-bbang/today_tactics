@@ -4637,7 +4637,7 @@ def _heatmap_players_for_team(team_id, tournament_id):
     conn = sqlite3.connect(DB_PATH)
     rows = conn.execute("""
         SELECT mps.player_id,
-               COALESCE(NULLIF(mps.player_name,''), p.name_ko, p.name) AS name,
+               COALESCE(p.name_ko, NULLIF(mps.player_name,''), p.name) AS name,
                COALESCE(mps.position, p.position) AS pos,
                COUNT(DISTINCT mps.event_id) as games,
                ROUND(AVG(mps.rating), 2) as avg_rating
