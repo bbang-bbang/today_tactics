@@ -481,6 +481,14 @@
                 <button class="hm-league-tab" data-league="k2">K리그2</button>
             </div>
 
+            <!-- 통합 선수 검색 (팀 단계 건너뛰고 바로 선수로) -->
+            <div id="k2-quick-search-wrap" class="k2-quick-search-wrap">
+                <input id="k2-quick-search" class="k2-search-input" type="text"
+                       placeholder="🔍 선수 이름으로 바로 검색 (K리그1·2 전 구단)"
+                       autocomplete="off" aria-label="선수 통합 검색">
+                <ul id="k2-quick-results" class="k2-quick-results hidden" role="listbox"></ul>
+            </div>
+
             <!-- STEP 1: 팀 선택 -->
             <div id="k2-step-team">
                 <p class="k2-step-label">① 팀 선택</p>
@@ -507,10 +515,22 @@
                     <span id="k2-selected-player-name"></span>
                 </div>
                 <div id="k2-player-context-area"></div>
+                <div id="k2-compare-bar" class="k2-compare-bar">
+                    <span class="k2-cmp-label">비교</span>
+                    <div class="k2-cmp-modes" role="group" aria-label="히트맵 비교 모드">
+                        <button class="k2-cmp-mode active" data-cmp="none" type="button">없음</button>
+                        <button class="k2-cmp-mode" data-cmp="position" type="button">포지션 평균</button>
+                        <button class="k2-cmp-mode" data-cmp="player" type="button">다른 선수</button>
+                        <button class="k2-cmp-mode" data-cmp="venue" type="button">홈 vs 원정</button>
+                    </div>
+                    <div id="k2-cmp-sub" class="k2-cmp-sub"></div>
+                </div>
                 <div class="k2-heatmap-wrap">
                     <canvas id="k2-heatmap-canvas" width="600" height="390"></canvas>
                     <div id="k2-heatmap-loading" class="k2-loading">로딩 중...</div>
                 </div>
+                <div id="k2-cmp-legend" class="k2-cmp-legend hidden" aria-live="polite"></div>
+                <div id="k2-cmp-insight" class="k2-cmp-insight hidden" aria-live="polite"></div>
                 <div id="k2-match-list-wrap">
                     <p class="k2-step-label">경기별 보기</p>
                     <ul id="k2-match-list" class="k2-match-list"></ul>
@@ -850,7 +870,7 @@
     <script src="/static/js/app.js?v=17"></script>
 
     <script src="/static/js/info.js?v=7"></script>
-    <script src="/static/js/k2heatmap.js?v=2"></script>
+    <script src="/static/js/k2heatmap.js?v=4"></script>
     <script src="/static/js/banner_stats.js?v=3"></script>
     <script src="/static/js/team_compare.js?v=12"></script>
     <script src="/static/js/analytics.js?v=6"></script>

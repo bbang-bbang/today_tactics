@@ -28,6 +28,24 @@
     let currentPlayer = null;  // { playerId, name }
     let allMatches    = [];
 
+    // ── 비교 오버레이 상태 ──
+    let currentBasePoints = [];   // 화면에 그려지는 내 선수 좌표 (비교 시 빨강 층)
+    let cumulativePoints  = [];   // 선수 누적 좌표 (모드 전환 시 base 복원용)
+    let compareMode   = "none";   // none | position | player | venue
+    let overlayPoints = null;     // 비교 대상 좌표 (파랑 층)
+    let baseLabel     = "";
+    let overlayLabel  = "";
+
+    const cmpModes  = document.querySelectorAll(".k2-cmp-mode");
+    const cmpSub    = document.getElementById("k2-cmp-sub");
+    const cmpLegend = document.getElementById("k2-cmp-legend");
+    const cmpInsight   = document.getElementById("k2-cmp-insight");
+    const quickSearch  = document.getElementById("k2-quick-search");
+    const quickResults = document.getElementById("k2-quick-results");
+    const POS_LABEL = { G:"GK", D:"DF", M:"MF", F:"FW" };
+    const RED  = [255, 60, 30];
+    const BLUE = [40, 120, 255];
+
     const apiBase = () => `/api/kleague${currentLeague === "k1" ? "1" : "2"}`;
 
     // ── 열기/닫기 ──────────────────────────────────────────
@@ -169,18 +187,27 @@
         loading.style.display = "none";
 
         allMatches = data.matches || [];
-        drawHeatmap(data.points || []);
+        cumulativePoints = data.points || [];
+        baseLabel = player.name;
+        // 새 선수 선택 시 비교 모드 초기화
+        compareMode = "none";
+        overlayPoints = null;
+        cmpModes.forEach(b => b.classList.toggle("active", b.dataset.cmp === "none"));
+        cmpSub.innerHTML = "";
+        setBase(cumulativePoints);
         renderMatchList(allMatches, null);
     }
 
     // ── 경기별 히트맵 ────────────────────────────────────────
     async function loadMatchHeatmap(eventId) {
+        if (compareMode === "venue") return;   // 홈vs원정 모드에선 경기 선택 무시
         loading.style.display = "flex";
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         const res  = await fetch(`${apiBase()}/heatmap?playerId=${currentPlayer.playerId}&teamId=${currentTeam.sofascore_id}&eventId=${eventId}`);
         const data = await res.json();
         loading.style.display = "none";
-        drawHeatmap(data.points || []);
+        baseLabel = currentPlayer.name + " (이 경기)";
+        setBase(data.points || []);
     }
 
     function renderMatchList(matches, activeId) {
@@ -191,13 +218,10 @@
         allLi.className = "k2-match-item" + (activeId === null ? " active" : "");
         allLi.textContent = "전체 누적";
         allLi.addEventListener("click", async () => {
+            if (compareMode === "venue") return;
             renderMatchList(allMatches, null);
-            loading.style.display = "flex";
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const res  = await fetch(`${apiBase()}/heatmap?playerId=${currentPlayer.playerId}&teamId=${currentTeam.sofascore_id}`);
-            const data = await res.json();
-            loading.style.display = "none";
-            drawHeatmap(data.points || []);
+            baseLabel = currentPlayer ? currentPlayer.name : baseLabel;
+            setBase(cumulativePoints);
         });
         matchList.appendChild(allLi);
 
@@ -293,5 +317,281 @@
         // 페널티 박스 (오른쪽)
         ctx.strokeRect(W*0.77, H*0.2, W*0.18, H*0.6);
         ctx.strokeRect(W*0.87, H*0.33, W*0.08, H*0.34);
+    }
+
+    // ── 비교 오버레이 ────────────────────────────────────────
+    // base 좌표를 저장하고 현재 모드에 맞게 렌더 (단일 or 듀얼)
+    function setBase(points) {
+        currentBasePoints = points || [];
+        render();
+    }
+    function render() {
+        if (compareMode === "none" || !overlayPoints) {
+            cmpLegend.classList.add("hidden");
+            cmpInsight.classList.add("hidden");
+            drawHeatmap(currentBasePoints);
+        } else {
+            drawCompare(currentBasePoints, overlayPoints);
+            renderLegend();
+            renderInsight();
+        }
+    }
+
+    // 모드 버튼
+    cmpModes.forEach(btn => {
+        btn.addEventListener("click", () => {
+            if (!currentPlayer) return;
+            const mode = btn.dataset.cmp;
+            cmpModes.forEach(b => b.classList.toggle("active", b === btn));
+            compareMode = mode;
+            cmpSub.innerHTML = "";
+            overlayPoints = null;
+            if (mode === "venue") {
+                loadVenueCompare();
+            } else {
+                // 누적 기준 복원 (직전 venue 모드의 홈-only base 등 되돌림)
+                baseLabel = currentPlayer.name;
+                currentBasePoints = cumulativePoints;
+                if (mode === "none")          render();
+                else if (mode === "position") buildPositionSub();
+                else if (mode === "player")   buildPlayerSub();
+            }
+        });
+    });
+
+    // A. 포지션 평균
+    function buildPositionSub() {
+        const sel = document.createElement("select");
+        sel.className = "k2-cmp-select";
+        sel.setAttribute("aria-label", "비교 포지션 선택");
+        ["G", "D", "M", "F"].forEach(p => {
+            const o = document.createElement("option");
+            o.value = p; o.textContent = POS_LABEL[p] + " 평균";
+            sel.appendChild(o);
+        });
+        sel.value = POS_LABEL[currentPlayer.position] ? currentPlayer.position : "M";
+        sel.addEventListener("change", () => fetchPositionOverlay(sel.value));
+        cmpSub.appendChild(sel);
+        fetchPositionOverlay(sel.value);
+    }
+    async function fetchPositionOverlay(pos) {
+        loading.style.display = "flex";
+        try {
+            const data = await (await fetch(`${apiBase()}/position-heatmap?position=${pos}`)).json();
+            overlayPoints = data.points || [];
+            overlayLabel = (POS_LABEL[pos] || pos) + " 평균";
+        } catch (e) { overlayPoints = []; }
+        loading.style.display = "none";
+        render();
+    }
+
+    // B. 다른 선수 (팀 + 선수 2단 선택, 크로스팀 가능)
+    async function buildPlayerSub() {
+        const teamSel   = document.createElement("select");
+        const playerSel = document.createElement("select");
+        teamSel.className = playerSel.className = "k2-cmp-select";
+        teamSel.setAttribute("aria-label", "비교 팀 선택");
+        playerSel.setAttribute("aria-label", "비교 선수 선택");
+        playerSel.innerHTML = "<option value=''>선수…</option>";
+        cmpSub.appendChild(teamSel);
+        cmpSub.appendChild(playerSel);
+
+        const teams = await (await fetch(`${apiBase()}/teams`)).json();
+        teamSel.innerHTML = "";
+        teams.forEach(t => {
+            const o = document.createElement("option");
+            o.value = t.sofascore_id;
+            o.textContent = t.short || t.name;
+            teamSel.appendChild(o);
+        });
+        teamSel.value = currentTeam.sofascore_id;
+
+        async function loadPlayers() {
+            playerSel.innerHTML = "<option value=''>선수…</option>";
+            const pls = await (await fetch(`${apiBase()}/players?teamId=${teamSel.value}`)).json();
+            pls.forEach(p => {
+                if (String(teamSel.value) === String(currentTeam.sofascore_id) &&
+                    p.playerId === currentPlayer.playerId) return;  // 자기 자신 제외
+                const o = document.createElement("option");
+                o.value = p.playerId;
+                o.dataset.name = p.name;
+                o.textContent = `${p.name}${p.position ? " ("+(POS_LABEL[p.position]||p.position)+")" : ""}`;
+                playerSel.appendChild(o);
+            });
+        }
+        teamSel.addEventListener("change", loadPlayers);
+        playerSel.addEventListener("change", async () => {
+            if (!playerSel.value) { overlayPoints = null; render(); return; }
+            const nm = playerSel.options[playerSel.selectedIndex].dataset.name;
+            loading.style.display = "flex";
+            try {
+                const data = await (await fetch(`${apiBase()}/heatmap?playerId=${playerSel.value}&teamId=${teamSel.value}`)).json();
+                overlayPoints = data.points || [];
+                overlayLabel = nm;
+            } catch (e) { overlayPoints = []; }
+            loading.style.display = "none";
+            render();
+        });
+        await loadPlayers();
+    }
+
+    // C. 홈 vs 원정 (같은 선수)
+    async function loadVenueCompare() {
+        loading.style.display = "flex";
+        const url = `${apiBase()}/heatmap?playerId=${currentPlayer.playerId}&teamId=${currentTeam.sofascore_id}`;
+        try {
+            const [hp, ap] = await Promise.all([
+                fetch(`${url}&venue=home`).then(r => r.json()),
+                fetch(`${url}&venue=away`).then(r => r.json()),
+            ]);
+            currentBasePoints = hp.points || [];
+            overlayPoints     = ap.points || [];
+            baseLabel    = `${currentPlayer.name} (홈)`;
+            overlayLabel = `${currentPlayer.name} (원정)`;
+        } catch (e) { overlayPoints = []; }
+        loading.style.display = "none";
+        render();
+    }
+
+    // 듀얼 컬러 오버레이 렌더 (빨강=base, 파랑=overlay, 보라=겹침)
+    function drawCompare(basePts, overPts) {
+        const W = canvas.width, H = canvas.height;
+        ctx.clearRect(0, 0, W, H);
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0, "#1a4a1a");
+        grad.addColorStop(0.5, "#1e5c1e");
+        grad.addColorStop(1, "#1a4a1a");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+        drawFieldLines(ctx, W, H);
+
+        const comp = document.createElement("canvas");
+        comp.width = W; comp.height = H;
+        const c = comp.getContext("2d");
+        const rl = renderLayer(basePts, RED, W, H);
+        const bl = renderLayer(overPts, BLUE, W, H);
+        if (rl) c.drawImage(rl, 0, 0);
+        c.globalCompositeOperation = "lighter";   // 겹치면 빨강+파랑 → 보라
+        if (bl) c.drawImage(bl, 0, 0);
+        ctx.drawImage(comp, 0, 0);
+    }
+
+    // 한 층을 단색 밀도 필드로 렌더 — 각 층 자기 피크로 정규화(표본 크기 무관 공정 비교)
+    function renderLayer(points, rgb, W, H) {
+        if (!points || !points.length) return null;
+        const off = document.createElement("canvas");
+        off.width = W; off.height = H;
+        const o = off.getContext("2d");
+        const R = 22;
+        points.forEach(p => {
+            const x = (p.x / 100) * W, y = (p.y / 100) * H;
+            const g = o.createRadialGradient(x, y, 0, x, y, R);
+            g.addColorStop(0, "rgba(0,0,0,0.12)");
+            g.addColorStop(1, "rgba(0,0,0,0)");
+            o.fillStyle = g;
+            o.beginPath(); o.arc(x, y, R, 0, Math.PI * 2); o.fill();
+        });
+        const img = o.getImageData(0, 0, W, H), d = img.data;
+        let maxA = 0;
+        for (let i = 3; i < d.length; i += 4) if (d[i] > maxA) maxA = d[i];
+        if (!maxA) return null;
+        for (let i = 0; i < d.length; i += 4) {
+            const norm = d[i + 3] / maxA;
+            if (norm < 0.05) { d[i + 3] = 0; continue; }
+            d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2];
+            d[i + 3] = Math.round(Math.min(norm, 1) * 200);
+        }
+        o.putImageData(img, 0, 0);
+        return off;
+    }
+
+    function renderLegend() {
+        cmpLegend.classList.remove("hidden");
+        cmpLegend.innerHTML =
+            `<span class="k2-lg"><i style="background:rgb(${RED.join(",")})"></i>${baseLabel}</span>` +
+            `<span class="k2-lg"><i style="background:rgb(${BLUE.join(",")})"></i>${overlayLabel}</span>` +
+            `<span class="k2-lg"><i style="background:rgb(170,70,200)"></i>겹침</span>`;
+    }
+
+    // 비교 인사이트 배너 — 두 좌표군의 차이를 자동 해석 (x=공격방향, y=세로 폭)
+    function pointStats(pts) {
+        if (!pts || !pts.length) return null;
+        let sx = 0, sy = 0;
+        for (const p of pts) { sx += p.x; sy += p.y; }
+        const n = pts.length, mx = sx / n, my = sy / n;
+        let vy = 0;
+        for (const p of pts) vy += (p.y - my) * (p.y - my);
+        return { mx, my, spreadY: Math.sqrt(vy / n) };
+    }
+    function renderInsight() {
+        const b = pointStats(currentBasePoints), o = pointStats(overlayPoints);
+        if (!b || !o) { cmpInsight.classList.add("hidden"); return; }
+        const chips = [];
+        const adv = Math.round(b.mx - o.mx);            // +면 base가 더 전진
+        if (adv >= 3)       chips.push(`<b>↑ 전진</b> 평균보다 ${adv}칸 높은 위치`);
+        else if (adv <= -3) chips.push(`<b>↓ 후방</b> 평균보다 ${-adv}칸 낮은 위치`);
+        else                chips.push(`<b>≈ 전후 위치 유사</b>`);
+
+        const bc = Math.abs(b.my - 50), oc = Math.abs(o.my - 50);
+        const side = b.my < 47 ? "위쪽" : (b.my > 53 ? "아래쪽" : "중앙");
+        if (bc - oc >= 6)       chips.push(`<b>측면 지향</b> (${side} 치우침)`);
+        else if (bc - oc <= -6) chips.push(`<b>중앙 지향</b>`);
+
+        const sd = Math.round(b.spreadY - o.spreadY);
+        if (sd >= 4)       chips.push(`활동 폭 넓음`);
+        else if (sd <= -4) chips.push(`활동 폭 좁음`);
+
+        cmpInsight.classList.remove("hidden");
+        cmpInsight.innerHTML =
+            `<span class="k2-ins-title">${baseLabel} vs ${overlayLabel}</span>` +
+            chips.map(c => `<span class="k2-ins-chip">${c}</span>`).join("");
+    }
+
+    // ── 통합 선수 검색 (전 구단 → 바로 히트맵 진입) ──────────
+    let quickTimer = null;
+    if (quickSearch) {
+        quickSearch.addEventListener("input", () => {
+            const q = quickSearch.value.trim();
+            clearTimeout(quickTimer);
+            if (q.length < 1) { quickResults.classList.add("hidden"); quickResults.innerHTML = ""; return; }
+            quickTimer = setTimeout(() => runQuickSearch(q), 200);
+        });
+        document.addEventListener("click", (e) => {
+            if (!e.target.closest("#k2-quick-search-wrap")) quickResults.classList.add("hidden");
+        });
+    }
+    async function runQuickSearch(q) {
+        let list = [];
+        try { list = await (await fetch(`/api/heatmap-player-search?q=${encodeURIComponent(q)}`)).json(); }
+        catch (e) { list = []; }
+        quickResults.innerHTML = "";
+        if (!list.length) {
+            quickResults.innerHTML = `<li class="k2-quick-empty">검색 결과 없음</li>`;
+            quickResults.classList.remove("hidden");
+            return;
+        }
+        list.forEach(r => {
+            const li = document.createElement("li");
+            li.className = "k2-quick-item";
+            li.setAttribute("role", "option");
+            li.tabIndex = 0;
+            li.innerHTML =
+                `<span class="k2-quick-name">${r.name}</span>` +
+                `<span class="k2-quick-meta">${r.teamShort || r.teamName} · ${POS_LABEL[r.position] || r.position || ""} · ${r.games}경기 · ${r.league.toUpperCase()}</span>`;
+            const go = () => jumpToPlayer(r);
+            li.addEventListener("click", go);
+            li.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+            quickResults.appendChild(li);
+        });
+        quickResults.classList.remove("hidden");
+    }
+    function jumpToPlayer(r) {
+        quickResults.classList.add("hidden");
+        quickSearch.value = "";
+        currentLeague = r.league;
+        leagueTabs.forEach(t => t.classList.toggle("active", t.dataset.league === r.league));
+        currentTeam = { sofascore_id: r.teamId, name: r.teamName, short: r.teamShort, primary: "#888" };
+        selTeamName.textContent = r.teamName;
+        selectPlayer({ playerId: r.playerId, name: r.name, position: r.position, games: r.games, avgRating: null });
     }
 })();

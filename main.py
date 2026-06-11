@@ -3477,14 +3477,11 @@ def _find_player(cur, name):
     return (row["id"], row["team_id"], matched)
 
 def _flip_points(rows, player_team_id):
-    """away 경기 포인트를 x축 반전 (x→100-x)"""
-    result = []
-    for r in rows:
-        if r["away_team_id"] == player_team_id:
-            result.append({"x": 100 - r["x"], "y": r["y"]})
-        else:
-            result.append({"x": r["x"], "y": r["y"]})
-    return result
+    """SofaScore 원본 좌표는 이미 팀상대 정규화(전 선수 '공격=오른쪽') 상태다.
+    검증(2026-06-11): 91/91 경기에서 홈·원정 GK가 모두 원본 x<50(자기 골문)에 위치 →
+    원본이 절대좌표가 아닌 팀상대좌표임을 확정. 따라서 away 경기 x 반전은 오히려
+    원정 데이터(≈절반)를 좌우 뒤집는 버그였음. 그대로 통과시킨다. (player_team_id는 호출부 호환용)"""
+    return [{"x": r["x"], "y": r["y"]} for r in rows]
 
 CURRENT_YEAR = str(datetime.now().year)
 
@@ -4654,7 +4651,7 @@ def _heatmap_players_for_team(team_id, tournament_id):
     } for r in rows]
 
 
-def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id):
+def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id, venue=None):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
 
@@ -4665,6 +4662,21 @@ def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id):
             LEFT JOIN events e ON h.event_id = e.id
             WHERE h.player_id = ? AND h.event_id = ? AND e.tournament_id = ?
         """, (player_id, event_id, tournament_id)).fetchall()
+    elif venue == "home":
+        # 홈 경기만 (모드 C: 홈 vs 원정 비교)
+        rows = conn.execute("""
+            SELECT h.x, h.y, e.away_team_id
+            FROM heatmap_points h
+            JOIN events e ON h.event_id = e.id
+            WHERE h.player_id = ? AND e.tournament_id = ? AND e.home_team_id = ?
+        """, (player_id, tournament_id, int(team_id))).fetchall()
+    elif venue == "away":
+        rows = conn.execute("""
+            SELECT h.x, h.y, e.away_team_id
+            FROM heatmap_points h
+            JOIN events e ON h.event_id = e.id
+            WHERE h.player_id = ? AND e.tournament_id = ? AND e.away_team_id = ?
+        """, (player_id, tournament_id, int(team_id))).fetchall()
     else:
         rows = conn.execute("""
             SELECT h.x, h.y, e.away_team_id
@@ -4743,11 +4755,13 @@ def get_kleague2_heatmap():
     player_id = request.args.get("playerId", "").strip()
     team_id   = request.args.get("teamId", "").strip()
     event_id  = request.args.get("eventId", "").strip()
+    venue     = request.args.get("venue", "").strip().lower()
+    venue     = venue if venue in ("home", "away") else None
     if not player_id or not team_id:
         return jsonify({"error": "playerId and teamId required"}), 400
     if not os.path.exists(DB_PATH):
         return jsonify({"points": []})
-    return jsonify(_heatmap_points_for_player(player_id, team_id, event_id, LEAGUE_TOURNAMENT_ID["k2"]))
+    return jsonify(_heatmap_points_for_player(player_id, team_id, event_id, LEAGUE_TOURNAMENT_ID["k2"], venue))
 
 
 @app.route("/api/kleague1/heatmap")
@@ -4756,11 +4770,106 @@ def get_kleague1_heatmap():
     player_id = request.args.get("playerId", "").strip()
     team_id   = request.args.get("teamId", "").strip()
     event_id  = request.args.get("eventId", "").strip()
+    venue     = request.args.get("venue", "").strip().lower()
+    venue     = venue if venue in ("home", "away") else None
     if not player_id or not team_id:
         return jsonify({"error": "playerId and teamId required"}), 400
     if not os.path.exists(DB_PATH):
         return jsonify({"points": []})
-    return jsonify(_heatmap_points_for_player(player_id, team_id, event_id, LEAGUE_TOURNAMENT_ID["k1"]))
+    return jsonify(_heatmap_points_for_player(player_id, team_id, event_id, LEAGUE_TOURNAMENT_ID["k1"], venue))
+
+
+def _position_heatmap(position, tournament_id, cap=3000):
+    """같은 포지션 전 선수의 히트맵 좌표를 풀링(팀별 away-flip) 후 균등 샘플.
+    절대 개수가 아닌 '밀도 형태'를 비교하므로 cap 샘플로 충분하며 응답을 가볍게 유지."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    # 원본은 이미 팀상대 정규화(공격=오른쪽) — flip 불필요 (_flip_points 주석 참조)
+    rows = conn.execute("""
+        SELECT h.x AS x, h.y AS y
+        FROM heatmap_points h
+        JOIN match_player_stats mps
+          ON mps.event_id = h.event_id AND mps.player_id = h.player_id
+        JOIN events e ON e.id = h.event_id
+        LEFT JOIN players p ON p.id = h.player_id
+        WHERE e.tournament_id = ?
+          AND COALESCE(mps.position, p.position) = ?
+    """, (tournament_id, position)).fetchall()
+    conn.close()
+
+    pts = [{"x": r["x"], "y": r["y"]} for r in rows]
+
+    total = len(pts)
+    if total > cap:
+        step = total / cap
+        pts = [pts[int(i * step)] for i in range(cap)]
+    return {"points": pts, "position": position, "total": total, "sampled": len(pts)}
+
+
+def _position_heatmap_response(league_key):
+    position = request.args.get("position", "").strip().upper()
+    if position not in ("G", "D", "M", "F"):
+        return jsonify({"error": "position must be one of G/D/M/F"}), 400
+    if not os.path.exists(DB_PATH):
+        return jsonify({"points": []})
+    return jsonify(_position_heatmap(position, LEAGUE_TOURNAMENT_ID[league_key]))
+
+
+@app.route("/api/heatmap-player-search")
+@cached_response(ttl=600)
+def heatmap_player_search():
+    """히트맵 통합 선수 검색 — K1·K2 전 구단에서 이름으로 바로 조회 (팀 단계 생략용).
+    영문명/한글명/mps 표기명 어느 쪽으로 입력해도 매칭."""
+    q = request.args.get("q", "").strip()
+    if len(q) < 1:
+        return jsonify([])
+    if not os.path.exists(DB_PATH):
+        return jsonify([])
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    like = "%" + q + "%"
+    k1, k2 = LEAGUE_TOURNAMENT_ID["k1"], LEAGUE_TOURNAMENT_ID["k2"]
+    rows = conn.execute("""
+        SELECT mps.player_id AS pid, mps.team_id AS tid, e.tournament_id AS tour,
+               COALESCE(p.name_ko, NULLIF(mps.player_name,''), p.name) AS name,
+               COALESCE(mps.position, p.position) AS pos,
+               COUNT(DISTINCT mps.event_id) AS games
+        FROM match_player_stats mps
+        JOIN events e ON e.id = mps.event_id
+        LEFT JOIN players p ON p.id = mps.player_id
+        WHERE e.tournament_id IN (?, ?)
+          AND (mps.player_name LIKE ? OR p.name_ko LIKE ? OR p.name LIKE ?)
+        GROUP BY mps.player_id, e.tournament_id
+        HAVING name IS NOT NULL
+        ORDER BY games DESC, name
+        LIMIT 30
+    """, (k1, k2, like, like, like)).fetchall()
+    conn.close()
+    team_map = {t["sofascore_id"]: t for t in TEAMS}
+    out = []
+    for r in rows:
+        t = team_map.get(r["tid"])
+        out.append({
+            "playerId": r["pid"], "name": r["name"], "position": r["pos"],
+            "games": r["games"], "teamId": r["tid"],
+            "teamName": (t["name"] if t else ""), "teamShort": (t["short"] if t else ""),
+            "league": ("k1" if r["tour"] == k1 else "k2"),
+        })
+    return jsonify(out)
+
+
+@app.route("/api/kleague1/position-heatmap")
+@cached_response(ttl=3600)
+def get_kleague1_position_heatmap():
+    """K리그1 포지션(G/D/M/F) 평균 동선 — 비교 오버레이용"""
+    return _position_heatmap_response("k1")
+
+
+@app.route("/api/kleague2/position-heatmap")
+@cached_response(ttl=3600)
+def get_kleague2_position_heatmap():
+    """K리그2 포지션(G/D/M/F) 평균 동선 — 비교 오버레이용"""
+    return _position_heatmap_response("k2")
 
 
 # ── 포지션 인사이트 API ──────────────────────────────────

@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-06-11 | 히트맵 비교 오버레이 신규 + 🔴 flip 선재 버그 발견·수정
+
+### 작업 배경
+- 전문가 패널 회의 → "히트맵 비교 오버레이"(P3 선수 관점) 선정. 사용자 추가 요청: 비교 인사이트 배너 + 통합 선수 검색.
+
+### 🔴 flip 선재 버그 발견·수정 (가장 중요)
+- **증상**: 비교 기능 검증 중 조현우(GK) 누적 히트맵이 **양쪽 골문**에 찍힘(x>80 비율 44.3%).
+- **진단**: 원본 좌표를 포지션·홈/원정으로 집계 → FW 홈61/원정60, GK 홈9.7/원정9.4, **단일 경기 91/91건 양 팀 GK 모두 x<50** → SofaScore 원본이 이미 팀상대 정규화(공격=오른쪽)임을 확정. `_flip_points`의 away x반전이 오히려 원정 데이터(≈절반)를 좌우 뒤집던 **선재 버그**.
+- **수정**: `_flip_points` pass-through화 + `_position_heatmap` inline flip 제거(main.py 2곳). **DB 무변경(렌더링 로직만)** → 마이그레이션 불필요. 기존 프로덕션 `/api/heatmap`·히트맵 모달 전체가 함께 정상화.
+- **검증**: 조현우 x>80 **44.3%→0.0%**, 원정 전용도 0%. before/after 증거 `analysis/output/heatmap_flip_fix.png`.
+- 좌표변환=Red → 사용자 승인 후 진행, 시각 검증 완료.
+
+### 🆕 히트맵 비교 오버레이 (3모드, 듀얼 컬러)
+- **A 포지션평균**: 신규 `/api/kleague{1,2}/position-heatmap?position=G/D/M/F` — 동일 포지션 전 선수 좌표 풀링 + 균등 샘플 cap 3000(밀도 형태 보존).
+- **B 다른 선수**(크로스팀): 기존 heatmap 엔드포인트 재사용, 팀+선수 2단 셀렉터.
+- **C 홈 vs 원정**: 기존 heatmap에 `venue=home|away` 필터 추가(home+away=total 검증).
+- 렌더: `drawCompare`/`renderLayer` 신규(빨강=base·파랑=overlay·보라=겹침, **각 층 자기피크 정규화**로 표본크기 무관 공정 비교). 기존 `drawHeatmap` 코어 무변경.
+
+### 🆕 비교 인사이트 배너
+- 두 좌표군 차이를 자동 해석(전진도 Δx·중앙/측면 Δ|y-50|·활동폭 Δσy). 예: 엄원상 vs M평균 "↑전진 5칸", 홈 vs 원정 "↑전진 4칸".
+
+### 🆕 통합 선수 검색 진입
+- 신규 `/api/heatmap-player-search?q=` — K1·K2 전 구단, 한글/영문/표기명 매칭, LIMIT 30. 모달 상단 검색→선택 시 팀 단계 건너뛰고 바로 히트맵(`jumpToPlayer`).
+
+### 변경 파일 / 보안 / QA
+- `main.py`(flip 2곳 + position-heatmap·player-search·venue), `static/js/k2heatmap.js`, `templates/index.html`(v=3→4), `static/css/style.css`.
+- P7: position(G/D/M/F)·venue(home/away) 화이트리스트, q 파라미터 바인딩. qa_check **31/31 PASS**.
+- 검증 한계: node/playwright 미설치로 라이브 DOM 클릭은 미확인 — 백엔드·알고리즘(PIL 충실 재현)·데이터까지 검증.
+
+---
+
 ## 2026-06-11 | PM 주도 — 데이터 정합성 재감사 + backlog stale 정리
 
 ### 작업 배경
