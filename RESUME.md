@@ -1,18 +1,26 @@
 # RESUME — 다른 PC / 새 세션에서 작업 재개 가이드
 
 > 이 파일 + `checklist/work-log-*.md` + git 커밋 기록만 보고 작업을 이어갈 수 있도록 정리.
-> 최종 갱신: 2026-06-09 (history: `checklist/history.md` 2026-06-09 섹션)
+> 최종 갱신: 2026-06-11 (history: `checklist/history.md` 2026-06-11 섹션 — 히트맵 작업 다수)
 
 ---
 
-## 1. 현재 상태 (2026-06-09 종료 시점)
-- **브랜치/HEAD**: `main` `03d209c`. **origin push + 운영 git 동기화 완료**(로컬=origin=prod 일치, prod dirty 0 · 서비스 active · 헬스 200). 로컬 작업트리는 `checklist/history.md`에 자동로그(마스킹 훅) 한두 줄이 수시로 쌓여 dirty할 수 있음(감사 로그 — 배포 무관).
-- **이번 세션 핵심 (커밋 9개, history.md 2026-06-09 요약표 참조)**:
-  1. **K2 미수집 8경기 수집** (6/5~6/7): 로컬 DB가 5/31 정체 → `playwright`+chromium 설치 후 `update_data.py` STEP 0~16 완주. prod는 자체수집으로 대부분 보유, 천안–수원FC 히트맵만 보강. 2026 전수감사 누락 0.
-  2. **수비P 지표 재설계**: 구 공식이 공중볼·듀얼 포함+이중계상으로 공격수가 수비 상위 점령 → **수비P(순수 수비행동) / 몸싸움P(듀얼)** 2지표로 분리.
-  3. **수비 세부 3컬럼 백필**(`won_tackle`·`ball_recovery`·`challenge_lost`, raw_json 추출) + **수비P 정밀화**(볼회수×0.5−피드리블). won_tackle은 커버리지 17% NULL로 미사용(totalTackle 유지).
-  4. **인사이트 리더보드 표본 강화**: per-90 자격을 `mins≥90→450`(5경기)로 상향 — 소표본 왜곡(몸싸움P 1위가 284분 선수 등) 제거.
-- **정적 자산 최신 버전**: `insights.js?v=37` (이번 세션 변경분). 그 외 변경 시 `templates/index.html`의 `?v=` 동반 증가 필수.
+## 0. ⏭ 재개 지점 (NEXT — 2026-06-11 중단)
+**히트맵 "비교 필터 — 포지션 세분화" 방식 결정 대기 중.** 사용자가 G/D/M/F 4분류를 더 세분(CB/FB, 수비형/공격형 MF 등)하길 원함. 그런데 **DB엔 세부 포지션 라벨이 없음**(mps·players·match_lineups·raw_json 전부 G/D/M/F만). 두 안 중 선택 필요:
+- **A. 히트맵 centroid 추정** — 평균 (x,y)로 CB/FB·DM/AM·측면/중앙 분류. 즉시 가능하나 **추정이라 부정확**(P4 신뢰 우려).
+- **B. SofaScore 세부 포지션 백필** — 라인업 API에서 DC/DL/DMC/AMC/ST 등 크롤링→DB 저장 후 사용. **정확하나 수집 작업 필요**.
+→ 사용자가 헤이스 정규화처럼 정확성을 중시 → B 유력하나 미결정. **재개 시 이 선택부터 확인.**
+
+## 1. 현재 상태 (2026-06-11 종료 시점)
+- **브랜치/HEAD**: `main` `6e34781`. **origin push + 운영 git 동기화 완료**(로컬=origin=prod 일치 · 서비스 active · 헬스 200). 로컬 트리는 `checklist/history.md` 자동로그(마스킹 훅)로 수시 dirty(감사 로그 — 배포 무관).
+- **이번 세션(6/11) = 히트맵 대규모 개편**. 상세는 `checklist/history.md` 2026-06-11 섹션. 핵심:
+  1. **히트맵 비교 오버레이**(포지션평균/다른선수/홈vs원정, 듀얼 컬러 빨강/파랑/보라) + **인사이트 배너**(전진·측면·활동폭 자동해석) + **통합 선수검색**(`/api/heatmap-player-search`, K1·2 전구단·선수당 1줄).
+  2. **🔴 flip 선재 버그 수정**: SofaScore 원본이 이미 팀상대 정규화인데 `_flip_points`가 원정 경기를 또 반전 → 누적 히트맵 절반 좌우뒤집힘. pass-through화(GK x>80 44%→0%).
+  3. **히트맵을 5번째 워크스페이스 탭으로**(팝업 제거, `workspace.js` 인라인). 전술판 툴바 `btn-k2-heatmap` 제거.
+  4. **년도(시즌) 필터** + **시즌별 소속팀 표시**(이적 선수). **이적 선수 데이터 정규화**: mps.team_id가 현 소속 고정이라 부정확 → 시즌팀을 event home/away+is_home로 유도, 리그 무관(player 중심) 통합(광주 K1→수원 K2 과거시즌도 조회). 다중시즌은 기본 최신시즌(전체누적 과포화 방지).
+  5. **팀 그리드 현 시즌 정리**(K1 12·K2 17, 수원삼성 복원), **선수목록 히트맵 보유·현시즌만·한글명**, **리그탭 race 수정**(`_teamLoadSeq` 가드 — K2탭에 K1팀 뜨던 버그), 경기별보기 5:5 우측배치, 경기장 크기 축소(560), 히트맵 점 경기장 안쪽 매핑.
+- **정적 자산 최신 버전**: `k2heatmap.js?v=12` · `workspace.js?v=6` · `style.css?v=82`. 변경 시 `templates/index.html`의 `?v=` 동반 증가 필수.
+- **신규 엔드포인트**(README §API 반영됨): `/api/kleague{1,2}/position-heatmap`(year), `/api/heatmap-player-search`, `/api/kleague{1,2}/heatmap`에 `year`·`venue` 파라미터.
 - **운영**: https://www.today-football-tactics.xyz 라이브. 배포는 **`git push origin main` → GitHub Actions가 forced-command `ci_deploy.sh`(fetch+reset+restart+health) 자동 실행**. prod에서 직접 크롤러/백필 실행 시 `venv/bin/python3` 사용(시스템 python3엔 playwright 없음).
 - **데이터**: 서버가 주기 cron `update_data.py` 자체 수집. **K2 6/7까지 완비**, K1 5/17까지. **다음 라운드 2026-07-04 재개**(월드컵 휴식기) → 그 사이 경기 없음(미수집 아님). 수비 세부 3컬럼은 로컬+prod DB 모두 백필 완료.
 - **⚠️ 남은 미완 1건**: 새 도메인 **OAuth 콘솔 redirect URI 등록 안 됨 → 로그인만 깨진 상태**(사이트 본체·데이터는 정상). §7 참조.
@@ -28,6 +36,8 @@ git clone/pull 후 아래를 별도로 확보해야 **로컬 실행/배포** 가
 | Playwright chromium | 크롤러/`update_data.py` 실행 시 필수 | `playwright install chromium` (이 PC도 이번 세션에 설치함) |
 | `.update_secret_local.txt` | update 트리거 시크릿 (gitignored) | 필요 시 재생성 |
 | `saves/`, `squads/{team}_2026.json` 일부 | 사용자 저장물 (gitignored) | 없어도 앱 기동 가능 |
+
+> **6/11 세션 검증 환경(참고)**: 이 PC엔 venv 없이 `pip install flask==3.1.3 authlib requests`로 직접 설치 후 `DISABLE_SCHEDULER=1 python main.py`로 로컬 기동. **UI 변경은 Playwright(`pip install playwright && playwright install chromium`)로 헤드리스 검증**(히트맵 탭 클릭→선수→비교까지 + 콘솔 에러 캡처). 온보딩 오버레이가 클릭 가로막으면 `document.getElementById('onboarding-overlay').remove()` 후 진행. 한글 검색 입력은 Playwright `type`이 불안정 → `el.value=...; dispatchEvent(new Event('input',{bubbles:true}))` 또는 팀→선수 클릭 경로 사용.
 
 ## 3. 로컬 실행 / 배포
 ```bash
