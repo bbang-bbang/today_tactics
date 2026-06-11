@@ -83,6 +83,13 @@
 - **경기장 추가 축소**: `.k2-heatmap-wrap{max-width:560px}` 재도입(5:5 컬럼이어도 캡). 캔버스 675→**560×364**. style v81→82.
 - **"다른 선수" 비교 한글명**: 이미 한글로 동작 확인(드롭다운 로스·송민규, 범례 "구성윤 vs 로스"). `_heatmap_players_for_team` 한글화(c257652)가 비교 드롭다운에도 적용됨. 현 시즌 히트맵 선수 K1 349·K2 513명 전원 name_ko 보유(영문 0) → 코드 변경 불필요. (사용자가 본 영문은 캐시된 옛 화면 추정)
 
+### 🔴 이적 선수 데이터 정규화 + 리그탭 race 수정 + 기본 최신시즌
+- **문제 진단**: 헤이스(288313) mps.team_id가 **전 시즌 7652(수원)로 고정**(실제: 21-22 광주, 23-24 제주, 25 광주, 26 수원). + 광주/제주=K1·수원=K2로 **리그가 갈려 과거 시즌이 진입 리그에 막혀 누락**.
+- **정규화**: `_heatmap_points_for_player`를 **리그 무관(player 중심)**으로 — points·matches·seasons에서 `tournament_id` 필터 제거. 시즌별 팀을 **event home/away + is_home로 유도**(mps.team_id 불신), `_ko_team`+TEAMS.short로 단축. 검증: 헤이스 seasons=2026수원/2025광주/2024제주/2023제주/2022광주/2021광주, year=2025→광주 2479pts. `_flip_points`도 pass-through라 직접 매핑.
+- **기본 최신 시즌**: 다중 시즌은 '전체 누적'이 과포화(헤이스 17,677pts=전 경기장 빨강) → selectPlayer가 `changeYear(최신시즌)` 자동. 단일시즌은 기존대로.
+- **🔴 리그탭 race 수정**: 히트맵 진입 K1 loadTeams와 K2탭 클릭 loadTeams 경쟁 → 늦게 끝난 응답이 덮어써 K2탭에 K1팀 표시되던 버그("리그 필터 꼬임"). `_teamLoadSeq` 순번 가드로 최신 요청만 렌더. 검증: K2탭→17팀 정상.
+- k2heatmap v10→12. 브라우저 검증: K2 17팀·헤이스 기본 2026수원·이적이력 버튼, 에러 0.
+
 ---
 
 ## 2026-06-11 | PM 주도 — 데이터 정합성 재감사 + backlog stale 정리
@@ -3728,3 +3735,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-11 17:42:12 | ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && curl -s -m6 http://127.0.0.1:5000/ | grep -oE 'k2heatmap.js\?v=[0-9]+|style.css\?v=[0-9]+' | sort -u" 2>&1 | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory\|may need"
 - 2026-06-11 17:42:23 | ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> 'cd /opt/today_tactics && curl -s -m6 http://127.0.0.1:5000/ | grep -o "k2heatmap.js?v=[0-9]*" | head -1 && curl -s -m6 http://127.0.0.1:5000/ | grep -o "style.css?v=[0-9]*" | head -1' 2>&1 | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory\|may need"
 - 2026-06-11 18:31:13 | for i in $(seq 1 15); do /   v=$(ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && git rev-parse --short HEAD && curl -s -m5 http://127.0.0.1:5000/ | grep -o 'k2heatmap.js?v=[0-9]*' | head -1" 2>/dev/null | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory") /   echo "$v" | grep -q "505c2af" && { echo "=== PROD ==="; echo "$v"; break; } || { echo "try $i..."; sleep 6; } / done
+- 2026-06-11 18:53:55 | for i in $(seq 1 15); do /   v=$(ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && git rev-parse --short HEAD && curl -s -m5 http://127.0.0.1:5000/ | grep -o 'style.css?v=[0-9]*' | head -1" 2>/dev/null | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory") /   echo "$v" | grep -q "915e4ea" && { echo "=== PROD ==="; echo "$v"; break; } || { echo "try $i..."; sleep 6; } / done

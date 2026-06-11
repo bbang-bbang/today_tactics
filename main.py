@@ -4677,61 +4677,69 @@ def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id, venu
         except (ValueError, TypeError):
             pass
 
+    # NOTE: 선수 히트맵은 리그 무관(player 중심) — tournament_id로 가두지 않는다.
+    # 이적 선수(예: 광주 K1 → 수원 K2)의 과거 시즌이 진입 리그에 막혀 사라지던 문제 정규화.
     if event_id:
         rows = conn.execute("""
-            SELECT h.x, h.y, e.away_team_id
+            SELECT h.x, h.y
             FROM heatmap_points h
-            LEFT JOIN events e ON h.event_id = e.id
-            WHERE h.player_id = ? AND h.event_id = ? AND e.tournament_id = ?
-        """, (player_id, event_id, tournament_id)).fetchall()
+            WHERE h.player_id = ? AND h.event_id = ?
+        """, (player_id, event_id)).fetchall()
     elif venue == "home":
-        # 홈 경기만 (모드 C: 홈 vs 원정 비교)
+        # 홈 경기만 (모드 C: 홈 vs 원정 비교) — is_home로 판정(team_id가 현 소속 고정이라 부정확)
         rows = conn.execute("""
-            SELECT h.x, h.y, e.away_team_id
+            SELECT h.x, h.y
             FROM heatmap_points h
+            JOIN match_player_stats mps ON mps.event_id = h.event_id AND mps.player_id = h.player_id
             JOIN events e ON h.event_id = e.id
-            WHERE h.player_id = ? AND e.tournament_id = ? AND e.home_team_id = ?
-        """ + year_clause, (player_id, tournament_id, int(team_id), *year_params)).fetchall()
+            WHERE h.player_id = ? AND mps.is_home = 1
+        """ + year_clause, (player_id, *year_params)).fetchall()
     elif venue == "away":
         rows = conn.execute("""
-            SELECT h.x, h.y, e.away_team_id
+            SELECT h.x, h.y
             FROM heatmap_points h
+            JOIN match_player_stats mps ON mps.event_id = h.event_id AND mps.player_id = h.player_id
             JOIN events e ON h.event_id = e.id
-            WHERE h.player_id = ? AND e.tournament_id = ? AND e.away_team_id = ?
-        """ + year_clause, (player_id, tournament_id, int(team_id), *year_params)).fetchall()
+            WHERE h.player_id = ? AND mps.is_home = 0
+        """ + year_clause, (player_id, *year_params)).fetchall()
     else:
         rows = conn.execute("""
-            SELECT h.x, h.y, e.away_team_id
+            SELECT h.x, h.y
             FROM heatmap_points h
             LEFT JOIN events e ON h.event_id = e.id
-            WHERE h.player_id = ? AND e.tournament_id = ?
-        """ + year_clause, (player_id, tournament_id, *year_params)).fetchall()
+            WHERE h.player_id = ?
+        """ + year_clause, (player_id, *year_params)).fetchall()
 
-    points = _flip_points(rows, int(team_id))
+    points = [{"x": r["x"], "y": r["y"]} for r in rows]
 
-    # 사용 가능한 시즌 목록 (필터 버튼용) — 연도별 소속팀 함께 (이적 선수는 시즌마다 팀이 다름)
+    # 시즌 목록 — 연도별 실제 소속팀(event home/away + is_home로 유도, mps.team_id는 현 소속 고정이라 부정확)
     season_rows = conn.execute("""
         SELECT strftime('%Y', datetime(e.date_ts,'unixepoch')) AS yr,
-               mps.team_id AS tid, COUNT(DISTINCT h.event_id) AS cnt
+               CASE WHEN mps.is_home = 1 THEN e.home_team_id ELSE e.away_team_id END AS tid,
+               CASE WHEN mps.is_home = 1 THEN e.home_team_name ELSE e.away_team_name END AS tname,
+               COUNT(DISTINCT h.event_id) AS cnt
         FROM heatmap_points h
         JOIN match_player_stats mps ON mps.event_id = h.event_id AND mps.player_id = h.player_id
         JOIN events e ON e.id = h.event_id
-        WHERE h.player_id = ? AND e.tournament_id = ? AND e.date_ts IS NOT NULL
-        GROUP BY yr, mps.team_id
-    """, (player_id, tournament_id)).fetchall()
-    _team_short = {t["sofascore_id"]: t["short"] for t in TEAMS}
-    def _short(tid):
-        if tid in _team_short:
-            return _team_short[tid]
-        row = conn.execute("SELECT name FROM teams WHERE id = ?", (tid,)).fetchone()
-        return row["name"] if row else ""
-    _yr_best = {}  # yr -> (cnt, tid)  연도별 최다 출전 팀
+        WHERE h.player_id = ? AND e.date_ts IS NOT NULL
+        GROUP BY yr, tid
+    """, (player_id,)).fetchall()
+    _short_by_id = {t["sofascore_id"]: t["short"] for t in TEAMS}
+    _short_by_name = {t["name"]: t["short"] for t in TEAMS}
+    def _season_team(tid, tname):
+        if tid in _short_by_id:
+            return _short_by_id[tid]
+        ko = _ko_team(tid, tname or "")
+        if ko in _short_by_name:
+            return _short_by_name[ko]
+        return ko.split(" ")[0] if ko else (tname or "")
+    _yr_best = {}  # yr -> (cnt, tid, tname)  연도별 최다 출전 팀
     for r in season_rows:
         if not r["yr"]:
             continue
         if r["yr"] not in _yr_best or r["cnt"] > _yr_best[r["yr"]][0]:
-            _yr_best[r["yr"]] = (r["cnt"], r["tid"])
-    seasons = [{"year": yr, "team": _short(_yr_best[yr][1])}
+            _yr_best[r["yr"]] = (r["cnt"], r["tid"], r["tname"])
+    seasons = [{"year": yr, "team": _season_team(_yr_best[yr][1], _yr_best[yr][2])}
                for yr in sorted(_yr_best, reverse=True)]
 
     matches_rows = conn.execute("""
@@ -4740,10 +4748,10 @@ def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id, venu
                e.home_score, e.away_score, e.date_ts
         FROM heatmap_points h
         JOIN events e ON h.event_id = e.id
-        WHERE h.player_id = ? AND e.tournament_id = ? AND e.date_ts IS NOT NULL
+        WHERE h.player_id = ? AND e.date_ts IS NOT NULL
     """ + year_clause + """
         ORDER BY e.date_ts DESC
-    """, (player_id, tournament_id, *year_params)).fetchall()
+    """, (player_id, *year_params)).fetchall()
 
     matches = [{
         "id":        r["id"],

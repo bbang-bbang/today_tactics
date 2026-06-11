@@ -97,10 +97,14 @@
     }
 
     // ── 팀 목록 ─────────────────────────────────────────────
+    let _teamLoadSeq = 0;
     async function loadTeams() {
+        const seq = ++_teamLoadSeq;           // 리그 빠른 전환 시 늦게 끝난 응답이 덮어쓰지 않게 가드
+        const league = currentLeague;
         teamGrid.innerHTML = "<p style='color:#aaa'>로딩 중...</p>";
         const res  = await fetch(`${apiBase()}/teams`);
         const teams = await res.json();
+        if (seq !== _teamLoadSeq) return;     // 그 사이 다른 리그 클릭됨 → 이 응답 폐기
         teamGrid.innerHTML = "";
         teams.forEach(t => {
             const el = document.createElement("div");
@@ -216,8 +220,13 @@
         cmpModes.forEach(b => b.classList.toggle("active", b.dataset.cmp === "none"));
         cmpSub.innerHTML = "";
         renderYearFilter();
-        setBase(cumulativePoints);
         renderMatchList(allMatches, null);
+        // 다중 시즌(이적 선수 등)은 '전체 누적'이 과포화 → 최신 시즌을 기본으로
+        if (currentSeasons.length > 1) {
+            changeYear(currentSeasons[0].year);
+        } else {
+            setBase(cumulativePoints);
+        }
     }
 
     // ── 경기별 히트맵 ────────────────────────────────────────
