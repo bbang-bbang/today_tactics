@@ -4864,17 +4864,21 @@ def heatmap_player_search():
     conn.row_factory = sqlite3.Row
     like = "%" + q + "%"
     k1, k2 = LEAGUE_TOURNAMENT_ID["k1"], LEAGUE_TOURNAMENT_ID["k2"]
+    # 선수당 1줄 — 여러 리그/시즌을 뛴 선수도 중복 노출 안 함.
+    # MAX(e.date_ts) 단일 집계로 bare 컬럼(team_id·tournament_id·position)이 '가장 최근 경기' 행에서 채워짐
+    # → 검색 결과는 그 선수의 현재(최근) 소속을 가리키고, 리그/시즌은 진입 후 탭·년도 필터로 조회.
     rows = conn.execute("""
         SELECT mps.player_id AS pid, mps.team_id AS tid, e.tournament_id AS tour,
                COALESCE(p.name_ko, NULLIF(mps.player_name,''), p.name) AS name,
                COALESCE(mps.position, p.position) AS pos,
-               COUNT(DISTINCT mps.event_id) AS games
+               COUNT(DISTINCT mps.event_id) AS games,
+               MAX(e.date_ts) AS last_ts
         FROM match_player_stats mps
         JOIN events e ON e.id = mps.event_id
         LEFT JOIN players p ON p.id = mps.player_id
         WHERE e.tournament_id IN (?, ?)
           AND (mps.player_name LIKE ? OR p.name_ko LIKE ? OR p.name LIKE ?)
-        GROUP BY mps.player_id, e.tournament_id
+        GROUP BY mps.player_id
         HAVING name IS NOT NULL
         ORDER BY games DESC, name
         LIMIT 30
