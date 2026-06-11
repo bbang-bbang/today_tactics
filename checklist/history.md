@@ -4,6 +4,28 @@
 
 ---
 
+## 2026-06-11 | PM 주도 — 데이터 정합성 재감사 + backlog stale 정리
+
+### 작업 배경
+- 사용자 "데이터 정합성 모두 끝났어?" → PM 주도로 검증 가능·ROI 높은 2건 실행: ① 로컬+운영 정합성 재감사 ② backlog stale 항목 실증 후 정리.
+
+### 정합성 재감사 (로컬 6/9 DB + 운영 prod)
+- 2026 치러진 경기 **210**(L1 90 + L2 120). 양쪽 모두 선수스탯·히트맵·경기장 누락 **0건**.
+- 운영 = 로컬 **정확히 일치** → prod self-collect divergence 없음 확인. (다음 라운드 7/4, 현재 휴식기)
+
+### backlog stale 항목 4건 실증 후 정리 (문서)
+- `5/5 K1 R11 3매치 히트맵`: 강원-포항 1335 / 대전-인천 1567 / 김천-울산 1370 — cron 자동 회복됨 → [x].
+- `5/9 K1 2매치 전술데이터`: Gimcheon-Incheon(ev15373001) avg_pos32·shotmap18, Gwangju-Gangwon(ev15373003) avg_pos32·shotmap26 — 채워짐 → [x].
+- `shotmap 좌표 정규화`: API 레벨(main.py 7927~7934 `x=100-x`) + 프론트 100-x 제거(prediction.js:1784) 확인 → 이중변환 없음, [x].
+- 중복 `mps.player_name NULL` 스텁 제거(line 61에서 이미 완료 처리).
+
+### 남은 실질 미완
+- **Google OAuth 발급 + LOGIN_REQUIRED=1**(P1) — 외부 Google Console 작업, 사용자 발급값 필요. 발급 후 SSH 환경변수 주입까지 즉시 가능.
+
+> 변경 파일: `checklist/backlog.md`(stale 4건 정리), `checklist/history.md`. main.py/JS 무변경.
+
+---
+
 ## 2026-06-09 | K2 미수집 8경기 수집 + def_score(수비P) 지표 재설계
 
 ### 이번 세션 커밋 (8개)
@@ -3616,3 +3638,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-09 16:01:18 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=20 rocky@<PROD_IP> 'cd /opt/today_tactics && echo "=== PROD git ===" && git log --oneline -3 && echo "HEAD=$(git rev-parse --short HEAD) origin=$(git rev-parse --short origin/main) dirty=$(git status --short | wc -l)" && echo "SERVICE=$(systemctl is-active today_tactics) HEALTH=$(curl -sf -o /dev/null -w %{http_code} http://127.0.0.1:5000/)"' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*|Could not create"
 - 2026-06-09 17:31:33 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=20 rocky@<PROD_IP> 'cd /opt/today_tactics && echo "=== PROD ===" && git log --oneline -3 && echo "HEAD=$(git rev-parse --short HEAD) origin=$(git rev-parse --short origin/main) dirty=$(git status --short | wc -l)" && echo "SERVICE=$(systemctl is-active today_tactics) HEALTH=$(curl -sf -o /dev/null -w %{http_code} http://127.0.0.1:5000/)"' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*|Could not create"
 - 2026-06-09 17:45:01 | for i in $(seq 1 8); do h=$(ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=15 rocky@<PROD_IP> 'cd /opt/today_tactics && git rev-parse --short HEAD' 2>/dev/null | tr -d "[:space:]"); if [ "$h" = "03d209c" ]; then echo "PROD SYNCED ($h) try $i"; break; fi; echo "try $i: $h"; sleep 8; done
+- 2026-06-09 17:52:40 | for i in $(seq 1 8); do h=$(ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=15 rocky@<PROD_IP> 'cd /opt/today_tactics && git rev-parse --short HEAD' 2>/dev/null | tr -d "[:space:]"); if [ "$h" = "18d078a" ]; then echo "PROD SYNCED ($h) try $i"; break; fi; echo "try $i: $h"; sleep 8; done
