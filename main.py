@@ -4635,24 +4635,27 @@ def _heatmap_teams_for_league(tournament_id, league_label=None):
 
 def _heatmap_players_for_team(team_id, tournament_id):
     conn = sqlite3.connect(DB_PATH)
-    # games = 히트맵 보유 경기수. HAVING games>0 → 히트맵 데이터 없는 선수(예: 일부 백업 GK) 제외
-    # (mps엔 있으나 heatmap_points 없는 선수를 누르면 빈 히트맵이 떠서 목록에서 빼는 게 맞음)
+    # 현재 시즌(CURRENT_YEAR) 명단만 — 과거 시즌 누적 로스터 제외.
+    # games = 현 시즌 히트맵 보유 경기수, HAVING games>0 → 빈 히트맵 선수 제외(일부 백업 GK 등).
+    ys, ye = _year_range(CURRENT_YEAR)
     rows = conn.execute("""
         SELECT mps.player_id,
                COALESCE(p.name_ko, NULLIF(mps.player_name,''), p.name) AS name,
                COALESCE(mps.position, p.position) AS pos,
                (SELECT COUNT(DISTINCT hp.event_id)
                   FROM heatmap_points hp JOIN events e2 ON e2.id = hp.event_id
-                  WHERE hp.player_id = mps.player_id AND e2.tournament_id = ?) AS games,
+                  WHERE hp.player_id = mps.player_id AND e2.tournament_id = ?
+                    AND e2.date_ts >= ? AND e2.date_ts < ?) AS games,
                ROUND(AVG(mps.rating), 2) as avg_rating
         FROM match_player_stats mps
         JOIN events e ON mps.event_id = e.id
         LEFT JOIN players p ON mps.player_id = p.id
         WHERE mps.team_id = ? AND e.tournament_id = ?
+          AND e.date_ts >= ? AND e.date_ts < ?
         GROUP BY mps.player_id
         HAVING name IS NOT NULL AND games > 0
         ORDER BY games DESC, name
-    """, (tournament_id, team_id, tournament_id)).fetchall()
+    """, (tournament_id, ys, ye, team_id, tournament_id, ys, ye)).fetchall()
     conn.close()
     return [{
         "playerId": r[0], "name": r[1], "position": r[2],
@@ -4706,13 +4709,30 @@ def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id, venu
 
     points = _flip_points(rows, int(team_id))
 
-    # 사용 가능한 시즌 목록 (필터 버튼용) — 전 시즌 기준
-    seasons = [r["yr"] for r in conn.execute("""
-        SELECT DISTINCT strftime('%Y', datetime(e.date_ts,'unixepoch')) AS yr
-        FROM heatmap_points h JOIN events e ON h.event_id = e.id
+    # 사용 가능한 시즌 목록 (필터 버튼용) — 연도별 소속팀 함께 (이적 선수는 시즌마다 팀이 다름)
+    season_rows = conn.execute("""
+        SELECT strftime('%Y', datetime(e.date_ts,'unixepoch')) AS yr,
+               mps.team_id AS tid, COUNT(DISTINCT h.event_id) AS cnt
+        FROM heatmap_points h
+        JOIN match_player_stats mps ON mps.event_id = h.event_id AND mps.player_id = h.player_id
+        JOIN events e ON e.id = h.event_id
         WHERE h.player_id = ? AND e.tournament_id = ? AND e.date_ts IS NOT NULL
-        ORDER BY yr DESC
-    """, (player_id, tournament_id)).fetchall() if r["yr"]]
+        GROUP BY yr, mps.team_id
+    """, (player_id, tournament_id)).fetchall()
+    _team_short = {t["sofascore_id"]: t["short"] for t in TEAMS}
+    def _short(tid):
+        if tid in _team_short:
+            return _team_short[tid]
+        row = conn.execute("SELECT name FROM teams WHERE id = ?", (tid,)).fetchone()
+        return row["name"] if row else ""
+    _yr_best = {}  # yr -> (cnt, tid)  연도별 최다 출전 팀
+    for r in season_rows:
+        if not r["yr"]:
+            continue
+        if r["yr"] not in _yr_best or r["cnt"] > _yr_best[r["yr"]][0]:
+            _yr_best[r["yr"]] = (r["cnt"], r["tid"])
+    seasons = [{"year": yr, "team": _short(_yr_best[yr][1])}
+               for yr in sorted(_yr_best, reverse=True)]
 
     matches_rows = conn.execute("""
         SELECT DISTINCT e.id, e.home_team_id, e.home_team_name,

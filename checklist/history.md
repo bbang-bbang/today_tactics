@@ -68,6 +68,12 @@
 - **경기장 축소**: 인라인 탭에서 `#k2-heatmap-canvas width:100%`가 패널 전체 폭으로 과대 → `.k2-heatmap-wrap{max-width:500px}` + canvas `height:auto`. 캔버스 1000+px → **500×325**(native 600×390 비율 유지). style v79→80.
 - 브라우저 검증: 캔버스 500×325, 에러 0.
 
+### 히트맵 2열(5:5) 레이아웃 + 현 시즌 명단 + 년도필터 소속팀 표시
+- **5:5 레이아웃**: `#k2-step-heatmap` 본문을 `.k2-hm-main` flex 2열로 — 좌(`.k2-hm-left`: 경기장+범례+인사이트) / 우(`#k2-match-list-wrap`: 경기별 보기). 각 `flex:1`(50%), 820px↓ 1열 스택. 경기장 max-width 제거(컬럼이 폭 결정), 매치리스트 max-height 160→440. 검증: 좌675=우675 동일행.
+- **현 시즌 명단만**: `_heatmap_players_for_team`에 `CURRENT_YEAR` 범위 필터 + games 서브쿼리도 현 시즌. 검증: 수원삼성 68→27명(과거 시즌 누적 로스터 제거).
+- **년도필터 소속팀 표시**: `_heatmap_points_for_player` seasons를 `[{year, team}]`로(연도별 최다 출전 팀=mps.team_id, TEAMS.short 매핑·없으면 teams.name). 프론트 년도 버튼에 `2026 수원`처럼 팀 부기. 이적 선수는 시즌마다 팀 다르게 표시.
+- k2heatmap v8→9·style v80→81. 브라우저 검증(에러 0).
+
 ---
 
 ## 2026-06-11 | PM 주도 — 데이터 정합성 재감사 + backlog stale 정리

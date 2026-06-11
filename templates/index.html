@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=80">
+    <link rel="stylesheet" href="/static/css/style.css?v=81">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -531,15 +531,19 @@
                     </div>
                     <div id="k2-cmp-sub" class="k2-cmp-sub"></div>
                 </div>
-                <div class="k2-heatmap-wrap">
-                    <canvas id="k2-heatmap-canvas" width="600" height="390"></canvas>
-                    <div id="k2-heatmap-loading" class="k2-loading">로딩 중...</div>
-                </div>
-                <div id="k2-cmp-legend" class="k2-cmp-legend hidden" aria-live="polite"></div>
-                <div id="k2-cmp-insight" class="k2-cmp-insight hidden" aria-live="polite"></div>
-                <div id="k2-match-list-wrap">
-                    <p class="k2-step-label">경기별 보기</p>
-                    <ul id="k2-match-list" class="k2-match-list"></ul>
+                <div class="k2-hm-main">
+                    <div class="k2-hm-left">
+                        <div class="k2-heatmap-wrap">
+                            <canvas id="k2-heatmap-canvas" width="600" height="390"></canvas>
+                            <div id="k2-heatmap-loading" class="k2-loading">로딩 중...</div>
+                        </div>
+                        <div id="k2-cmp-legend" class="k2-cmp-legend hidden" aria-live="polite"></div>
+                        <div id="k2-cmp-insight" class="k2-cmp-insight hidden" aria-live="polite"></div>
+                    </div>
+                    <div id="k2-match-list-wrap">
+                        <p class="k2-step-label">경기별 보기</p>
+                        <ul id="k2-match-list" class="k2-match-list"></ul>
+                    </div>
                 </div>
             </div>
 
@@ -876,7 +880,7 @@
     <script src="/static/js/app.js?v=17"></script>
 
     <script src="/static/js/info.js?v=7"></script>
-    <script src="/static/js/k2heatmap.js?v=8"></script>
+    <script src="/static/js/k2heatmap.js?v=9"></script>
     <script src="/static/js/banner_stats.js?v=3"></script>
     <script src="/static/js/team_compare.js?v=12"></script>
     <script src="/static/js/analytics.js?v=6"></script>

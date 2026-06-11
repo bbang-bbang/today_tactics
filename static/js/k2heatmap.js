@@ -576,13 +576,21 @@
         lbl.className = "k2-year-label";
         lbl.textContent = "시즌";
         yearFilter.appendChild(lbl);
-        ["전체", ...currentSeasons].forEach(y => {
-            const isAll = (y === "전체");
+        // 전체 버튼
+        const allBtn = document.createElement("button");
+        allBtn.type = "button";
+        allBtn.className = "k2-year-btn" + (!currentYear ? " active" : "");
+        allBtn.textContent = "전체";
+        allBtn.addEventListener("click", () => changeYear(null));
+        yearFilter.appendChild(allBtn);
+        // 연도별 + 해당 시즌 소속팀 (이적 선수 구분)
+        currentSeasons.forEach(s => {
             const btn = document.createElement("button");
             btn.type = "button";
-            btn.className = "k2-year-btn" + (((isAll && !currentYear) || y === currentYear) ? " active" : "");
-            btn.textContent = y;
-            btn.addEventListener("click", () => changeYear(isAll ? null : y));
+            btn.dataset.year = s.year;
+            btn.className = "k2-year-btn" + (s.year === currentYear ? " active" : "");
+            btn.innerHTML = `${s.year}${s.team ? `<span class="k2-year-team">${s.team}</span>` : ""}`;
+            btn.addEventListener("click", () => changeYear(s.year));
             yearFilter.appendChild(btn);
         });
     }
@@ -590,7 +598,7 @@
         if (y === currentYear) return;
         currentYear = y;
         yearFilter.querySelectorAll(".k2-year-btn").forEach(b => {
-            const v = (b.textContent === "전체") ? null : b.textContent;
+            const v = b.dataset.year || null;   // 전체 버튼은 dataset 없음 → null
             b.classList.toggle("active", v === currentYear);
         });
         loading.style.display = "flex";

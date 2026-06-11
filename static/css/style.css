@@ -2828,6 +2828,13 @@ body {
 .k2-year-btn:hover { background: #243040; }
 .k2-year-btn.active { background: #2f6df0; border-color: #2f6df0; color: #fff; font-weight: 600; }
 .k2-year-btn:focus-visible { outline: 2px solid #6ea8ff; outline-offset: 1px; }
+.k2-year-btn .k2-year-team {
+    margin-left: 5px;
+    font-size: 10.5px;
+    font-weight: 600;
+    opacity: 0.75;
+}
+.k2-year-btn.active .k2-year-team { opacity: 0.92; }
 
 /* ── 비교 인사이트 배너 ── */
 .k2-cmp-insight {
@@ -2895,11 +2902,23 @@ body {
 .k2-quick-meta { font-size: 11.5px; color: #8a98a8; white-space: nowrap; }
 .k2-quick-empty { padding: 10px; color: #8a98a8; font-size: 12.5px; text-align: center; }
 
+/* 히트맵 본문 2열: 좌(경기장+범례+인사이트) / 우(경기별 보기) 5:5 */
+.k2-hm-main {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    margin-top: 8px;
+}
+.k2-hm-left { flex: 1 1 0; min-width: 0; }
+#k2-match-list-wrap { flex: 1 1 0; min-width: 0; }
+@media (max-width: 820px) {
+    .k2-hm-main { flex-direction: column; }
+    .k2-hm-left { width: 100%; }
+}
 .k2-heatmap-wrap {
     position: relative;
     border-radius: 8px;
     overflow: hidden;
-    max-width: 500px;   /* 인라인 탭에서 경기장·히트맵이 과도하게 커지지 않게 제한 (native 600x390) */
 }
 #k2-heatmap-canvas { display: block; width: 100%; height: auto; border-radius: 8px; }
 .k2-loading {
@@ -2914,7 +2933,7 @@ body {
 }
 .k2-match-list {
     list-style: none;
-    max-height: 160px;
+    max-height: 440px;
     overflow-y: auto;
     border: 1px solid #333;
     border-radius: 6px;
