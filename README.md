@@ -53,7 +53,8 @@ today_tactics/
       banner_stats.js            # 배너 스탯
       info.js                    # 정보 패널
       insights.js                # 인사이트 뷰 (대시보드/순위 통합)
-      k2heatmap.js               # K2 히트맵 시각화
+      k2heatmap.js               # 히트맵 분석 뷰 (워크스페이스 탭): 통합검색·년도필터·비교 오버레이(포지션평균/타선수/홈vs원정)·인사이트 배너
+      workspace.js               # 상단 워크스페이스 탭 컨트롤러 (전술판/경기예측/팀/선수/히트맵)
       player_analytics.js        # 선수 개인 분석 모달
       player_report.js           # 선수 리포트 (레이더 차트, 스탯 바)
       prediction.js              # 경기 예측 + 시즌 시뮬레이션
@@ -156,7 +157,7 @@ backfill 스크립트
 | `/api/season-simulation` | 시즌 시뮬레이션 |
 | `/api/predicted-lineup` | 예상 라인업 |
 | `/api/standings` | K1/K2 순위표 |
-| `/api/heatmap` | 선수 히트맵 좌표 |
+| `/api/heatmap` | 선수 히트맵 좌표 (이름 기반) |
 | `/api/player-matches` | 선수 경기별 스탯 |
 | `/api/player-stat-report` | 선수 스탯 리포트 |
 | `/api/player-analytics` | 선수 개인 분석 (활동량 지수) |
@@ -165,7 +166,10 @@ backfill 스크립트
 | `/api/league-dashboard` | 리그 대시보드 |
 | `/api/k1/schedule`, `/api/k1/rounds` | K1 일정/라운드 |
 | `/api/k2/schedule`, `/api/k2/rounds` | K2 일정/라운드 |
-| `/api/kleague2/teams`, `/players`, `/heatmap` | K2 전용 |
+| `/api/kleague1/teams`, `/players`, `/heatmap` | K1 히트맵 뷰 (ID 기반, `year`·`venue=home\|away` 필터) |
+| `/api/kleague2/teams`, `/players`, `/heatmap` | K2 히트맵 뷰 (현 시즌 팀만, 수원삼성 포함) |
+| `/api/kleague1/position-heatmap`, `/api/kleague2/position-heatmap` | 포지션(G/D/M/F) 평균 동선 — 비교 오버레이용 (`year` 필터) |
+| `/api/heatmap-player-search` | 히트맵 통합 선수 검색 (K1·2 전 구단, 선수당 1줄) |
 | `/api/insights/top-performers` | 포지션별 TOP 퍼포머 |
 | `/api/insights/xg-efficiency` | xG 효율 분석 |
 | `/api/insights/forward-goals` | 공격수 득점 패턴 |

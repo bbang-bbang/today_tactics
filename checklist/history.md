@@ -52,6 +52,12 @@
 - **수원삼성(7652) 복원**: 구 `team_id != 7652` 제외가 stale → 수원삼성은 현 2026 K2 정식 팀(선수 68명·2026 mps 268행, 히트맵 정상). 제외 제거로 K2 17팀 완성. (P2-Red: 팀 데이터 표시 → 선수목록·샘플 히트맵 정상 검증 후 반영)
 - qa_check **31/31 PASS**.
 
+### 히트맵 후속 UX 3건 (커밋 `c257652`·`5fdf186`·`f23a254`)
+- **선수명 한글 우선**(`c257652`): `_heatmap_players_for_team` COALESCE 영문→`name_ko` 우선. 외국인도 name_ko 한글표기(페신·일류첸코) 폴백. 통합검색은 이미 한글 우선이라 일관성 확보.
+- **통합검색 선수당 1줄**(`5fdf186`): `GROUP BY player_id, tournament_id` → `player_id` 단독 + `MAX(date_ts)` 단일집계로 최근 소속 채움. 한 player_id가 K1·K2 다 뛰어도 1줄(예 825502). 동명이인(다른 player_id)은 팀으로 구분해 별도 표시(정상). 리그/시즌은 탭·년도 필터로.
+- **선수 리스트 가시성 개선**(`f23a254`, P6): 포지션 헤더 색상구분(GK황·DF청·MF녹·FW적)+인원수 배지+sticky, 행 구분선·좌측 포지션 액센트·hover 강화, 이름 14px 고대비·평점 골드, list 280→420px. style v77→78·k2heatmap v6→7. Playwright 검증(에러 0).
+- 3건 모두 운영 배포 + (UI건) 브라우저 검증 완료.
+
 ---
 
 ## 2026-06-11 | PM 주도 — 데이터 정합성 재감사 + backlog stale 정리
@@ -3692,3 +3698,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-11 14:38:32 | ssh -i <SSH_KEY>.pem -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && git log -1 --format='%h %s' && echo '---svc---' && systemctl is-active today_tactics && curl -s -m5 -o /dev/null -w 'health=%{http_code}\n' http://127.0.0.1:5000/health && echo '---v---' && curl -s -m5 http://127.0.0.1:5000/ | grep -o 'k2heatmap.js?v=[0-9]*' | head -1" 2>&1 | grep -vi "warning\|post-quantum\|store now\|may need\|openssh"
 - 2026-06-11 14:39:19 | ssh -i <SSH_KEY>.pem -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && echo '--search--' && curl -s -m8 'http://127.0.0.1:5000/api/heatmap-player-search?q=Son' | head -c 120 && echo '' && echo '--posheat--' && curl -s -m8 'http://127.0.0.1:5000/api/kleague1/position-heatmap?position=D' | python3 -c 'import sys,json;d=json.load(sys.stdin);print(\"sampled\",d.get(\"sampled\"),\"total\",d.get(\"total\"))' && echo '--GKflip--' && curl -s -m8 'http://127.0.0.1:5000/api/kleague1/heatmap?playerId=825502&teamId=7653' | python3 -c 'import sys,json;d=json.load(sys.stdin)[\"points\"];print(\"GK x>80 %.1f%%\"%(100*sum(1 for p in d if p[\"x\"]>80)/len(d)))'" 2>&1 | grep -vi "warning\|post-quantum\|store now\|may need\|openssh\|known_hosts\|create directory"
 - 2026-06-11 16:07:57 | ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && systemctl is-active today_tactics && curl -s -m6 http://127.0.0.1:5000/ | grep -oE 'data-ws=\"heatmap\"|k2heatmap.js\?v=[0-9]+|workspace.js\?v=[0-9]+|style.css\?v=[0-9]+' | sort -u" 2>&1 | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory\|may need"
+- 2026-06-11 17:26:33 | for i in $(seq 1 15); do /   v=$(ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && git rev-parse --short HEAD && curl -s -m5 http://127.0.0.1:5000/ | grep -oE 'k2heatmap.js\?v=[0-9]+|style.css\?v=[0-9]+'" 2>/dev/null | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory") /   echo "$v" | grep -q "f23a254" && { echo "=== PROD ==="; echo "$v"; break; } || { echo "try $i..."; sleep 6; } / done
