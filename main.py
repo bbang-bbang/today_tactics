@@ -4651,9 +4651,19 @@ def _heatmap_players_for_team(team_id, tournament_id):
     } for r in rows]
 
 
-def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id, venue=None):
+def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id, venue=None, year=None):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+
+    # 년도 필터 — 시즌 혼합 방지 (year=None/"all"이면 전 시즌)
+    year_clause, year_params = "", []
+    if year and str(year).lower() != "all":
+        try:
+            ys, ye = _year_range(year)
+            year_clause = " AND e.date_ts >= ? AND e.date_ts < ?"
+            year_params = [ys, ye]
+        except (ValueError, TypeError):
+            pass
 
     if event_id:
         rows = conn.execute("""
@@ -4669,23 +4679,31 @@ def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id, venu
             FROM heatmap_points h
             JOIN events e ON h.event_id = e.id
             WHERE h.player_id = ? AND e.tournament_id = ? AND e.home_team_id = ?
-        """, (player_id, tournament_id, int(team_id))).fetchall()
+        """ + year_clause, (player_id, tournament_id, int(team_id), *year_params)).fetchall()
     elif venue == "away":
         rows = conn.execute("""
             SELECT h.x, h.y, e.away_team_id
             FROM heatmap_points h
             JOIN events e ON h.event_id = e.id
             WHERE h.player_id = ? AND e.tournament_id = ? AND e.away_team_id = ?
-        """, (player_id, tournament_id, int(team_id))).fetchall()
+        """ + year_clause, (player_id, tournament_id, int(team_id), *year_params)).fetchall()
     else:
         rows = conn.execute("""
             SELECT h.x, h.y, e.away_team_id
             FROM heatmap_points h
             LEFT JOIN events e ON h.event_id = e.id
             WHERE h.player_id = ? AND e.tournament_id = ?
-        """, (player_id, tournament_id)).fetchall()
+        """ + year_clause, (player_id, tournament_id, *year_params)).fetchall()
 
     points = _flip_points(rows, int(team_id))
+
+    # 사용 가능한 시즌 목록 (필터 버튼용) — 전 시즌 기준
+    seasons = [r["yr"] for r in conn.execute("""
+        SELECT DISTINCT strftime('%Y', datetime(e.date_ts,'unixepoch')) AS yr
+        FROM heatmap_points h JOIN events e ON h.event_id = e.id
+        WHERE h.player_id = ? AND e.tournament_id = ? AND e.date_ts IS NOT NULL
+        ORDER BY yr DESC
+    """, (player_id, tournament_id)).fetchall() if r["yr"]]
 
     matches_rows = conn.execute("""
         SELECT DISTINCT e.id, e.home_team_id, e.home_team_name,
@@ -4694,8 +4712,9 @@ def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id, venu
         FROM heatmap_points h
         JOIN events e ON h.event_id = e.id
         WHERE h.player_id = ? AND e.tournament_id = ? AND e.date_ts IS NOT NULL
+    """ + year_clause + """
         ORDER BY e.date_ts DESC
-    """, (player_id, tournament_id)).fetchall()
+    """, (player_id, tournament_id, *year_params)).fetchall()
 
     matches = [{
         "id":        r["id"],
@@ -4708,7 +4727,7 @@ def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id, venu
     } for r in matches_rows]
 
     conn.close()
-    return {"points": points, "matches": matches, "playerId": player_id}
+    return {"points": points, "matches": matches, "playerId": player_id, "seasons": seasons}
 
 
 @app.route("/api/kleague2/teams")
@@ -4757,11 +4776,12 @@ def get_kleague2_heatmap():
     event_id  = request.args.get("eventId", "").strip()
     venue     = request.args.get("venue", "").strip().lower()
     venue     = venue if venue in ("home", "away") else None
+    year      = request.args.get("year", "").strip() or None
     if not player_id or not team_id:
         return jsonify({"error": "playerId and teamId required"}), 400
     if not os.path.exists(DB_PATH):
         return jsonify({"points": []})
-    return jsonify(_heatmap_points_for_player(player_id, team_id, event_id, LEAGUE_TOURNAMENT_ID["k2"], venue))
+    return jsonify(_heatmap_points_for_player(player_id, team_id, event_id, LEAGUE_TOURNAMENT_ID["k2"], venue, year))
 
 
 @app.route("/api/kleague1/heatmap")
@@ -4772,18 +4792,27 @@ def get_kleague1_heatmap():
     event_id  = request.args.get("eventId", "").strip()
     venue     = request.args.get("venue", "").strip().lower()
     venue     = venue if venue in ("home", "away") else None
+    year      = request.args.get("year", "").strip() or None
     if not player_id or not team_id:
         return jsonify({"error": "playerId and teamId required"}), 400
     if not os.path.exists(DB_PATH):
         return jsonify({"points": []})
-    return jsonify(_heatmap_points_for_player(player_id, team_id, event_id, LEAGUE_TOURNAMENT_ID["k1"], venue))
+    return jsonify(_heatmap_points_for_player(player_id, team_id, event_id, LEAGUE_TOURNAMENT_ID["k1"], venue, year))
 
 
-def _position_heatmap(position, tournament_id, cap=3000):
-    """같은 포지션 전 선수의 히트맵 좌표를 풀링(팀별 away-flip) 후 균등 샘플.
+def _position_heatmap(position, tournament_id, cap=3000, year=None):
+    """같은 포지션 전 선수의 히트맵 좌표를 풀링 후 균등 샘플.
     절대 개수가 아닌 '밀도 형태'를 비교하므로 cap 샘플로 충분하며 응답을 가볍게 유지."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    year_clause, year_params = "", []
+    if year and str(year).lower() != "all":
+        try:
+            ys, ye = _year_range(year)
+            year_clause = " AND e.date_ts >= ? AND e.date_ts < ?"
+            year_params = [ys, ye]
+        except (ValueError, TypeError):
+            pass
     # 원본은 이미 팀상대 정규화(공격=오른쪽) — flip 불필요 (_flip_points 주석 참조)
     rows = conn.execute("""
         SELECT h.x AS x, h.y AS y
@@ -4794,7 +4823,7 @@ def _position_heatmap(position, tournament_id, cap=3000):
         LEFT JOIN players p ON p.id = h.player_id
         WHERE e.tournament_id = ?
           AND COALESCE(mps.position, p.position) = ?
-    """, (tournament_id, position)).fetchall()
+    """ + year_clause, (tournament_id, position, *year_params)).fetchall()
     conn.close()
 
     pts = [{"x": r["x"], "y": r["y"]} for r in rows]
@@ -4812,7 +4841,8 @@ def _position_heatmap_response(league_key):
         return jsonify({"error": "position must be one of G/D/M/F"}), 400
     if not os.path.exists(DB_PATH):
         return jsonify({"points": []})
-    return jsonify(_position_heatmap(position, LEAGUE_TOURNAMENT_ID[league_key]))
+    year = request.args.get("year", "").strip() or None
+    return jsonify(_position_heatmap(position, LEAGUE_TOURNAMENT_ID[league_key], year=year))
 
 
 @app.route("/api/heatmap-player-search")

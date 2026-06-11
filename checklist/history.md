@@ -33,6 +33,12 @@
 - P7: position(G/D/M/F)·venue(home/away) 화이트리스트, q 파라미터 바인딩. qa_check **31/31 PASS**.
 - 검증 한계: node/playwright 미설치로 라이브 DOM 클릭은 미확인 — 백엔드·알고리즘(PIL 충실 재현)·데이터까지 검증.
 
+### 후속 — 사용자 피드백 반영(같은 날): 히트맵 모달 "단독 분석 뷰" 개선
+- **피드백**: 🔥 히트맵 모달이 더블클릭과 중복·잘 안 씀·선수조회 불편·**년도 필터 없음(전 시즌 혼합)**·리그 필터 꼬임.
+- **PM 결정**: 전술판은 이미 복잡 → 비교를 보드에 얹는 안 철회. 모달 유지하되 "검색 우선 + 년도 필터 + 깔끔한 단독 분석 뷰"로 개선. 더블클릭(보드 위 단일선수 빠른확인)과 역할 분리.
+- **년도 필터 추가**(핵심): `_heatmap_points_for_player`·`_position_heatmap`에 `year` 파라미터 + `_year_range` 시즌 필터. **시즌 혼합 결함 해결** — 응답에 `seasons` 목록 추가, 프론트 년도 버튼(다중 시즌 선수만 노출). 비교 오버레이도 같은 시즌 재요청. 검증: 홍정호 전체 9030pts(6시즌)→2025만 2094·2023만 1244, position D 전체 81365→2026만 56512.
+- **검색 우선**: 모달 열면 통합검색 자동 포커스. `index.html` v=4→5. qa_check **31/31 PASS**.
+
 ---
 
 ## 2026-06-11 | PM 주도 — 데이터 정합성 재감사 + backlog stale 정리
@@ -3670,3 +3676,5 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-09 17:31:33 | ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=20 rocky@<PROD_IP> 'cd /opt/today_tactics && echo "=== PROD ===" && git log --oneline -3 && echo "HEAD=$(git rev-parse --short HEAD) origin=$(git rev-parse --short origin/main) dirty=$(git status --short | wc -l)" && echo "SERVICE=$(systemctl is-active today_tactics) HEALTH=$(curl -sf -o /dev/null -w %{http_code} http://127.0.0.1:5000/)"' 2>&1 | grep -v -E "WARNING|vulnerable|may need|openssh.com|post-quantum|store now|Permanently|known_hosts|^\*\*|Could not create"
 - 2026-06-09 17:45:01 | for i in $(seq 1 8); do h=$(ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=15 rocky@<PROD_IP> 'cd /opt/today_tactics && git rev-parse --short HEAD' 2>/dev/null | tr -d "[:space:]"); if [ "$h" = "03d209c" ]; then echo "PROD SYNCED ($h) try $i"; break; fi; echo "try $i: $h"; sleep 8; done
 - 2026-06-09 17:52:40 | for i in $(seq 1 8); do h=$(ssh -i <SSH_KEY>.pem -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=15 rocky@<PROD_IP> 'cd /opt/today_tactics && git rev-parse --short HEAD' 2>/dev/null | tr -d "[:space:]"); if [ "$h" = "18d078a" ]; then echo "PROD SYNCED ($h) try $i"; break; fi; echo "try $i: $h"; sleep 8; done
+- 2026-06-11 14:38:32 | ssh -i <SSH_KEY>.pem -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && git log -1 --format='%h %s' && echo '---svc---' && systemctl is-active today_tactics && curl -s -m5 -o /dev/null -w 'health=%{http_code}\n' http://127.0.0.1:5000/health && echo '---v---' && curl -s -m5 http://127.0.0.1:5000/ | grep -o 'k2heatmap.js?v=[0-9]*' | head -1" 2>&1 | grep -vi "warning\|post-quantum\|store now\|may need\|openssh"
+- 2026-06-11 14:39:19 | ssh -i <SSH_KEY>.pem -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && echo '--search--' && curl -s -m8 'http://127.0.0.1:5000/api/heatmap-player-search?q=Son' | head -c 120 && echo '' && echo '--posheat--' && curl -s -m8 'http://127.0.0.1:5000/api/kleague1/position-heatmap?position=D' | python3 -c 'import sys,json;d=json.load(sys.stdin);print(\"sampled\",d.get(\"sampled\"),\"total\",d.get(\"total\"))' && echo '--GKflip--' && curl -s -m8 'http://127.0.0.1:5000/api/kleague1/heatmap?playerId=825502&teamId=7653' | python3 -c 'import sys,json;d=json.load(sys.stdin)[\"points\"];print(\"GK x>80 %.1f%%\"%(100*sum(1 for p in d if p[\"x\"]>80)/len(d)))'" 2>&1 | grep -vi "warning\|post-quantum\|store now\|may need\|openssh\|known_hosts\|create directory"

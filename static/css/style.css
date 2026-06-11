@@ -2762,6 +2762,28 @@ body {
     display: inline-block;
 }
 
+/* ── 시즌(년도) 필터 ── */
+.k2-year-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 2px;
+}
+.k2-year-btn {
+    appearance: none;
+    border: 1px solid #34404e;
+    background: #1b222c;
+    color: #cdd6e0;
+    font-size: 12px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out;
+}
+.k2-year-btn:hover { background: #243040; }
+.k2-year-btn.active { background: #2f6df0; border-color: #2f6df0; color: #fff; font-weight: 600; }
+.k2-year-btn:focus-visible { outline: 2px solid #6ea8ff; outline-offset: 1px; }
+
 /* ── 비교 인사이트 배너 ── */
 .k2-cmp-insight {
     display: flex;

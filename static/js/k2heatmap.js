@@ -35,7 +35,11 @@
     let overlayPoints = null;     // 비교 대상 좌표 (파랑 층)
     let baseLabel     = "";
     let overlayLabel  = "";
+    let currentYear   = null;     // null/"all" = 전 시즌, "2026" 등 = 해당 시즌만
+    let currentSeasons = [];
 
+    const yearFilter = document.getElementById("k2-year-filter");
+    const yearQS = () => (currentYear ? `&year=${currentYear}` : "");
     const cmpModes  = document.querySelectorAll(".k2-cmp-mode");
     const cmpSub    = document.getElementById("k2-cmp-sub");
     const cmpLegend = document.getElementById("k2-cmp-legend");
@@ -53,6 +57,8 @@
         modal.classList.remove("hidden");
         showStep("team");
         loadTeams();
+        // 검색 우선 — 선수명으로 바로 조회 유도
+        if (quickSearch) setTimeout(() => quickSearch.focus(), 60);
     });
     [btnClose, backdrop].forEach(el =>
         el.addEventListener("click", () => modal.classList.add("hidden"))
@@ -182,18 +188,21 @@
             </div>`;
         }
 
+        currentYear = null;   // 새 선수는 전 시즌부터
         const res  = await fetch(`${apiBase()}/heatmap?playerId=${player.playerId}&teamId=${currentTeam.sofascore_id}`);
         const data = await res.json();
         loading.style.display = "none";
 
         allMatches = data.matches || [];
         cumulativePoints = data.points || [];
+        currentSeasons = data.seasons || [];
         baseLabel = player.name;
         // 새 선수 선택 시 비교 모드 초기화
         compareMode = "none";
         overlayPoints = null;
         cmpModes.forEach(b => b.classList.toggle("active", b.dataset.cmp === "none"));
         cmpSub.innerHTML = "";
+        renderYearFilter();
         setBase(cumulativePoints);
         renderMatchList(allMatches, null);
     }
@@ -377,7 +386,7 @@
     async function fetchPositionOverlay(pos) {
         loading.style.display = "flex";
         try {
-            const data = await (await fetch(`${apiBase()}/position-heatmap?position=${pos}`)).json();
+            const data = await (await fetch(`${apiBase()}/position-heatmap?position=${pos}${yearQS()}`)).json();
             overlayPoints = data.points || [];
             overlayLabel = (POS_LABEL[pos] || pos) + " 평균";
         } catch (e) { overlayPoints = []; }
@@ -425,7 +434,7 @@
             const nm = playerSel.options[playerSel.selectedIndex].dataset.name;
             loading.style.display = "flex";
             try {
-                const data = await (await fetch(`${apiBase()}/heatmap?playerId=${playerSel.value}&teamId=${teamSel.value}`)).json();
+                const data = await (await fetch(`${apiBase()}/heatmap?playerId=${playerSel.value}&teamId=${teamSel.value}${yearQS()}`)).json();
                 overlayPoints = data.points || [];
                 overlayLabel = nm;
             } catch (e) { overlayPoints = []; }
@@ -438,7 +447,7 @@
     // C. 홈 vs 원정 (같은 선수)
     async function loadVenueCompare() {
         loading.style.display = "flex";
-        const url = `${apiBase()}/heatmap?playerId=${currentPlayer.playerId}&teamId=${currentTeam.sofascore_id}`;
+        const url = `${apiBase()}/heatmap?playerId=${currentPlayer.playerId}&teamId=${currentTeam.sofascore_id}${yearQS()}`;
         try {
             const [hp, ap] = await Promise.all([
                 fetch(`${url}&venue=home`).then(r => r.json()),
@@ -545,6 +554,62 @@
         cmpInsight.innerHTML =
             `<span class="k2-ins-title">${baseLabel} vs ${overlayLabel}</span>` +
             chips.map(c => `<span class="k2-ins-chip">${c}</span>`).join("");
+    }
+
+    // ── 시즌 필터 ──────────────────────────────────────────
+    function renderYearFilter() {
+        if (!yearFilter) return;
+        yearFilter.innerHTML = "";
+        if (currentSeasons.length <= 1) { yearFilter.style.display = "none"; return; }
+        yearFilter.style.display = "";
+        ["전체", ...currentSeasons].forEach(y => {
+            const isAll = (y === "전체");
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "k2-year-btn" + (((isAll && !currentYear) || y === currentYear) ? " active" : "");
+            btn.textContent = y;
+            btn.addEventListener("click", () => changeYear(isAll ? null : y));
+            yearFilter.appendChild(btn);
+        });
+    }
+    async function changeYear(y) {
+        if (y === currentYear) return;
+        currentYear = y;
+        yearFilter.querySelectorAll(".k2-year-btn").forEach(b => {
+            const v = (b.textContent === "전체") ? null : b.textContent;
+            b.classList.toggle("active", v === currentYear);
+        });
+        loading.style.display = "flex";
+        try {
+            const d = await (await fetch(`${apiBase()}/heatmap?playerId=${currentPlayer.playerId}&teamId=${currentTeam.sofascore_id}${yearQS()}`)).json();
+            cumulativePoints = d.points || [];
+            allMatches = d.matches || [];
+        } catch (e) {}
+        loading.style.display = "none";
+        renderMatchList(allMatches, null);
+
+        if (compareMode === "venue") {
+            loadVenueCompare();
+        } else if (compareMode === "position") {
+            currentBasePoints = cumulativePoints;
+            const sel = cmpSub.querySelector("select");
+            fetchPositionOverlay(sel ? sel.value : (currentPlayer.position || "M"));
+        } else if (compareMode === "player") {
+            currentBasePoints = cumulativePoints;
+            const sels = cmpSub.querySelectorAll("select");
+            const psel = sels[1];
+            if (psel && psel.value) {
+                const nm = psel.options[psel.selectedIndex].dataset.name;
+                try {
+                    const d2 = await (await fetch(`${apiBase()}/heatmap?playerId=${psel.value}&teamId=${sels[0].value}${yearQS()}`)).json();
+                    overlayPoints = d2.points || [];
+                    overlayLabel = nm;
+                } catch (e) {}
+            }
+            render();
+        } else {
+            setBase(cumulativePoints);
+        }
     }
 
     // ── 통합 선수 검색 (전 구단 → 바로 히트맵 진입) ──────────
