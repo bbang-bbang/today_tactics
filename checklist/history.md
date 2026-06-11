@@ -79,6 +79,10 @@
 - **수정**: `fieldX/fieldY` 헬퍼로 점을 `FIELD_PAD 0.06 + (v/100)*0.88` 매핑(라인 5~95%보다 살짝 안쪽). drawHeatmap·renderLayer(비교 오버레이) 동일 적용. k2heatmap v9→10.
 - 브라우저 검증: 경기장 외곽선 온전히 보이고 히트맵이 그 안에 담김, 에러 0.
 
+### 히트맵 추가 축소 + "다른 선수" 비교 한글 확인
+- **경기장 추가 축소**: `.k2-heatmap-wrap{max-width:560px}` 재도입(5:5 컬럼이어도 캡). 캔버스 675→**560×364**. style v81→82.
+- **"다른 선수" 비교 한글명**: 이미 한글로 동작 확인(드롭다운 로스·송민규, 범례 "구성윤 vs 로스"). `_heatmap_players_for_team` 한글화(c257652)가 비교 드롭다운에도 적용됨. 현 시즌 히트맵 선수 K1 349·K2 513명 전원 name_ko 보유(영문 0) → 코드 변경 불필요. (사용자가 본 영문은 캐시된 옛 화면 추정)
+
 ---
 
 ## 2026-06-11 | PM 주도 — 데이터 정합성 재감사 + backlog stale 정리
@@ -3723,3 +3727,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-11 17:41:55 | for i in $(seq 1 15); do /   v=$(ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && git rev-parse --short HEAD && curl -s -m5 http://127.0.0.1:5000/ | grep -oE 'k2heatmap.js\?v=[0-9]+|style.css\?v=[0-9]+'" 2>/dev/null | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory") /   echo "$v" | grep -q "de9141b" && { echo "=== PROD ==="; echo "$v"; break; } || { echo "try $i..."; sleep 6; } / done
 - 2026-06-11 17:42:12 | ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && curl -s -m6 http://127.0.0.1:5000/ | grep -oE 'k2heatmap.js\?v=[0-9]+|style.css\?v=[0-9]+' | sort -u" 2>&1 | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory\|may need"
 - 2026-06-11 17:42:23 | ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> 'cd /opt/today_tactics && curl -s -m6 http://127.0.0.1:5000/ | grep -o "k2heatmap.js?v=[0-9]*" | head -1 && curl -s -m6 http://127.0.0.1:5000/ | grep -o "style.css?v=[0-9]*" | head -1' 2>&1 | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory\|may need"
+- 2026-06-11 18:31:13 | for i in $(seq 1 15); do /   v=$(ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && git rev-parse --short HEAD && curl -s -m5 http://127.0.0.1:5000/ | grep -o 'k2heatmap.js?v=[0-9]*' | head -1" 2>/dev/null | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory") /   echo "$v" | grep -q "505c2af" && { echo "=== PROD ==="; echo "$v"; break; } || { echo "try $i..."; sleep 6; } / done

@@ -2919,6 +2919,7 @@ body {
     position: relative;
     border-radius: 8px;
     overflow: hidden;
+    max-width: 560px;   /* 5:5 컬럼이어도 경기장이 과도하게 커지지 않게 살짝 캡 */
 }
 #k2-heatmap-canvas { display: block; width: 100%; height: auto; border-radius: 8px; }
 .k2-loading {
