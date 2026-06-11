@@ -49,6 +49,10 @@
     const POS_LABEL = { G:"GK", D:"DF", M:"MF", F:"FW" };
     const RED  = [255, 60, 30];
     const BLUE = [40, 120, 255];
+    // 히트맵 점을 경기장(라인 5~95%) 안쪽으로 매핑 — 살짝 더 들여 경기장보다 작게
+    const FIELD_PAD = 0.06, FIELD_SPAN = 0.88;
+    const fieldX = (x, W) => (FIELD_PAD + (x / 100) * FIELD_SPAN) * W;
+    const fieldY = (y, H) => (FIELD_PAD + (y / 100) * FIELD_SPAN) * H;
 
     const apiBase = () => `/api/kleague${currentLeague === "k1" ? "1" : "2"}`;
 
@@ -282,8 +286,8 @@
 
         const R = 20;
         points.forEach(p => {
-            const x = (p.x / 100) * W;
-            const y = (p.y / 100) * H;
+            const x = fieldX(p.x, W);
+            const y = fieldY(p.y, H);
             const g = off.createRadialGradient(x, y, 0, x, y, R);
             g.addColorStop(0,   "rgba(255,50,0,0.15)");
             g.addColorStop(1,   "rgba(255,50,0,0)");
@@ -502,7 +506,7 @@
         const o = off.getContext("2d");
         const R = 22;
         points.forEach(p => {
-            const x = (p.x / 100) * W, y = (p.y / 100) * H;
+            const x = fieldX(p.x, W), y = fieldY(p.y, H);
             const g = o.createRadialGradient(x, y, 0, x, y, R);
             g.addColorStop(0, "rgba(0,0,0,0.12)");
             g.addColorStop(1, "rgba(0,0,0,0)");
