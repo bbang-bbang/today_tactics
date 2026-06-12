@@ -795,7 +795,7 @@
             li.tabIndex = 0;
             li.innerHTML =
                 `<span class="k2-quick-name">${r.name}</span>` +
-                `<span class="k2-quick-meta">${r.teamShort || r.teamName} · ${POS_LABEL[r.position] || r.position || ""} · ${r.games}경기 · ${r.league.toUpperCase()}</span>`;
+                `<span class="k2-quick-meta">${r.teamShort || r.teamName} · ${r.detailLabel || POS_LABEL[r.position] || r.position || ""} · ${r.games}경기 · ${r.league.toUpperCase()}</span>`;
             const go = () => jumpToPlayer(r);
             li.addEventListener("click", go);
             li.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });

@@ -159,7 +159,7 @@ backfill 스크립트
 | `/api/standings` | K1/K2 순위표 |
 | `/api/heatmap` | 선수 히트맵 좌표 (이름 기반) |
 | `/api/player-matches` | 선수 경기별 스탯 |
-| `/api/player-stat-report` | 선수 스탯 리포트 |
+| `/api/player-stat-report` | 선수 스탯 리포트 — 퍼센타일 비교군이 **세부 포지션**(풀백↔풀백 등, 표본<5는 대분류 폴백). 응답에 `detail_label`·`peer_label` |
 | `/api/player-analytics` | 선수 개인 분석 (활동량 지수) |
 | `/api/player-vs-teams` | 선수 상대팀별 성적 |
 | `/api/player-status` (CRUD) | 부상/출전정지/출전의문 관리 |
@@ -171,7 +171,7 @@ backfill 스크립트
 | `/api/kleague{1,2}/heatmap` | 선수 히트맵 — **리그 무관(career), `year`·`venue=home\|away` 필터**. 응답에 `seasons=[{year,team}]`(시즌별 실소속, event+is_home 유도) + `detailPos`(선택 시즌 세부 포지션, 비교 기본값) |
 | `/api/kleague{1,2}/position-heatmap` | 포지션 평균 동선 — 비교 오버레이용. `detail=`(세부 8그룹 GK/CB/FB/DM/CM/AM/W/ST) 우선, 없으면 `position=`(G/D/M/F). `year` 필터 |
 | `/api/heatmap-player-search` | 히트맵 통합 선수 검색 (K1·2 전 구단, 선수당 1줄, 최근 소속) |
-| `/api/insights/top-performers` | 포지션별 TOP 퍼포머 |
+| `/api/insights/top-performers` | 포지션별 TOP 퍼포머 — 행에 `detail`(세부 포지션 최빈) 부착, 프론트 칩이 CB/FB/DM/CM/AM/W/ST로 행 필터 |
 | `/api/insights/xg-efficiency` | xG 효율 분석 |
 | `/api/insights/forward-goals` | 공격수 득점 패턴 |
 | `/api/insights/midfielder-pass` | 미드필더 패스 분석 |

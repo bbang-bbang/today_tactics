@@ -83,6 +83,8 @@
 
   // 포지션 배지 표시용
   const POS_BADGE = { F: "공격", M: "미드", D: "수비", G: "GK" };
+  // 세부 그룹 → 대분류(배지 색상 정합용)
+  const DETAIL_BROAD = { CB:"D", FB:"D", DM:"M", CM:"M", AM:"M", W:"F", ST:"F", GK:"G" };
 
   // 셀 1개 렌더 (컬럼 메타 기반)
   function renderCell(col, r, rank) {
@@ -90,8 +92,11 @@
     if (col.key === "name") return `<td class="ins-name">${r.name}</td>`;
     if (col.key === "team") return `<td class="ins-team">${r.team || "-"}</td>`;
     if (col.key === "pos") {
-      const posCls = r.pos ? `ins-pos-badge ins-pos-${r.pos}` : "ins-pos-badge";
-      return `<td><span class="${posCls}">${POS_BADGE[r.pos] || "-"}</span></td>`;
+      // 색상은 detail 기준 대분류로 정합(윙어=공격색 등), 라벨은 세부 우선
+      const broad = (r.detail && DETAIL_BROAD[r.detail]) || r.pos;
+      const posCls = broad ? `ins-pos-badge ins-pos-${broad}` : "ins-pos-badge";
+      const label = r.detail_label || POS_BADGE[r.pos] || "-";
+      return `<td><span class="${posCls}">${label}</span></td>`;
     }
     let v = r[col.key];
     if (col.signed && typeof v === "number") {   // 결정력(G−xG) — ± 부호 + 색
@@ -265,7 +270,11 @@
     if (!body || !data) return;
     const base = data.all || [];
     // 포지션 칩은 데이터셋 교체가 아니라 통합표의 행 필터 (정렬 상태 유지)
-    const raw = currentPos === "all" ? base : base.filter(r => r.pos === currentPos);
+    // currentPos: "all" | 세부그룹(CB/FB/DM/CM/AM/W/ST) | (구)대분류 F/M/D
+    const DETAIL_TOKENS = new Set(["CB","FB","DM","CM","AM","W","ST"]);
+    const raw = currentPos === "all" ? base
+              : DETAIL_TOKENS.has(currentPos) ? base.filter(r => r.detail === currentPos)
+              : base.filter(r => r.pos === currentPos);
     renderCategoryBoxes(raw);   // 부문 카드도 같은 필터 집합 기준
     if (!raw.length) { body.innerHTML = '<p class="ins-empty">데이터 없음</p>'; return; }
 

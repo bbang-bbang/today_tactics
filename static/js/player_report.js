@@ -56,6 +56,9 @@
         // 신체 정보 뱃지
         const posLabel = p.pos_label || p.pos || "?";
         const posColor = {GK:"#fbbf24",DF:"#4ade80",MF:"#4ea4f8",FW:"#f87171"}[posLabel] || "#9ab";
+        // 세부 포지션 라벨(센터백·풀백 등) 우선 표시 — 색상은 대분류 기준 유지
+        const roleLabel = p.detail_label || posLabel;
+        const peerLabel = p.peer_label || posLabel;
         const heightBadge = p.height ? physBadge("키", `${p.height}cm`, p.height_rank) : "";
         const weightBadge = p.weight ? physBadge("몸무게", `${p.weight}kg`, p.weight_rank) : "";
 
@@ -82,7 +85,7 @@
         body.innerHTML = `
         <div class="pr-card pr-info-card">
             <div class="pr-player-header">
-                <div class="pr-pos-badge" style="background:${posColor}22;border-color:${posColor}55;color:${posColor}">${posLabel}</div>
+                <div class="pr-pos-badge" style="background:${posColor}22;border-color:${posColor}55;color:${posColor}">${roleLabel}</div>
                 <div class="pr-player-name">${p.name}</div>
                 <div class="pr-player-team">${p.team}</div>
                 <div class="pr-info-badges">
@@ -94,7 +97,7 @@
                     ${p.reds    ? `<span class="pr-badge">🟥${p.reds}</span>` : ""}
                     ${heightBadge}${weightBadge}
                 </div>
-                <div class="pr-peer-note">동일 포지션 ${posLabel} 선수 ${d.peer_count}명 대비 퍼센타일</div>
+                <div class="pr-peer-note">동일 포지션 <b>${peerLabel}</b> ${d.peer_count}명 대비 퍼센타일</div>
             </div>
         </div>
 

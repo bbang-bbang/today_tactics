@@ -46,6 +46,14 @@
 - **인사이트 확대**: 후보 9종으로(전진도·좌우치우침·좌우활동폭·**전후활동폭**·활동범위·공격가담·수비복귀·**상대 박스 부근**·**측면운영/중앙침투**). `pointStats`에 boxPct/widePct/cenPct 추가. 각 후보에 중요도 점수 → **정렬 후 상위 6개만** 노출(과밀 방지). 헤드라인 성향에 "박스 침투형" 추가.
 - 검증: Playwright — 헤이스 vs ST평균 칩3(유사), vs CB평균 칩6("공격가담 +43%p"·"전방 약 27m 앞"·"박스부근 +9%p" 등 중요도순)·노트 표시·콘솔 에러 0. `k2heatmap.js` v14→15, `style.css` v83→84. **DB 무변경**.
 
+### 후속3(같은 날): 세부 포지션 전체 확장 — 리포트 퍼센타일·인사이트 랭킹·검색칩
+- **요청**: "세부 포지션 정보로 전체 업데이트" → 히트맵 비교 외 다른 기능에도 확장(사용자 ①+②+③ 전체 선택).
+- **데이터 제약 진단**: detail_pos 보유 선수 83.9%(선발 경험), 16% 서브전용 → **대분류 폴백 필요**. 941명이 2개+ 세부포지션 → **대표(최빈) 그룹** 산정 필요. 공통 헬퍼 `_player_detail_groups()`(시즌·리그 스코프 최빈 그룹) + `DETAIL_TO_BROAD`/`BROAD_POS_LABELS` 추가.
+- **① 선수 스탯 리포트 퍼센타일**(P4 핵심): 비교군을 **같은 세부포지션 선수로** 좁힘(풀백↔풀백). 표본 5명 미만이면 대분류 폴백(`peer_label`로 실제 비교군 표기). 검증: 풀백 1026202 비교군 **수비수 94명→풀백 31명**. 응답에 `detail_pos`/`detail_label`/`peer_label`.
+- **② 인사이트 TOP 퍼포머 랭킹**: 통합표 포지션 칩을 대분류(F/M/D) → **세부 8그룹(전체+CB/FB/DM/CM/AM/W/ST)**. top-performers 응답에 선수별 `detail`(양 리그·연도 최빈) 부착, 프론트 행 필터 + 배지 라벨 detail 우선(색상은 detail→대분류 정합). 검증: CB 필터 전부 "센터백"·FB 전부 "풀백·윙백".
+- **③ 라벨/검색칩**: 선수 리포트 포지션 배지 = 세부 라벨, 퍼센타일 주석 = 실제 비교군. 통합검색(`heatmap-player-search`) 결과에 `detailPos`/`detailLabel` → 히트맵 검색 칩에 세부 표기.
+- 검증: Playwright — 인사이트 8칩·CB/FB 필터 정확·콘솔 에러 0, 리포트 풀백 비교군 31명. `k2heatmap.js` v15→16, `player_report.js` v5→6, `insights.js` v37→38. **DB 무변경(기존 detail_pos 컬럼 재사용) → prod 마이그레이션 불필요**.
+
 ---
 
 ## 2026-06-11 | 히트맵 비교 오버레이 신규 + 🔴 flip 선재 버그 발견·수정
@@ -3810,3 +3818,7 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-12 10:37:59 | pkill -f "python main.py" 2>/dev/null; echo "server stopped"
 - 2026-06-12 10:44:53 | pkill -f "python main.py" 2>/dev/null; sleep 1 / DISABLE_SCHEDULER=1 LOGIN_REQUIRED=0 python main.py > /tmp/flask_v15.log 2>&1 & / echo "pid $!"; sleep 7; tail -1 /tmp/flask_v15.log
 - 2026-06-12 10:45:53 | pkill -f "python main.py" 2>/dev/null; echo "stopped"
+- 2026-06-12 10:46:41 | KEY=<SSH_KEY>.pem; R=rocky@<PROD_IP> / for i in $(seq 1 8); do /   H=$(ssh -i "$KEY" -o ConnectTimeout=15 "$R" "cd /opt/today_tactics && git rev-parse --short HEAD" 2>/dev/null) /   echo "poll $i: prod=$H (target 5f4ce45)" /   [ "$H" = "5f4ce45" ] && { echo DEPLOYED; break; } /   sleep 12 / done / BASE=https://www.today-football-tactics.xyz / curl -s -o /dev/null -w "k2heatmap v15: %{http_code}\n" --max-time 15 "$BASE/static/js/k2heatmap.js?v=15" / curl -s -o /dev/null -w "style v84:     %{http_code}\n" --max-time 15 "$BASE/static/css/style.css?v=84" / curl -s -o /dev/null -w "health:        %{http_code}\n" --max-time 15 "$BASE/health"
+- 2026-06-12 11:17:36 | python -c "import ast; ast.parse(open('main.py',encoding='utf-8').read()); print('syntax OK')" && pkill -f "python main.py" 2>/dev/null; sleep 1 / DISABLE_SCHEDULER=1 LOGIN_REQUIRED=0 python main.py > /tmp/flask_detail2.log 2>&1 & / echo "pid $!"; sleep 8; tail -1 /tmp/flask_detail2.log
+- 2026-06-12 11:24:23 | python -c "import ast; ast.parse(open('main.py',encoding='utf-8').read()); print('main.py OK')" / pkill -f "python main.py" 2>/dev/null; sleep 1 / DISABLE_SCHEDULER=1 LOGIN_REQUIRED=0 python main.py > /tmp/flask_v16.log 2>&1 & / echo "pid $!"; sleep 9; tail -1 /tmp/flask_v16.log
+- 2026-06-12 11:59:40 | pkill -f "python main.py" 2>/dev/null; echo "stopped"

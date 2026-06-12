@@ -3719,6 +3719,18 @@ def get_player_stat_report():
     height_rank = physical_rank("height", height)
     weight_rank = physical_rank("weight", weight)
 
+    # ── 세부 포지션 비교군 — 풀백을 전체 수비수가 아닌 풀백끼리 비교(통계 정확성, P4) ──
+    # 선발 detail_pos 최빈 그룹으로 피어를 좁힌다. 서브 전용 등 detail 없는 선수는
+    # detail_grp=None → 기존 대분류(mps.position) 비교로 자동 폴백.
+    _detail_map = _player_detail_groups(conn, 777, year_clause, yp)
+    try:
+        _pid_int = int(pid)
+    except (TypeError, ValueError):
+        _pid_int = None
+    detail_grp = _detail_map.get(_pid_int)
+    detail_members = {p for p, g in _detail_map.items() if g == detail_grp} if detail_grp else None
+    detail_label = DETAIL_POS_LABELS.get(detail_grp) if detail_grp else None
+
     # ── 같은 포지션 선수 집계 (퍼센타일 기준) ──────────────────
     cur.execute(f"""
         SELECT mps.player_id,
@@ -3776,6 +3788,18 @@ def get_player_stat_report():
             "touches":  v90("touches"),
             "fouls":    v90("fouls"),
         }
+
+    # 세부 포지션 비교군 적용 — 같은 그룹 피어가 5명 이상일 때만(표본 안정).
+    # 미만이면 대분류 전체로 폴백(백분위 신뢰성 우선). peer_label = 실제 비교군 이름.
+    if detail_members is not None:
+        _filtered = {pp: v for pp, v in peers.items() if pp in detail_members}
+        if len(_filtered) >= 5:
+            peers = _filtered
+            peer_label = detail_label
+        else:
+            peer_label = BROAD_POS_LABELS.get(pos_raw, pos_label)
+    else:
+        peer_label = BROAD_POS_LABELS.get(pos_raw, pos_label)
 
     def percentile(key, val, higher_is_better=True):
         vals = [v[key] for v in peers.values() if v[key] is not None]
@@ -3982,6 +4006,9 @@ def get_player_stat_report():
             "team":     team_name,
             "pos":      pos_raw,
             "pos_label": pos_label,
+            "detail_pos":   detail_grp,
+            "detail_label": detail_label,
+            "peer_label":   peer_label,
             "height":   height,
             "weight":   weight,
             "height_rank": height_rank,
@@ -4889,6 +4916,35 @@ def _detail_group_for_label(label):
     return None
 
 
+# 대분류(G/D/M/F) ← 세부 그룹 역매핑 (라벨 그룹 메트릭 세트 선택용)
+DETAIL_TO_BROAD = {
+    "GK": "G", "CB": "D", "FB": "D",
+    "DM": "M", "CM": "M", "AM": "M", "W": "F", "ST": "F",
+}
+BROAD_POS_LABELS = {"G": "골키퍼", "D": "수비수", "M": "미드필더", "F": "공격수"}
+
+
+def _player_detail_groups(conn, tournament_id, year_clause="", yp=()):
+    """리그·시즌 내 선수별 대표 세부포지션 그룹 {player_id: 그룹토큰}.
+    선발 detail_pos 최빈(그룹 합산). 서브 전용(detail 없음) 선수는 미포함 → 호출부에서 대분류 폴백.
+    year_clause는 events 별칭 e 기준 ('AND e.date_ts...'), yp는 그 바인딩 파라미터."""
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT l.player_id, l.detail_pos, COUNT(*) c
+        FROM match_lineups l JOIN events e ON e.id = l.event_id
+        WHERE e.tournament_id = ? AND l.detail_pos IS NOT NULL {year_clause}
+        GROUP BY l.player_id, l.detail_pos
+    """, (tournament_id, *yp))
+    agg = {}
+    for pid_, dp, c in cur.fetchall():
+        g = _detail_group_for_label(dp)
+        if not g:
+            continue
+        d = agg.setdefault(pid_, {})
+        d[g] = d.get(g, 0) + c
+    return {p: max(gc, key=gc.get) for p, gc in agg.items() if gc}
+
+
 def _position_heatmap(position, tournament_id, cap=3000, year=None, detail=None):
     """같은 포지션 전 선수의 히트맵 좌표를 풀링 후 균등 샘플.
     절대 개수가 아닌 '밀도 형태'를 비교하므로 cap 샘플로 충분하며 응답을 가볍게 유지.
@@ -4994,13 +5050,32 @@ def heatmap_player_search():
         ORDER BY games DESC, name
         LIMIT 30
     """, (k1, k2, like, like, like)).fetchall()
+    # 결과 선수들의 대표 세부포지션 (검색 결과 칩 표기용)
+    pids = [r["pid"] for r in rows]
+    detail_by_pid = {}
+    if pids:
+        ph = ",".join("?" for _ in pids)
+        agg = {}
+        for pid_, dp, c in conn.execute(f"""
+            SELECT player_id, detail_pos, COUNT(*) c FROM match_lineups
+            WHERE player_id IN ({ph}) AND detail_pos IS NOT NULL
+            GROUP BY player_id, detail_pos
+        """, pids).fetchall():
+            g = _detail_group_for_label(dp)
+            if not g:
+                continue
+            d = agg.setdefault(pid_, {})
+            d[g] = d.get(g, 0) + c
+        detail_by_pid = {p: max(gc, key=gc.get) for p, gc in agg.items() if gc}
     conn.close()
     team_map = {t["sofascore_id"]: t for t in TEAMS}
     out = []
     for r in rows:
         t = team_map.get(r["tid"])
+        dg = detail_by_pid.get(r["pid"])
         out.append({
             "playerId": r["pid"], "name": r["name"], "position": r["pos"],
+            "detailPos": dg, "detailLabel": DETAIL_POS_LABELS.get(dg, "") if dg else "",
             "games": r["games"], "teamId": r["tid"],
             "teamName": (t["name"] if t else ""), "teamShort": (t["short"] if t else ""),
             "league": ("k1" if r["tour"] == k1 else "k2"),
@@ -5103,12 +5178,38 @@ def insights_top_performers():
         ORDER BY mins DESC LIMIT 600
     """, date_params + date_params + league_params).fetchall()
 
+    # 선수별 대표 세부포지션 그룹 (양 리그·해당 연도) — 통합표 행 필터 세분화용(CB/FB/DM/CM/AM/W/ST)
+    _det_clause, _det_params = "", ()
+    if year and year != "all":
+        try:
+            _ys, _ye = _year_range(year)
+            _det_clause = "AND e.date_ts >= ? AND e.date_ts < ?"
+            _det_params = (_ys, _ye)
+        except (ValueError, TypeError):
+            pass
+    _det_agg = {}
+    for pid_, dp, c in conn.execute(f"""
+        SELECT l.player_id, l.detail_pos, COUNT(*) c
+        FROM match_lineups l JOIN events e ON e.id = l.event_id
+        WHERE l.detail_pos IS NOT NULL {_det_clause}
+        GROUP BY l.player_id, l.detail_pos
+    """, _det_params).fetchall():
+        g = _detail_group_for_label(dp)
+        if not g:
+            continue
+        dd = _det_agg.setdefault(pid_, {})
+        dd[g] = dd.get(g, 0) + c
+    player_detail = {p: max(gc, key=gc.get) for p, gc in _det_agg.items() if gc}
+
     def serialize_all(r):
         mins  = r["mins"] or 0
         aerial_tot = (r["aw"] or 0) + (r["al"] or 0)
         duel_tot   = (r["dw"] or 0) + (r["dl"] or 0)
+        _dg = player_detail.get(r["player_id"])
         return {**pinfo(r),
             "pos": r["main_pos"] or "",
+            "detail": _dg or "",
+            "detail_label": DETAIL_POS_LABELS.get(_dg, "") if _dg else "",
             "goals": r["goals"] or 0,
             "assists": r["assists"] or 0,
             "attack_pts": (r["goals"] or 0) + (r["assists"] or 0),   # 공격기여 = 골+도움
