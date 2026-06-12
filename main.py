@@ -1258,12 +1258,31 @@ def get_team_shotmap():
     goals = sum(1 for s in shots if s["outcome"] == "goal")
     on_target = sum(1 for s in shots if s["outcome"] in ("goal", "save"))
     xg_sum = round(sum(s["xg"] for s in shots), 2)
+    # outcome별 개수 (필터 칩 + 분해)
+    oc = {k: 0 for k in ("goal", "save", "post", "block", "miss")}
+    for s in shots:
+        oc[s["outcome"]] = oc.get(s["outcome"], 0) + 1
+    # 상황별 골 (오픈플레이 vs 세트피스)
+    SET_PIECE = {"corner", "set-piece", "free-kick", "throw-in-set-piece", "penalty"}
+    set_goals = sum(1 for s in shots if s["outcome"] == "goal" and s["situation"] in SET_PIECE)
+    open_goals = goals - set_goals
+    # 경기 수 (경기당 슛)
+    gconn = sqlite3.connect(DB_PATH)
+    games = gconn.execute(f"""
+        SELECT COUNT(DISTINCT e.id) FROM events e
+        WHERE e.tournament_id=? AND (e.home_team_id=? OR e.away_team_id=?)
+          AND e.home_score IS NOT NULL {yclause}
+    """, (tid, ss, ss, *yp)).fetchone()[0]
+    gconn.close()
     summary = {
         "shots": n, "goals": goals, "xg": xg_sum,
         "xgPerShot": round(xg_sum / n, 3) if n else 0,
         "onTargetPct": round(on_target / n * 100) if n else 0,
         "convPct": round(goals / n * 100, 1) if n else 0,
         "xgDiff": round(goals - xg_sum, 1),   # 결정력 (실제 골 − xG)
+        "outcomes": oc, "games": games,
+        "perGame": round(n / games, 1) if games else 0,
+        "openGoals": open_goals, "setGoals": set_goals,
     }
     return jsonify({
         "team": team_info["name"], "year": year or "전체", "side": side,

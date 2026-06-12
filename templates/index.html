@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=86">
+    <link rel="stylesheet" href="/static/css/style.css?v=87">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -889,12 +889,13 @@
                             </div>
                         </div>
                         <div class="ta-shape-wrap"><canvas id="ta-shotmap-canvas" width="560" height="380"></canvas></div>
-                        <p class="tc-hint">점 = 슛(클수록 높은 xG) · <span style="color:#22c55e">●</span>골 <span style="color:#60a5fa">●</span>유효 <span style="color:#a78bfa">●</span>골대 <span style="color:#f59e0b">●</span>차단 <span style="color:#94a3b8">●</span>빗나감 · 공격 방향 → (오른쪽 골문)</p>
+                        <div class="ta-sm-legend" id="ta-shotmap-legend" role="group" aria-label="결과별 표시 필터"></div>
+                        <p class="tc-hint">점 하나 = 슈팅 1개 · <b>점이 클수록 득점 기대값(xG)이 높은 결정적 기회</b> · 오른쪽이 공격 골문 · 색을 클릭하면 해당 결과만 켜고 끌 수 있어요</p>
                     </div>
                     <div class="tc-panel" style="--tc-accent:#22d3ee">
                         <p class="tc-panel-label">📊 슈팅 요약</p>
-                        <div class="ta-shape-metrics" id="ta-shotmap-summary"></div>
-                        <p class="tc-hint">결정력 = 실제 골 − 누적 xG (양수면 기대 이상 마무리)</p>
+                        <div class="ta-shape-metrics ta-sm-summary" id="ta-shotmap-summary"></div>
+                        <div class="ta-sm-extra" id="ta-shotmap-extra"></div>
                     </div>
                 </div>
 
@@ -926,7 +927,7 @@
     <script src="/static/js/k2heatmap.js?v=16"></script>
     <script src="/static/js/banner_stats.js?v=3"></script>
     <script src="/static/js/team_compare.js?v=12"></script>
-    <script src="/static/js/analytics.js?v=8"></script>
+    <script src="/static/js/analytics.js?v=9"></script>
     <script src="/static/js/prediction.js?v=59"></script>
 
     <!-- 선수 분석 모달 -->

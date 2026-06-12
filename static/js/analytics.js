@@ -23,6 +23,7 @@
     let currentYear = "전체";
     let _shotmapData = { for: null, against: null };   // 슛맵 캐시 (토글 재렌더용)
     let _shotmapSide = "for";
+    let _shotFilter = { goal: true, save: true, post: true, block: true, miss: true };  // 결과별 표시 필터
 
     // ── 유틸 ──────────────────────────────────────────────────────
     function destroyChart(id) {
@@ -714,34 +715,38 @@
         }
     }
 
-    // ── 슛맵 (xG 버블 + 요약) ─────────────────────────────────────
+    // ── 슛맵 (xG 버블 + 필터 + 요약) ──────────────────────────────
     const SHOT_COLOR = { goal: "#22c55e", save: "#60a5fa", post: "#a78bfa", block: "#f59e0b", miss: "#94a3b8" };
+    const SHOT_LABEL = { goal: "골", save: "유효(선방)", post: "골대", block: "차단", miss: "빗나감" };
+    const SHOT_ORDER = ["goal", "save", "post", "block", "miss"];
     function renderShotmap() {
         const cv = document.getElementById("ta-shotmap-canvas");
         const sumEl = document.getElementById("ta-shotmap-summary");
+        const extraEl = document.getElementById("ta-shotmap-extra");
+        const legEl = document.getElementById("ta-shotmap-legend");
         if (!cv) return;
         const data = _shotmapData[_shotmapSide] || {};
-        const shots = data.shots || [];
+        const allShots = data.shots || [];
+        const m = data.summary || {};
+        const isFor = _shotmapSide === "for";
+        const shots = allShots.filter(s => _shotFilter[s.outcome] !== false);
+
         const ctx = cv.getContext("2d");
         const W = cv.width, H = cv.height;
         ctx.clearRect(0, 0, W, H);
-        // 잔디(공격 1/3 — 오른쪽이 골문)
         ctx.fillStyle = "#163d1c"; ctx.fillRect(0, 0, W, H);
         ctx.strokeStyle = "rgba(255,255,255,0.28)"; ctx.lineWidth = 1.5;
         ctx.strokeRect(8, 8, W - 16, H - 16);
-        // 오른쪽 골문 + 페널티/골 박스
         const cy = H / 2;
-        ctx.strokeRect(W - 8 - 150, cy - 110, 150, 220);   // 페널티 박스
-        ctx.strokeRect(W - 8 - 55, cy - 55, 55, 110);      // 골 박스
-        ctx.beginPath(); ctx.arc(W - 8 - 100, cy, 2.5, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fill();  // 페널티 스폿
+        ctx.strokeRect(W - 8 - 150, cy - 110, 150, 220);
+        ctx.strokeRect(W - 8 - 55, cy - 55, 55, 110);
+        ctx.beginPath(); ctx.arc(W - 8 - 100, cy, 2.5, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fill();
         ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(W - 9, cy - 26); ctx.lineTo(W - 9, cy + 26); ctx.stroke();  // 골문
+        ctx.beginPath(); ctx.moveTo(W - 9, cy - 26); ctx.lineTo(W - 9, cy + 26); ctx.stroke();
 
-        // x=골문 거리(0=골라인) → 오른쪽 골문. 표시 캡 50.
         const XCAP = 50, PAD = 10;
         const fx = v => (W - 10) - (Math.min(v, XCAP) / XCAP) * (W - 20 - PAD);
         const fy = v => PAD + (v / 100) * (H - 2 * PAD);
-        // 골을 위에 그리도록 정렬(골 > 유효 > 나머지)
         const order = { goal: 3, save: 2, post: 1 };
         [...shots].sort((a, b) => (order[a.outcome] || 0) - (order[b.outcome] || 0)).forEach(s => {
             const r = Math.max(3, Math.min(15, 3 + Math.sqrt(s.xg) * 22));
@@ -751,29 +756,52 @@
             ctx.fill();
             if (s.outcome === "goal") { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke(); }
         });
-        if (!shots.length) {
+        if (!allShots.length) {
             ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
             ctx.fillText("이 시즌 슛 데이터가 없습니다", W / 2, cy);
         }
 
+        // 결과별 필터 칩 (클릭 토글, 개수 표시)
+        if (legEl) {
+            const oc = m.outcomes || {};
+            legEl.innerHTML = SHOT_ORDER.map(k =>
+                `<button type="button" class="ta-sm-chip${_shotFilter[k] === false ? " off" : ""}" data-oc="${k}" aria-pressed="${_shotFilter[k] !== false}">
+                    <i style="background:${SHOT_COLOR[k]}"></i>${SHOT_LABEL[k]} <b>${oc[k] || 0}</b></button>`
+            ).join("");
+            legEl.querySelectorAll(".ta-sm-chip").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const k = btn.dataset.oc;
+                    _shotFilter[k] = _shotFilter[k] === false;  // 토글
+                    renderShotmap();
+                });
+            });
+        }
+
         if (sumEl) {
-            const m = data.summary || {};
-            if (!shots.length) { sumEl.innerHTML = '<p class="tc-hint">데이터 없음</p>'; return; }
-            const isFor = _shotmapSide === "for";
+            if (!allShots.length) { sumEl.innerHTML = '<p class="tc-hint">데이터 없음</p>'; if (extraEl) extraEl.innerHTML = ""; return; }
             const fin = m.xgDiff;
-            // 공격: 골−xG 양수=결정력 좋음(초록). 수비: 실점−xG 양수=많이 내줌(나쁨, 빨강)
             const good = isFor ? fin > 0 : fin < 0;
             const finCls = fin === 0 ? "" : (good ? "ta-shape-pos" : "ta-shape-neg");
             const card = (k, v, h) => `<div class="ta-shape-card"><div class="ta-shape-k">${k}</div>
                 <div class="ta-shape-v">${v}</div><div class="ta-shape-h">${h}</div></div>`;
             sumEl.innerHTML =
-                card("슛", m.shots, isFor ? "총 슈팅 수" : "내준 슈팅") +
-                card(isFor ? "득점" : "실점", m.goals, "골") +
-                card(isFor ? "누적 xG" : "피 xG", m.xg, "기대 " + (isFor ? "득점" : "실점")) +
-                card("유효슛%", m.onTargetPct + "%", "온타깃 비율") +
+                card(isFor ? "슈팅" : "피슈팅", m.shots, `경기당 ${m.perGame}개`) +
+                card(isFor ? "득점" : "실점", m.goals, `오픈 ${m.openGoals} · 세트피스 ${m.setGoals}`) +
+                card(isFor ? "누적 xG" : "피 xG", m.xg, `슛당 기대값 ${m.xgPerShot}`) +
+                card("유효슛 비율", m.onTargetPct + "%", "골문 안으로 간 슛(골+선방)") +
                 `<div class="ta-shape-card"><div class="ta-shape-k">${isFor ? "결정력" : "실점 효율"}</div>
                  <div class="ta-shape-v ${finCls}">${fin > 0 ? "+" : ""}${fin}</div>
-                 <div class="ta-shape-h">${isFor ? "골 − xG" : "실점 − xG"}</div></div>`;
+                 <div class="ta-shape-h">${isFor ? "골 − xG · +면 기대 이상 마무리" : "실점 − xG · −면 선방·수비 선전"}</div></div>`;
+
+            if (extraEl) {
+                const visN = shots.length, hidden = allShots.length - visN;
+                const verdict = isFor
+                    ? (fin >= 1 ? "기대(xG)보다 잘 마무리하는 결정력 우위" : fin <= -1 ? "기대(xG) 대비 마무리가 아쉬움" : "기대치만큼 마무리")
+                    : (fin <= -1 ? "실점이 xG보다 적음 — 골키퍼·수비 선전(또는 운)" : fin >= 1 ? "xG보다 많이 실점 — 수비 위기관리 과제" : "기대치만큼 실점");
+                extraEl.innerHTML =
+                    `<div class="ta-sm-verdict">💡 ${verdict}</div>` +
+                    (hidden > 0 ? `<div class="ta-sm-note">필터로 ${hidden}개 슛 숨김 — 색을 다시 켜면 전체가 보입니다</div>` : "");
+            }
         }
     }
 
