@@ -32,6 +32,13 @@
 - Playwright: 헤이스 선택→포지션평균 비교 → 드롭다운 8그룹·기본값 ST·범례 "스트라이커 평균"·**콘솔 에러 0**. 스크린샷 확인.
 - 엔드포인트 회귀: detail=CB/position=D/teams/search 전부 200. backtest는 dev 단일스레드 느림(90s엔 정상) — qa 10s 타임아웃은 기존 아티팩트(히트맵과 무관).
 - 변경: `crawlers/backfill_detail_positions.py`(신규), `main.py`, `static/js/k2heatmap.js`(v13), `templates/index.html`, `update_data.py`, `README.md`. **prod: 컬럼+백필 별도 적용 필요**(SSH 1회).
+- 배포 완료: 커밋 `12ab462` → prod 백필 먼저 SSH 실행(42,570행, 로컬과 동일분포) → push → 라이브 200 검증. 로컬=origin=prod 일치.
+
+### 후속(같은 날): 비교 UX 개선 — 레이어 개별 토글 + 인사이트 강화
+- **요청**: ① 세부포지션이 히트맵 외 다른 기능에도 적용됐는지(답: **히트맵 전용·의도됨** — detail_pos는 선발 포메이션 슬롯 유도값이라 누적스탯 리포트엔 대분류가 적합) ② 비교 시 선수/평균 개별 조회 ③ 하단 인사이트 강화.
+- **레이어 토글**(②): 범례 칩을 클릭 토글 버튼화(`.k2-lg-btn`, `layerVis{base,overlay}`). 한 층만 켜서 개별 조회, 마지막 1개는 못 끔(빈화면 방지). 새 비교 진입 시 둘 다 ON 리셋. `겹침` 칩은 둘 다 켤 때만 노출.
+- **인사이트 강화**(③): `pointStats`에 spreadX·공격/수비 1/3 점유율 추가. 칩 3→최대 6종(전진도·좌우치우침·좌우활동폭·**활동범위(면적%)**·**공격 진영 가담%p**·**수비 진영 복귀%p**) + **헤드라인**(주 활동 전방/중원/후방 × 좌/중/우 + 성향 요약). 의미있는 Δ만 노출.
+- 검증: Playwright 토글 ON/OFF·겹침칩 소멸·헤드라인("주 활동 전방·우측 — 광역 활동")·콘솔 에러 0. `k2heatmap.js` v13→14, `style.css` v82→83. **DB 무변경(순수 프론트) → prod 마이그레이션 불필요**.
 
 ---
 
@@ -3787,3 +3794,11 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-12 09:57:06 | sleep 3; python qa_check.py 2>&1 | tail -45
 - 2026-06-12 09:59:47 | git status --short; echo "--- ignored check ---"; git check-ignore players.db.bak_detailpos players.db 2>&1; echo "exit $?"
 - 2026-06-12 10:00:00 | pkill -f "python main.py" 2>/dev/null; echo "dev server stopped"
+- 2026-06-12 10:10:32 | ls -la <SSH_KEY>.pem 2>&1 | head -2; echo "---"; ls <SSH_KEY>.pem 2>&1 | head -1
+- 2026-06-12 10:17:24 | KEY=<SSH_KEY>.pem / R=rocky@<PROD_IP> / APP=/opt/today_tactics / echo "=== scp backfill script ===" / scp -i "$KEY" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 crawlers/backfill_detail_positions.py "$R:$APP/crawlers/" 2>&1 | tail -3 / echo "=== run backfill on prod (venv python) ===" / ssh -i "$KEY" -o ConnectTimeout=20 "$R" "cd $APP && venv/bin/python3 crawlers/backfill_detail_positions.py" 2>&1 | tail -25
+- 2026-06-12 10:17:38 | git push origin main 2>&1 | tail -8
+- 2026-06-12 10:17:58 | KEY=<SSH_KEY>.pem; R=rocky@<PROD_IP> / # wait for CI/CD to pull+restart / for i in $(seq 1 10); do /   PROD_HEAD=$(ssh -i "$KEY" -o ConnectTimeout=15 "$R" "cd /opt/today_tactics && git rev-parse --short HEAD" 2>/dev/null) /   echo "poll $i: prod HEAD=$PROD_HEAD (target 12ab462)" /   if [ "$PROD_HEAD" = "12ab462" ]; then echo "DEPLOYED"; break; fi /   sleep 12 / done
+- 2026-06-12 10:33:59 | node -e "require('fs').readFileSync('static/js/k2heatmap.js','utf8'); new Function(require('fs').readFileSync('static/js/k2heatmap.js','utf8'));" 2>&1 | head -5 && echo "JS parse OK" || echo "JS parse attempted (function wrap may fail on top-level return, ignore)"
+- 2026-06-12 10:36:05 | pkill -f "python main.py" 2>/dev/null; sleep 1 / DISABLE_SCHEDULER=1 LOGIN_REQUIRED=0 python main.py > /tmp/flask_v14.log 2>&1 & / echo "pid $!"; sleep 7; tail -2 /tmp/flask_v14.log
+- 2026-06-12 10:37:32 | PYTHONIOENCODING=utf-8 python /tmp/verify_v14.py
+- 2026-06-12 10:37:59 | pkill -f "python main.py" 2>/dev/null; echo "server stopped"

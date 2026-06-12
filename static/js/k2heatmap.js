@@ -38,6 +38,7 @@
     let currentYear   = null;     // null/"all" = 전 시즌, "2026" 등 = 해당 시즌만
     let currentSeasons = [];
     let currentPlayerDetail = null;  // 선수 본인 세부 포지션 그룹(선택 시즌 기준) — 비교 기본값
+    let layerVis = { base: true, overlay: true };  // 비교 레이어 개별 표시 토글
 
     const yearFilter = document.getElementById("k2-year-filter");
     const yearQS = () => (currentYear ? `&year=${currentYear}` : "");
@@ -389,6 +390,7 @@
             compareMode = mode;
             cmpSub.innerHTML = "";
             overlayPoints = null;
+            layerVis = { base: true, overlay: true };   // 새 비교 시작 → 두 층 모두 표시
             if (mode === "venue") {
                 loadVenueCompare();
             } else {
@@ -423,6 +425,7 @@
         fetchPositionOverlay(sel.value);
     }
     async function fetchPositionOverlay(detail) {
+        layerVis = { base: true, overlay: true };
         loading.style.display = "flex";
         try {
             const data = await (await fetch(`${apiBase()}/position-heatmap?detail=${detail}${yearQS()}`)).json();
@@ -471,6 +474,7 @@
         playerSel.addEventListener("change", async () => {
             if (!playerSel.value) { overlayPoints = null; render(); return; }
             const nm = playerSel.options[playerSel.selectedIndex].dataset.name;
+            layerVis = { base: true, overlay: true };
             loading.style.display = "flex";
             try {
                 const data = await (await fetch(`${apiBase()}/heatmap?playerId=${playerSel.value}&teamId=${teamSel.value}${yearQS()}`)).json();
@@ -485,6 +489,7 @@
 
     // C. 홈 vs 원정 (같은 선수)
     async function loadVenueCompare() {
+        layerVis = { base: true, overlay: true };
         loading.style.display = "flex";
         const url = `${apiBase()}/heatmap?playerId=${currentPlayer.playerId}&teamId=${currentTeam.sofascore_id}${yearQS()}`;
         try {
@@ -516,8 +521,9 @@
         const comp = document.createElement("canvas");
         comp.width = W; comp.height = H;
         const c = comp.getContext("2d");
-        const rl = renderLayer(basePts, RED, W, H);
-        const bl = renderLayer(overPts, BLUE, W, H);
+        // 레이어 토글 — 꺼진 층은 렌더 생략 (범례 클릭으로 개별 조회)
+        const rl = layerVis.base    ? renderLayer(basePts, RED, W, H)  : null;
+        const bl = layerVis.overlay ? renderLayer(overPts, BLUE, W, H) : null;
         if (rl) c.drawImage(rl, 0, 0);
         c.globalCompositeOperation = "lighter";   // 겹치면 빨강+파랑 → 보라
         if (bl) c.drawImage(bl, 0, 0);
@@ -555,44 +561,106 @@
 
     function renderLegend() {
         cmpLegend.classList.remove("hidden");
+        const chip = (key, rgb, label) =>
+            `<button type="button" class="k2-lg k2-lg-btn${layerVis[key] ? "" : " off"}"` +
+            ` data-layer="${key}" aria-pressed="${layerVis[key]}"` +
+            ` title="클릭하면 이 층만 켜고 끌 수 있어요">` +
+            `<i style="background:rgb(${rgb.join(",")})"></i>${label}</button>`;
         cmpLegend.innerHTML =
-            `<span class="k2-lg"><i style="background:rgb(${RED.join(",")})"></i>${baseLabel}</span>` +
-            `<span class="k2-lg"><i style="background:rgb(${BLUE.join(",")})"></i>${overlayLabel}</span>` +
-            `<span class="k2-lg"><i style="background:rgb(170,70,200)"></i>겹침</span>`;
+            chip("base", RED, baseLabel) +
+            chip("overlay", BLUE, overlayLabel) +
+            (layerVis.base && layerVis.overlay
+                ? `<span class="k2-lg"><i style="background:rgb(170,70,200)"></i>겹침</span>` : "");
+        cmpLegend.querySelectorAll(".k2-lg-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const k = btn.dataset.layer;
+                const other = k === "base" ? "overlay" : "base";
+                // 마지막 한 층은 끄지 않음 (둘 다 꺼지면 빈 화면)
+                if (layerVis[k] && !layerVis[other]) return;
+                layerVis[k] = !layerVis[k];
+                render();
+            });
+        });
     }
 
-    // 비교 인사이트 배너 — 두 좌표군의 차이를 자동 해석 (x=공격방향, y=세로 폭)
+    // 비교 인사이트 배너 — 두 좌표군의 차이를 자동 해석 (x=공격방향 0~100, y=세로 폭 0~100)
     function pointStats(pts) {
         if (!pts || !pts.length) return null;
         let sx = 0, sy = 0;
         for (const p of pts) { sx += p.x; sy += p.y; }
         const n = pts.length, mx = sx / n, my = sy / n;
-        let vy = 0;
-        for (const p of pts) vy += (p.y - my) * (p.y - my);
-        return { mx, my, spreadY: Math.sqrt(vy / n) };
+        let vx = 0, vy = 0, att = 0, def = 0, mid = 0;
+        for (const p of pts) {
+            vx += (p.x - mx) * (p.x - mx);
+            vy += (p.y - my) * (p.y - my);
+            if (p.x >= 200 / 3)      att++;   // 공격 1/3 (x>66.7)
+            else if (p.x < 100 / 3)  def++;   // 수비 1/3 (x<33.3)
+            else                     mid++;   // 중앙 1/3
+        }
+        return {
+            n, mx, my,
+            spreadX: Math.sqrt(vx / n), spreadY: Math.sqrt(vy / n),
+            attPct: att / n * 100, defPct: def / n * 100, midPct: mid / n * 100,
+        };
     }
     function renderInsight() {
         const b = pointStats(currentBasePoints), o = pointStats(overlayPoints);
         if (!b || !o) { cmpInsight.classList.add("hidden"); return; }
         const chips = [];
+
+        // 1. 전후 위치 (전진도)
         const adv = Math.round(b.mx - o.mx);            // +면 base가 더 전진
-        if (adv >= 3)       chips.push(`<b>↑ 전진</b> 평균보다 ${adv}칸 높은 위치`);
-        else if (adv <= -3) chips.push(`<b>↓ 후방</b> 평균보다 ${-adv}칸 낮은 위치`);
-        else                chips.push(`<b>≈ 전후 위치 유사</b>`);
+        if (adv >= 3)       chips.push(`<b>↑ 전진</b> 평균보다 ${adv}칸 높게`);
+        else if (adv <= -3) chips.push(`<b>↓ 후방</b> 평균보다 ${-adv}칸 낮게`);
+        else                chips.push(`<b>≈ 전후 위치</b> 평균과 유사`);
 
+        // 2. 좌우 치우침
         const bc = Math.abs(b.my - 50), oc = Math.abs(o.my - 50);
-        const side = b.my < 47 ? "위쪽" : (b.my > 53 ? "아래쪽" : "중앙");
-        if (bc - oc >= 6)       chips.push(`<b>측면 지향</b> (${side} 치우침)`);
-        else if (bc - oc <= -6) chips.push(`<b>중앙 지향</b>`);
+        const bSide = bc < 4 ? "중앙" : (b.my < 50 ? "좌측" : "우측");
+        if (bc - oc >= 6)       chips.push(`<b>측면 지향</b> ${bSide} 치우침`);
+        else if (bc - oc <= -6) chips.push(`<b>중앙 지향</b> 평균보다 안쪽`);
 
-        const sd = Math.round(b.spreadY - o.spreadY);
-        if (sd >= 4)       chips.push(`활동 폭 넓음`);
-        else if (sd <= -4) chips.push(`활동 폭 좁음`);
+        // 3. 좌우 활동폭 (세로 분산)
+        const sdY = Math.round(b.spreadY - o.spreadY);
+        if (sdY >= 4)       chips.push(`좌우 활동폭 <b>넓음</b> (+${sdY})`);
+        else if (sdY <= -4) chips.push(`좌우 활동폭 <b>좁음</b> (${sdY})`);
+
+        // 4. 활동 범위(면적 = 전후 폭 × 좌우 폭)
+        const areaB = b.spreadX * b.spreadY, areaO = o.spreadX * o.spreadY;
+        const areaPct = areaO ? Math.round((areaB / areaO - 1) * 100) : 0;
+        if (areaPct >= 15)       chips.push(`활동 범위 <b>${areaPct}% 넓음</b>`);
+        else if (areaPct <= -15) chips.push(`활동 범위 <b>${-areaPct}% 집약</b>`);
+
+        // 5. 공격 진영 가담 (공격 1/3 점유율 차)
+        const dAtt = Math.round(b.attPct - o.attPct);
+        if (dAtt >= 8)       chips.push(`공격 진영 가담 <b>+${dAtt}%p</b>`);
+        else if (dAtt <= -8) chips.push(`공격 진영 가담 <b>${dAtt}%p</b>`);
+
+        // 6. 수비 진영 복귀 (수비 1/3 점유율 차)
+        const dDef = Math.round(b.defPct - o.defPct);
+        if (dDef >= 8)       chips.push(`수비 진영 복귀 <b>+${dDef}%p</b>`);
+        else if (dDef <= -8) chips.push(`수비 진영 복귀 <b>${dDef}%p</b>`);
+
+        // 헤드라인 — 절대 주 활동 지역 + 가장 두드러진 성향 한 줄 요약
+        const zoneV = b.mx >= 60 ? "전방" : (b.mx < 40 ? "후방" : "중원");
+        const zoneH = bc < 5 ? "중앙" : (b.my < 50 ? "좌측" : "우측");
+        const tone = [];
+        if (adv >= 3) tone.push("전진형");
+        else if (adv <= -3) tone.push("후방형");
+        if (dAtt >= 8) tone.push("공격 가담 활발");
+        else if (dDef >= 8) tone.push("수비 가담 활발");
+        if (areaPct >= 15) tone.push("광역 활동");
+        else if (areaPct <= -15) tone.push("집약 활동");
+        const headline = `주 활동 <b>${zoneV}·${zoneH}</b>` +
+            (tone.length ? ` — ${tone.slice(0, 2).join(", ")}` : "");
 
         cmpInsight.classList.remove("hidden");
         cmpInsight.innerHTML =
-            `<span class="k2-ins-title">${baseLabel} vs ${overlayLabel}</span>` +
-            chips.map(c => `<span class="k2-ins-chip">${c}</span>`).join("");
+            `<div class="k2-ins-head"><span class="k2-ins-title">${baseLabel} vs ${overlayLabel}</span>` +
+            `<span class="k2-ins-sum">${headline}</span></div>` +
+            `<div class="k2-ins-chips">` +
+            chips.map(c => `<span class="k2-ins-chip">${c}</span>`).join("") +
+            `</div>`;
     }
 
     // ── 시즌 필터 ──────────────────────────────────────────

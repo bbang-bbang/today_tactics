@@ -2798,6 +2798,23 @@ body {
     border-radius: 3px;
     display: inline-block;
 }
+/* 범례 = 레이어 개별 토글 버튼 (클릭으로 선수/평균 개별 조회) */
+.k2-lg-btn {
+    appearance: none;
+    border: 1px solid #34404e;
+    background: #1b222c;
+    color: #cdd6e0;
+    font: inherit;
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: opacity 0.15s ease-in-out, border-color 0.15s ease-in-out, background 0.15s ease-in-out;
+}
+.k2-lg-btn:hover { border-color: #4a5a6e; background: #243040; }
+.k2-lg-btn.off { opacity: 0.38; }
+.k2-lg-btn.off i { filter: grayscale(0.5); }
+.k2-lg-btn:focus-visible { outline: 2px solid #6ea8ff; outline-offset: 1px; }
 
 /* ── 시즌(년도) 필터 ── */
 .k2-year-filter {
@@ -2839,11 +2856,11 @@ body {
 /* ── 비교 인사이트 배너 ── */
 .k2-cmp-insight {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 7px;
     margin-top: 8px;
-    padding: 9px 12px;
+    padding: 10px 12px;
     background: linear-gradient(90deg, #1d2733, #1a2230);
     border: 1px solid #2f6df0;
     border-left-width: 3px;
@@ -2852,7 +2869,18 @@ body {
     color: #dbe4ee;
 }
 .k2-cmp-insight.hidden { display: none; }
-.k2-ins-title { font-weight: 700; color: #fff; margin-right: 2px; }
+.k2-ins-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #2a3444;
+}
+.k2-ins-title { font-weight: 700; color: #fff; }
+.k2-ins-sum { color: #aebfd0; font-size: 12px; }
+.k2-ins-sum b { color: #8fd0a0; font-weight: 700; }
+.k2-ins-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .k2-ins-chip {
     background: #243040;
     border-radius: 5px;
