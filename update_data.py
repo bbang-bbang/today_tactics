@@ -128,6 +128,8 @@ def main():
             [PYTHON, str(CRAWLERS/"backfill_rounds.py")]),
         (18, "세부 포지션 백필 (formation+slot → detail_pos, 비교 필터용)",
             [PYTHON, str(CRAWLERS/"backfill_detail_positions.py")]),
+        (19, "mps.team_id 정규화 (경기 실제 소속으로 — 팀 집계 정합성)",
+            [PYTHON, str(CRAWLERS/"normalize_mps_team.py")]),
     ]
 
     # STEP 0~2 실패 시 후속 의미 없음 → fail_ok=False (기본).

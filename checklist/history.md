@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-06-12 | 🔴🔴 mps.team_id 전면 정규화 — 팀 집계 정합성 (K3는 빙산의 일각)
+
+### 발견 (데이터 정합성 작업 = K리그 심화 ⑥)
+- K3 정리 후 잔여 고아(team_id가 teams 마스터에 없는 mps 15,488·players 682) 추적 → **K3는 일부였고 본질은 광범위**.
+- 측정: 전체 mps **69,622 중 42,855(61.6%)**의 team_id가 실제 경기팀(`is_home?home:away`)과 불일치. 비정규 ID(시즌별 별칭/현소속 고정, 예 phantom 241802=안산 별칭, events·teams 어디에도 없음)로 기록됨.
+- **가시적 영향 확증**: `get_team_top_players`·`_heatmap_players_for_team` 등이 `WHERE mps.team_id=?`로 집계 → 안산(248375) 선수 **90명만 잡힘(실제 139명, 49명 누락)**.
+- 교정 타깃(경기 유도팀)은 **100% 마스터에 존재** → 무손실.
+
+### 처리 — `crawlers/normalize_mps_team.py`(멱등, 단일 트랜잭션, 백업 후)
+- **A** mps.team_id = (is_home ? event.home_team_id : away_team_id), 불일치 42,855행 정규화.
+- **B** players.team_id = 최신 경기(date_ts max) 소속팀, 1,732명 정규화.
+- `update_data.py` **STEP 19** 추가 → prod 자체수집 후에도 매번 재정규화(self-healing).
+- **검증**: 불일치 42,855→**0**, 마스터에 없는 mps 15,488→**0**, players 682→7(엣지: 경기 home/away 메타 없는 선수). 안산 90→**139** 회복. 스모크 team-top-players/ranking/standings/players 전부 200. 로컬+prod DB 백업 선행.
+
+---
+
 ## 2026-06-12 | 🔴 K3 라벨 손상 정리 — mps.team_id 현소속고정 버그 (헤이스 동류)
 
 ### 발견 (다른 리그 확장 논의 중)
