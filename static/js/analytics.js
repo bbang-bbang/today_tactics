@@ -160,7 +160,8 @@
             fetch(`/api/team-trend?teamId=${currentTeamId}${yp}`).then(r => r.json()),
             fetch(`/api/league-rankings?league=${currentLeague}${yp}`).then(r => r.json()),
             fetch(`/api/team-insights?teamId=${currentTeamId}${yp}`).then(r => r.json()).catch(() => ({})),
-        ]).then(([analytics, trend, rankings, insights]) => {
+            fetch(`/api/team-shape?teamId=${currentTeamId}${yp}`).then(r => r.json()).catch(() => ({})),
+        ]).then(([analytics, trend, rankings, insights, shape]) => {
             buildYearFilter(analytics.available_years || []);
             renderIdentity(meta, analytics, trend, rankings);
             // 결과 분석
@@ -172,6 +173,8 @@
             renderWeather(analytics.weather || {});
             // 심화 인사이트
             renderInsights(insights, meta);
+            // 팀 형태
+            renderShape(shape, meta);
             // 스킬 프로필
             renderSkill(rankings, meta);
         }).catch(err => {
@@ -616,6 +619,83 @@
                 }
             }
         });
+    }
+
+    // ── 팀 형태 (평균 진형 피치 + 지표) ───────────────────────────
+    const SHAPE_LINE_COLOR = { G: "#fbbf24", D: "#34d399", M: "#60a5fa", F: "#f87171" };
+    function renderShape(shape, meta) {
+        const cv = document.getElementById("ta-shape-pitch");
+        const metricsEl = document.getElementById("ta-shape-metrics");
+        const scope = document.getElementById("ta-shape-scope");
+        if (!cv) return;
+        const nodes = (shape && shape.nodes) || [];
+        if (scope) scope.textContent = shape && shape.samples
+            ? `${shape.year} · 표본 ${shape.samples}명 / ${shape.games}경기` : "데이터 없음";
+
+        const ctx = cv.getContext("2d");
+        const W = cv.width, H = cv.height;
+        ctx.clearRect(0, 0, W, H);
+        // 잔디 + 라인
+        const g = ctx.createLinearGradient(0, 0, W, 0);
+        g.addColorStop(0, "#13401a"); g.addColorStop(1, "#185020");
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = "rgba(255,255,255,0.28)"; ctx.lineWidth = 1.5;
+        const PAD = 14;
+        ctx.strokeRect(PAD, PAD, W - 2 * PAD, H - 2 * PAD);
+        ctx.beginPath(); ctx.moveTo(W / 2, PAD); ctx.lineTo(W / 2, H - PAD); ctx.stroke();
+        ctx.beginPath(); ctx.arc(W / 2, H / 2, 42, 0, Math.PI * 2); ctx.stroke();
+        const boxH = H * 0.55, boxW = 64;
+        ctx.strokeRect(PAD, (H - boxH) / 2, boxW, boxH);
+        ctx.strokeRect(W - PAD - boxW, (H - boxH) / 2, boxW, boxH);
+
+        if (!nodes.length) {
+            ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "13px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("이 시즌 평균 위치 데이터가 없습니다", W / 2, H / 2);
+            if (metricsEl) metricsEl.innerHTML = '<p class="tc-hint">데이터 없음</p>';
+            return;
+        }
+        // x(0~100, 공격→오른쪽) → 캔버스 가로, y(0~100) → 세로
+        const fx = v => PAD + (v / 100) * (W - 2 * PAD);
+        const fy = v => PAD + (v / 100) * (H - 2 * PAD);
+        nodes.forEach(n => {
+            const x = fx(n.x), y = fy(n.y), col = SHAPE_LINE_COLOR[n.line] || "#cbd5e1";
+            ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2);
+            ctx.fillStyle = col; ctx.fill();
+            ctx.strokeStyle = "rgba(0,0,0,0.45)"; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.fillStyle = "#fff"; ctx.font = "600 10.5px sans-serif"; ctx.textAlign = "center";
+            const short = (n.name || "").split(" ").pop().slice(0, 4);
+            ctx.fillText(short, x, y - 14);
+        });
+
+        // 지표 카드 (리그 평균 대비)
+        if (metricsEl) {
+            const m = (shape && shape.metrics) || {}, lg = (shape && shape.league) || {};
+            const card = (label, key, unit, hint, hiGood) => {
+                const v = m[key], l = lg[key];
+                if (v == null) return "";
+                let diff = "", cls = "";
+                if (l != null) {
+                    const d = Math.round((v - l) * 10) / 10;
+                    if (d !== 0) {
+                        const up = d > 0;
+                        // hiGood=true면 높을수록 진함(초록), null이면 중립
+                        cls = hiGood == null ? "" : ((up === hiGood) ? "ta-shape-pos" : "ta-shape-neg");
+                        diff = `<span class="ta-shape-diff ${cls}">${up ? "▲" : "▼"} ${Math.abs(d)}</span>`;
+                    }
+                    diff += `<span class="ta-shape-lg">리그 ${l}</span>`;
+                }
+                return `<div class="ta-shape-card"><div class="ta-shape-k">${label}</div>
+                    <div class="ta-shape-v">${v}${unit || ""}</div><div class="ta-shape-cmp">${diff}</div>
+                    <div class="ta-shape-h">${hint}</div></div>`;
+            };
+            metricsEl.innerHTML =
+                card("무게중심 높이", "centroidX", "", "팀 전체 평균 전진도", null) +
+                card("수비라인", "defLine", "", "수비 평균 위치", null) +
+                card("공격라인", "fwdLine", "", "공격 평균 위치", null) +
+                card("팀 길이", "length", "", "공격~수비 간격(압축도)", false) +
+                card("팀 폭", "width", "", "좌우 전개 폭", null);
+        }
     }
 
     // ── 스킬 프로필 (레이더 + 지표 바) ────────────────────────────

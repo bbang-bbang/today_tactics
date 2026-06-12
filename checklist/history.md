@@ -4,6 +4,23 @@
 
 ---
 
+## 2026-06-12 | 🆕 K리그 심화 ① 팀 형태(Shape) 분석 — 미활용 avg_positions 활용
+
+### 배경
+- 데이터 정합성(⑥) 완료 후 K리그 심화 ① 진행. `match_avg_positions`(5.9만 행)가 prediction.js에서만 쓰이던 미활용 데이터 → 전술 분석으로 승격.
+
+### 백엔드 `/api/team-shape?teamId=&year=`
+- 팀 선발(avg_positions.is_substitute=0, 우리팀 쪽 is_home)의 시즌 평균 위치를 선수별 집계(games≥2, 상위 14명) + `_player_detail_groups`로 라인(D/M/F) 분류.
+- 형태 지표: 무게중심 높이(centroidX)·수비라인·공격라인·팀 길이(공격−수비, 압축도)·팀 폭(좌우 10~90 백분위). **리그 평균 baseline** 동봉(같은 리그·시즌 전 팀 1회 집계). `@cached_response`.
+- 커버리지: K1 90/198·K2 120/272 경기(SofaScore 제공분), 평균 진형엔 충분.
+
+### UI — 팀 분석 모달 `🧭 팀 형태` 탭 (analytics.js)
+- 캔버스 평균 진형 피치(공격 방향→, GK 골드·수비 초록·미드 파랑·공격 빨강, 선수명 라벨) + 지표 5카드(리그 평균 대비 ▲▼, 팀 길이는 작을수록 좋음 색상). `loadAll` Promise.all에 fetch 추가, 숨김 패널이라 캔버스 직접 렌더.
+- 검증: Playwright — 안산 선택→팀형태 탭, 캔버스 paint·카드 5개·scope·**콘솔 에러 0**. `analytics.js` v6→7, `style.css` v84→85, `index.html`.
+- **DB 무변경(읽기 전용 신규 엔드포인트) → prod 마이그레이션 불필요**.
+
+---
+
 ## 2026-06-12 | 🔴🔴 mps.team_id 전면 정규화 — 팀 집계 정합성 (K3는 빙산의 일각)
 
 ### 발견 (데이터 정합성 작업 = K리그 심화 ⑥)
@@ -3861,3 +3878,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-12 11:59:40 | pkill -f "python main.py" 2>/dev/null; echo "stopped"
 - 2026-06-12 13:20:43 | KEY=<SSH_KEY>.pem; R=rocky@<PROD_IP> / ssh -i "$KEY" -o ConnectTimeout=20 "$R" "cd /opt/today_tactics && git rev-parse --short HEAD" 2>&1 | grep -v "post-quantum\|store now\|openssh.com\|may need"
 - 2026-06-12 13:29:05 | KEY=<SSH_KEY>.pem; R=rocky@<PROD_IP> / ssh -i "$KEY" -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=20 "$R" "cd /opt/today_tactics && venv/bin/python3 -c \"import sqlite3; c=sqlite3.connect('players.db').cursor(); print([r[0] for r in c.execute(\\\"select name from sqlite_master where type='index' and tbl_name='match_lineups'\\\").fetchall()])\"" 2>&1 | grep -v "post-quantum\|store now\|openssh.com\|may need"
+- 2026-06-12 15:24:15 | BASE=https://www.today-football-tactics.xyz / code=$(curl -s -o /tmp/ttp.json -w "%{http_code}" --max-time 25 "$BASE/api/team-top-players?teamId=248375&league=k2") / echo "HTTP $code, bytes=$(wc -c < /tmp/ttp.json)" / head -c 400 /tmp/ttp.json; echo

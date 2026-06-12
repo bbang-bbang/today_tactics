@@ -1099,6 +1099,112 @@ def get_team_top_players():
     return jsonify({"year": latest_year, "scorers": scorers, "assisters": assisters})
 
 
+@app.route("/api/team-shape")
+@cached_response(ttl=3600)
+def get_team_shape():
+    """팀 평균 진형(Shape) — match_avg_positions(선발) 기반 평균 위치 + 형태 지표.
+    좌표: x=공격방향(0 자기골문~100 상대골문), y=좌우(0~100). 리그 평균을 baseline으로 동봉."""
+    team_id = request.args.get("teamId")
+    team_info = next((t for t in TEAMS if t["id"] == team_id), None)
+    if not team_info:
+        return jsonify({})
+    ss = team_info["sofascore_id"]
+    _key, tid = _team_league(ss)
+    if not os.path.exists(DB_PATH):
+        return jsonify({})
+    year = (request.args.get("year") or "").strip()
+    yclause, yp = "", []
+    if year and year not in ("전체", "all"):
+        try:
+            ys, ye = _year_range(year)
+            yclause = " AND e.date_ts >= ? AND e.date_ts < ?"
+            yp = [ys, ye]
+        except (ValueError, TypeError):
+            pass
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+
+    # 선수별 대표 세부 포지션 그룹(시즌 스코프) → 라인 분류
+    detail_map = _player_detail_groups(conn, tid, yclause, tuple(yp))
+
+    def broad(pid):
+        g = detail_map.get(pid)
+        return DETAIL_TO_BROAD.get(g) if g else None
+
+    # 이 팀의 선발 평균 위치 (avg_positions.is_home가 우리 팀 쪽일 때만)
+    rows = conn.execute(f"""
+        SELECT a.player_id AS pid, AVG(a.x) AS ax, AVG(a.y) AS ay,
+               COUNT(DISTINCT a.event_id) AS g,
+               COALESCE(p.name_ko, p.name) AS nm
+        FROM match_avg_positions a
+        JOIN events e ON e.id = a.event_id
+        LEFT JOIN players p ON p.id = a.player_id
+        WHERE e.tournament_id = ? AND a.is_substitute = 0
+          AND ((a.is_home = 1 AND e.home_team_id = ?) OR (a.is_home = 0 AND e.away_team_id = ?))
+          {yclause}
+        GROUP BY a.player_id
+        HAVING g >= 2
+        ORDER BY g DESC, ax
+    """, (tid, ss, ss, *yp)).fetchall()
+
+    nodes = []
+    for r in rows:
+        g = detail_map.get(r["pid"])
+        nodes.append({
+            "name": r["nm"] or "", "x": round(r["ax"], 1), "y": round(r["ay"], 1),
+            "games": r["g"], "detail": g or "", "line": broad(r["pid"]) or "",
+        })
+    # 진형은 주전 위주 — 출전 많은 상위 14명
+    nodes = nodes[:14]
+
+    games_total = conn.execute(f"""
+        SELECT COUNT(DISTINCT e.id) FROM events e
+        WHERE e.tournament_id = ? AND (e.home_team_id = ? OR e.away_team_id = ?)
+          AND e.home_score IS NOT NULL {yclause}
+    """, (tid, ss, ss, *yp)).fetchone()[0]
+
+    def shape_metrics(node_list):
+        """노드 리스트 → 형태 지표. GK 제외(라인 계산 왜곡 방지)."""
+        outfield = [n for n in node_list if n["line"] in ("D", "M", "F")]
+        if not outfield:
+            return None
+        def line_x(L):
+            xs = [n["x"] for n in node_list if n["line"] == L]
+            return round(sum(xs) / len(xs), 1) if xs else None
+        dx, mx, fx = line_x("D"), line_x("M"), line_x("F")
+        cx = round(sum(n["x"] for n in outfield) / len(outfield), 1)
+        ys = sorted(n["y"] for n in outfield)
+        # 팀 폭 = 좌우 10~90 백분위 폭(이상치 완화)
+        lo = ys[max(0, int(len(ys) * 0.1))]
+        hi = ys[min(len(ys) - 1, int(len(ys) * 0.9))]
+        width = round(hi - lo, 1)
+        length = round((fx - dx), 1) if (fx is not None and dx is not None) else None
+        return {"defLine": dx, "midLine": mx, "fwdLine": fx,
+                "centroidX": cx, "width": width, "length": length}
+
+    metrics = shape_metrics(nodes)
+
+    # 리그 평균 baseline — 같은 리그·시즌 전 팀 선발 평균위치를 한 번에 집계
+    lrows = conn.execute(f"""
+        SELECT a.player_id AS pid, AVG(a.x) AS ax, AVG(a.y) AS ay
+        FROM match_avg_positions a
+        JOIN events e ON e.id = a.event_id
+        WHERE e.tournament_id = ? AND a.is_substitute = 0 {yclause}
+        GROUP BY a.player_id, (CASE WHEN a.is_home=1 THEN e.home_team_id ELSE e.away_team_id END)
+        HAVING COUNT(DISTINCT a.event_id) >= 2
+    """, (tid, *yp)).fetchall()
+    lnodes = [{"x": round(r["ax"], 1), "y": round(r["ay"], 1), "line": broad(r["pid"]) or ""} for r in lrows]
+    league = shape_metrics(lnodes) if lnodes else None
+
+    conn.close()
+    return jsonify({
+        "team": team_info["name"], "year": year or "전체",
+        "games": games_total, "samples": len(rows),
+        "nodes": nodes, "metrics": metrics, "league": league,
+    })
+
+
 _ENG_TO_KO = {t["sofascore_id"]: t["name"] for t in TEAMS}
 
 def _ko_name_by_ss_id(ss_id):

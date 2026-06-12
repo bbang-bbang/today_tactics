@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=84">
+    <link rel="stylesheet" href="/static/css/style.css?v=85">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -788,6 +788,7 @@
                 <div class="ta-tabs">
                     <button class="ta-tab-btn active" data-tab="results">📋 결과 분석</button>
                     <button class="ta-tab-btn" data-tab="insights">📈 심화 인사이트</button>
+                    <button class="ta-tab-btn" data-tab="shape">🧭 팀 형태</button>
                     <button class="ta-tab-btn" data-tab="skill">📡 스킬 프로필</button>
                 </div>
 
@@ -859,6 +860,23 @@
                     </div>
                 </div>
 
+                <!-- 팀 형태 -->
+                <div class="ta-tab-panel hidden" id="ta-panel-shape">
+                    <div class="tc-panel" style="--tc-accent:#38bdf8">
+                        <div class="tc-rank-header">
+                            <p class="tc-panel-label" style="margin:0">🧭 평균 진형 (실측 평균 위치)</p>
+                            <span id="ta-shape-scope" class="tc-rank-scope"></span>
+                        </div>
+                        <div class="ta-shape-wrap"><canvas id="ta-shape-pitch" width="560" height="360"></canvas></div>
+                        <p class="tc-hint">점 = 선발 선수의 시즌 평균 위치(공격 방향 →) · 색 = 라인(수비/미드/공격) · 표본 있는 경기 평균</p>
+                    </div>
+                    <div class="tc-panel" style="--tc-accent:#34d399">
+                        <p class="tc-panel-label">📐 형태 지표 (리그 평균 대비)</p>
+                        <div class="ta-shape-metrics" id="ta-shape-metrics"></div>
+                        <p class="tc-hint">무게중심↑=높은 위치 · 팀 길이=공격~수비 라인 간격(작을수록 압축) · 팀 폭=좌우 전개</p>
+                    </div>
+                </div>
+
                 <!-- 스킬 프로필 -->
                 <div class="ta-tab-panel hidden" id="ta-panel-skill">
                     <div class="tc-panel" style="--tc-accent:#a78bfa">
@@ -887,7 +905,7 @@
     <script src="/static/js/k2heatmap.js?v=16"></script>
     <script src="/static/js/banner_stats.js?v=3"></script>
     <script src="/static/js/team_compare.js?v=12"></script>
-    <script src="/static/js/analytics.js?v=6"></script>
+    <script src="/static/js/analytics.js?v=7"></script>
     <script src="/static/js/prediction.js?v=59"></script>
 
     <!-- 선수 분석 모달 -->
