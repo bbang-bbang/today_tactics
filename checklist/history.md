@@ -54,6 +54,12 @@
 - **③ 라벨/검색칩**: 선수 리포트 포지션 배지 = 세부 라벨, 퍼센타일 주석 = 실제 비교군. 통합검색(`heatmap-player-search`) 결과에 `detailPos`/`detailLabel` → 히트맵 검색 칩에 세부 표기.
 - 검증: Playwright — 인사이트 8칩·CB/FB 필터 정확·콘솔 에러 0, 리포트 풀백 비교군 31명. `k2heatmap.js` v15→16, `player_report.js` v5→6, `insights.js` v37→38. **DB 무변경(기존 detail_pos 컬럼 재사용) → prod 마이그레이션 불필요**.
 
+### 후속4(같은 날): 🔴 성능 회귀 수정 — match_lineups player_id 인덱스
+- **증상**: "전체적으로 조회 느려짐". **원인**: `match_lineups`(71,902행)에 `player_id` 인덱스가 없어, 세부 포지션 기능이 추가한 쿼리들(선수 히트맵 detailPos·통합검색 보조·`_player_detail_groups`)이 매 요청 **풀스캔**. EXPLAIN=`SCAN match_lineups`.
+- **수정**: `_ensure_indexes()`에 `idx_mlu_player_detail(player_id, detail_pos)` + `idx_mlu_detail(detail_pos, is_starter, event_id)` 추가 + `ANALYZE`. 부팅 시 자동 생성 → **로컬·prod 재시작 시 IF NOT EXISTS로 자동 적용**(수동 마이그레이션 불필요).
+- **측정**: 선수 히트맵 detailPos 4.0ms→**0.08ms**(50×), 통합검색 보조 풀스캔→**0.06ms**(covering). 워밍 후 주요 엔드포인트 2~45ms. (참고: 로컬 누적 dev 서버 7개 프로세스도 DB/포트 경합 → 정리)
+- `main.py`만 변경. **DB 무변경(인덱스만)**.
+
 ---
 
 ## 2026-06-11 | 히트맵 비교 오버레이 신규 + 🔴 flip 선재 버그 발견·수정

@@ -3433,6 +3433,11 @@ def _ensure_indexes():
         "CREATE INDEX IF NOT EXISTS idx_mps_team_event ON match_player_stats(team_id, event_id)",
         "CREATE INDEX IF NOT EXISTS idx_heatmap_event ON heatmap_points(event_id)",
         "CREATE INDEX IF NOT EXISTS idx_lineups_event ON match_lineups(event_id)",
+        # match_lineups에 player_id 인덱스가 없어 detail_pos 관련 쿼리가 풀스캔(71K)이던 것 해소.
+        #   - (player_id, detail_pos): 선수 히트맵 detailPos·통합검색·GROUP BY player_id
+        #   - (detail_pos, is_starter, event_id): 세부 포지션 풀링(detail_pos IN .. 드라이버)
+        "CREATE INDEX IF NOT EXISTS idx_mlu_player_detail ON match_lineups(player_id, detail_pos)",
+        "CREATE INDEX IF NOT EXISTS idx_mlu_detail ON match_lineups(detail_pos, is_starter, event_id)",
     ]
     for sql in indexes:
         try:
@@ -3440,6 +3445,11 @@ def _ensure_indexes():
         except Exception:
             pass  # 테이블이 아직 없을 수 있음
     conn.commit()
+    # 인덱스 추가 후 통계 갱신 — 쿼리 플래너가 새 인덱스를 활용하도록
+    try:
+        conn.execute("ANALYZE")
+    except Exception:
+        pass
     conn.close()
 
 _ensure_indexes()
