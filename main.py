@@ -1239,14 +1239,13 @@ def get_team_shotmap():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     rows = conn.execute(f"""
-        SELECT s.x, s.y, s.xg, s.outcome, s.situation, s.body_part, s.time_min,
+        SELECT s.event_id AS eid, s.x, s.y, s.xg, s.outcome, s.situation, s.body_part, s.time_min,
                COALESCE(p.name_ko, p.name) AS nm
         FROM match_shotmap s
         JOIN events e ON e.id = s.event_id
         LEFT JOIN players p ON p.id = s.player_id
         WHERE e.tournament_id = ? AND {side_cond} {yclause}
     """, (tid, ss, ss, *yp)).fetchall()
-    conn.close()
 
     shots = [{
         "x": r["x"], "y": r["y"], "xg": round(r["xg"] or 0, 3),
@@ -1258,22 +1257,31 @@ def get_team_shotmap():
     goals = sum(1 for s in shots if s["outcome"] == "goal")
     on_target = sum(1 for s in shots if s["outcome"] in ("goal", "save"))
     xg_sum = round(sum(s["xg"] for s in shots), 2)
-    # outcome별 개수 (필터 칩 + 분해)
     oc = {k: 0 for k in ("goal", "save", "post", "block", "miss")}
     for s in shots:
         oc[s["outcome"]] = oc.get(s["outcome"], 0) + 1
-    # 상황별 골 (오픈플레이 vs 세트피스)
     SET_PIECE = {"corner", "set-piece", "free-kick", "throw-in-set-piece", "penalty"}
     set_goals = sum(1 for s in shots if s["outcome"] == "goal" and s["situation"] in SET_PIECE)
     open_goals = goals - set_goals
-    # 경기 수 (경기당 슛)
-    gconn = sqlite3.connect(DB_PATH)
-    games = gconn.execute(f"""
-        SELECT COUNT(DISTINCT e.id) FROM events e
-        WHERE e.tournament_id=? AND (e.home_team_id=? OR e.away_team_id=?)
-          AND e.home_score IS NOT NULL {yclause}
-    """, (tid, ss, ss, *yp)).fetchone()[0]
-    gconn.close()
+    # 경기당 지표는 '슛 데이터 보유 경기' 기준(슛맵 커버 ~45%라 전체경기로 나누면 과소평가)
+    games = len(set(r["eid"] for r in rows))
+
+    # 리그 평균 baseline — 같은 리그·시즌 전 슛 1회 집계. 팀당·경기당 평균 = 합계 / (2×슛보유경기).
+    lrow = conn.execute(f"""
+        SELECT COUNT(*) shots, COALESCE(SUM(s.xg),0) xg,
+               SUM(CASE WHEN s.outcome='goal' THEN 1 ELSE 0 END) goals,
+               COUNT(DISTINCT s.event_id) evs
+        FROM match_shotmap s JOIN events e ON e.id = s.event_id
+        WHERE e.tournament_id = ? {yclause}
+    """, (tid, *yp)).fetchone()
+    conn.close()
+    lg_team_games = 2 * (lrow["evs"] or 0)   # 슛보유경기 × 2팀
+    league = {
+        "xgPerGame": round((lrow["xg"] or 0) / lg_team_games, 2) if lg_team_games else 0,
+        "gpgPerGame": round((lrow["goals"] or 0) / lg_team_games, 2) if lg_team_games else 0,
+        "perGame": round((lrow["shots"] or 0) / lg_team_games, 1) if lg_team_games else 0,
+    } if lg_team_games else None
+
     summary = {
         "shots": n, "goals": goals, "xg": xg_sum,
         "xgPerShot": round(xg_sum / n, 3) if n else 0,
@@ -1282,9 +1290,10 @@ def get_team_shotmap():
         "xgDiff": round(goals - xg_sum, 1),   # 결정력 (실제 골 − xG)
         "outcomes": oc, "games": games,
         "perGame": round(n / games, 1) if games else 0,
-        "xgPerGame": round(xg_sum / games, 2) if games else 0,   # 경기당 xG (볼륨 무관 비교지표)
-        "gpgPerGame": round(goals / games, 2) if games else 0,   # 경기당 득점/실점
+        "xgPerGame": round(xg_sum / games, 2) if games else 0,   # 경기당 xG (슛보유경기 기준)
+        "gpgPerGame": round(goals / games, 2) if games else 0,
         "openGoals": open_goals, "setGoals": set_goals,
+        "league": league,   # 리그 평균(팀·경기당) baseline
     }
 
     # ── 상세 리포트 분해 ──────────────────────────────

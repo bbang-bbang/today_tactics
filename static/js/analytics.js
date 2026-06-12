@@ -793,12 +793,21 @@
                 <div class="ta-sm-stat-val ${cls}">${value}</div>
                 <div class="ta-sm-stat-sub">${sub}</div></div>`;
             const ot = (m.outcomes || {});
+            const lg = m.league || {};
+            // 리그 평균 대비 (for=높을수록 좋음, against=낮을수록 좋음)
+            const cmp = (v, lv, hiGood) => {
+                if (lv == null) return "";
+                const d = Math.round((v - lv) * 100) / 100;
+                if (d === 0) return `리그 평균 ${lv}`;
+                const up = d > 0, good = hiGood ? up : !up;
+                return `<span class="${good ? "ta-shape-pos" : "ta-shape-neg"}">${up ? "▲" : "▼"}${Math.abs(d)}</span> vs 리그 ${lv}`;
+            };
             sumEl.innerHTML =
-                stat(isFor ? "경기당 슈팅" : "경기당 피슈팅", m.perGame, `총 ${m.shots}개`) +
-                stat(isFor ? "경기당 득점" : "경기당 실점", m.gpgPerGame, `합계 ${m.goals} (오픈 ${m.openGoals}·세트 ${m.setGoals})`) +
-                stat(isFor ? "경기당 xG" : "경기당 피xG", m.xgPerGame, `슛당 ${m.xgPerShot} · 누적 ${m.xg}`) +
-                stat("유효슛", m.onTargetPct + "%", `${(ot.goal || 0) + (ot.save || 0)} / ${m.shots}`) +
-                stat(isFor ? "결정력" : "실점 효율", `${fin > 0 ? "+" : ""}${fin}`, isFor ? "골 − xG (누적)" : "실점 − xG (누적)", finCls);
+                stat(isFor ? "경기당 슈팅" : "경기당 피슈팅", m.perGame, cmp(m.perGame, lg.perGame, isFor)) +
+                stat(isFor ? "경기당 득점" : "경기당 실점", m.gpgPerGame, cmp(m.gpgPerGame, lg.gpgPerGame, isFor)) +
+                stat(isFor ? "경기당 xG" : "경기당 피xG", m.xgPerGame, cmp(m.xgPerGame, lg.xgPerGame, isFor)) +
+                stat("유효슛", m.onTargetPct + "%", `골+선방 ${(ot.goal || 0) + (ot.save || 0)}/${m.shots}`) +
+                stat(isFor ? "결정력" : "실점 효율", `${fin > 0 ? "+" : ""}${fin}`, isFor ? "골 − xG(누적)" : "실점 − xG(누적)", finCls);
 
             if (extraEl) {
                 const hidden = allShots.length - shots.length;
