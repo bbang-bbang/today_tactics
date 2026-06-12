@@ -2888,6 +2888,13 @@ body {
     line-height: 1.5;
 }
 .k2-ins-chip b { color: #6ea8ff; font-weight: 700; }
+.k2-ins-note {
+    font-size: 10.5px;
+    color: #7c8a99;
+    line-height: 1.4;
+    padding-top: 4px;
+    border-top: 1px dashed #2a3444;
+}
 
 /* ── 통합 선수 검색 ── */
 .k2-quick-search-wrap { position: relative; margin: 6px 0 12px; }

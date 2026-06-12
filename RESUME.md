@@ -18,7 +18,7 @@
   3. **히트맵을 5번째 워크스페이스 탭으로**(팝업 제거, `workspace.js` 인라인). 전술판 툴바 `btn-k2-heatmap` 제거.
   4. **년도(시즌) 필터** + **시즌별 소속팀 표시**(이적 선수). **이적 선수 데이터 정규화**: mps.team_id가 현 소속 고정이라 부정확 → 시즌팀을 event home/away+is_home로 유도, 리그 무관(player 중심) 통합(광주 K1→수원 K2 과거시즌도 조회). 다중시즌은 기본 최신시즌(전체누적 과포화 방지).
   5. **팀 그리드 현 시즌 정리**(K1 12·K2 17, 수원삼성 복원), **선수목록 히트맵 보유·현시즌만·한글명**, **리그탭 race 수정**(`_teamLoadSeq` 가드 — K2탭에 K1팀 뜨던 버그), 경기별보기 5:5 우측배치, 경기장 크기 축소(560), 히트맵 점 경기장 안쪽 매핑.
-- **정적 자산 최신 버전**: `k2heatmap.js?v=14` · `workspace.js?v=6` · `style.css?v=83`. 변경 시 `templates/index.html`의 `?v=` 동반 증가 필수.
+- **정적 자산 최신 버전**: `k2heatmap.js?v=15` · `workspace.js?v=6` · `style.css?v=84`. 변경 시 `templates/index.html`의 `?v=` 동반 증가 필수.
 - **신규 엔드포인트**(README §API 반영됨): `/api/kleague{1,2}/position-heatmap`(year), `/api/heatmap-player-search`, `/api/kleague{1,2}/heatmap`에 `year`·`venue` 파라미터.
 - **운영**: https://www.today-football-tactics.xyz 라이브. 배포는 **`git push origin main` → GitHub Actions가 forced-command `ci_deploy.sh`(fetch+reset+restart+health) 자동 실행**. prod에서 직접 크롤러/백필 실행 시 `venv/bin/python3` 사용(시스템 python3엔 playwright 없음).
 - **데이터**: 서버가 주기 cron `update_data.py` 자체 수집. **K2 6/7까지 완비**, K1 5/17까지. **다음 라운드 2026-07-04 재개**(월드컵 휴식기) → 그 사이 경기 없음(미수집 아님). 수비 세부 3컬럼은 로컬+prod DB 모두 백필 완료.

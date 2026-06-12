@@ -40,6 +40,12 @@
 - **인사이트 강화**(③): `pointStats`에 spreadX·공격/수비 1/3 점유율 추가. 칩 3→최대 6종(전진도·좌우치우침·좌우활동폭·**활동범위(면적%)**·**공격 진영 가담%p**·**수비 진영 복귀%p**) + **헤드라인**(주 활동 전방/중원/후방 × 좌/중/우 + 성향 요약). 의미있는 Δ만 노출.
 - 검증: Playwright 토글 ON/OFF·겹침칩 소멸·헤드라인("주 활동 전방·우측 — 광역 활동")·콘솔 에러 0. `k2heatmap.js` v13→14, `style.css` v82→83. **DB 무변경(순수 프론트) → prod 마이그레이션 불필요**.
 
+### 후속2(같은 날): 단위 명확화(칸→m) + 인사이트 추가 확대
+- **피드백**: "N칸" 단위가 이해 안 됨 + 인사이트 더 다양하게.
+- **단위 환산**: 좌표 1단위 → 경기장 기준 m(가로 105m·세로 68m, `M_X=1.05`/`M_Y=0.68`). "평균보다 N칸" → "약 Nm 앞/뒤", 활동폭도 "±약 Nm". 배너 하단에 단위 설명 노트(`.k2-ins-note`) 추가.
+- **인사이트 확대**: 후보 9종으로(전진도·좌우치우침·좌우활동폭·**전후활동폭**·활동범위·공격가담·수비복귀·**상대 박스 부근**·**측면운영/중앙침투**). `pointStats`에 boxPct/widePct/cenPct 추가. 각 후보에 중요도 점수 → **정렬 후 상위 6개만** 노출(과밀 방지). 헤드라인 성향에 "박스 침투형" 추가.
+- 검증: Playwright — 헤이스 vs ST평균 칩3(유사), vs CB평균 칩6("공격가담 +43%p"·"전방 약 27m 앞"·"박스부근 +9%p" 등 중요도순)·노트 표시·콘솔 에러 0. `k2heatmap.js` v14→15, `style.css` v83→84. **DB 무변경**.
+
 ---
 
 ## 2026-06-11 | 히트맵 비교 오버레이 신규 + 🔴 flip 선재 버그 발견·수정
@@ -3802,3 +3808,5 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-12 10:36:05 | pkill -f "python main.py" 2>/dev/null; sleep 1 / DISABLE_SCHEDULER=1 LOGIN_REQUIRED=0 python main.py > /tmp/flask_v14.log 2>&1 & / echo "pid $!"; sleep 7; tail -2 /tmp/flask_v14.log
 - 2026-06-12 10:37:32 | PYTHONIOENCODING=utf-8 python /tmp/verify_v14.py
 - 2026-06-12 10:37:59 | pkill -f "python main.py" 2>/dev/null; echo "server stopped"
+- 2026-06-12 10:44:53 | pkill -f "python main.py" 2>/dev/null; sleep 1 / DISABLE_SCHEDULER=1 LOGIN_REQUIRED=0 python main.py > /tmp/flask_v15.log 2>&1 & / echo "pid $!"; sleep 7; tail -1 /tmp/flask_v15.log
+- 2026-06-12 10:45:53 | pkill -f "python main.py" 2>/dev/null; echo "stopped"

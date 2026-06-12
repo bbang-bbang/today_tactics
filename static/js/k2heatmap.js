@@ -583,71 +583,102 @@
         });
     }
 
-    // 비교 인사이트 배너 — 두 좌표군의 차이를 자동 해석 (x=공격방향 0~100, y=세로 폭 0~100)
+    // 비교 인사이트 배너 — 두 좌표군의 차이를 자동 해석.
+    // 좌표: x=공격 방향(0=자기 골문, 100=상대 골문), y=좌우 폭(0~100).
+    // 거리는 경기장 기준 환산 — 가로(길이) 105m, 세로(폭) 68m.
+    const M_X = 1.05, M_Y = 0.68;   // 좌표 1단위 → m
     function pointStats(pts) {
         if (!pts || !pts.length) return null;
         let sx = 0, sy = 0;
         for (const p of pts) { sx += p.x; sy += p.y; }
         const n = pts.length, mx = sx / n, my = sy / n;
-        let vx = 0, vy = 0, att = 0, def = 0, mid = 0;
+        let vx = 0, vy = 0, att = 0, def = 0, mid = 0, box = 0, wide = 0, cen = 0;
         for (const p of pts) {
             vx += (p.x - mx) * (p.x - mx);
             vy += (p.y - my) * (p.y - my);
             if (p.x >= 200 / 3)      att++;   // 공격 1/3 (x>66.7)
             else if (p.x < 100 / 3)  def++;   // 수비 1/3 (x<33.3)
             else                     mid++;   // 중앙 1/3
+            if (p.x >= 83 && p.y >= 21 && p.y <= 79) box++;   // 상대 박스 부근(중앙)
+            const lat = Math.abs(p.y - 50);
+            if (lat > 25)      wide++;        // 측면
+            else if (lat < 12) cen++;         // 중앙
         }
         return {
             n, mx, my,
             spreadX: Math.sqrt(vx / n), spreadY: Math.sqrt(vy / n),
             attPct: att / n * 100, defPct: def / n * 100, midPct: mid / n * 100,
+            boxPct: box / n * 100, widePct: wide / n * 100, cenPct: cen / n * 100,
         };
     }
     function renderInsight() {
         const b = pointStats(currentBasePoints), o = pointStats(overlayPoints);
         if (!b || !o) { cmpInsight.classList.add("hidden"); return; }
-        const chips = [];
 
-        // 1. 전후 위치 (전진도)
-        const adv = Math.round(b.mx - o.mx);            // +면 base가 더 전진
-        if (adv >= 3)       chips.push(`<b>↑ 전진</b> 평균보다 ${adv}칸 높게`);
-        else if (adv <= -3) chips.push(`<b>↓ 후방</b> 평균보다 ${-adv}칸 낮게`);
-        else                chips.push(`<b>≈ 전후 위치</b> 평균과 유사`);
+        // 후보 인사이트 — {중요도 s, 텍스트 t}. 의미있는 차이만 담고 중요도순 상위만 노출.
+        const cand = [];
+
+        // 1. 전후 위치 (전진도) — m 환산
+        const advM = (b.mx - o.mx) * M_X;
+        if (advM >= 3)       cand.push({ s: advM,  t: `<b>↑ 전방</b> 평균보다 약 ${Math.round(advM)}m 앞` });
+        else if (advM <= -3) cand.push({ s: -advM, t: `<b>↓ 후방</b> 평균보다 약 ${Math.round(-advM)}m 뒤` });
 
         // 2. 좌우 치우침
         const bc = Math.abs(b.my - 50), oc = Math.abs(o.my - 50);
-        const bSide = bc < 4 ? "중앙" : (b.my < 50 ? "좌측" : "우측");
-        if (bc - oc >= 6)       chips.push(`<b>측면 지향</b> ${bSide} 치우침`);
-        else if (bc - oc <= -6) chips.push(`<b>중앙 지향</b> 평균보다 안쪽`);
+        const side = b.my < 50 ? "좌측" : "우측";
+        if (bc - oc >= 6)       cand.push({ s: (bc - oc) * 0.8, t: `<b>측면 치우침</b> ${side} 으로` });
+        else if (bc - oc <= -6) cand.push({ s: (oc - bc) * 0.8, t: `<b>중앙 밀집</b> 평균보다 안쪽` });
 
-        // 3. 좌우 활동폭 (세로 분산)
-        const sdY = Math.round(b.spreadY - o.spreadY);
-        if (sdY >= 4)       chips.push(`좌우 활동폭 <b>넓음</b> (+${sdY})`);
-        else if (sdY <= -4) chips.push(`좌우 활동폭 <b>좁음</b> (${sdY})`);
+        // 3. 좌우 활동폭 (세로 분산) — m 환산
+        const latM = (b.spreadY - o.spreadY) * M_Y;
+        if (latM >= 2)       cand.push({ s: latM * 1.5,  t: `좌우로 더 넓게 (±약 ${Math.round(latM)}m)` });
+        else if (latM <= -2) cand.push({ s: -latM * 1.5, t: `좌우로 더 좁게 (±약 ${Math.round(-latM)}m)` });
 
-        // 4. 활동 범위(면적 = 전후 폭 × 좌우 폭)
+        // 4. 전후 활동폭 (가로 분산) — m 환산
+        const depM = (b.spreadX - o.spreadX) * M_X;
+        if (depM >= 3)       cand.push({ s: depM,  t: `전후로 더 활동적 (±약 ${Math.round(depM)}m)` });
+        else if (depM <= -3) cand.push({ s: -depM, t: `전후로 더 고정적 (±약 ${Math.round(-depM)}m)` });
+
+        // 5. 활동 범위(면적 = 전후 폭 × 좌우 폭)
         const areaB = b.spreadX * b.spreadY, areaO = o.spreadX * o.spreadY;
         const areaPct = areaO ? Math.round((areaB / areaO - 1) * 100) : 0;
-        if (areaPct >= 15)       chips.push(`활동 범위 <b>${areaPct}% 넓음</b>`);
-        else if (areaPct <= -15) chips.push(`활동 범위 <b>${-areaPct}% 집약</b>`);
+        if (areaPct >= 15)       cand.push({ s: areaPct / 4,  t: `활동 범위 <b>${areaPct}% 넓음</b>` });
+        else if (areaPct <= -15) cand.push({ s: -areaPct / 4, t: `활동 범위 <b>${-areaPct}% 집약</b>` });
 
-        // 5. 공격 진영 가담 (공격 1/3 점유율 차)
+        // 6. 공격 진영 가담 (공격 1/3 점유율 차)
         const dAtt = Math.round(b.attPct - o.attPct);
-        if (dAtt >= 8)       chips.push(`공격 진영 가담 <b>+${dAtt}%p</b>`);
-        else if (dAtt <= -8) chips.push(`공격 진영 가담 <b>${dAtt}%p</b>`);
+        if (dAtt >= 8)       cand.push({ s: dAtt, t: `공격 진영 가담 <b>+${dAtt}%p</b>` });
+        else if (dAtt <= -8) cand.push({ s: -dAtt, t: `공격 진영 가담 <b>${dAtt}%p</b>` });
 
-        // 6. 수비 진영 복귀 (수비 1/3 점유율 차)
+        // 7. 수비 진영 복귀 (수비 1/3 점유율 차)
         const dDef = Math.round(b.defPct - o.defPct);
-        if (dDef >= 8)       chips.push(`수비 진영 복귀 <b>+${dDef}%p</b>`);
-        else if (dDef <= -8) chips.push(`수비 진영 복귀 <b>${dDef}%p</b>`);
+        if (dDef >= 8)       cand.push({ s: dDef, t: `수비 진영 복귀 <b>+${dDef}%p</b>` });
+        else if (dDef <= -8) cand.push({ s: -dDef, t: `수비 진영 복귀 <b>${dDef}%p</b>` });
+
+        // 8. 상대 박스 부근 활동 (침투/마무리 가담)
+        const dBox = Math.round(b.boxPct - o.boxPct);
+        if (dBox >= 4)       cand.push({ s: dBox * 1.6, t: `상대 박스 부근 <b>+${dBox}%p</b>` });
+        else if (dBox <= -4) cand.push({ s: -dBox * 1.6, t: `상대 박스 부근 <b>${dBox}%p</b>` });
+
+        // 9. 측면 운영 vs 중앙 침투 (좌우 위치 성향)
+        const dWide = Math.round(b.widePct - o.widePct);
+        const dCen = Math.round(b.cenPct - o.cenPct);
+        if (dWide >= 10)     cand.push({ s: dWide * 0.7, t: `측면 운영 <b>+${dWide}%p</b>` });
+        else if (dCen >= 10) cand.push({ s: dCen * 0.7, t: `중앙 침투 <b>+${dCen}%p</b>` });
+
+        // 중요도순 상위 6개만 (과밀 방지)
+        cand.sort((a, b2) => b2.s - a.s);
+        const chips = cand.slice(0, 6).map(c => c.t);
+        if (!chips.length) chips.push(`평균과 활동 패턴이 거의 동일`);
 
         // 헤드라인 — 절대 주 활동 지역 + 가장 두드러진 성향 한 줄 요약
         const zoneV = b.mx >= 60 ? "전방" : (b.mx < 40 ? "후방" : "중원");
         const zoneH = bc < 5 ? "중앙" : (b.my < 50 ? "좌측" : "우측");
         const tone = [];
-        if (adv >= 3) tone.push("전진형");
-        else if (adv <= -3) tone.push("후방형");
-        if (dAtt >= 8) tone.push("공격 가담 활발");
+        if (advM >= 3) tone.push("전진형");
+        else if (advM <= -3) tone.push("후방형");
+        if (dBox >= 4) tone.push("박스 침투형");
+        else if (dAtt >= 8) tone.push("공격 가담 활발");
         else if (dDef >= 8) tone.push("수비 가담 활발");
         if (areaPct >= 15) tone.push("광역 활동");
         else if (areaPct <= -15) tone.push("집약 활동");
@@ -660,7 +691,8 @@
             `<span class="k2-ins-sum">${headline}</span></div>` +
             `<div class="k2-ins-chips">` +
             chips.map(c => `<span class="k2-ins-chip">${c}</span>`).join("") +
-            `</div>`;
+            `</div>` +
+            `<div class="k2-ins-note">거리는 경기장 기준 환산(가로 105m·세로 68m). %p = 평균 대비 비중 차이</div>`;
     }
 
     // ── 시즌 필터 ──────────────────────────────────────────
