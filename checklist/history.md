@@ -4,6 +4,21 @@
 
 ---
 
+## 2026-06-12 | 🆕 K리그 심화 ② 슛맵·xG 분석 — 미활용 match_shotmap 활용
+
+### 백엔드 `/api/team-shotmap?teamId=&year=&side=for|against`
+- `match_shotmap`(4.6만) 기반. for=자팀 슛, against=피슛(상대가 우리에게). is_home×event home/away로 주체 판정.
+- 반환: 슛 배열(x=골문거리·y·xg·outcome·situation·body·min·name) + 요약(슛·골/실점·누적xG·유효슛%·결정력=골−xG). `@cached_response`.
+- 커버리지 K1 2095슛·K2 2739슛(2026). 검증: 안산 공격 137슛/15골/xG16.2 vs 피슛 220/24실점 → 팀 형태(깊은 블록)와 교차검증.
+
+### UI — 팀 분석 모달 `📍 슛맵` 탭 (analytics.js)
+- 캔버스 슛맵(우측 골문, 페널티/골 박스, xG 버블 크기, outcome 색: 골 초록·유효 파랑·골대 보라·차단 주황·빗나감 회색) + **공격/수비 토글**(`ta-sm-side`, loadAll서 양측 캐시→토글 재렌더) + 요약 5카드.
+- 수비 측은 의미 반전 정합화: 라벨 "피 xG·실점 효율", 결정력 색상 반전(실점−xG 양수=나쁨 빨강).
+- 검증: Playwright 공격/수비 토글·캔버스 paint·카드·콘솔 에러 0. `analytics.js` v7→8, `style.css` v85→86, `index.html`.
+- **DB 무변경(읽기 전용) → prod 마이그레이션 불필요**.
+
+---
+
 ## 2026-06-12 | 🆕 K리그 심화 ① 팀 형태(Shape) 분석 — 미활용 avg_positions 활용
 
 ### 배경
@@ -3879,3 +3894,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-12 13:20:43 | KEY=<SSH_KEY>.pem; R=rocky@<PROD_IP> / ssh -i "$KEY" -o ConnectTimeout=20 "$R" "cd /opt/today_tactics && git rev-parse --short HEAD" 2>&1 | grep -v "post-quantum\|store now\|openssh.com\|may need"
 - 2026-06-12 13:29:05 | KEY=<SSH_KEY>.pem; R=rocky@<PROD_IP> / ssh -i "$KEY" -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=20 "$R" "cd /opt/today_tactics && venv/bin/python3 -c \"import sqlite3; c=sqlite3.connect('players.db').cursor(); print([r[0] for r in c.execute(\\\"select name from sqlite_master where type='index' and tbl_name='match_lineups'\\\").fetchall()])\"" 2>&1 | grep -v "post-quantum\|store now\|openssh.com\|may need"
 - 2026-06-12 15:24:15 | BASE=https://www.today-football-tactics.xyz / code=$(curl -s -o /tmp/ttp.json -w "%{http_code}" --max-time 25 "$BASE/api/team-top-players?teamId=248375&league=k2") / echo "HTTP $code, bytes=$(wc -c < /tmp/ttp.json)" / head -c 400 /tmp/ttp.json; echo
+- 2026-06-12 15:45:37 | BASE=https://www.today-football-tactics.xyz; sleep 5 / curl -s -o /dev/null -w "health: %{http_code}\n" --max-time 20 "$BASE/health" / curl -s -o /dev/null -w "team page: %{http_code}\n" --max-time 20 "$BASE/"

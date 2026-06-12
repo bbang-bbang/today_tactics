@@ -153,6 +153,7 @@ backfill 스크립트
 | `/api/team-top-players` | 팀별 TOP 선수 |
 | `/api/team-goal-timing` | 팀 득점 시간대 분석 |
 | `/api/team-shape` | 팀 평균 진형(Shape) — avg_positions 기반 평균위치 + 형태지표(수비라인·공격라인·팀길이·팀폭·무게중심) + 리그평균 baseline |
+| `/api/team-shotmap` | 팀 슛맵 — match_shotmap 기반 `side=for\|against`, 슛 좌표·xG·outcome + 요약(슛·골·xG·유효슛%·결정력) |
 | `/api/match-prediction` | 경기 예측 |
 | `/api/prediction-backtest` | 예측 모델 백테스트 |
 | `/api/season-simulation` | 시즌 시뮬레이션 |

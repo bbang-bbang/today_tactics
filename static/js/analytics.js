@@ -21,6 +21,8 @@
     let currentTeamId = null;
     let currentLeague = null;
     let currentYear = "전체";
+    let _shotmapData = { for: null, against: null };   // 슛맵 캐시 (토글 재렌더용)
+    let _shotmapSide = "for";
 
     // ── 유틸 ──────────────────────────────────────────────────────
     function destroyChart(id) {
@@ -146,6 +148,15 @@
         });
     });
 
+    // 슛맵 공격/수비 토글
+    modal.querySelectorAll(".ta-sm-side").forEach(btn => {
+        btn.addEventListener("click", () => {
+            modal.querySelectorAll(".ta-sm-side").forEach(b => b.classList.toggle("active", b === btn));
+            _shotmapSide = btn.dataset.side;
+            renderShotmap();
+        });
+    });
+
     // ── 메인 로드 ─────────────────────────────────────────────────
     function loadAll() {
         bodyEl.classList.remove("hidden");
@@ -161,7 +172,9 @@
             fetch(`/api/league-rankings?league=${currentLeague}${yp}`).then(r => r.json()),
             fetch(`/api/team-insights?teamId=${currentTeamId}${yp}`).then(r => r.json()).catch(() => ({})),
             fetch(`/api/team-shape?teamId=${currentTeamId}${yp}`).then(r => r.json()).catch(() => ({})),
-        ]).then(([analytics, trend, rankings, insights, shape]) => {
+            fetch(`/api/team-shotmap?teamId=${currentTeamId}&side=for${yp}`).then(r => r.json()).catch(() => ({})),
+            fetch(`/api/team-shotmap?teamId=${currentTeamId}&side=against${yp}`).then(r => r.json()).catch(() => ({})),
+        ]).then(([analytics, trend, rankings, insights, shape, smFor, smAgainst]) => {
             buildYearFilter(analytics.available_years || []);
             renderIdentity(meta, analytics, trend, rankings);
             // 결과 분석
@@ -175,6 +188,9 @@
             renderInsights(insights, meta);
             // 팀 형태
             renderShape(shape, meta);
+            // 슛맵
+            _shotmapData = { for: smFor, against: smAgainst };
+            renderShotmap();
             // 스킬 프로필
             renderSkill(rankings, meta);
         }).catch(err => {
@@ -695,6 +711,69 @@
                 card("공격라인", "fwdLine", "", "공격 평균 위치", null) +
                 card("팀 길이", "length", "", "공격~수비 간격(압축도)", false) +
                 card("팀 폭", "width", "", "좌우 전개 폭", null);
+        }
+    }
+
+    // ── 슛맵 (xG 버블 + 요약) ─────────────────────────────────────
+    const SHOT_COLOR = { goal: "#22c55e", save: "#60a5fa", post: "#a78bfa", block: "#f59e0b", miss: "#94a3b8" };
+    function renderShotmap() {
+        const cv = document.getElementById("ta-shotmap-canvas");
+        const sumEl = document.getElementById("ta-shotmap-summary");
+        if (!cv) return;
+        const data = _shotmapData[_shotmapSide] || {};
+        const shots = data.shots || [];
+        const ctx = cv.getContext("2d");
+        const W = cv.width, H = cv.height;
+        ctx.clearRect(0, 0, W, H);
+        // 잔디(공격 1/3 — 오른쪽이 골문)
+        ctx.fillStyle = "#163d1c"; ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = "rgba(255,255,255,0.28)"; ctx.lineWidth = 1.5;
+        ctx.strokeRect(8, 8, W - 16, H - 16);
+        // 오른쪽 골문 + 페널티/골 박스
+        const cy = H / 2;
+        ctx.strokeRect(W - 8 - 150, cy - 110, 150, 220);   // 페널티 박스
+        ctx.strokeRect(W - 8 - 55, cy - 55, 55, 110);      // 골 박스
+        ctx.beginPath(); ctx.arc(W - 8 - 100, cy, 2.5, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fill();  // 페널티 스폿
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(W - 9, cy - 26); ctx.lineTo(W - 9, cy + 26); ctx.stroke();  // 골문
+
+        // x=골문 거리(0=골라인) → 오른쪽 골문. 표시 캡 50.
+        const XCAP = 50, PAD = 10;
+        const fx = v => (W - 10) - (Math.min(v, XCAP) / XCAP) * (W - 20 - PAD);
+        const fy = v => PAD + (v / 100) * (H - 2 * PAD);
+        // 골을 위에 그리도록 정렬(골 > 유효 > 나머지)
+        const order = { goal: 3, save: 2, post: 1 };
+        [...shots].sort((a, b) => (order[a.outcome] || 0) - (order[b.outcome] || 0)).forEach(s => {
+            const r = Math.max(3, Math.min(15, 3 + Math.sqrt(s.xg) * 22));
+            ctx.beginPath(); ctx.arc(fx(s.x), fy(s.y), r, 0, Math.PI * 2);
+            const col = SHOT_COLOR[s.outcome] || "#94a3b8";
+            ctx.fillStyle = (s.outcome === "goal") ? col : col + "cc";
+            ctx.fill();
+            if (s.outcome === "goal") { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke(); }
+        });
+        if (!shots.length) {
+            ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
+            ctx.fillText("이 시즌 슛 데이터가 없습니다", W / 2, cy);
+        }
+
+        if (sumEl) {
+            const m = data.summary || {};
+            if (!shots.length) { sumEl.innerHTML = '<p class="tc-hint">데이터 없음</p>'; return; }
+            const isFor = _shotmapSide === "for";
+            const fin = m.xgDiff;
+            // 공격: 골−xG 양수=결정력 좋음(초록). 수비: 실점−xG 양수=많이 내줌(나쁨, 빨강)
+            const good = isFor ? fin > 0 : fin < 0;
+            const finCls = fin === 0 ? "" : (good ? "ta-shape-pos" : "ta-shape-neg");
+            const card = (k, v, h) => `<div class="ta-shape-card"><div class="ta-shape-k">${k}</div>
+                <div class="ta-shape-v">${v}</div><div class="ta-shape-h">${h}</div></div>`;
+            sumEl.innerHTML =
+                card("슛", m.shots, isFor ? "총 슈팅 수" : "내준 슈팅") +
+                card(isFor ? "득점" : "실점", m.goals, "골") +
+                card(isFor ? "누적 xG" : "피 xG", m.xg, "기대 " + (isFor ? "득점" : "실점")) +
+                card("유효슛%", m.onTargetPct + "%", "온타깃 비율") +
+                `<div class="ta-shape-card"><div class="ta-shape-k">${isFor ? "결정력" : "실점 효율"}</div>
+                 <div class="ta-shape-v ${finCls}">${fin > 0 ? "+" : ""}${fin}</div>
+                 <div class="ta-shape-h">${isFor ? "골 − xG" : "실점 − xG"}</div></div>`;
         }
     }
 

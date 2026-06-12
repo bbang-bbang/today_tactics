@@ -1205,6 +1205,72 @@ def get_team_shape():
     })
 
 
+@app.route("/api/team-shotmap")
+@cached_response(ttl=3600)
+def get_team_shotmap():
+    """팀 슛맵 — match_shotmap 기반. side=for(자팀 슛) | against(피슛).
+    좌표: x=골문까지 거리(0=골라인), y=좌우(0~100). 요약(슛/유효/골/xG/결정력) 동봉."""
+    team_id = request.args.get("teamId")
+    team_info = next((t for t in TEAMS if t["id"] == team_id), None)
+    if not team_info:
+        return jsonify({})
+    ss = team_info["sofascore_id"]
+    _key, tid = _team_league(ss)
+    if not os.path.exists(DB_PATH):
+        return jsonify({})
+    side = (request.args.get("side") or "for").strip().lower()
+    side = side if side in ("for", "against") else "for"
+    year = (request.args.get("year") or "").strip()
+    yclause, yp = "", []
+    if year and year not in ("전체", "all"):
+        try:
+            ys, ye = _year_range(year)
+            yclause = " AND e.date_ts >= ? AND e.date_ts < ?"
+            yp = [ys, ye]
+        except (ValueError, TypeError):
+            pass
+
+    # for: 자팀이 찬 슛(슛 주체가 우리 팀 쪽) / against: 상대가 우리에게 찬 슛
+    if side == "for":
+        side_cond = "((s.is_home=1 AND e.home_team_id=?) OR (s.is_home=0 AND e.away_team_id=?))"
+    else:
+        side_cond = "((s.is_home=0 AND e.home_team_id=?) OR (s.is_home=1 AND e.away_team_id=?))"
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(f"""
+        SELECT s.x, s.y, s.xg, s.outcome, s.situation, s.body_part, s.time_min,
+               COALESCE(p.name_ko, p.name) AS nm
+        FROM match_shotmap s
+        JOIN events e ON e.id = s.event_id
+        LEFT JOIN players p ON p.id = s.player_id
+        WHERE e.tournament_id = ? AND {side_cond} {yclause}
+    """, (tid, ss, ss, *yp)).fetchall()
+    conn.close()
+
+    shots = [{
+        "x": r["x"], "y": r["y"], "xg": round(r["xg"] or 0, 3),
+        "outcome": r["outcome"] or "miss", "situation": r["situation"] or "",
+        "body": r["body_part"] or "", "min": r["time_min"], "name": r["nm"] or "",
+    } for r in rows]
+
+    n = len(shots)
+    goals = sum(1 for s in shots if s["outcome"] == "goal")
+    on_target = sum(1 for s in shots if s["outcome"] in ("goal", "save"))
+    xg_sum = round(sum(s["xg"] for s in shots), 2)
+    summary = {
+        "shots": n, "goals": goals, "xg": xg_sum,
+        "xgPerShot": round(xg_sum / n, 3) if n else 0,
+        "onTargetPct": round(on_target / n * 100) if n else 0,
+        "convPct": round(goals / n * 100, 1) if n else 0,
+        "xgDiff": round(goals - xg_sum, 1),   # 결정력 (실제 골 − xG)
+    }
+    return jsonify({
+        "team": team_info["name"], "year": year or "전체", "side": side,
+        "shots": shots, "summary": summary,
+    })
+
+
 _ENG_TO_KO = {t["sofascore_id"]: t["name"] for t in TEAMS}
 
 def _ko_name_by_ss_id(ss_id):

@@ -8865,6 +8865,16 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ta-shape-diff.ta-shape-neg { color: #f87171; }
 .ta-shape-lg { color: #7c8a99; }
 .ta-shape-h { font-size: 9.5px; color: #6b7886; margin-top: 3px; line-height: 1.3; }
+/* 슛맵 공격/수비 토글 */
+.ta-sm-toggle { display: inline-flex; gap: 4px; }
+.ta-sm-side {
+    appearance: none; border: 1px solid #34404e; background: #1b222c; color: #9aa7b4;
+    font: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ta-sm-side:hover { background: #243040; }
+.ta-sm-side.active { background: #2f6df0; border-color: #2f6df0; color: #fff; font-weight: 600; }
+.ta-sm-side:focus-visible { outline: 2px solid #6ea8ff; outline-offset: 1px; }
 
 /* 재사용 .tc-panel 다크 오버라이드 (이 모달 스코프 한정) */
 .ta-modal-content .tc-panel {
