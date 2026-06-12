@@ -794,11 +794,11 @@
                 <div class="ta-sm-stat-sub">${sub}</div></div>`;
             const ot = (m.outcomes || {});
             sumEl.innerHTML =
-                stat(isFor ? "슈팅" : "피슈팅", m.shots, `경기당 ${m.perGame}개`) +
-                stat(isFor ? "득점" : "실점", m.goals, `오픈 ${m.openGoals} · 세트 ${m.setGoals}`) +
-                stat(isFor ? "누적 xG" : "피 xG", m.xg, `슛당 ${m.xgPerShot}`) +
+                stat(isFor ? "경기당 슈팅" : "경기당 피슈팅", m.perGame, `총 ${m.shots}개`) +
+                stat(isFor ? "경기당 득점" : "경기당 실점", m.gpgPerGame, `합계 ${m.goals} (오픈 ${m.openGoals}·세트 ${m.setGoals})`) +
+                stat(isFor ? "경기당 xG" : "경기당 피xG", m.xgPerGame, `슛당 ${m.xgPerShot} · 누적 ${m.xg}`) +
                 stat("유효슛", m.onTargetPct + "%", `${(ot.goal || 0) + (ot.save || 0)} / ${m.shots}`) +
-                stat(isFor ? "결정력" : "실점 효율", `${fin > 0 ? "+" : ""}${fin}`, isFor ? "골 − xG" : "실점 − xG", finCls);
+                stat(isFor ? "결정력" : "실점 효율", `${fin > 0 ? "+" : ""}${fin}`, isFor ? "골 − xG (누적)" : "실점 − xG (누적)", finCls);
 
             if (extraEl) {
                 const hidden = allShots.length - shots.length;

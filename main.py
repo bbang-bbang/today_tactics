@@ -1282,6 +1282,8 @@ def get_team_shotmap():
         "xgDiff": round(goals - xg_sum, 1),   # 결정력 (실제 골 − xG)
         "outcomes": oc, "games": games,
         "perGame": round(n / games, 1) if games else 0,
+        "xgPerGame": round(xg_sum / games, 2) if games else 0,   # 경기당 xG (볼륨 무관 비교지표)
+        "gpgPerGame": round(goals / games, 2) if games else 0,   # 경기당 득점/실점
         "openGoals": open_goals, "setGoals": set_goals,
     }
 
