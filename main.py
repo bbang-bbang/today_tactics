@@ -1284,9 +1284,50 @@ def get_team_shotmap():
         "perGame": round(n / games, 1) if games else 0,
         "openGoals": open_goals, "setGoals": set_goals,
     }
+
+    # ── 상세 리포트 분해 ──────────────────────────────
+    def agg_init():
+        return {"shots": 0, "goals": 0, "xg": 0.0}
+
+    def agg_add(d, s):
+        d["shots"] += 1
+        d["goals"] += 1 if s["outcome"] == "goal" else 0
+        d["xg"] += s["xg"]
+
+    SIT_MAP = {
+        "assisted": "오픈 플레이", "regular": "오픈 플레이", "fast-break": "역습",
+        "corner": "코너", "free-kick": "프리킥",
+        "set-piece": "세트피스", "throw-in-set-piece": "세트피스",
+        "penalty": "페널티", "own-goal": "자책 관련",
+    }
+    SIT_ORDER = ["오픈 플레이", "역습", "코너", "프리킥", "세트피스", "페널티", "자책 관련"]
+    BODY_MAP = {"right-foot": "오른발", "left-foot": "왼발", "head": "헤더", "other": "기타"}
+
+    by_sit, by_body, by_zone = {}, {}, {"박스 안": agg_init(), "박스 밖": agg_init()}
+    shooters = {}
+    for s in shots:
+        sit = SIT_MAP.get(s["situation"], "기타")
+        agg_add(by_sit.setdefault(sit, agg_init()), s)
+        bd = BODY_MAP.get(s["body"], "기타")
+        agg_add(by_body.setdefault(bd, agg_init()), s)
+        agg_add(by_zone["박스 안" if (s["x"] or 0) <= 18 else "박스 밖"], s)
+        nm = s["name"] or "?"
+        agg_add(shooters.setdefault(nm, agg_init()), s)
+
+    def fin(d):
+        d["xg"] = round(d["xg"], 2)
+        return d
+
+    report = {
+        "bySituation": [{"label": k, **fin(by_sit[k])} for k in SIT_ORDER if k in by_sit],
+        "byBody": [{"label": k, **fin(v)} for k, v in sorted(by_body.items(), key=lambda kv: -kv[1]["shots"])],
+        "byZone": [{"label": k, **fin(by_zone[k])} for k in ("박스 안", "박스 밖")],
+        "topShooters": [{"name": k, **fin(v)} for k, v in
+                        sorted(shooters.items(), key=lambda kv: (-kv[1]["goals"], -kv[1]["shots"]))[:6]],
+    }
     return jsonify({
         "team": team_info["name"], "year": year or "전체", "side": side,
-        "shots": shots, "summary": summary,
+        "shots": shots, "summary": summary, "report": report,
     })
 
 

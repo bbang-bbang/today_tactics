@@ -777,30 +777,64 @@
             });
         }
 
+        const repEl = document.getElementById("ta-shotmap-report");
         if (sumEl) {
-            if (!allShots.length) { sumEl.innerHTML = '<p class="tc-hint">데이터 없음</p>'; if (extraEl) extraEl.innerHTML = ""; return; }
+            if (!allShots.length) {
+                sumEl.innerHTML = '<p class="tc-hint">데이터 없음</p>';
+                if (extraEl) extraEl.innerHTML = "";
+                if (repEl) repEl.innerHTML = "";
+                return;
+            }
             const fin = m.xgDiff;
             const good = isFor ? fin > 0 : fin < 0;
             const finCls = fin === 0 ? "" : (good ? "ta-shape-pos" : "ta-shape-neg");
-            const card = (k, v, h) => `<div class="ta-shape-card"><div class="ta-shape-k">${k}</div>
-                <div class="ta-shape-v">${v}</div><div class="ta-shape-h">${h}</div></div>`;
+            const stat = (label, value, sub, cls = "") => `<div class="ta-sm-stat">
+                <div class="ta-sm-stat-label">${label}</div>
+                <div class="ta-sm-stat-val ${cls}">${value}</div>
+                <div class="ta-sm-stat-sub">${sub}</div></div>`;
+            const ot = (m.outcomes || {});
             sumEl.innerHTML =
-                card(isFor ? "슈팅" : "피슈팅", m.shots, `경기당 ${m.perGame}개`) +
-                card(isFor ? "득점" : "실점", m.goals, `오픈 ${m.openGoals} · 세트피스 ${m.setGoals}`) +
-                card(isFor ? "누적 xG" : "피 xG", m.xg, `슛당 기대값 ${m.xgPerShot}`) +
-                card("유효슛 비율", m.onTargetPct + "%", "골문 안으로 간 슛(골+선방)") +
-                `<div class="ta-shape-card"><div class="ta-shape-k">${isFor ? "결정력" : "실점 효율"}</div>
-                 <div class="ta-shape-v ${finCls}">${fin > 0 ? "+" : ""}${fin}</div>
-                 <div class="ta-shape-h">${isFor ? "골 − xG · +면 기대 이상 마무리" : "실점 − xG · −면 선방·수비 선전"}</div></div>`;
+                stat(isFor ? "슈팅" : "피슈팅", m.shots, `경기당 ${m.perGame}개`) +
+                stat(isFor ? "득점" : "실점", m.goals, `오픈 ${m.openGoals} · 세트 ${m.setGoals}`) +
+                stat(isFor ? "누적 xG" : "피 xG", m.xg, `슛당 ${m.xgPerShot}`) +
+                stat("유효슛", m.onTargetPct + "%", `${(ot.goal || 0) + (ot.save || 0)} / ${m.shots}`) +
+                stat(isFor ? "결정력" : "실점 효율", `${fin > 0 ? "+" : ""}${fin}`, isFor ? "골 − xG" : "실점 − xG", finCls);
 
             if (extraEl) {
-                const visN = shots.length, hidden = allShots.length - visN;
+                const hidden = allShots.length - shots.length;
                 const verdict = isFor
-                    ? (fin >= 1 ? "기대(xG)보다 잘 마무리하는 결정력 우위" : fin <= -1 ? "기대(xG) 대비 마무리가 아쉬움" : "기대치만큼 마무리")
+                    ? (fin >= 1 ? "기대(xG)보다 잘 마무리 — 결정력 우위" : fin <= -1 ? "기대(xG) 대비 마무리가 아쉬움 (찬스 대비 적은 득점)" : "기대치만큼 마무리")
                     : (fin <= -1 ? "실점이 xG보다 적음 — 골키퍼·수비 선전(또는 운)" : fin >= 1 ? "xG보다 많이 실점 — 수비 위기관리 과제" : "기대치만큼 실점");
                 extraEl.innerHTML =
                     `<div class="ta-sm-verdict">💡 ${verdict}</div>` +
-                    (hidden > 0 ? `<div class="ta-sm-note">필터로 ${hidden}개 슛 숨김 — 색을 다시 켜면 전체가 보입니다</div>` : "");
+                    (hidden > 0 ? `<div class="ta-sm-note">지도에서 ${hidden}개 슛 숨김 (필터) — 요약·리포트는 전체 기준</div>` : "");
+            }
+        }
+
+        // 상세 리포트 (지역·상황·부위·슈터)
+        if (repEl) {
+            const rep = data.report || {};
+            if (!allShots.length) { repEl.innerHTML = ""; }
+            else {
+                const barSection = (title, items, useName) => {
+                    if (!items || !items.length) return "";
+                    const max = Math.max(...items.map(i => i.shots), 1);
+                    const rows = items.map(i => {
+                        const w = Math.round(i.shots / max * 100);
+                        const gw = i.shots ? Math.round(i.goals / i.shots * 100) : 0;
+                        const label = useName ? i.name : i.label;
+                        return `<div class="ta-sm-bar-row">
+                            <span class="ta-sm-bar-label" title="${label}">${label}</span>
+                            <span class="ta-sm-bar-track"><span class="ta-sm-bar-fill" style="width:${w}%"><span class="ta-sm-bar-goal" style="width:${gw}%"></span></span></span>
+                            <span class="ta-sm-bar-num">${i.shots}슛${i.goals ? ` · <b>${i.goals}골</b>` : ""} · xG ${i.xg}</span></div>`;
+                    }).join("");
+                    return `<div class="ta-sm-rep-block"><div class="ta-sm-rep-title">${title}</div>${rows}</div>`;
+                };
+                repEl.innerHTML =
+                    barSection("📍 지역별 (박스 안/밖)", rep.byZone) +
+                    barSection("🎬 상황별", rep.bySituation) +
+                    barSection("🦶 슈팅 부위", rep.byBody) +
+                    barSection(isFor ? "👟 슈터 TOP" : "🥅 실점 허용 상대 TOP", rep.topShooters, true);
             }
         }
     }

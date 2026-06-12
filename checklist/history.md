@@ -23,6 +23,12 @@
 - **요약 상세화**: 요약에 outcomes·games·perGame·openGoals/setGoals 추가(백엔드). 카드 = 슈팅(경기당)·득점(오픈/세트피스 분해)·xG(슛당 기대값)·유효슛%·결정력(골−xG, +면 기대이상) + **해석 배너**(💡 결정력 우위/실점 선방 등). 설명 hint 보강.
 - 검증: Playwright 필터 토글·개수·해석배너·콘솔 에러 0. `analytics.js` v8→9, `style.css` v86→87.
 
+### 후속2(같은 날): 슈팅 요약 가독성 + 상세 리포트 추가
+- 피드백: 요약 가독성 ↑, 리포트 더 자세히.
+- **요약 가독성**: `.ta-shape-card` 격자 → `.ta-sm-stat`(큰 숫자·라벨·서브) 5칸으로 재구성.
+- **상세 리포트**(신규): 백엔드 `report`에 bySituation(오픈/역습/코너/프리킥/세트피스/페널티)·byBody(부위)·byZone(박스 안/밖)·topShooters(슈터 TOP6) 분해. 프론트는 막대(길이=슛, 초록=득점) + xG로 표시. 예: 안산 박스안 xG14.4 vs 밖 1.8.
+- 검증: Playwright 요약 5stat·리포트 4섹션(지역/상황/부위/슈터)·콘솔 에러 0. `analytics.js` v9→10, `style.css` v87→88.
+
 ---
 
 ## 2026-06-12 | 🆕 K리그 심화 ① 팀 형태(Shape) 분석 — 미활용 avg_positions 활용
