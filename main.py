@@ -4763,8 +4763,27 @@ def _heatmap_points_for_player(player_id, team_id, event_id, tournament_id, venu
         "isAway":    r["away_team_id"] == int(team_id),
     } for r in matches_rows]
 
+    # 본인 세부 포지션 — 선택 시즌(year_clause) 내 선발 detail_pos 최빈 그룹.
+    # UI 비교 필터에서 기본 선택값으로 사용(추정 아님, formation+slot 유도값).
+    det_rows = conn.execute("""
+        SELECT l.detail_pos AS dp, COUNT(*) AS c
+        FROM match_lineups l
+        JOIN events e ON e.id = l.event_id
+        WHERE l.player_id = ? AND l.is_starter = 1 AND l.detail_pos IS NOT NULL
+    """ + year_clause + """
+        GROUP BY l.detail_pos
+    """, (player_id, *year_params)).fetchall()
+    grp_counts = {}
+    for r in det_rows:
+        g = _detail_group_for_label(r["dp"])
+        if g:
+            grp_counts[g] = grp_counts.get(g, 0) + r["c"]
+    detail_pos = max(grp_counts, key=grp_counts.get) if grp_counts else None
+
     conn.close()
-    return {"points": points, "matches": matches, "playerId": player_id, "seasons": seasons}
+    return {"points": points, "matches": matches, "playerId": player_id,
+            "seasons": seasons, "detailPos": detail_pos,
+            "detailPosLabel": DETAIL_POS_LABELS.get(detail_pos) if detail_pos else None}
 
 
 @app.route("/api/kleague2/teams")
@@ -4837,9 +4856,44 @@ def get_kleague1_heatmap():
     return jsonify(_heatmap_points_for_player(player_id, team_id, event_id, LEAGUE_TOURNAMENT_ID["k1"], venue, year))
 
 
-def _position_heatmap(position, tournament_id, cap=3000, year=None):
+# ── 세부 포지션(detail_pos) 분류 ───────────────────────────
+# match_lineups.detail_pos는 formation+slot_order로 결정론적 유도됨
+# (crawlers/backfill_detail_positions.py). 비교 필터는 G/D/M/F 4분류보다
+# 세분된 8그룹으로 풀링한다. FB/WB는 표본 안정성 위해 '측면수비'로 통합.
+DETAIL_POS_GROUPS = {
+    "GK": ["GK"],
+    "CB": ["CB"],
+    "FB": ["FB", "WB"],
+    "DM": ["DM"],
+    "CM": ["CM"],
+    "AM": ["AM"],
+    "W":  ["W"],
+    "ST": ["ST"],
+}
+DETAIL_POS_LABELS = {
+    "GK": "골키퍼", "CB": "센터백", "FB": "풀백·윙백", "DM": "수비형 MF",
+    "CM": "중앙 MF", "AM": "공격형 MF", "W": "윙어", "ST": "스트라이커",
+}
+DETAIL_POS_ORDER = ["GK", "CB", "FB", "DM", "CM", "AM", "W", "ST"]
+
+
+def _detail_group_for_label(label):
+    """저장 라벨(WB 등) → 비교 그룹 토큰(FB 등). 이미 그룹 토큰이면 그대로."""
+    if not label:
+        return None
+    if label in DETAIL_POS_GROUPS:
+        return label
+    for g, labels in DETAIL_POS_GROUPS.items():
+        if label in labels:
+            return g
+    return None
+
+
+def _position_heatmap(position, tournament_id, cap=3000, year=None, detail=None):
     """같은 포지션 전 선수의 히트맵 좌표를 풀링 후 균등 샘플.
-    절대 개수가 아닌 '밀도 형태'를 비교하므로 cap 샘플로 충분하며 응답을 가볍게 유지."""
+    절대 개수가 아닌 '밀도 형태'를 비교하므로 cap 샘플로 충분하며 응답을 가볍게 유지.
+    detail(그룹 토큰)이 주어지면 match_lineups.detail_pos 기반 세부 포지션으로 풀링,
+    아니면 기존 G/D/M/F(mps.position) 풀링."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     year_clause, year_params = "", []
@@ -4851,16 +4905,33 @@ def _position_heatmap(position, tournament_id, cap=3000, year=None):
         except (ValueError, TypeError):
             pass
     # 원본은 이미 팀상대 정규화(공격=오른쪽) — flip 불필요 (_flip_points 주석 참조)
-    rows = conn.execute("""
-        SELECT h.x AS x, h.y AS y
-        FROM heatmap_points h
-        JOIN match_player_stats mps
-          ON mps.event_id = h.event_id AND mps.player_id = h.player_id
-        JOIN events e ON e.id = h.event_id
-        LEFT JOIN players p ON p.id = h.player_id
-        WHERE e.tournament_id = ?
-          AND COALESCE(mps.position, p.position) = ?
-    """ + year_clause, (tournament_id, position, *year_params)).fetchall()
+    detail_labels = DETAIL_POS_GROUPS.get(detail) if detail else None
+    if detail_labels:
+        # 세부 포지션 풀링 — 선발(detail_pos 보유)만, detail_pos IN (그룹 라벨)
+        placeholders = ",".join("?" for _ in detail_labels)
+        rows = conn.execute("""
+            SELECT h.x AS x, h.y AS y
+            FROM heatmap_points h
+            JOIN match_lineups l
+              ON l.event_id = h.event_id AND l.player_id = h.player_id
+            JOIN events e ON e.id = h.event_id
+            WHERE e.tournament_id = ?
+              AND l.is_starter = 1
+              AND l.detail_pos IN (""" + placeholders + ")"
+            + year_clause, (tournament_id, *detail_labels, *year_params)).fetchall()
+        pool_key = detail
+    else:
+        rows = conn.execute("""
+            SELECT h.x AS x, h.y AS y
+            FROM heatmap_points h
+            JOIN match_player_stats mps
+              ON mps.event_id = h.event_id AND mps.player_id = h.player_id
+            JOIN events e ON e.id = h.event_id
+            LEFT JOIN players p ON p.id = h.player_id
+            WHERE e.tournament_id = ?
+              AND COALESCE(mps.position, p.position) = ?
+        """ + year_clause, (tournament_id, position, *year_params)).fetchall()
+        pool_key = position
     conn.close()
 
     pts = [{"x": r["x"], "y": r["y"]} for r in rows]
@@ -4869,17 +4940,25 @@ def _position_heatmap(position, tournament_id, cap=3000, year=None):
     if total > cap:
         step = total / cap
         pts = [pts[int(i * step)] for i in range(cap)]
-    return {"points": pts, "position": position, "total": total, "sampled": len(pts)}
+    return {"points": pts, "position": pool_key, "detail": detail,
+            "label": DETAIL_POS_LABELS.get(detail) if detail else None,
+            "total": total, "sampled": len(pts)}
 
 
 def _position_heatmap_response(league_key):
+    # detail(세부 포지션 그룹 토큰) 우선, 없으면 기존 G/D/M/F position
+    detail = request.args.get("detail", "").strip().upper() or None
     position = request.args.get("position", "").strip().upper()
-    if position not in ("G", "D", "M", "F"):
+    if detail:
+        if detail not in DETAIL_POS_GROUPS:
+            return jsonify({"error": "detail must be one of " + ",".join(DETAIL_POS_ORDER)}), 400
+    elif position not in ("G", "D", "M", "F"):
         return jsonify({"error": "position must be one of G/D/M/F"}), 400
     if not os.path.exists(DB_PATH):
         return jsonify({"points": []})
     year = request.args.get("year", "").strip() or None
-    return jsonify(_position_heatmap(position, LEAGUE_TOURNAMENT_ID[league_key], year=year))
+    return jsonify(_position_heatmap(position, LEAGUE_TOURNAMENT_ID[league_key],
+                                     year=year, detail=detail))
 
 
 @app.route("/api/heatmap-player-search")

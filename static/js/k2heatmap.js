@@ -37,6 +37,7 @@
     let overlayLabel  = "";
     let currentYear   = null;     // null/"all" = 전 시즌, "2026" 등 = 해당 시즌만
     let currentSeasons = [];
+    let currentPlayerDetail = null;  // 선수 본인 세부 포지션 그룹(선택 시즌 기준) — 비교 기본값
 
     const yearFilter = document.getElementById("k2-year-filter");
     const yearQS = () => (currentYear ? `&year=${currentYear}` : "");
@@ -47,6 +48,16 @@
     const quickSearch  = document.getElementById("k2-quick-search");
     const quickResults = document.getElementById("k2-quick-results");
     const POS_LABEL = { G:"GK", D:"DF", M:"MF", F:"FW" };
+    // 세부 포지션 그룹 (서버 detail 토큰과 일치) — 비교 필터 세분화
+    const DETAIL_LABEL = {
+        GK:"골키퍼", CB:"센터백", FB:"풀백·윙백", DM:"수비형 MF",
+        CM:"중앙 MF", AM:"공격형 MF", W:"윙어", ST:"스트라이커"
+    };
+    const DETAIL_ORDER = ["GK","CB","FB","DM","CM","AM","W","ST"];
+    // 대분류(G/D/M/F) → 그 안의 세부 그룹 (기본값 폴백용)
+    const POS_TO_DETAILS = {
+        G:["GK"], D:["CB","FB"], M:["DM","CM","AM"], F:["W","ST"]
+    };
     const RED  = [255, 60, 30];
     const BLUE = [40, 120, 255];
     // 히트맵 점을 경기장(라인 5~95%) 안쪽으로 매핑 — 살짝 더 들여 경기장보다 작게
@@ -213,6 +224,7 @@
         allMatches = data.matches || [];
         cumulativePoints = data.points || [];
         currentSeasons = data.seasons || [];
+        currentPlayerDetail = data.detailPos || null;
         baseLabel = player.name;
         // 새 선수 선택 시 비교 모드 초기화
         compareMode = "none";
@@ -390,27 +402,32 @@
         });
     });
 
-    // A. 포지션 평균
+    // A. 포지션 평균 — 세부 포지션(8그룹) 비교. 기본값 = 선수 본인 세부 포지션.
+    function defaultDetail() {
+        if (currentPlayerDetail && DETAIL_LABEL[currentPlayerDetail]) return currentPlayerDetail;
+        const cands = POS_TO_DETAILS[currentPlayer && currentPlayer.position] || ["CM"];
+        return cands[Math.floor(cands.length / 2)] || cands[0];
+    }
     function buildPositionSub() {
         const sel = document.createElement("select");
         sel.className = "k2-cmp-select";
-        sel.setAttribute("aria-label", "비교 포지션 선택");
-        ["G", "D", "M", "F"].forEach(p => {
+        sel.setAttribute("aria-label", "비교 세부 포지션 선택");
+        DETAIL_ORDER.forEach(dp => {
             const o = document.createElement("option");
-            o.value = p; o.textContent = POS_LABEL[p] + " 평균";
+            o.value = dp; o.textContent = DETAIL_LABEL[dp] + " 평균";
             sel.appendChild(o);
         });
-        sel.value = POS_LABEL[currentPlayer.position] ? currentPlayer.position : "M";
+        sel.value = defaultDetail();
         sel.addEventListener("change", () => fetchPositionOverlay(sel.value));
         cmpSub.appendChild(sel);
         fetchPositionOverlay(sel.value);
     }
-    async function fetchPositionOverlay(pos) {
+    async function fetchPositionOverlay(detail) {
         loading.style.display = "flex";
         try {
-            const data = await (await fetch(`${apiBase()}/position-heatmap?position=${pos}${yearQS()}`)).json();
+            const data = await (await fetch(`${apiBase()}/position-heatmap?detail=${detail}${yearQS()}`)).json();
             overlayPoints = data.points || [];
-            overlayLabel = (POS_LABEL[pos] || pos) + " 평균";
+            overlayLabel = (DETAIL_LABEL[detail] || detail) + " 평균";
         } catch (e) { overlayPoints = []; }
         loading.style.display = "none";
         render();
@@ -619,6 +636,7 @@
             const d = await (await fetch(`${apiBase()}/heatmap?playerId=${currentPlayer.playerId}&teamId=${currentTeam.sofascore_id}${yearQS()}`)).json();
             cumulativePoints = d.points || [];
             allMatches = d.matches || [];
+            currentPlayerDetail = d.detailPos || null;   // 시즌별 세부 포지션 갱신
         } catch (e) {}
         loading.style.display = "none";
         renderMatchList(allMatches, null);
@@ -628,7 +646,7 @@
         } else if (compareMode === "position") {
             currentBasePoints = cumulativePoints;
             const sel = cmpSub.querySelector("select");
-            fetchPositionOverlay(sel ? sel.value : (currentPlayer.position || "M"));
+            fetchPositionOverlay(sel ? sel.value : defaultDetail());
         } else if (compareMode === "player") {
             currentBasePoints = cumulativePoints;
             const sels = cmpSub.querySelectorAll("select");

@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-06-12 | 히트맵 비교 필터 세분화 — 세부 포지션(8그룹) 백필·풀링
+
+### 작업 배경
+- 6/11 보류 건: "비교 필터가 너무 대충" → 포지션 평균 비교가 G/D/M/F 4분류뿐. 사용자 선택 **B안(정확)** = SofaScore 세부 포지션 백필.
+
+### 핵심 발견 — 재크롤링 불필요
+- DB엔 세부 포지션 라벨 없음(mps·players·match_lineups 전부 G/D/M/F). **그러나** SofaScore lineup이 선발을 **포메이션 슬롯 순서(`slot_order` 0~10)**로 정렬해 주고, `formation`도 저장됨 → **선발 42,570행 100%**에 formation+slot 존재.
+- 슬롯 = [GK→수비라인→…→공격라인] 순 + 라인 내 좌우(y) 순. **평균좌표(`match_avg_positions`) 대조 80% 단조 일치**로 검증 — 추정(centroid)이 아닌 실제 배치 인코딩.
+
+### 세부 포지션 8그룹 결정론적 유도
+- `crawlers/backfill_detail_positions.py` 신규: formation별 슬롯→라벨 매핑표(주요 15개 99.4% + 희소 9개 + 제네릭 폴백). 컬럼 마이그레이션(`match_lineups.detail_pos` nullable ADD) + 멱등 UPDATE.
+- 라벨: GK/CB/FB/WB/DM/CM/AM/W/ST. 비교 풀링은 8그룹(FB+WB=측면수비 통합).
+- **정확성 교차검증**(평균좌표): GK x9.4·CB x35·DM/FB x47·CM x50·W x58·AM x60·ST x62 (전진도 단조), 측면(FB/WB/W) |y-50|>23 vs 중앙(GK/DM/CM/ST/AM) <11 — 교과서적 분리.
+
+### main.py
+- `_position_heatmap(..., detail=)` — detail 그룹 토큰 주면 `match_lineups.detail_pos IN (그룹 라벨)`로 풀링(선발만), 없으면 기존 G/D/M/F(mps.position) 풀링. `_position_heatmap_response`가 `detail=` 우선 수용(화이트리스트 검증).
+- `_heatmap_points_for_player` 응답에 `detailPos`(선택 시즌 선발 detail_pos 최빈 그룹) + `detailPosLabel` 추가. 시즌 스코핑 → 헤이스 전체=W·2026=ST(역할 변화 반영).
+
+### k2heatmap.js + UI
+- 비교 "포지션 평균" 드롭다운을 G/D/M/F(4) → **세부 8그룹**으로. 기본값 = 선수 본인 `detailPos`(없으면 대분류→중간 세부 폴백). `fetchPositionOverlay`가 `?detail=` 호출. 시즌 변경 시 detailPos 갱신. `index.html` k2heatmap.js v=12→13.
+
+### update_data.py
+- STEP 18 추가: formation 갱신(STEP 15·16) 이후 detail_pos 백필 자동 실행(prod 신규 경기도 반영, 비치명).
+
+### 검증 / 배포
+- Playwright: 헤이스 선택→포지션평균 비교 → 드롭다운 8그룹·기본값 ST·범례 "스트라이커 평균"·**콘솔 에러 0**. 스크린샷 확인.
+- 엔드포인트 회귀: detail=CB/position=D/teams/search 전부 200. backtest는 dev 단일스레드 느림(90s엔 정상) — qa 10s 타임아웃은 기존 아티팩트(히트맵과 무관).
+- 변경: `crawlers/backfill_detail_positions.py`(신규), `main.py`, `static/js/k2heatmap.js`(v13), `templates/index.html`, `update_data.py`, `README.md`. **prod: 컬럼+백필 별도 적용 필요**(SSH 1회).
+
+---
+
 ## 2026-06-11 | 히트맵 비교 오버레이 신규 + 🔴 flip 선재 버그 발견·수정
 
 ### 작업 배경
@@ -3741,3 +3772,18 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-11 17:42:23 | ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> 'cd /opt/today_tactics && curl -s -m6 http://127.0.0.1:5000/ | grep -o "k2heatmap.js?v=[0-9]*" | head -1 && curl -s -m6 http://127.0.0.1:5000/ | grep -o "style.css?v=[0-9]*" | head -1' 2>&1 | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory\|may need"
 - 2026-06-11 18:31:13 | for i in $(seq 1 15); do /   v=$(ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && git rev-parse --short HEAD && curl -s -m5 http://127.0.0.1:5000/ | grep -o 'k2heatmap.js?v=[0-9]*' | head -1" 2>/dev/null | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory") /   echo "$v" | grep -q "505c2af" && { echo "=== PROD ==="; echo "$v"; break; } || { echo "try $i..."; sleep 6; } / done
 - 2026-06-11 18:53:55 | for i in $(seq 1 15); do /   v=$(ssh -i <SSH_KEY>.pem -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new rocky@<PROD_IP> "cd /opt/today_tactics && git rev-parse --short HEAD && curl -s -m5 http://127.0.0.1:5000/ | grep -o 'style.css?v=[0-9]*' | head -1" 2>/dev/null | grep -vi "warning\|quantum\|store\|openssh\|known_hosts\|create directory") /   echo "$v" | grep -q "915e4ea" && { echo "=== PROD ==="; echo "$v"; break; } || { echo "try $i..."; sleep 6; } / done
+- 2026-06-12 08:55:27 | python -c " / import sqlite3 / db=sqlite3.connect('players.db') / c=db.cursor() / for t in ['match_lineups','match_player_stats','players']: /     try: /         cols=[r[1] for r in c.execute(f'PRAGMA table_info({t})').fetchall()] /         print(t, '->', cols) /     except Exception as e: /         print(t,'ERR',e) / print('---tables---') / print([r[0] for r in c.execute(\"select name from sqlite_master where type='table'\").fetchall()]) / "
+- 2026-06-12 08:55:33 | python -c " / import sqlite3,json / db=sqlite3.connect('players.db') / c=db.cursor() / print('== match_lineups.position distinct ==') / for r in c.execute('select position,count(*) from match_lineups group by position order by 2 desc limit 30'): /     print(repr(r[0]), r[1]) / print('== mps.position distinct ==') / for r in c.execute('select position,count(*) from match_player_stats group by position order by 2 desc limit 30'): /     print(repr(r[0]), r[1]) / print('== match_avg_positions schema ==') / print([x[1] for x in c.execute('PRAGMA table_info(match_avg_positions)').fetchall()]) / print('rows', c.execute('select count(*) from match_avg_positions').fetchone()[0]) / "
+- 2026-06-12 08:57:55 | python -c " / import sqlite3,json / db=sqlite3.connect('players.db') / c=db.cursor() / row=c.execute(\"select raw_json from match_player_stats where raw_json is not null and raw_json!='' limit 1\").fetchone() / if row: /     d=json.loads(row[0]) /     print('mps.raw_json keys:', list(d.keys())[:40]) /     # search for position-like keys /     for k in d: /         if 'pos' in k.lower(): /             print('  POS KEY', k, '=', d[k]) / "
+- 2026-06-12 08:58:20 | python -c " / import sqlite3 / db=sqlite3.connect('players.db') / c=db.cursor() / print('== formation distinct (top) ==') / for r in c.execute('select formation,count(*) from match_lineups group by formation order by 2 desc limit 15'): /     print(repr(r[0]), r[1]) / print('== slot_order sample for one event (starters) ==') / ev=c.execute('select event_id from match_lineups where formation is not null and formation!=\"\" limit 1').fetchone()[0] / print('event', ev) / for r in c.execute('select is_home,formation,slot_order,position,player_name,is_starter from match_lineups where event_id=? order by is_home,slot_order',(ev,)): /     print(r) / "
+- 2026-06-12 09:01:03 | $env:PYTHONIOENCODING="utf-8"; python -c " / import sqlite3 / from collections import defaultdict / db=sqlite3.connect('players.db') / c=db.cursor() / # For each event/team, group starters by formation LINE, check if slot_order rank within line correlates with avg y. / # Build formation->line sizes / def lines(f): /     return [1]+[int(x) for x in f.split('-')]  # GK + each line /  / evs=c.execute('''select distinct event_id,is_home from match_avg_positions limit 3000''').fetchall() / mono_inc=0; mono_dec=0; total_lines=0 / for ev,ih in evs: /     f=c.execute('select formation from match_lineups where event_id=? and is_home=? and is_starter=1 and formation is not null limit 1',(ev,ih)).fetchone() /     if not f or not f[0]: continue /     rows=c.execute('''select l.slot_order,a.y from match_lineups l /        join match_avg_positions a on a.event_id=l.event_id and a.player_id=l.player_id and a.is_home=l.is_home /        where l.event_id=? and l.is_home=? and l.is_starter=1 and l.slot_order is not null order by l.slot_order''',(ev,ih)).fetchall() /     if len(rows)<11: continue /     sizes=lines(f[0]) /     idx=0 /     for sz in sizes: /         line=rows[idx:idx+sz]; idx+=sz /         if sz>=2: /             ys=[r[1] for r in line] /             inc=all(ys[i]<=ys[i+1] for i in range(len(ys)-1)) /             dec=all(ys[i]>=ys[i+1] for i in range(len(ys)-1)) /             total_lines+=1 /             if inc: mono_inc+=1 /             if dec: mono_dec+=1 / print('lines checked:',total_lines) / print('slot asc => y ascending (left->right one way):', mono_inc, round(100*mono_inc/total_lines,1),'%') / print('slot asc => y descending:', mono_dec, round(100*mono_dec/total_lines,1),'%') / "
+- 2026-06-12 09:03:44 | python -c " / import sqlite3 / db=sqlite3.connect('players.db') / c=db.cursor() / tot=c.execute('select count(*) from match_lineups where is_starter=1').fetchone()[0] / ok=c.execute(\"select count(*) from match_lineups where is_starter=1 and slot_order is not null and formation is not null and formation!=''\").fetchone()[0] / print('starter rows:',tot,' with formation+slot:',ok, f'({round(100*ok/tot,1)}%)') / # formations coverage by count / covered=set('4-4-2 3-4-3 4-2-3-1 4-3-3 5-4-1 4-1-4-1 3-5-2 5-3-2 4-5-1 3-4-2-1 3-4-1-2 4-4-1-1 3-1-4-2 4-1-3-2 3-2-4-1'.split()) / rows=c.execute(\"select formation,count(*) from match_lineups where is_starter=1 and formation is not null and formation!='' group by formation\").fetchall() / incov=sum(n for f,n in rows if f in covered); allf=sum(n for f,n in rows) / print('formations covered by my taxonomy:', f'{round(100*incov/allf,1)}%') / print('uncovered formations:', [(f,n) for f,n in rows if f not in covered]) / "
+- 2026-06-12 09:05:52 | cp players.db players.db.bak_detailpos 2>/dev/null && echo "backup ok" && python crawlers/backfill_detail_positions.py
+- 2026-06-12 09:12:06 | python -c "import ast; ast.parse(open('main.py',encoding='utf-8').read()); print('main.py syntax OK')"
+- 2026-06-12 09:47:10 | DISABLE_SCHEDULER=1 LOGIN_REQUIRED=0 python main.py > /tmp/flask_detail.log 2>&1 & / echo "started pid $!"; sleep 6; tail -5 /tmp/flask_detail.log
+- 2026-06-12 09:47:20 | echo "=== position-heatmap detail=CB (K1 2026) ===" / curl -s "http://127.0.0.1:5000/api/kleague1/position-heatmap?detail=CB&year=2026" | python -c "import sys,json;d=json.load(sys.stdin);print({k:d[k] for k in('position','detail','label','total','sampled')})" / echo "=== detail=ST ===" / curl -s "http://127.0.0.1:5000/api/kleague1/position-heatmap?detail=ST&year=2026" | python -c "import sys,json;d=json.load(sys.stdin);print({k:d[k] for k in('position','detail','label','total','sampled')})" / echo "=== detail=FB (FB+WB merged) ===" / curl -s "http://127.0.0.1:5000/api/kleague2/position-heatmap?detail=FB" | python -c "import sys,json;d=json.load(sys.stdin);print({k:d[k] for k in('position','detail','label','total','sampled')})" / echo "=== bad detail ===" / curl -s "http://127.0.0.1:5000/api/kleague1/position-heatmap?detail=XX" | head -c 200 / echo "" / echo "=== legacy position=D still works ===" / curl -s "http://127.0.0.1:5000/api/kleague1/position-heatmap?position=D&year=2026" | python -c "import sys,json;d=json.load(sys.stdin);print({k:d[k] for k in('position','detail','total','sampled')})"
+- 2026-06-12 09:56:04 | python qa_check.py 2>&1 | tail -40
+- 2026-06-12 09:56:49 | pkill -f "python main.py" 2>/dev/null; sleep 2 / DISABLE_SCHEDULER=1 LOGIN_REQUIRED=0 python main.py > /tmp/flask_detail.log 2>&1 & / echo "restarted pid $!"; sleep 12; echo "--- warmed ---"; tail -3 /tmp/flask_detail.log
+- 2026-06-12 09:57:06 | sleep 3; python qa_check.py 2>&1 | tail -45
+- 2026-06-12 09:59:47 | git status --short; echo "--- ignored check ---"; git check-ignore players.db.bak_detailpos players.db 2>&1; echo "exit $?"
+- 2026-06-12 10:00:00 | pkill -f "python main.py" 2>/dev/null; echo "dev server stopped"

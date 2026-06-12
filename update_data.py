@@ -126,6 +126,8 @@ def main():
             [PYTHON, str(CRAWLERS/"crawl_kleague_lineup.py"), "all", "--years", "2026"]),
         (17, "events.round 백필 (K리그 roundId → 백테스트 per_round)",
             [PYTHON, str(CRAWLERS/"backfill_rounds.py")]),
+        (18, "세부 포지션 백필 (formation+slot → detail_pos, 비교 필터용)",
+            [PYTHON, str(CRAWLERS/"backfill_detail_positions.py")]),
     ]
 
     # STEP 0~2 실패 시 후속 의미 없음 → fail_ok=False (기본).

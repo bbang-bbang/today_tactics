@@ -168,8 +168,8 @@ backfill 스크립트
 | `/api/k2/schedule`, `/api/k2/rounds` | K2 일정/라운드 |
 | `/api/kleague{1,2}/teams` | 히트맵 그리드 팀 — 현 시즌 소속(K1 12·K2 17, 수원삼성 포함) |
 | `/api/kleague{1,2}/players` | 팀 현 시즌 로스터 — 히트맵 보유 선수만, 한글명 우선 |
-| `/api/kleague{1,2}/heatmap` | 선수 히트맵 — **리그 무관(career), `year`·`venue=home\|away` 필터**. 응답에 `seasons=[{year,team}]`(시즌별 실소속, event+is_home 유도) |
-| `/api/kleague{1,2}/position-heatmap` | 포지션(G/D/M/F) 평균 동선 — 비교 오버레이용 (`year` 필터) |
+| `/api/kleague{1,2}/heatmap` | 선수 히트맵 — **리그 무관(career), `year`·`venue=home\|away` 필터**. 응답에 `seasons=[{year,team}]`(시즌별 실소속, event+is_home 유도) + `detailPos`(선택 시즌 세부 포지션, 비교 기본값) |
+| `/api/kleague{1,2}/position-heatmap` | 포지션 평균 동선 — 비교 오버레이용. `detail=`(세부 8그룹 GK/CB/FB/DM/CM/AM/W/ST) 우선, 없으면 `position=`(G/D/M/F). `year` 필터 |
 | `/api/heatmap-player-search` | 히트맵 통합 선수 검색 (K1·2 전 구단, 선수당 1줄, 최근 소속) |
 | `/api/insights/top-performers` | 포지션별 TOP 퍼포머 |
 | `/api/insights/xg-efficiency` | xG 효율 분석 |
@@ -198,6 +198,7 @@ backfill 스크립트
 | `backfill_k1_mps.py` | K1 match_player_stats 누락분 보완 |
 | `backfill_match_stats.py` | match_player_stats 일반 누락분 보완 |
 | `backfill_events.py` | events 테이블 누락분 보완 |
+| `backfill_detail_positions.py` | `match_lineups.detail_pos` 백필 — formation+slot_order → 세부 포지션(GK/CB/FB/WB/DM/CM/AM/W/ST) 결정론적 유도 (재크롤링 불필요) |
 | `collect_goal_incidents.py` | 골 이벤트 수집 |
 
 ---
