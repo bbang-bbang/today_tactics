@@ -6,6 +6,7 @@
     <title>해외리그 통계 — Today Tactics</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
     <link rel="stylesheet" href="/static/css/style.css?v=89">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         /* ── leagues.html 전용 레이아웃 ── */
         body { background: #0a0f1a; color: #c9d8ec; font-family: 'Pretendard', sans-serif; margin: 0; min-height: 100vh; }
@@ -211,6 +212,110 @@
             font-size: 12px;
             color: #f59e0b;
         }
+
+        /* ── 리그 분석 탭 ── */
+        .lp-analysis { display: flex; flex-direction: column; gap: 28px; }
+
+        /* 하이라이트 카드 6개 */
+        .lp-hl-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        .lp-hl-card {
+            background: #111827;
+            border: 1px solid #1e2a3a;
+            border-radius: 10px;
+            padding: 14px 16px;
+            transition: border-color 0.15s ease;
+        }
+        .lp-hl-card:hover { border-color: #334155; }
+        .lp-hl-label {
+            font-size: 11px;
+            color: #7a8ba8;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+        .lp-hl-name {
+            font-size: 15px;
+            font-weight: 700;
+            color: #e2eaf5;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .lp-hl-team {
+            font-size: 12px;
+            color: #7a8ba8;
+            margin-bottom: 10px;
+        }
+        .lp-hl-val {
+            font-size: 26px;
+            font-weight: 800;
+            color: #60a5fa;
+            line-height: 1;
+        }
+        .lp-hl-unit {
+            font-size: 12px;
+            color: #7a8ba8;
+            margin-left: 4px;
+            font-weight: 400;
+        }
+
+        /* Scatter 차트 */
+        .lp-chart-section { }
+        .lp-chart-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #c9d8ec;
+            margin-bottom: 12px;
+        }
+        .lp-chart-title span { color: #7a8ba8; font-size: 12px; font-weight: 400; margin-left: 8px; }
+        .lp-chart-box {
+            background: #111827;
+            border: 1px solid #1e2a3a;
+            border-radius: 10px;
+            padding: 20px;
+            position: relative;
+            height: 340px;
+        }
+        .lp-chart-legend {
+            display: flex;
+            gap: 16px;
+            margin-top: 10px;
+            font-size: 11px;
+            color: #7a8ba8;
+        }
+        .lp-legend-dot {
+            display: inline-block;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+
+        /* 포지션별 랭킹 */
+        .lp-pos-section { }
+        .lp-pos-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .lp-pos-btn {
+            padding: 5px 14px;
+            border-radius: 6px;
+            border: 1px solid #1e2a3a;
+            background: transparent;
+            color: #7a8ba8;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .lp-pos-btn:hover { border-color: #3b82f6; color: #93c5fd; }
+        .lp-pos-btn.active { background: #1e3a5f; border-color: #3b82f6; color: #e2eaf5; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -239,6 +344,7 @@
             <button class="lp-sec-btn active" data-sec="standings">📋 순위표</button>
             <button class="lp-sec-btn" data-sec="team-rankings">📊 팀 지표</button>
             <button class="lp-sec-btn" data-sec="top-performers">⭐ TOP 퍼포머</button>
+            <button class="lp-sec-btn" data-sec="analysis">🔬 리그 분석</button>
         </div>
         <div class="lp-year-wrap">
             <span class="lp-year-label">시즌</span>
@@ -330,9 +436,10 @@ async function lpLoadSection() {
     const code = LP.activeLeague;
     const qs   = `?year=${LP.activeYear}`;
     try {
-        if (LP.activeSection === 'standings')      await lpStandings(code, qs);
+        if (LP.activeSection === 'standings')          await lpStandings(code, qs);
         else if (LP.activeSection === 'team-rankings') await lpTeamRankings(code, qs);
         else if (LP.activeSection === 'top-performers') await lpTopPerformers(code, qs);
+        else if (LP.activeSection === 'analysis')      await lpAnalysis(code, qs);
     } catch (e) {
         content().innerHTML = `<div class="lp-error">데이터 로드 실패: ${e.message}</div>`;
     }
@@ -546,6 +653,207 @@ async function _lpPerfTable(code, qs, metric) {
                 </tbody>
             </table>
         </div>`;
+}
+
+// ── 리그 분석 ──
+let _scatterChart = null;
+
+async function lpAnalysis(code, qs) {
+    content().innerHTML = headingHtml() + '<div class="lp-loading">분석 데이터 로딩 중…</div>';
+
+    // 기존 차트 인스턴스 제거
+    if (_scatterChart) { _scatterChart.destroy(); _scatterChart = null; }
+
+    // 6개 지표 top-1 + 팀 지표 병렬 로드
+    const metricKeys = PERF_METRICS.map(m => m.key);
+    const [teamData, ...perfResults] = await Promise.all([
+        _lpFetch(`tr|${code}|${qs}`, `/api/league/${code}/team-rankings${qs}`),
+        ...metricKeys.map(mk =>
+            _lpFetch(`tp|${code}|${qs}|${mk}`, `/api/league/${code}/top-performers${qs}&metric=${mk}&limit=20`)
+        ),
+    ]);
+
+    // 데이터 없음 처리 (Serie A / Ligue 1)
+    const hasData = perfResults.some(d => d && d.length > 0);
+    if (!hasData) {
+        content().innerHTML = headingHtml() + `
+            <div class="lp-no-player-note">⚠️ 이 리그는 선수 스탯이 수집되지 않아 분석을 제공할 수 없습니다.</div>
+            ${noDataHtml(code, 'analysis')}`;
+        return;
+    }
+
+    // 하이라이트 카드 HTML
+    const hlUnits = { goals:'골', assists:'도움', xg:'xG', key_passes:'키패스', tackles:'태클', rating:'평점' };
+    const hlLabels = { goals:'⚽ 득점왕', assists:'🤝 도움왕', xg:'🎯 xG 1위', key_passes:'🔑 키패스왕', tackles:'🛡️ 태클왕', rating:'⭐ 평점왕' };
+    const hlFields = { goals:'goals', assists:'assists', xg:'xg', key_passes:'keyPasses', tackles:'tackles', rating:'avgRating' };
+
+    const cardsHtml = metricKeys.map((mk, i) => {
+        const top = perfResults[i] && perfResults[i][0];
+        if (!top) return `<div class="lp-hl-card"><div class="lp-hl-label">${hlLabels[mk]}</div><div class="lp-hl-name" style="color:#7a8ba8">데이터 없음</div></div>`;
+        const val = top[hlFields[mk]];
+        const disp = (val === null || val === undefined) ? '-' : val;
+        return `
+            <div class="lp-hl-card">
+                <div class="lp-hl-label">${hlLabels[mk]}</div>
+                <div class="lp-hl-name">${top.name}</div>
+                <div class="lp-hl-team">${top.team}</div>
+                <div class="lp-hl-val">${disp}<span class="lp-hl-unit">${hlUnits[mk]}</span></div>
+            </div>`;
+    }).join('');
+
+    // 포지션별 랭킹 (공격 기본값)
+    const posGroups = { F: '공격수', M: '미드필더', D: '수비수', G: '골키퍼' };
+    const allPlayers = perfResults.flat().reduce((acc, p) => {
+        if (!p) return acc;
+        if (!acc[p.playerId]) acc[p.playerId] = p;
+        return acc;
+    }, {});
+    const playerList = Object.values(allPlayers);
+
+    function posRankHtml(pos) {
+        const filtered = playerList
+            .filter(p => p.position === pos)
+            .sort((a, b) => (b.goals || 0) - (a.goals || 0))
+            .slice(0, 8);
+        if (!filtered.length) return '<div style="color:#7a8ba8;font-size:13px;padding:12px 0">해당 포지션 데이터 없음</div>';
+        return `<table class="gl-table" style="margin-top:8px">
+            <thead><tr><th>#</th><th>선수</th><th>팀</th><th class="num-col">득점</th><th class="num-col">도움</th><th class="num-col gl-perf-primary">xG</th><th class="num-col">평점</th></tr></thead>
+            <tbody>${filtered.map((p, i) => `
+                <tr>
+                    <td class="gl-rank">${i+1}</td>
+                    <td class="gl-player-name">${p.name}</td>
+                    <td class="gl-team-sub">${p.team}</td>
+                    <td class="num-col">${p.goals ?? '-'}</td>
+                    <td class="num-col">${p.assists ?? '-'}</td>
+                    <td class="num-col gl-perf-primary"><strong>${p.xg ?? '-'}</strong></td>
+                    <td class="num-col">${p.avgRating ?? '-'}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+    }
+
+    content().innerHTML = headingHtml() + `
+        <div class="lp-analysis">
+            <!-- 하이라이트 카드 -->
+            <div>
+                <div class="lp-chart-title">시즌 리더보드<span>각 지표 1위</span></div>
+                <div class="lp-hl-grid">${cardsHtml}</div>
+            </div>
+
+            <!-- 팀 scatter 차트 -->
+            ${teamData && teamData.length ? `
+            <div class="lp-chart-section">
+                <div class="lp-chart-title">팀 결정력 분석<span>기대득점(xG) vs 실제 득점 — 대각선 위: 결정력 우위</span></div>
+                <div class="lp-chart-box">
+                    <canvas id="lp-scatter-canvas"></canvas>
+                </div>
+                <div class="lp-chart-legend">
+                    <span><span class="lp-legend-dot" style="background:#34d399"></span>결정력 우위 (득점 > xG)</span>
+                    <span><span class="lp-legend-dot" style="background:#f87171"></span>결정력 부족 (득점 < xG)</span>
+                </div>
+            </div>` : ''}
+
+            <!-- 포지션별 랭킹 -->
+            <div class="lp-pos-section">
+                <div class="lp-chart-title">포지션별 랭킹<span>득점 기준 정렬</span></div>
+                <div class="lp-pos-tabs" id="lp-pos-tabs">
+                    ${Object.entries(posGroups).map(([k,v],i) =>
+                        `<button class="lp-pos-btn${i===0?' active':''}" data-pos="${k}">${v}</button>`
+                    ).join('')}
+                </div>
+                <div class="gl-table-wrap" id="lp-pos-table">
+                    ${posRankHtml('F')}
+                </div>
+            </div>
+        </div>`;
+
+    // 포지션 탭 이벤트
+    document.querySelectorAll('.lp-pos-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.lp-pos-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('lp-pos-table').innerHTML = posRankHtml(btn.dataset.pos);
+        });
+    });
+
+    // Scatter 차트 렌더
+    if (teamData && teamData.length) {
+        const ctx = document.getElementById('lp-scatter-canvas');
+        if (ctx) {
+            const maxVal = Math.max(...teamData.map(t => Math.max(t.xg, t.goals))) * 1.1;
+            _scatterChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: '팀',
+                        data: teamData.map(t => ({ x: t.xg, y: t.goals, label: t.team, xg: t.xg, goals: t.goals })),
+                        backgroundColor: teamData.map(t => t.goals > t.xg ? 'rgba(52,211,153,0.75)' : 'rgba(248,113,113,0.75)'),
+                        borderColor: teamData.map(t => t.goals > t.xg ? '#34d399' : '#f87171'),
+                        borderWidth: 1.5,
+                        pointRadius: 7,
+                        pointHoverRadius: 9,
+                    }, {
+                        label: '기준선 (xG=득점)',
+                        data: [{ x: 0, y: 0 }, { x: maxVal, y: maxVal }],
+                        type: 'line',
+                        borderColor: 'rgba(148,163,184,0.3)',
+                        borderDash: [5, 5],
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        fill: false,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const d = ctx.raw;
+                                    const diff = d.goals - d.xg;
+                                    const sign = diff >= 0 ? '+' : '';
+                                    return [`${d.label}`, `득점 ${d.goals}  xG ${d.xg}  (${sign}${diff.toFixed(1)})`];
+                                },
+                            },
+                            backgroundColor: '#1e2a3a',
+                            titleColor: '#e2eaf5',
+                            bodyColor: '#7a8ba8',
+                            borderColor: '#334155',
+                            borderWidth: 1,
+                            padding: 10,
+                        },
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'xG (기대득점)', color: '#7a8ba8', font: { size: 11 } },
+                            ticks: { color: '#7a8ba8', font: { size: 11 } },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            min: 0, max: maxVal,
+                        },
+                        y: {
+                            title: { display: true, text: '실제 득점', color: '#7a8ba8', font: { size: 11 } },
+                            ticks: { color: '#7a8ba8', font: { size: 11 } },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            min: 0, max: maxVal,
+                        },
+                    },
+                },
+            });
+        }
+    }
+}
+
+// ── 공용 fetch 헬퍼 (캐시 포함) ──
+async function _lpFetch(cKey, url) {
+    if (!_lpCache[cKey]) {
+        try {
+            const r = await fetch(url);
+            _lpCache[cKey] = await r.json();
+        } catch { _lpCache[cKey] = []; }
+    }
+    return _lpCache[cKey];
 }
 
 // ── 데이터 없음 ──
