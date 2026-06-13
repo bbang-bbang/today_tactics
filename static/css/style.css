@@ -9072,6 +9072,26 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .gl-perf-title { font-size: 14px; color: #93c5fd; margin-bottom: 8px; font-weight: 600; }
 .gl-perf-table th, .gl-perf-table td { font-size: 12px; padding: 6px 8px; }
 
+/* TOP퍼포머 v2 — metric 스위처 */
+.gl-perf-wrap2 { display: flex; flex-direction: column; gap: 12px; }
+.gl-perf-metrics { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 4px; border-bottom: 1px solid #1e2a3a; }
+.gl-perf-btn {
+  padding: 5px 14px; border-radius: 20px; border: 1px solid #334155;
+  background: transparent; color: #7a8ba8; font-size: 12px; cursor: pointer;
+  transition: all 0.15s ease;
+}
+.gl-perf-btn:hover { border-color: #60a5fa; color: #93c5fd; }
+.gl-perf-btn.active { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; font-weight: 600; }
+.gl-perf-table-area { min-height: 200px; }
+.gl-perf-primary { color: #60a5fa !important; background: rgba(37,99,235,0.07); }
+.gl-perf-tbl th.gl-perf-primary { color: #60a5fa !important; }
+.gl-pos { color: #7a8ba8; font-size: 11px; width: 28px; text-align: center !important; }
+.gl-src-badge {
+  display: inline-block; margin-bottom: 8px; padding: 3px 10px;
+  background: #0f2044; border: 1px solid #1e3a5f; border-radius: 12px;
+  font-size: 11px; color: #60a5fa;
+}
+
 /* 데이터 없음 */
 .gl-empty {
   text-align: center; padding: 48px 24px; color: #7a8ba8;

@@ -9,13 +9,17 @@
 
   /* ── 상태 ─────────────────────────────────────────── */
   const GL = {
-    leagues:       [],   // 전체 리그 목록 (/api/leagues)
-    activeLeague:  null, // 현재 선택된 league code
-    activeYear:    '2025',
-    activeSection: 'standings',
-    teams:         [],   // 현재 리그 팀 목록
-    initialized:   false,
+    leagues:          [],     // 전체 리그 목록 (/api/leagues)
+    activeLeague:     null,   // 현재 선택된 league code
+    activeYear:       '2025',
+    activeSection:    'standings',
+    activePerfMetric: 'goals', // TOP퍼포머 현재 선택 metric
+    teams:            [],
+    initialized:      false,
   };
+
+  /* 퍼포머 캐시: `${code}|${qs}|${metric}` → data[] */
+  const _perfCache = {};
 
   const ROOT = () => document.getElementById('gl-root');
 
@@ -216,56 +220,113 @@
   }
 
   /* ── TOP 퍼포머 ───────────────────────────────────── */
-  async function renderTopPerformers(code, qs) {
-    const [resGoals, resRating, resXg] = await Promise.all([
-      fetch(`/api/league/${code}/top-performers${qs}&metric=goals`).then(r => r.json()),
-      fetch(`/api/league/${code}/top-performers${qs}&metric=rating`).then(r => r.json()),
-      fetch(`/api/league/${code}/top-performers${qs}&metric=xg`).then(r => r.json()),
-    ]);
-    const content = document.getElementById('gl-content');
 
-    if (!resGoals.length && !resRating.length) {
-      content.innerHTML = noDataHtml('TOP 퍼포머', code);
+  const PERF_METRICS = [
+    { key: 'goals',      label: '⚽ 득점'   },
+    { key: 'assists',    label: '🤝 도움'   },
+    { key: 'xg',         label: '🎯 xG'    },
+    { key: 'key_passes', label: '🔑 키패스' },
+    { key: 'tackles',    label: '🛡️ 태클'  },
+    { key: 'rating',     label: '⭐ 평점'   },
+  ];
+
+  // [헤더 라벨, API 필드]  — 첫 번째가 주요 지표 (굵게 + 하이라이트)
+  const PERF_COLS = {
+    goals:      [['득점','goals'],    ['도움','assists'],   ['xG','xg'],       ['평점','avgRating']],
+    assists:    [['도움','assists'],   ['키패스','keyPasses'],['득점','goals'],  ['평점','avgRating']],
+    xg:         [['xG','xg'],         ['득점','goals'],     ['도움','assists'], ['평점','avgRating']],
+    key_passes: [['키패스','keyPasses'],['도움','assists'],  ['득점','goals'],   ['평점','avgRating']],
+    tackles:    [['태클','tackles'],   ['키패스','keyPasses'],['도움','assists'],['평점','avgRating']],
+    rating:     [['평점','avgRating'], ['득점','goals'],     ['도움','assists'], ['xG','xg']],
+  };
+
+  function posLabel(pos) {
+    return { F: '공', M: '미', D: '수', G: '골' }[pos] || pos || '-';
+  }
+
+  async function renderTopPerformers(code, qs) {
+    const content = document.getElementById('gl-content');
+    content.innerHTML = `
+      <div class="gl-perf-wrap2">
+        <div class="gl-perf-metrics" id="gl-perf-metrics">
+          ${PERF_METRICS.map(m => `
+            <button class="gl-perf-btn${GL.activePerfMetric === m.key ? ' active' : ''}"
+                    data-metric="${m.key}">${m.label}</button>
+          `).join('')}
+        </div>
+        <div id="gl-perf-table" class="gl-perf-table-area">
+          <div class="gl-loading">로딩 중…</div>
+        </div>
+      </div>
+    `;
+
+    document.querySelectorAll('.gl-perf-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        GL.activePerfMetric = btn.dataset.metric;
+        document.querySelectorAll('.gl-perf-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        await _loadPerfTable(code, qs, GL.activePerfMetric);
+      });
+    });
+
+    await _loadPerfTable(code, qs, GL.activePerfMetric);
+  }
+
+  async function _loadPerfTable(code, qs, metric) {
+    const area = document.getElementById('gl-perf-table');
+    if (!area) return;
+    area.innerHTML = '<div class="gl-loading">로딩 중…</div>';
+
+    const cKey = `${code}|${qs}|${metric}`;
+    if (!_perfCache[cKey]) {
+      try {
+        const r = await fetch(`/api/league/${code}/top-performers${qs}&metric=${metric}&limit=20`);
+        _perfCache[cKey] = await r.json();
+      } catch (e) {
+        area.innerHTML = '<div class="gl-error">데이터 로드 실패</div>';
+        return;
+      }
+    }
+
+    const data = _perfCache[cKey];
+    if (!data.length) {
+      area.innerHTML = noDataHtml('TOP 퍼포머', code);
       return;
     }
 
-    function playerRows(list) {
-      return list.slice(0, 10).map((p, i) => `
-        <tr>
-          <td class="gl-rank">${i + 1}</td>
-          <td class="gl-player-name">${p.name}</td>
-          <td class="gl-team-sub">${p.team}</td>
-          <td>${p.position || '-'}</td>
-          <td>${p.games}</td>
-          <td class="num-col"><strong>${p.goals}</strong></td>
-          <td>${p.assists}</td>
-          <td>${p.xg}</td>
-          <td class="rating-col">${p.avgRating}</td>
-        </tr>
-      `).join('');
-    }
+    const cols     = PERF_COLS[metric] || PERF_COLS.goals;
+    const isSeason = data[0] && data[0].source === 'season_stats';
 
-    function tableHtml(title, list) {
-      if (!list.length) return '';
-      return `
-        <div class="gl-perf-block">
-          <h3 class="gl-perf-title">${title}</h3>
-          <table class="gl-table gl-perf-table">
-            <thead>
-              <tr><th>#</th><th>선수</th><th>팀</th><th>포지션</th>
-                  <th>경기</th><th>득점</th><th>도움</th><th>xG</th><th>평점</th></tr>
-            </thead>
-            <tbody>${playerRows(list)}</tbody>
-          </table>
-        </div>
-      `;
-    }
-
-    content.innerHTML = `
-      <div class="gl-perf-wrap">
-        ${tableHtml('⚽ 득점 순위', resGoals)}
-        ${tableHtml('⭐ 평점 순위', resRating)}
-        ${tableHtml('🎯 xG 순위', resXg)}
+    area.innerHTML = `
+      <div class="gl-table-wrap">
+        ${isSeason ? '<div class="gl-src-badge">📡 SofaScore 시즌 누적 스탯</div>' : ''}
+        <table class="gl-table gl-perf-tbl">
+          <thead>
+            <tr>
+              <th>#</th><th>선수</th><th>팀</th><th>POS</th><th>경기</th>
+              ${cols.map((c, i) => `<th class="num-col${i === 0 ? ' gl-perf-primary' : ''}">${c[0]}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${data.slice(0, 20).map((p, i) => {
+              const cells = cols.map((c, ci) => {
+                const val  = p[c[1]];
+                const disp = (val === null || val === undefined) ? '-' : val;
+                const cls  = `num-col${ci === 0 ? ' gl-perf-primary' : ''}`;
+                return `<td class="${cls}">${ci === 0 ? `<strong>${disp}</strong>` : disp}</td>`;
+              }).join('');
+              return `
+                <tr>
+                  <td class="gl-rank">${i + 1}</td>
+                  <td class="gl-player-name">${p.name}</td>
+                  <td class="gl-team-sub">${p.team}</td>
+                  <td class="gl-pos">${posLabel(p.position)}</td>
+                  <td>${p.games}</td>
+                  ${cells}
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
       </div>
     `;
   }
