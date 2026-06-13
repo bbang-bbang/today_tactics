@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS teams (
     name          TEXT,
     name_ko       TEXT,
     short_name    TEXT,
+    slug          TEXT,
     league        TEXT,
     tournament_id INTEGER,
     season_id     INTEGER,
@@ -206,6 +207,27 @@ CREATE TABLE IF NOT EXISTS sub_events (
     team_id     INTEGER,
     minute      INTEGER,
     UNIQUE(event_id, player_in)
+);
+
+-- 리그 순위표 (standings API 직접 저장)
+CREATE TABLE IF NOT EXISTS league_standings (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    tournament_id INTEGER,
+    season_id     INTEGER,
+    team_id       INTEGER,
+    team_name     TEXT,
+    team_slug     TEXT,
+    position      INTEGER,
+    matches       INTEGER,
+    wins          INTEGER,
+    draws         INTEGER,
+    losses        INTEGER,
+    gf            INTEGER,
+    ga            INTEGER,
+    gd            INTEGER,
+    points        INTEGER,
+    updated_at    INTEGER,
+    UNIQUE(tournament_id, season_id, team_id)
 );
 
 -- 인덱스

@@ -8879,17 +8879,41 @@ def _validate_league(code):
 
 @app.route("/api/league/<code>/standings")
 def league_standings(code):
-    """리그 순위표 — 승/무/패/득실/승점 기준."""
+    """리그 순위표 — league_standings 테이블 우선, 없으면 events 집계."""
     cfg, err = _validate_league(code)
     if err:
         return err
     year = request.args.get("year")
-    year_cond = "AND strftime('%Y', datetime(date_ts,'unixepoch','localtime')) = ?" if year else ""
-    yp = [year] if year else []
 
     with get_league_db(code) as conn:
         tids = [t["id"] for t in cfg["tournaments"]]
         ph   = ",".join("?" * len(tids))
+
+        # 1순위: league_standings 테이블 (SofaScore 공식 순위표)
+        has_standings_table = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='league_standings'"
+        ).fetchone()
+
+        if has_standings_table:
+            year_cond = "AND s.tournament_id IN ({ph})"
+            rows_st = conn.execute(f"""
+                SELECT team_id, team_name, position, matches, wins, draws, losses, gf, ga, gd, points
+                FROM league_standings
+                WHERE tournament_id IN ({ph}) AND matches > 0
+                ORDER BY position ASC
+            """, tids).fetchall()
+            if rows_st:
+                return jsonify([{
+                    "rank":   r[2],
+                    "teamId": r[0],
+                    "team":   r[1] or str(r[0]),
+                    "played": r[3], "wins": r[4], "draws": r[5], "losses": r[6],
+                    "gf": r[7], "ga": r[8], "gd": r[9], "pts": r[10],
+                } for r in rows_st])
+
+        # 2순위: events 테이블 집계 (fallback)
+        year_cond = "AND strftime('%Y', datetime(date_ts,'unixepoch','localtime')) = ?" if year else ""
+        yp = [year] if year else []
         rows = conn.execute(f"""
             WITH matches AS (
                 SELECT home_team_id AS tid, home_score AS gf, away_score AS ga, date_ts
@@ -8913,7 +8937,6 @@ def league_standings(code):
             ORDER BY pts DESC, gd DESC, gf DESC
         """, (*tids, *yp, *tids, *yp)).fetchall()
 
-        # 팀명 조회
         team_names = {r[0]: r[1] for r in conn.execute(
             f"SELECT id, name FROM teams WHERE tournament_id IN ({ph})", tids
         ).fetchall()}

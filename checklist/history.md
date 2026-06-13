@@ -4,6 +4,72 @@
 
 ---
 
+## 2026-06-13 | 해외 리그 확장 아키텍처 — LEAGUE_REGISTRY + 제네릭 API + 크롤러 + 해외리그 탭
+
+### 배경
+- K리그 월드컵 휴식기(6/11~7/19) + 유럽 5대 리그 비시즌(8월 개막) → 아키텍처 구축 최적 타이밍.
+- PM 판단: K리그 핵심 기능 완성 상태, 해외 확장으로 ROI 극대화.
+- league-rankings xG 오태깅 잠재 버그 → 6/12 normalize_mps_team.py로 이미 해결됨(K1+K2 오태깅 0건) 확인 후 확장 진행.
+
+### ① LEAGUE_REGISTRY + DB 헬퍼 (main.py)
+- `LEAGUE_REGISTRY`: EPL(17)/라리가(8)/분데스(35)/세리에A(23)/리그앙(34) + K리그 6개 리그 등록.
+- `_league_db_path(code)`, `_league_tournament_ids(code)`, `get_league_db(code)` 헬퍼 추가.
+- `/api/leagues` 엔드포인트 신규 — 프론트 리그 스위처용, 6개 리그 목록 반환.
+- 기존 K리그 코드·DB_PATH 전혀 변경 없음(하위 호환).
+
+### ② DB 초기화 스크립트 (`crawlers/init_league_db.py`)
+- `--league all`로 epl/laliga/bundesliga/seriea/ligue1.db 5개 일괄 생성.
+- 공용 스키마 12개 테이블(events/teams/players/mps/heatmap_points/match_lineups/match_avg_positions/match_shotmap/goal_events/card_events/sub_events) + 인덱스.
+- K리그 전용(kleague_event_map/lineup/schedule)은 제외. 멱등(IF NOT EXISTS).
+- **검증**: 5개 DB 각 12개 테이블 정상 생성.
+
+### ③ 범용 리그 크롤러 (`crawlers/crawl_league.py`)
+- `--league epl --year 2025 --step all`로 실행, step 단위 선택 가능.
+- 수집 단계: events → teams → players → mps → avgpos → shotmap → heatmap(선택).
+- 시즌 자동 탐색(`/api/v1/unique-tournament/{tid}/seasons`), 연도 매칭 후 season_id 결정.
+- 기존 K리그 크롤러 패턴(Playwright, DELAY, api_fetch, 증분수집) 재활용.
+
+### ④ 제네릭 API 엔드포인트 (`/api/league/<code>/...`)
+- standings, team-rankings, top-performers, team-shape, team-shotmap, teams 6종.
+- 잘못된 league code → 400 + 유효 코드 목록 반환.
+- 각 엔드포인트는 `get_league_db(code)` context manager로 리그별 DB 자동 연결.
+- `?year=` 파라미터 지원, 데이터 없으면 빈 배열 반환(graceful empty).
+
+### ⑤ 프론트엔드 해외리그 탭 (🌍)
+- `index.html`: `ws-global` 탭 버튼 + 패널 추가 (기존 5탭 → 6탭).
+- `workspace.js v7`: panels에 global 등록, onShow에 `initGlobalLeagueView()` 훅.
+- `global_league.js v1`: 리그 스위처(EPL/라리가/분데스/세리에/리그앙) + 연도 셀렉터 + 섹션 탭(순위표/팀지표/TOP퍼포머). 데이터 없으면 크롤러 실행 안내 표시.
+- `style.css v89`: gl-* CSS 추가(다크 테마, 팀명 강조, 득점/평점 색상).
+- **검증**: ALL PASS (13개 엔드포인트 스모크, K리그 회귀 없음).
+- **DB 무변경(K리그 players.db 읽기 전용)** → prod 마이그레이션 불필요.
+
+### ⑥ SofaScore 403 해결 — team profile page 방식 + standings 정합 (후속 세션)
+
+#### 문제
+- tournament-season level API(`/api/v1/unique-tournament/{tid}/season/{sid}/events/...`, `.../teams`) → EPL/상위 리그 전체 403.
+- Serie A/Ligue 1 LEAGUE_REGISTRY 초기 season_id(95836/96127)가 실제와 달라 standings 0pt.
+
+#### 해결책
+- **팀 프로필 페이지 컨텍스트 방식**: 각 팀 SofaScore 프로필 URL 방문 후 `/api/v1/team/{id}/events/last/0` → 200 응답. `crawl_events()` 전면 재작성.
+- **fallback_sids 메커니즘**: Serie A·Ligue 1은 seasons API ID(95836/96127)로 팀 목록 수집, 실제 경기 필터는 event 내 `season.id`(76457/77356)로 분리.
+- **matches > 0 가드**: `league_standings` 저장·쿼리 양쪽에 `matches > 0` 조건 추가 → 0pt 행 차단.
+- **events 수집 중 teams upsert**: `crawl_events()`가 home/away 팀 정보를 `INSERT OR IGNORE`로 teams 테이블에 저장 → 팀명 누락 방지.
+- **init_league_db.py**: `league_standings` 테이블 + `slug` 컬럼 스키마 추가. 기존 5개 DB에 ALTER TABLE 적용.
+- **main.py `/api/league/<code>/standings`**: 1순위 `league_standings`(matches>0), 2순위 events 집계 fallback 구조로 정비.
+
+#### 수집 결과 (5대 리그 2024/25)
+| 리그 | standings | events | 비고 |
+|------|-----------|--------|------|
+| EPL | 20팀·38경기·1위 Arsenal 85pt | 264경기 | team/events page 0만 가능(최근 ~29라운드) |
+| La Liga | 20팀·38경기·1위 FC Barcelona 94pt | 265경기 | |
+| Bundesliga | 18팀·34경기·1위 FC Bayern München 89pt | 240경기 | |
+| Serie A | 20팀·23경기·1위 Inter 54pt | 수집됨 | standings: events 집계(single-page 한계) |
+| Ligue 1 | 19팀·25경기·1위 RC Lens 54pt | 수집됨 | standings: events 집계(single-page 한계) |
+
+- **검증**: `/api/league/{code}/standings` 5개 리그 전부 정상 응답. K리그 회귀 없음.
+
+---
+
 ## 2026-06-12 | 🆕 K리그 심화 ② 슛맵·xG 분석 — 미활용 match_shotmap 활용
 
 ### 백엔드 `/api/team-shotmap?teamId=&year=&side=for|against`
