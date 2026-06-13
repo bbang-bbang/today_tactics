@@ -114,10 +114,31 @@
 - `style.css`: `.league-tab-ext` 추가 — K리그1/2 필터 옆 해외리그 진입 링크 버튼.
 - `templates/index.html`: `#league-tabs` 안에 `<a href="/leagues" class="league-tab-ext">🌍 해외리그</a>` 추가.
 
+### ③ 리그 분석 탭 (`leagues.html` + Chart.js)
+- `leagues.html`에 **🔬 리그 분석** 탭 추가 (4번째 탭).
+- **시즌 리더보드 카드 6개**: 득점왕·도움왕·xG왕·키패스왕·태클왕·평점왕 — 각 지표 1위 선수 이름·팀·수치 표시.
+- **팀 결정력 분석 Scatter 차트** (Chart.js): X=xG, Y=실제득점. 대각선 기준선, 초록(득점>xG)·빨강(득점<xG) 색상 구분, hover 툴팁에 결정력 차이(±) 표시.
+- **포지션별 랭킹**: 공격수/미드필더/수비수/골키퍼 탭 전환, 득점 기준 상위 8명 테이블.
+- `_lpFetch()` 공용 캐시 헬퍼 추가 — 분석·TOP퍼포머 탭 간 `limit=20` 캐시 공유(키 충돌 방지).
+- Serie A/Ligue 1: player_stats 0건 → "수집 불가" 안내로 graceful 처리.
+
+### ④ 세리에A·리그앙 백로그 등록
+- SofaScore 403 차단으로 player_stats 수집 불가 → `checklist/backlog.md` P2 항목 등록.
+- PM 판단: 유럽 시즌 개막(2026-08월) 전 Fbref 파서 or 개별 프로필 방식으로 재검토.
+
+### 커밋 목록
+| 커밋 | 내용 |
+|------|------|
+| `ee84cab` | /leagues 독립 페이지 + team-rankings player_stats 집계 |
+| `5a3383d` | 리그 분석 탭 — 하이라이트 카드 + scatter 차트 + 포지션별 랭킹 |
+| `c87c8e7` | backlog: 세리에A·리그앙 선수 스탯 등록 |
+
 ### 검증
-- `/leagues` 200 OK, 페이지 길이 19 KB.
-- EPL team-rankings: 20행, `source=player_stats`, xG·keyPasses 정상.
-- 브라우저 `http://127.0.0.1:5000/leagues` → 데이터 확인 필요 (서버 실행 중).
+- `/leagues` 200 OK, 19KB.
+- EPL team-rankings 20행·`source=player_stats`·xG·keyPasses 정상.
+- top-performers(goals) 20행 정상 (Bruno Fernandes 21A, Harry Kane 36G 등).
+- JS 문법 `node --check` PASS.
+- **DB 무변경 (해외리그 DB 읽기 전용)** → prod 마이그레이션 불필요.
 
 ---
 
