@@ -9016,3 +9016,75 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 }
 .ws-panel #ta-close { display: none; }
 .ws-panel .ta-header { flex-wrap: wrap; }
+
+/* ════════════════════════════════════════════════════
+   해외리그 탭 (global_league.js)
+   ════════════════════════════════════════════════════ */
+.gl-wrap { padding: 16px; max-width: 1100px; margin: 0 auto; }
+
+/* 상단 툴바 */
+.gl-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.gl-league-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.gl-league-btn {
+  padding: 6px 14px; border-radius: 20px; border: 1px solid #444;
+  background: #1e2330; color: #bcc8e0; font-size: 13px; cursor: pointer;
+  transition: all .15s;
+}
+.gl-league-btn:hover { border-color: #60a5fa; color: #60a5fa; }
+.gl-league-btn.active { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600; }
+
+.gl-year-wrap { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.gl-label { font-size: 12px; color: #7a8ba8; }
+.gl-select { background: #1e2330; border: 1px solid #444; color: #bcc8e0; padding: 4px 8px; border-radius: 6px; font-size: 13px; }
+
+/* 섹션 탭 */
+.gl-section-tabs { display: flex; gap: 4px; border-bottom: 1px solid #2a3348; margin-bottom: 16px; }
+.gl-sec-btn {
+  padding: 8px 16px; background: none; border: none; border-bottom: 2px solid transparent;
+  color: #7a8ba8; font-size: 13px; cursor: pointer; transition: all .15s;
+}
+.gl-sec-btn:hover { color: #bcc8e0; }
+.gl-sec-btn.active { color: #60a5fa; border-bottom-color: #2563eb; font-weight: 600; }
+
+/* 테이블 공통 */
+.gl-table-wrap { overflow-x: auto; }
+.gl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.gl-table th { background: #1a2235; color: #7a8ba8; padding: 8px 10px; text-align: right; font-weight: 500; white-space: nowrap; }
+.gl-table th:first-child, .gl-table th:nth-child(2) { text-align: left; }
+.gl-table td { padding: 7px 10px; border-bottom: 1px solid #1e2a3a; color: #bcc8e0; text-align: right; }
+.gl-table td:first-child, .gl-table td:nth-child(2) { text-align: left; }
+.gl-table tr:hover td { background: #1c2840; }
+
+.gl-rank { color: #7a8ba8; width: 32px; }
+.gl-team-name { font-weight: 600; color: #e2e8f0; min-width: 140px; }
+.gl-player-name { font-weight: 600; color: #e2e8f0; min-width: 120px; }
+.gl-team-sub { color: #7a8ba8; font-size: 12px; }
+.pts-col { font-weight: 700; color: #f0f4ff; }
+.w-col { color: #4ade80; }
+.l-col { color: #f87171; }
+.pos-gd { color: #4ade80; }
+.neg-gd { color: #f87171; }
+.num-col { color: #60a5fa; }
+.rating-col { color: #fbbf24; }
+
+/* TOP 퍼포머 레이아웃 */
+.gl-perf-wrap { display: flex; flex-direction: column; gap: 24px; }
+.gl-perf-title { font-size: 14px; color: #93c5fd; margin-bottom: 8px; font-weight: 600; }
+.gl-perf-table th, .gl-perf-table td { font-size: 12px; padding: 6px 8px; }
+
+/* 데이터 없음 */
+.gl-empty {
+  text-align: center; padding: 48px 24px; color: #7a8ba8;
+  background: #111827; border-radius: 12px; margin-top: 16px;
+}
+.gl-empty strong { color: #bcc8e0; }
+.gl-empty-sub { font-size: 12px; margin-top: 8px; }
+.gl-code {
+  display: inline-block; margin-top: 12px; padding: 8px 16px;
+  background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+  font-family: monospace; font-size: 12px; color: #7dd3fc;
+}
+
+/* 로딩/에러 */
+.gl-loading, .gl-error { text-align: center; padding: 32px; color: #7a8ba8; font-size: 14px; }
+.gl-error { color: #f87171; }

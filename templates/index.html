@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=88">
+    <link rel="stylesheet" href="/static/css/style.css?v=89">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -123,6 +123,9 @@
             <button class="ws-tab" data-ws="heatmap" role="tab" aria-selected="false" tabindex="-1">
                 <span class="ws-tab-icon" aria-hidden="true">🔥</span><span class="ws-tab-label">히트맵</span>
             </button>
+            <button class="ws-tab" data-ws="global" role="tab" aria-selected="false" tabindex="-1">
+                <span class="ws-tab-icon" aria-hidden="true">🌍</span><span class="ws-tab-label">해외리그</span>
+            </button>
         </nav>
         <div id="workspace-panels">
             <section class="ws-panel" id="ws-tactics" data-ws="tactics" role="tabpanel" aria-label="전술판"></section>
@@ -137,6 +140,10 @@
             <section class="ws-panel hidden" id="ws-player" data-ws="player" role="tabpanel" aria-label="선수"></section>
             <section class="ws-panel hidden" id="ws-heatmap" data-ws="heatmap" role="tabpanel" aria-label="선수 히트맵 분석">
                 <!-- #k2-heatmap-modal 이 workspace.js 에 의해 여기로 재배치됨 -->
+            </section>
+            <!-- 해외리그 탭 패널 -->
+            <section class="ws-panel hidden" id="ws-global" data-ws="global" role="tabpanel" aria-label="해외 리그 분석">
+                <div id="gl-root"></div>
             </section>
         </div>
 
@@ -930,6 +937,7 @@
 
     <script src="/static/js/info.js?v=7"></script>
     <script src="/static/js/k2heatmap.js?v=16"></script>
+    <script src="/static/js/global_league.js?v=1"></script>
     <script src="/static/js/banner_stats.js?v=3"></script>
     <script src="/static/js/team_compare.js?v=12"></script>
     <script src="/static/js/analytics.js?v=12"></script>
@@ -982,7 +990,7 @@
     <script src="/static/js/insights.js?v=38"></script>
 
     <!-- 작업공간 탭 컨트롤러 — 반드시 모든 모듈 스크립트 뒤에 로드 -->
-    <script src="/static/js/workspace.js?v=6"></script>
+    <script src="/static/js/workspace.js?v=7"></script>
 
     <!-- 온보딩 오버레이 -->
     <div id="onboarding-overlay" class="ob-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Today Tactics 소개">

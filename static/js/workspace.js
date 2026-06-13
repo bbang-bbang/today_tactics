@@ -16,6 +16,7 @@
         team:    $("ws-team"),
         player:  $("ws-player"),
         heatmap: $("ws-heatmap"),
+        global:  $("ws-global"),
     };
     if (!panels.tactics) return; // 셸 미존재 시 무동작(레거시 안전)
 
@@ -95,6 +96,9 @@
         heatmap() {
             // 인라인 히트맵 뷰 최초 노출 시 초기화(팀 그리드 로드 + 검색 포커스)
             if (window.initK2HeatmapView) window.initK2HeatmapView();
+        },
+        global() {
+            if (window.initGlobalLeagueView) window.initGlobalLeagueView();
         },
     };
 

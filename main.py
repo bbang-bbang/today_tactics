@@ -118,11 +118,84 @@ STATUS_FILE = os.path.join(BASE_DIR, "data", "player_status.json")
 os.makedirs(SAVES_DIR,  exist_ok=True)
 os.makedirs(SQUADS_DIR, exist_ok=True)
 
+# ════════════════════════════════════════════════════════════════
+# 리그 레지스트리 — 해외 리그 확장 기반
+# tournament_id: SofaScore 기준 (2025/26 시즌 동일 ID 사용)
+# ════════════════════════════════════════════════════════════════
+LEAGUE_REGISTRY = {
+    "kleague": {
+        "db":        "players.db",
+        "label":     "K리그",
+        "flag":      "🇰🇷",
+        "tournaments": [
+            {"id": 410, "name": "K1리그", "code": "K1"},
+            {"id": 777, "name": "K2리그", "code": "K2"},
+        ],
+    },
+    "epl": {
+        "db":        "epl.db",
+        "label":     "Premier League",
+        "flag":      "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+        "tournaments": [{"id": 17, "name": "Premier League", "code": "PL"}],
+    },
+    "laliga": {
+        "db":        "laliga.db",
+        "label":     "La Liga",
+        "flag":      "🇪🇸",
+        "tournaments": [{"id": 8, "name": "La Liga", "code": "LL"}],
+    },
+    "bundesliga": {
+        "db":        "bundesliga.db",
+        "label":     "Bundesliga",
+        "flag":      "🇩🇪",
+        "tournaments": [{"id": 35, "name": "Bundesliga", "code": "BL"}],
+    },
+    "seriea": {
+        "db":        "seriea.db",
+        "label":     "Serie A",
+        "flag":      "🇮🇹",
+        "tournaments": [{"id": 23, "name": "Serie A", "code": "SA"}],
+    },
+    "ligue1": {
+        "db":        "ligue1.db",
+        "label":     "Ligue 1",
+        "flag":      "🇫🇷",
+        "tournaments": [{"id": 34, "name": "Ligue 1", "code": "L1"}],
+    },
+}
+
+_VALID_LEAGUE_CODES = set(LEAGUE_REGISTRY.keys())
+
+
+def _league_db_path(league_code: str) -> str:
+    """league_code → 절대 DB 파일 경로. 유효하지 않으면 기본 players.db."""
+    cfg = LEAGUE_REGISTRY.get((league_code or "kleague").lower())
+    db_file = cfg["db"] if cfg else "players.db"
+    return os.path.join(BASE_DIR, db_file)
+
+
+def _league_tournament_ids(league_code: str) -> list:
+    """league_code → tournament_id 리스트."""
+    cfg = LEAGUE_REGISTRY.get((league_code or "kleague").lower(), {})
+    return [t["id"] for t in cfg.get("tournaments", [])]
+
 
 @contextmanager
 def get_db(row_factory=True):
     """SQLite 연결 context manager — 예외 발생 경로에서도 conn.close() 보장."""
     conn = sqlite3.connect(DB_PATH)
+    if row_factory:
+        conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+@contextmanager
+def get_league_db(league_code: str, row_factory=True):
+    """리그 코드 기반 SQLite 연결 context manager."""
+    conn = sqlite3.connect(_league_db_path(league_code))
     if row_factory:
         conn.row_factory = sqlite3.Row
     try:
@@ -446,6 +519,20 @@ TEAMS = [
     {"id": "seosan",   "sofascore_id": 1169779,"name": "서산 시민 FC",        "short": "서산",   "league": "K3", "primary": "#000000", "secondary": "#ffffff", "accent": "#ffffff", "emblem": "", "border_home": "#000000", "border_away": "#000000"},
     {"id": "jincheon", "sofascore_id": 1169782,"name": "진천 HR FC",         "short": "진천",   "league": "K3", "primary": "#000000", "secondary": "#ffffff", "accent": "#ffffff", "emblem": "", "border_home": "#000000", "border_away": "#000000"},
 ]
+
+
+@app.route("/api/leagues")
+def get_leagues():
+    """지원 리그 목록 반환 — 프론트 리그 스위처용."""
+    return jsonify([
+        {
+            "code":  code,
+            "label": cfg["label"],
+            "flag":  cfg["flag"],
+            "tournaments": cfg["tournaments"],
+        }
+        for code, cfg in LEAGUE_REGISTRY.items()
+    ])
 
 
 @app.route("/api/teams")
@@ -8776,6 +8863,329 @@ def _warm_cache():
 
 # 서버 부팅 후 자동 워밍업 (production gunicorn에서도 동작)
 threading.Thread(target=_warm_cache, daemon=True).start()
+
+
+# ════════════════════════════════════════════════════════════════
+# 해외 리그 제네릭 API  /api/league/<code>/...
+# ════════════════════════════════════════════════════════════════
+
+def _validate_league(code):
+    """유효한 리그 코드인지 확인. 아니면 (None, error_response) 반환."""
+    if code not in _VALID_LEAGUE_CODES:
+        return None, (jsonify({"error": f"unknown league: {code}",
+                               "valid": list(_VALID_LEAGUE_CODES)}), 400)
+    return LEAGUE_REGISTRY[code], None
+
+
+@app.route("/api/league/<code>/standings")
+def league_standings(code):
+    """리그 순위표 — 승/무/패/득실/승점 기준."""
+    cfg, err = _validate_league(code)
+    if err:
+        return err
+    year = request.args.get("year")
+    year_cond = "AND strftime('%Y', datetime(date_ts,'unixepoch','localtime')) = ?" if year else ""
+    yp = [year] if year else []
+
+    with get_league_db(code) as conn:
+        tids = [t["id"] for t in cfg["tournaments"]]
+        ph   = ",".join("?" * len(tids))
+        rows = conn.execute(f"""
+            WITH matches AS (
+                SELECT home_team_id AS tid, home_score AS gf, away_score AS ga, date_ts
+                FROM events
+                WHERE tournament_id IN ({ph}) AND home_score IS NOT NULL {year_cond}
+                UNION ALL
+                SELECT away_team_id, away_score, home_score, date_ts
+                FROM events
+                WHERE tournament_id IN ({ph}) AND home_score IS NOT NULL {year_cond}
+            )
+            SELECT tid,
+                   COUNT(*) AS played,
+                   SUM(CASE WHEN gf > ga THEN 1 ELSE 0 END) AS wins,
+                   SUM(CASE WHEN gf = ga THEN 1 ELSE 0 END) AS draws,
+                   SUM(CASE WHEN gf < ga THEN 1 ELSE 0 END) AS losses,
+                   SUM(gf) AS gf, SUM(ga) AS ga,
+                   SUM(gf) - SUM(ga) AS gd,
+                   SUM(CASE WHEN gf > ga THEN 3 WHEN gf = ga THEN 1 ELSE 0 END) AS pts
+            FROM matches
+            GROUP BY tid
+            ORDER BY pts DESC, gd DESC, gf DESC
+        """, (*tids, *yp, *tids, *yp)).fetchall()
+
+        # 팀명 조회
+        team_names = {r[0]: r[1] for r in conn.execute(
+            f"SELECT id, name FROM teams WHERE tournament_id IN ({ph})", tids
+        ).fetchall()}
+
+    return jsonify([{
+        "rank":   i + 1,
+        "teamId": r[0],
+        "team":   team_names.get(r[0], str(r[0])),
+        "played": r[1], "wins": r[2], "draws": r[3], "losses": r[4],
+        "gf": r[5], "ga": r[6], "gd": r[7], "pts": r[8],
+    } for i, r in enumerate(rows)])
+
+
+@app.route("/api/league/<code>/team-rankings")
+def league_team_rankings(code):
+    """팀별 핵심 지표 비교 (xG, 슈팅, 듀얼 등)."""
+    cfg, err = _validate_league(code)
+    if err:
+        return err
+    year = request.args.get("year")
+    year_cond = "AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?" if year else ""
+    yp = [year] if year else []
+
+    with get_league_db(code) as conn:
+        tids = [t["id"] for t in cfg["tournaments"]]
+        ph   = ",".join("?" * len(tids))
+        rows = conn.execute(f"""
+            SELECT m.team_id,
+                   t.name,
+                   COUNT(DISTINCT m.event_id)   AS matches,
+                   ROUND(SUM(m.expected_goals),2) AS xg,
+                   SUM(m.goals)                 AS goals,
+                   SUM(m.total_shots)           AS shots,
+                   SUM(m.shots_on_target)       AS shots_on,
+                   SUM(m.duel_won)              AS duel_won,
+                   SUM(m.duel_lost)             AS duel_lost,
+                   SUM(m.tackles)               AS tackles,
+                   ROUND(AVG(m.rating), 2)      AS avg_rating
+            FROM match_player_stats m
+            JOIN events e ON e.id = m.event_id
+            LEFT JOIN teams t ON t.id = m.team_id
+            WHERE e.tournament_id IN ({ph}) {year_cond}
+            GROUP BY m.team_id
+            HAVING matches >= 1
+            ORDER BY xg DESC
+        """, (*tids, *yp)).fetchall()
+
+    return jsonify([{
+        "teamId":    r[0],
+        "team":      r[1] or str(r[0]),
+        "matches":   r[2],
+        "xg":        r[3] or 0,
+        "goals":     r[4] or 0,
+        "shots":     r[5] or 0,
+        "shotsOn":   r[6] or 0,
+        "duelWon":   r[7] or 0,
+        "duelLost":  r[8] or 0,
+        "tackles":   r[9] or 0,
+        "avgRating": r[10] or 0,
+    } for r in rows])
+
+
+@app.route("/api/league/<code>/top-performers")
+def league_top_performers(code):
+    """선수 TOP 퍼포머 (득점/평점/xG)."""
+    cfg, err = _validate_league(code)
+    if err:
+        return err
+    year    = request.args.get("year")
+    metric  = request.args.get("metric", "goals")  # goals|rating|xg
+    limit   = min(int(request.args.get("limit", 25)), 50)
+    year_cond = "AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?" if year else ""
+    yp = [year] if year else []
+
+    order_map = {"goals": "goals DESC", "rating": "avg_rating DESC", "xg": "xg DESC"}
+    order = order_map.get(metric, "goals DESC")
+
+    with get_league_db(code) as conn:
+        tids = [t["id"] for t in cfg["tournaments"]]
+        ph   = ",".join("?" * len(tids))
+        rows = conn.execute(f"""
+            SELECT m.player_id,
+                   COALESCE(p.name, m.player_name) AS name,
+                   m.team_id,
+                   t.name AS team_name,
+                   m.position,
+                   COUNT(*) AS games,
+                   SUM(m.goals)                    AS goals,
+                   SUM(m.assists)                  AS assists,
+                   ROUND(SUM(m.expected_goals), 2) AS xg,
+                   ROUND(AVG(m.rating), 2)         AS avg_rating,
+                   SUM(m.minutes_played)            AS minutes
+            FROM match_player_stats m
+            JOIN events e ON e.id = m.event_id
+            LEFT JOIN players p ON p.id = m.player_id
+            LEFT JOIN teams t ON t.id = m.team_id
+            WHERE e.tournament_id IN ({ph})
+              AND m.minutes_played > 0
+              {year_cond}
+            GROUP BY m.player_id
+            HAVING games >= 3
+            ORDER BY {order}
+            LIMIT ?
+        """, (*tids, *yp, limit)).fetchall()
+
+    return jsonify([{
+        "playerId":  r[0],
+        "name":      r[1] or "",
+        "teamId":    r[2],
+        "team":      r[3] or "",
+        "position":  r[4] or "",
+        "games":     r[5],
+        "goals":     r[6] or 0,
+        "assists":   r[7] or 0,
+        "xg":        r[8] or 0,
+        "avgRating": r[9] or 0,
+        "minutes":   r[10] or 0,
+    } for r in rows])
+
+
+@app.route("/api/league/<code>/team-shape")
+def league_team_shape(code):
+    """팀 평균 진형 (avg_positions 기반)."""
+    cfg, err = _validate_league(code)
+    if err:
+        return err
+    team_id = request.args.get("teamId", type=int)
+    year    = request.args.get("year")
+    if not team_id:
+        return jsonify({"error": "teamId required"}), 400
+    year_cond = "AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?" if year else ""
+    yp = [year] if year else []
+
+    with get_league_db(code) as conn:
+        tids = [t["id"] for t in cfg["tournaments"]]
+        ph   = ",".join("?" * len(tids))
+
+        # 팀 선발 평균 위치
+        rows = conn.execute(f"""
+            SELECT a.player_id,
+                   COALESCE(p.name, m.player_name) AS name,
+                   m.position,
+                   ROUND(AVG(a.avg_x), 1) AS cx,
+                   ROUND(AVG(a.avg_y), 1) AS cy,
+                   COUNT(*) AS games
+            FROM match_avg_positions a
+            JOIN events e ON e.id = a.event_id
+            LEFT JOIN match_player_stats m
+                   ON m.event_id = a.event_id AND m.player_id = a.player_id
+            LEFT JOIN players p ON p.id = a.player_id
+            WHERE e.tournament_id IN ({ph})
+              AND a.team_id = ?
+              AND a.is_substitute = 0
+              {year_cond}
+            GROUP BY a.player_id
+            HAVING games >= 2
+            ORDER BY cx ASC
+            LIMIT 14
+        """, (*tids, team_id, *yp)).fetchall()
+
+        # 리그 평균 무게중심
+        league_avg = conn.execute(f"""
+            SELECT ROUND(AVG(sub.cx),1), ROUND(AVG(sub.cy),1)
+            FROM (
+                SELECT a.team_id,
+                       AVG(a.avg_x) AS cx, AVG(a.avg_y) AS cy
+                FROM match_avg_positions a
+                JOIN events e ON e.id = a.event_id
+                WHERE e.tournament_id IN ({ph})
+                  AND a.is_substitute = 0
+                  {year_cond}
+                GROUP BY a.team_id, a.event_id
+            ) sub
+        """, (*tids, *yp)).fetchone()
+
+    if not rows:
+        return jsonify({"players": [], "summary": {}})
+
+    positions = [{"playerId": r[0], "name": r[1] or "", "position": r[2] or "",
+                  "x": r[3], "y": r[4], "games": r[5]} for r in rows]
+    xs = [p["x"] for p in positions if p["x"] is not None]
+    ys = [p["y"] for p in positions if p["y"] is not None]
+
+    return jsonify({
+        "players": positions,
+        "summary": {
+            "centroidX": round(sum(xs) / len(xs), 1) if xs else None,
+            "centroidY": round(sum(ys) / len(ys), 1) if ys else None,
+            "leagueCentroidX": league_avg[0] if league_avg else None,
+            "leagueCentroidY": league_avg[1] if league_avg else None,
+        },
+    })
+
+
+@app.route("/api/league/<code>/team-shotmap")
+def league_team_shotmap(code):
+    """팀 슛맵 + xG 요약."""
+    cfg, err = _validate_league(code)
+    if err:
+        return err
+    team_id = request.args.get("teamId", type=int)
+    year    = request.args.get("year")
+    side    = request.args.get("side", "for")  # for=공격, against=수비
+    if not team_id:
+        return jsonify({"error": "teamId required"}), 400
+    year_cond = "AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?" if year else ""
+    yp = [year] if year else []
+
+    with get_league_db(code) as conn:
+        tids = [t["id"] for t in cfg["tournaments"]]
+        ph   = ",".join("?" * len(tids))
+
+        if side == "for":
+            team_cond = "AND s.team_id = ?"
+        else:
+            team_cond = "AND s.team_id != ? AND (e.home_team_id=? OR e.away_team_id=?)"
+
+        params_shot = (*tids, team_id, *yp) if side == "for" else (*tids, team_id, team_id, team_id, *yp)
+
+        shots = conn.execute(f"""
+            SELECT s.x, s.y, s.xg, s.outcome, s.situation, s.body_part,
+                   s.minute, COALESCE(p.name, s.player_name) AS name
+            FROM match_shotmap s
+            JOIN events e ON e.id = s.event_id
+            LEFT JOIN players p ON p.id = s.player_id
+            WHERE e.tournament_id IN ({ph})
+              {team_cond}
+              {year_cond}
+            ORDER BY e.date_ts, s.minute
+        """, params_shot).fetchall()
+
+        # 요약
+        total_xg = sum((r[2] or 0) for r in shots)
+        goals    = sum(1 for r in shots if r[3] == "goal")
+        games    = conn.execute(f"""
+            SELECT COUNT(DISTINCT e.id) FROM events e
+            WHERE e.tournament_id IN ({ph})
+              AND e.home_score IS NOT NULL
+              AND (e.home_team_id=? OR e.away_team_id=?) {year_cond}
+        """, (*tids, team_id, team_id, *yp)).fetchone()[0] or 1
+
+    return jsonify({
+        "shots": [{"x": r[0], "y": r[1], "xg": r[2], "outcome": r[3],
+                   "situation": r[4], "bodyPart": r[5], "minute": r[6], "name": r[7]}
+                  for r in shots],
+        "summary": {
+            "shots":      len(shots),
+            "goals":      goals,
+            "xg":         round(total_xg, 2),
+            "xgPerGame":  round(total_xg / games, 2),
+            "gpg":        round(goals / games, 2),
+            "games":      games,
+            "efficiency": round(goals - total_xg, 2),
+        },
+    })
+
+
+@app.route("/api/league/<code>/teams")
+def league_teams(code):
+    """리그 팀 목록."""
+    cfg, err = _validate_league(code)
+    if err:
+        return err
+    with get_league_db(code) as conn:
+        tids = [t["id"] for t in cfg["tournaments"]]
+        ph   = ",".join("?" * len(tids))
+        rows = conn.execute(
+            f"SELECT id, name, short_name, primary_color FROM teams WHERE tournament_id IN ({ph}) ORDER BY name",
+            tids
+        ).fetchall()
+    return jsonify([{"id": r[0], "name": r[1] or "", "shortName": r[2] or "",
+                     "color": r[3] or "#888"} for r in rows])
 
 
 if __name__ == "__main__":
