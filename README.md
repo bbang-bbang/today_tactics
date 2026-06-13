@@ -39,22 +39,25 @@ python main.py
 
 ```
 today_tactics/
-  main.py                        # Flask 서버 (45+ API 엔드포인트)
+  main.py                        # Flask 서버 (50+ API 엔드포인트)
   update_data.py                 # 증분 업데이트 통합 실행
-  players.db                     # SQLite DB
+  players.db                     # K리그 SQLite DB  ※ gitignored
+  epl.db / laliga.db / bundesliga.db / seriea.db / ligue1.db  # 해외리그 DB  ※ gitignored
   requirements.txt               # Python 의존성
   templates/
-    index.html                   # 메인 SPA
+    index.html                   # 메인 SPA (전술판)
+    leagues.html                 # 해외리그 독립 페이지 (/leagues)
   static/
     css/style.css
     js/
       app.js                     # 전술판 코어 (Canvas, 드래그, 화살표, 애니메이션)
       analytics.js               # 팀 분석 차트
       banner_stats.js            # 배너 스탯
+      global_league.js           # 해외리그 워크스페이스 탭 (🌍) — 리그 스위처·순위표·팀지표·TOP퍼포머
       info.js                    # 정보 패널
       insights.js                # 인사이트 뷰 (대시보드/순위 통합)
-      k2heatmap.js               # 히트맵 분석 뷰 (워크스페이스 탭): 통합검색·년도필터·비교 오버레이(포지션평균/타선수/홈vs원정)·인사이트 배너
-      workspace.js               # 상단 워크스페이스 탭 컨트롤러 (전술판/경기예측/팀/선수/히트맵)
+      k2heatmap.js               # 히트맵 분석 뷰: 통합검색·비교 오버레이(포지션평균/타선수/홈vs원정)
+      workspace.js               # 워크스페이스 탭 컨트롤러 (전술판/예측/팀/선수/히트맵/해외리그)
       player_analytics.js        # 선수 개인 분석 모달
       player_report.js           # 선수 리포트 (레이더 차트, 스탯 바)
       prediction.js              # 경기 예측 + 시즌 시뮬레이션
@@ -62,16 +65,21 @@ today_tactics/
     img/emblems/                 # 팀 엠블럼 (K01~K42)
   data/
     kleague_players_2026.json    # 2026 시즌 선수 데이터
-    kleague_results_2026.json    # 2026 시즌 경기 결과 (196건)
+    kleague_results_2026.json    # 2026 시즌 경기 결과
     kleague_h2h.json             # 상대 전적
     kleague_team_stats.json      # 팀 스탯
     sofascore_teams.json         # SofaScore 팀 ID 매핑
     player_status.json           # 부상/출전정지/출전의문 수동 관리
-  crawlers/                      # 데이터 수집 스크립트 (42개)
+  crawlers/
+    crawl_league.py              # 해외리그 범용 크롤러 (standings/events/players)
+    init_league_db.py            # 해외리그 DB 초기화 (5개 DB, 12개 테이블)
+    crawl_sofascore.py           # K리그 선수·히트맵·이벤트
+    crawl_match_stats.py         # K리그 경기별 선수 세부 스탯
+    fetch_venues.py / fetch_weather.py / ...  # 메타 보완 스크립트
   analysis/                      # 분석/검증 스크립트 (읽기 전용)
   deploy/                        # 운영 배포 (nginx/systemd/setup.sh)
   saves/                         # 전술판 저장 파일 (gitignored)
-  squads/                        # 스쿼드 파일 (default_*.json + {team}_2026.json)
+  squads/                        # 스쿼드 파일
   checklist/                     # 개발 프로세스 문서
   qa_check.py                    # 로컬 API/DB 스모크 테스트
 ```
@@ -81,24 +89,23 @@ today_tactics/
 ## 데이터 수집 파이프라인
 
 ```
-SofaScore API (Playwright)
-  crawl_sofascore.py        -> teams, players, player_stats, heatmap_points, events
-  crawl_match_stats.py      -> match_player_stats (K1/K2 전 팀, --league 플래그)
-  crawl_kleague1_2026.py    -> K1 2026 시즌 경기별 선수 스탯
-  crawl_kleague2_all.py     -> K2 전 팀 히트맵 포함 경기별 선수 스탯
-  build_k1_xg.py            -> K1 xG 모델 데이터 구축
+K리그 (players.db)
+  crawl_sofascore.py        -> teams, players, heatmap_points, events
+  crawl_match_stats.py      -> match_player_stats (K1/K2, --league 플래그)
+  build_k1_xg.py            -> K1 xG 모델 구축
   fetch_venues.py           -> events (경기장 좌표)
   fetch_weather.py          -> match_player_stats (날씨)
   fetch_referees.py         -> events (심판 정보)
-  fetch_injuries.py         -> player_status.json (부상자, K리그는 수동 관리 필요)
+  update_results_2026.py    -> kleague_results_2026.json (K리그 공식 API)
+  backfill_*.py             -> 누락 데이터 보완 (1회성)
 
-K리그 공식 API
-  update_results_2026.py    -> kleague_results_2026.json (경기 결과 증분 수집)
-
-backfill 스크립트
-  backfill_k1_mps.py        -> K1 match_player_stats 누락분 보완
-  backfill_match_stats.py   -> match_player_stats 일반 누락분 보완
-  backfill_events.py        -> events 누락분 보완
+해외리그 (epl/laliga/bundesliga/seriea/ligue1.db)
+  init_league_db.py         -> DB 초기화 (--league all로 5개 일괄 생성, 12개 테이블)
+  crawl_league.py           -> 범용 크롤러 (--league epl --year 2025 --step standings/events/players)
+                               standings: league_standings 테이블
+                               events:   팀 프로필 컨텍스트 방식 (tournament API 403 우회)
+                               players:  top-players/overall API → player_stats 집계
+                               ※ Serie A / Ligue 1은 players step 403 차단 → 수집 불가
 ```
 
 ---
@@ -124,7 +131,9 @@ backfill 스크립트
 
 ---
 
-## 수집 현황 (2026-06-09 기준)
+## 수집 현황 (2026-06-14 기준)
+
+### K리그 (players.db)
 
 | 항목 | 수치 |
 |------|------|
@@ -134,6 +143,16 @@ backfill 스크립트
 | 경기별 선수 스탯 | 69,622건 |
 | 골 이벤트 | 4,959건 |
 | 등록 선수 수 | 1,747명 |
+
+### 해외 5대 리그 (2024/25 시즌)
+
+| 리그 | DB | 팀 | 경기 | 선수(player_stats) | 순위표 | 비고 |
+|------|----|----|------|--------------------|--------|------|
+| EPL | epl.db | 20 | 264 | 310명 | ✓ | |
+| La Liga | laliga.db | 20 | 265 | 308명 | ✓ | |
+| Bundesliga | bundesliga.db | 19 | 240 | 285명 | ✓ | |
+| Serie A | seriea.db | 23 | 268 | 0 (403 차단) | ✓ | player_stats 수집 불가 |
+| Ligue 1 | ligue1.db | 21 | 232 | 0 (403 차단) | ✓ | player_stats 수집 불가 |
 
 ---
 
@@ -179,6 +198,13 @@ backfill 스크립트
 | `/api/insights/midfielder-pass` | 미드필더 패스 분석 |
 | `/api/insights/defender-score` | 수비수 평점 분석 |
 | `/api/insights/player-detail` | 선수 인사이트 상세 |
+| **해외리그 (`/leagues` 페이지)** | |
+| `/leagues` | 해외리그 독립 페이지 (leagues.html) — 순위표·팀지표·TOP퍼포머·리그분석 4탭 |
+| `/api/leagues` | 지원 리그 목록 (kleague 제외 해외 5개 리그) |
+| `/api/league/<code>/standings` | 리그 순위표 — `league_standings` 우선, events 집계 fallback. `?year=` |
+| `/api/league/<code>/team-rankings` | 팀 지표 — `player_stats` 팀 집계 우선(해외), `match_player_stats` fallback(K리그). `source` 필드로 구분 |
+| `/api/league/<code>/top-performers` | 선수 TOP 퍼포머 — `player_stats` 우선, `?metric=goals\|assists\|xg\|key_passes\|tackles\|rating&limit=` |
+| `/api/league/<code>/teams` | 리그 팀 목록 |
 
 ---
 
