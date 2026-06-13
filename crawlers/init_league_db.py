@@ -44,16 +44,61 @@ CREATE TABLE IF NOT EXISTS teams (
 
 -- 선수 기본정보
 CREATE TABLE IF NOT EXISTS players (
-    id        INTEGER PRIMARY KEY,
-    team_id   INTEGER,
-    name      TEXT,
-    name_ko   TEXT,
-    position  TEXT,
-    height    INTEGER,
-    weight    INTEGER,
-    birth_date TEXT,
-    nationality TEXT,
-    jersey_number INTEGER
+    id            INTEGER PRIMARY KEY,
+    team_id       INTEGER,
+    name          TEXT,
+    name_ko       TEXT,
+    slug          TEXT,
+    position      TEXT,
+    height        INTEGER,
+    weight        INTEGER,
+    birth_date    TEXT,
+    nationality   TEXT,
+    jersey_number INTEGER,
+    preferred_foot TEXT
+);
+
+-- 시즌 누적 스탯 (player/{id}/unique-tournament/{tid}/season/{sid}/statistics/overall)
+CREATE TABLE IF NOT EXISTS player_stats (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id            INTEGER,
+    tournament_id        INTEGER,
+    season_id            INTEGER,
+    appearances          INTEGER,
+    minutes_played       INTEGER,
+    rating               REAL,
+    goals                INTEGER,
+    assists              INTEGER,
+    expected_goals       REAL,
+    expected_assists     REAL,
+    total_shots          INTEGER,
+    shots_on_target      INTEGER,
+    accurate_passes      INTEGER,
+    total_passes         INTEGER,
+    accurate_passes_pct  REAL,
+    key_passes           INTEGER,
+    successful_dribbles  INTEGER,
+    tackles              INTEGER,
+    interceptions        INTEGER,
+    yellow_cards         INTEGER,
+    red_cards            INTEGER,
+    aerial_duels_won     INTEGER,
+    aerial_duels_won_pct REAL,
+    ground_duels_won     INTEGER,
+    ground_duels_won_pct REAL,
+    big_chances_created  INTEGER,
+    big_chances_missed   INTEGER,
+    accurate_crosses     INTEGER,
+    clearances           INTEGER,
+    saves                INTEGER,
+    clean_sheet          INTEGER,
+    goals_conceded       INTEGER,
+    touches              INTEGER,
+    possession_lost      INTEGER,
+    was_fouled           INTEGER,
+    fouls                INTEGER,
+    raw_json             TEXT,
+    UNIQUE(player_id, tournament_id, season_id)
 );
 
 -- 경기 메타
@@ -234,6 +279,8 @@ CREATE TABLE IF NOT EXISTS league_standings (
 CREATE INDEX IF NOT EXISTS idx_mps_event     ON match_player_stats(event_id);
 CREATE INDEX IF NOT EXISTS idx_mps_player    ON match_player_stats(player_id);
 CREATE INDEX IF NOT EXISTS idx_mps_team      ON match_player_stats(team_id);
+CREATE INDEX IF NOT EXISTS idx_ps_player     ON player_stats(player_id);
+CREATE INDEX IF NOT EXISTS idx_ps_tid        ON player_stats(tournament_id, season_id);
 CREATE INDEX IF NOT EXISTS idx_hm_player     ON heatmap_points(player_id);
 CREATE INDEX IF NOT EXISTS idx_hm_event      ON heatmap_points(event_id);
 CREATE INDEX IF NOT EXISTS idx_events_tid    ON events(tournament_id);
@@ -260,6 +307,14 @@ def init_db(league_code: str):
 
     conn = sqlite3.connect(db_path)
     conn.executescript(SCHEMA_SQL)
+
+    # 기존 DB 컬럼 마이그레이션 (IF NOT EXISTS로 못 다루는 신규 컬럼)
+    players_cols = {r[1] for r in conn.execute("PRAGMA table_info(players)").fetchall()}
+    for col, typedef in [("slug", "TEXT"), ("preferred_foot", "TEXT")]:
+        if col not in players_cols:
+            conn.execute(f"ALTER TABLE players ADD COLUMN {col} {typedef}")
+            print(f"     [migrate] players.{col} 컬럼 추가")
+
     conn.commit()
     conn.close()
 

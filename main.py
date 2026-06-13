@@ -137,30 +137,35 @@ LEAGUE_REGISTRY = {
         "label":     "Premier League",
         "flag":      "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
         "tournaments": [{"id": 17, "name": "Premier League", "code": "PL"}],
+        "season_ids": {2025: 76986},
     },
     "laliga": {
         "db":        "laliga.db",
         "label":     "La Liga",
         "flag":      "🇪🇸",
         "tournaments": [{"id": 8, "name": "La Liga", "code": "LL"}],
+        "season_ids": {2025: 77559},
     },
     "bundesliga": {
         "db":        "bundesliga.db",
         "label":     "Bundesliga",
         "flag":      "🇩🇪",
         "tournaments": [{"id": 35, "name": "Bundesliga", "code": "BL"}],
+        "season_ids": {2025: 77333},
     },
     "seriea": {
         "db":        "seriea.db",
         "label":     "Serie A",
         "flag":      "🇮🇹",
         "tournaments": [{"id": 23, "name": "Serie A", "code": "SA"}],
+        "season_ids": {2025: 76457},
     },
     "ligue1": {
         "db":        "ligue1.db",
         "label":     "Ligue 1",
         "flag":      "🇫🇷",
         "tournaments": [{"id": 34, "name": "Ligue 1", "code": "L1"}],
+        "season_ids": {2025: 77356},
     },
 }
 
@@ -9001,46 +9006,108 @@ def league_team_rankings(code):
 
 @app.route("/api/league/<code>/top-performers")
 def league_top_performers(code):
-    """선수 TOP 퍼포머 (득점/평점/xG)."""
+    """선수 TOP 퍼포머 (득점/평점/xG/어시스트/키패스/태클).
+
+    우선순위:
+    1) player_stats (시즌 누적 — crawl_players 수집 후 사용)
+    2) match_player_stats 집계 (경기별 데이터 있을 경우 fallback)
+    """
     cfg, err = _validate_league(code)
     if err:
         return err
-    year    = request.args.get("year")
-    metric  = request.args.get("metric", "goals")  # goals|rating|xg
-    limit   = min(int(request.args.get("limit", 25)), 50)
-    year_cond = "AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?" if year else ""
-    yp = [year] if year else []
+    year   = request.args.get("year")
+    metric = request.args.get("metric", "goals")
+    limit  = min(int(request.args.get("limit", 25)), 50)
 
-    order_map = {"goals": "goals DESC", "rating": "avg_rating DESC", "xg": "xg DESC"}
-    order = order_map.get(metric, "goals DESC")
+    order_map = {
+        "goals":      "ps.goals DESC",
+        "assists":    "ps.assists DESC",
+        "rating":     "ps.rating DESC",
+        "xg":         "ps.expected_goals DESC",
+        "key_passes": "ps.key_passes DESC",
+        "tackles":    "ps.tackles DESC",
+    }
+    order = order_map.get(metric, "ps.goals DESC")
+
+    season_id = cfg.get("season_ids", {}).get(int(year)) if year else None
+    sid_cond  = "AND ps.season_id = ?" if season_id else ""
 
     with get_league_db(code) as conn:
         tids = [t["id"] for t in cfg["tournaments"]]
         ph   = ",".join("?" * len(tids))
+
+        # 1순위: player_stats (시즌 누적)
+        sid_params = [season_id] if season_id else []
         rows = conn.execute(f"""
-            SELECT m.player_id,
-                   COALESCE(p.name, m.player_name) AS name,
-                   m.team_id,
+            SELECT ps.player_id,
+                   p.name,
+                   p.team_id,
                    t.name AS team_name,
-                   m.position,
-                   COUNT(*) AS games,
-                   SUM(m.goals)                    AS goals,
-                   SUM(m.assists)                  AS assists,
-                   ROUND(SUM(m.expected_goals), 2) AS xg,
-                   ROUND(AVG(m.rating), 2)         AS avg_rating,
-                   SUM(m.minutes_played)            AS minutes
-            FROM match_player_stats m
-            JOIN events e ON e.id = m.event_id
-            LEFT JOIN players p ON p.id = m.player_id
-            LEFT JOIN teams t ON t.id = m.team_id
-            WHERE e.tournament_id IN ({ph})
-              AND m.minutes_played > 0
-              {year_cond}
-            GROUP BY m.player_id
-            HAVING games >= 3
+                   p.position,
+                   ps.appearances,
+                   COALESCE(ps.goals, 0)            AS goals,
+                   COALESCE(ps.assists, 0)          AS assists,
+                   ROUND(COALESCE(ps.expected_goals, 0), 2) AS xg,
+                   ROUND(COALESCE(ps.rating, 0), 2) AS rating,
+                   COALESCE(ps.minutes_played, 0)   AS minutes,
+                   COALESCE(ps.key_passes, 0)        AS key_passes,
+                   COALESCE(ps.tackles, 0)           AS tackles
+            FROM player_stats ps
+            JOIN players p ON p.id = ps.player_id
+            LEFT JOIN teams t ON t.id = p.team_id
+            WHERE ps.tournament_id IN ({ph})
+              AND COALESCE(ps.appearances, 0) >= 3
+              {sid_cond}
             ORDER BY {order}
             LIMIT ?
-        """, (*tids, *yp, limit)).fetchall()
+        """, (*tids, *sid_params, limit)).fetchall()
+
+        # 2순위: match_player_stats 집계 (player_stats 없을 때)
+        if not rows:
+            yp = [year] if year else []
+            year_cond = "AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?" if year else ""
+            order_mps = {
+                "goals":      "goals DESC",
+                "assists":    "assists DESC",
+                "rating":     "avg_rating DESC",
+                "xg":         "xg DESC",
+                "key_passes": "key_passes DESC",
+                "tackles":    "tackles DESC",
+            }.get(metric, "goals DESC")
+            rows_mps = conn.execute(f"""
+                SELECT m.player_id,
+                       COALESCE(p.name, m.player_name),
+                       m.team_id,
+                       t.name,
+                       m.position,
+                       COUNT(*)                          AS games,
+                       SUM(m.goals)                     AS goals,
+                       SUM(m.assists)                   AS assists,
+                       ROUND(SUM(m.expected_goals), 2)  AS xg,
+                       ROUND(AVG(m.rating), 2)          AS avg_rating,
+                       SUM(m.minutes_played)            AS minutes,
+                       SUM(m.key_passes)                AS key_passes,
+                       SUM(m.tackles)                   AS tackles
+                FROM match_player_stats m
+                JOIN events e ON e.id = m.event_id
+                LEFT JOIN players p ON p.id = m.player_id
+                LEFT JOIN teams t ON t.id = m.team_id
+                WHERE e.tournament_id IN ({ph})
+                  AND m.minutes_played > 0
+                  {year_cond}
+                GROUP BY m.player_id
+                HAVING games >= 3
+                ORDER BY {order_mps}
+                LIMIT ?
+            """, (*tids, *yp, limit)).fetchall()
+            return jsonify([{
+                "playerId": r[0], "name": r[1] or "", "teamId": r[2],
+                "team": r[3] or "", "position": r[4] or "", "games": r[5],
+                "goals": r[6] or 0, "assists": r[7] or 0, "xg": r[8] or 0,
+                "avgRating": r[9] or 0, "minutes": r[10] or 0,
+                "keyPasses": r[11] or 0, "tackles": r[12] or 0,
+                "source": "mps",
+            } for r in rows_mps])
 
     return jsonify([{
         "playerId":  r[0],
@@ -9048,12 +9115,15 @@ def league_top_performers(code):
         "teamId":    r[2],
         "team":      r[3] or "",
         "position":  r[4] or "",
-        "games":     r[5],
-        "goals":     r[6] or 0,
-        "assists":   r[7] or 0,
-        "xg":        r[8] or 0,
-        "avgRating": r[9] or 0,
-        "minutes":   r[10] or 0,
+        "games":     r[5] or 0,
+        "goals":     r[6],
+        "assists":   r[7],
+        "xg":        r[8],
+        "avgRating": r[9],
+        "minutes":   r[10],
+        "keyPasses": r[11],
+        "tackles":   r[12],
+        "source":    "season_stats",
     } for r in rows])
 
 

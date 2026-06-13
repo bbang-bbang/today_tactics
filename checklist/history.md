@@ -68,6 +68,31 @@
 
 - **검증**: `/api/league/{code}/standings` 5개 리그 전부 정상 응답. K리그 회귀 없음.
 
+### ⑦ 해외 리그 선수 시즌 스탯 수집 — top-players/overall API (같은 날 후속)
+
+#### 전략 탐색
+- `team/{id}/players`: EPL 포함 전 팀 403 완전 차단.
+- `unique-tournament/{tid}/season/{sid}/top-players/overall`: **tournament 페이지 컨텍스트에서 성공!**
+  - 28개 카테고리(rating/goals/xG/assists/keyPasses/tackles/saves/cleanSheet 등) × 최대 50명
+  - 카테고리별 statistics를 player_id 기준 합산 → 단 1번 API 호출로 ~300명 커버
+  - Serie A/Ligue 1은 이 엔드포인트도 403 → EPL·La Liga·Bundesliga 3개 리그만 지원
+
+#### 코드 변경
+- `init_league_db.py`: `player_stats` 테이블(37컬럼) + `players.slug/preferred_foot` 컬럼 추가. ALTER TABLE 마이그레이션 자동화.
+- `crawl_league.py`: `crawl_players()` 전면 재작성 — top-players/overall 집계 방식. `fallback_sid` 지원. `players` step `default_steps`에 추가.
+- `main.py`: LEAGUE_REGISTRY에 `season_ids` 추가. `top-performers` 엔드포인트 — player_stats 우선(season_stats), match_player_stats fallback, metric 확장(goals/assists/rating/xg/key_passes/tackles).
+
+#### 수집 결과 (EPL·La Liga·Bundesliga 2024/25)
+| 리그 | 선수 수 | 검증 |
+|------|--------|------|
+| EPL | 310명 | Haaland 27G·xG25.4, Bruno Fernandes 21A |
+| La Liga | 308명 | Mbappe 25G, Yamal 16G, Vinicius 16G |
+| Bundesliga | 285명 | Harry Kane 36G, Michael Olise 7.87 평점 |
+| Serie A | 0 (403 차단) | top-players/overall 엔드포인트 차단 |
+| Ligue 1 | 0 (403 차단) | 동일 |
+
+- **검증**: `/api/league/{epl,laliga,bundesliga}/top-performers?metric=goals&year=2025` 정상 응답, 실제 리그 순위와 일치.
+
 ---
 
 ## 2026-06-12 | 🆕 K리그 심화 ② 슛맵·xG 분석 — 미활용 match_shotmap 활용
@@ -3985,3 +4010,5 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-12 13:29:05 | KEY=<SSH_KEY>.pem; R=rocky@<PROD_IP> / ssh -i "$KEY" -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=20 "$R" "cd /opt/today_tactics && venv/bin/python3 -c \"import sqlite3; c=sqlite3.connect('players.db').cursor(); print([r[0] for r in c.execute(\\\"select name from sqlite_master where type='index' and tbl_name='match_lineups'\\\").fetchall()])\"" 2>&1 | grep -v "post-quantum\|store now\|openssh.com\|may need"
 - 2026-06-12 15:24:15 | BASE=https://www.today-football-tactics.xyz / code=$(curl -s -o /tmp/ttp.json -w "%{http_code}" --max-time 25 "$BASE/api/team-top-players?teamId=248375&league=k2") / echo "HTTP $code, bytes=$(wc -c < /tmp/ttp.json)" / head -c 400 /tmp/ttp.json; echo
 - 2026-06-12 15:45:37 | BASE=https://www.today-football-tactics.xyz; sleep 5 / curl -s -o /dev/null -w "health: %{http_code}\n" --max-time 20 "$BASE/health" / curl -s -o /dev/null -w "team page: %{http_code}\n" --max-time 20 "$BASE/"
+- 2026-06-13 23:43:52 | curl -s "http://127.0.0.1:5000/api/league/laliga/top-performers?metric=goals&limit=5&year=2025" | python3 -c " / import sys,json / d=json.load(sys.stdin) / for r in d: /     name = r['name'].encode('ascii','replace').decode() /     team = r['team'].encode('ascii','replace').decode() /     print(f'{name:25} | {team:25} | G:{r[\"goals\"]} xG:{r[\"xg\"]} Apps:{r[\"games\"]}') / "
+- 2026-06-13 23:43:56 | curl -s "http://127.0.0.1:5000/api/league/bundesliga/top-performers?metric=rating&limit=5&year=2025" | python3 -c " / import sys,json / d=json.load(sys.stdin) / for r in d: /     name = r['name'].encode('ascii','replace').decode() /     team = r['team'].encode('ascii','replace').decode() /     print(f'{name:25} | {team:25} | Rating:{r[\"avgRating\"]} G:{r[\"goals\"]} Apps:{r[\"games\"]}') / "

@@ -261,6 +261,142 @@ async def crawl_events(page, conn, tid, season_id, ctx):
     return saved
 
 
+# ── STEP 3: players + season stats ──────────────────────────────────────────
+
+async def crawl_players(page, conn, tid, season_id, fallback_sid=None):
+    """top-players/overall API로 선수 목록 + 시즌 누적 스탯 수집.
+
+    전략:
+    - /api/v1/unique-tournament/{tid}/season/{sid}/top-players/overall
+      → 28개 카테고리 × 최대 50명 → ~300+ unique 선수
+    - 카테고리별 stats를 player_id 기준으로 합산 → 1회 API 호출로 완료
+    - team/{id}/players 및 개인 페이지 방문 불필요 (EPL 등 상위 리그 403 우회)
+    - fallback_sid: 메인 season_id 실패 시 Serie A/Ligue 1 대체 sid
+    """
+    import json, time
+    log("[players] top-players/overall API로 선수 스탯 수집")
+
+    async def _fetch_top(sid):
+        return await page.evaluate(f"""() =>
+            fetch('/api/v1/unique-tournament/{tid}/season/{sid}/top-players/overall')
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null)
+        """)
+
+    data = await _fetch_top(season_id)
+    if (not isinstance(data, dict) or not data.get("topPlayers")) and fallback_sid:
+        log(f"  메인 season_id({season_id}) 실패 → fallback({fallback_sid}) 시도")
+        data = await _fetch_top(fallback_sid)
+
+    if not isinstance(data, dict) or not data.get("topPlayers"):
+        log("[players] top-players/overall API 실패 (403 또는 데이터 없음)")
+        return 0
+
+    tp = data["topPlayers"]
+
+    # player_id → {player_info, team_info, merged_stats} 집계
+    player_map = {}
+    for cat, entries in tp.items():
+        for entry in (entries or []):
+            p_obj = entry.get("player", {})
+            t_obj = entry.get("team", {})
+            s_obj = entry.get("statistics", {})
+            pid = p_obj.get("id")
+            if not pid:
+                continue
+            if pid not in player_map:
+                player_map[pid] = {
+                    "player": p_obj,
+                    "team":   t_obj,
+                    "stats":  {},
+                }
+            # appearances는 덮어쓰기(가장 정확한 값 유지), 나머지는 update
+            pm = player_map[pid]["stats"]
+            for k, v in s_obj.items():
+                if k in ("id", "type", "statisticsType"):
+                    continue
+                # appearances: 최댓값 유지
+                if k == "appearances":
+                    pm[k] = max(pm.get(k) or 0, v or 0)
+                elif k not in pm:
+                    pm[k] = v
+
+    log(f"  집계 완료 | unique 선수 {len(player_map)}명")
+
+    now_ts = int(time.time())
+    saved_p = 0
+    saved_s = 0
+
+    for pid, info in player_map.items():
+        p_obj = info["player"]
+        t_obj = info["team"]
+        s     = info["stats"]
+
+        team_id = t_obj.get("id")
+
+        # players 테이블 저장
+        conn.execute("""
+            INSERT OR REPLACE INTO players
+                (id, team_id, name, slug, position)
+            VALUES (?,?,?,?,?)
+        """, (
+            pid, team_id,
+            p_obj.get("name"), p_obj.get("slug"),
+            p_obj.get("position"),
+        ))
+        saved_p += 1
+
+        # teams 테이블 보완 (color 정보 포함)
+        if team_id and t_obj.get("name"):
+            colors = t_obj.get("teamColors", {})
+            conn.execute("""
+                INSERT OR IGNORE INTO teams
+                    (id, name, slug, tournament_id, season_id, primary_color, secondary_color)
+                VALUES (?,?,?,?,?,?,?)
+            """, (
+                team_id, t_obj.get("name"), t_obj.get("slug"),
+                tid, season_id,
+                colors.get("primary"), colors.get("secondary"),
+            ))
+
+        # player_stats 저장
+        conn.execute("""
+            INSERT OR REPLACE INTO player_stats (
+                player_id, tournament_id, season_id,
+                appearances, rating,
+                goals, assists, expected_goals, expected_assists,
+                total_shots, shots_on_target,
+                accurate_passes, accurate_passes_pct,
+                key_passes, successful_dribbles,
+                tackles, interceptions, yellow_cards, red_cards,
+                big_chances_created, big_chances_missed,
+                clearances, possession_lost,
+                saves, clean_sheet, goals_conceded,
+                raw_json
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            pid, tid, season_id,
+            s.get("appearances"),          s.get("rating"),
+            s.get("goals"),                s.get("assists"),
+            s.get("expectedGoals"),        s.get("expectedAssists"),
+            s.get("totalShots"),           s.get("shotsOnTarget"),
+            s.get("accuratePasses"),       s.get("accuratePassesPercentage"),
+            s.get("keyPasses"),            s.get("successfulDribbles"),
+            s.get("tackles"),              s.get("interceptions"),
+            s.get("yellowCards"),          s.get("redCards"),
+            s.get("bigChancesCreated"),    s.get("bigChancesMissed"),
+            s.get("clearances"),           s.get("possessionLost"),
+            s.get("saves"),                s.get("cleanSheet"),
+            s.get("goalsConceded"),
+            json.dumps(s, ensure_ascii=False),
+        ))
+        saved_s += 1
+
+    conn.commit()
+    log(f"[players] 완료 | 선수 {saved_p}명 | 스탯 {saved_s}명 저장")
+    return saved_s
+
+
 # ── 메인 ────────────────────────────────────────────────────────────────────
 
 async def run_league(league_code, year, steps):
@@ -287,8 +423,8 @@ async def run_league(league_code, year, steps):
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode=WAL")
 
-    unsupported = {"mps", "avgpos", "shotmap", "heatmap", "players"}
-    default_steps = ["standings", "events"]
+    unsupported = {"mps", "avgpos", "shotmap", "heatmap"}
+    default_steps = ["standings", "events", "players"]
     run_steps = default_steps if steps == ["all"] else steps
 
     async with async_playwright() as p:
@@ -304,6 +440,8 @@ async def run_league(league_code, year, steps):
                 await crawl_standings(page, conn, tid, season_id, fallback_sid)
             elif step == "events":
                 await crawl_events(page, conn, tid, season_id, ctx)
+            elif step == "players":
+                await crawl_players(page, conn, tid, season_id, fallback_sid)
             else:
                 log(f"[WARN] 알 수 없는 step: {step}")
 
