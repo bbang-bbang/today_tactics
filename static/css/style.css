@@ -3890,6 +3890,22 @@ body {
 }
 .league-tab-panel { display: none; }
 .league-tab-panel.active { display: block; }
+.league-tab-ext {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1px solid rgba(96,165,250,0.3);
+    background: transparent;
+    color: #60a5fa;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    margin-left: 6px;
+}
+.league-tab-ext:hover { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
 
 /* K2/K1 일정 배너 래퍼 (탭 내부) */
 #k2-schedule-banner-wrap,

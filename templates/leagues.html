@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>해외리그 통계 — Today Tactics</title>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=89">
+    <style>
+        /* ── leagues.html 전용 레이아웃 ── */
+        body { background: #0a0f1a; color: #c9d8ec; font-family: 'Pretendard', sans-serif; margin: 0; min-height: 100vh; }
+
+        .lp-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 14px 24px;
+            background: #0d1525;
+            border-bottom: 1px solid #1e2a3a;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .lp-back {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #60a5fa;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            padding: 5px 12px;
+            border: 1px solid #1e3a5f;
+            border-radius: 6px;
+            transition: all 0.15s ease;
+        }
+        .lp-back:hover { background: #1e3a5f; color: #93c5fd; }
+        .lp-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #e2eaf5;
+            margin: 0;
+            flex: 1;
+        }
+        .lp-title span { color: #60a5fa; }
+        .lp-user {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #7a8ba8;
+        }
+        .lp-user a { color: #7a8ba8; text-decoration: none; font-size: 12px; }
+        .lp-user a:hover { color: #93c5fd; }
+        .lp-avatar {
+            width: 28px; height: 28px; border-radius: 50%;
+            object-fit: cover; border: 1px solid #1e3a5f;
+        }
+
+        .lp-body {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px 24px 60px;
+        }
+
+        /* 리그 선택 칩 */
+        .lp-league-bar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .lp-league-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 18px;
+            border-radius: 24px;
+            border: 1px solid #1e2a3a;
+            background: #111827;
+            color: #7a8ba8;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .lp-league-chip:hover { border-color: #3b82f6; color: #93c5fd; }
+        .lp-league-chip.active {
+            background: #1e3a5f;
+            border-color: #3b82f6;
+            color: #e2eaf5;
+            font-weight: 700;
+        }
+        .lp-league-chip .lp-flag { font-size: 16px; line-height: 1; }
+
+        /* 컨트롤 바 (시즌 + 섹션) */
+        .lp-control-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .lp-section-tabs {
+            display: flex;
+            gap: 4px;
+            background: #111827;
+            border: 1px solid #1e2a3a;
+            border-radius: 8px;
+            padding: 4px;
+            flex: 1;
+        }
+        .lp-sec-btn {
+            flex: 1;
+            padding: 7px 16px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: #7a8ba8;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .lp-sec-btn:hover { color: #93c5fd; }
+        .lp-sec-btn.active { background: #1e3a5f; color: #e2eaf5; font-weight: 700; }
+
+        .lp-year-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .lp-year-label { font-size: 12px; color: #7a8ba8; }
+        .lp-year-select {
+            background: #111827;
+            border: 1px solid #1e2a3a;
+            color: #c9d8ec;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .lp-year-select:focus { outline: none; border-color: #3b82f6; }
+
+        /* 콘텐츠 영역 */
+        .lp-content {
+            min-height: 300px;
+            background: #0d1525;
+            border: 1px solid #1e2a3a;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .lp-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            color: #7a8ba8;
+            font-size: 14px;
+        }
+        .lp-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #7a8ba8;
+        }
+        .lp-empty p { margin: 6px 0; }
+        .lp-empty-sub { font-size: 12px; opacity: 0.7; }
+        .lp-empty code {
+            display: inline-block;
+            margin-top: 8px;
+            background: #111827;
+            border: 1px solid #1e2a3a;
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 11px;
+            color: #60a5fa;
+        }
+        .lp-error {
+            text-align: center;
+            padding: 40px 20px;
+            color: #f87171;
+            font-size: 14px;
+        }
+
+        /* 리그 제목 행 */
+        .lp-league-heading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #1e2a3a;
+        }
+        .lp-league-flag { font-size: 22px; }
+        .lp-league-name { font-size: 17px; font-weight: 700; color: #e2eaf5; }
+        .lp-league-season { font-size: 12px; color: #7a8ba8; margin-left: auto; }
+
+        /* 테이블 공통 — gl-table 재사용 */
+
+        /* 데이터 없음 안내 (리그 지원 미수집) */
+        .lp-no-player-note {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 12px;
+            padding: 5px 12px;
+            background: #1a1f2e;
+            border: 1px solid #2a3a5a;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #f59e0b;
+        }
+    </style>
+</head>
+<body>
+
+<header class="lp-header">
+    <a href="/" class="lp-back">← 전술판</a>
+    <h1 class="lp-title"><span>🌍</span> 해외리그 통계</h1>
+    {% if current_user %}
+    <div class="lp-user">
+        {% if current_user.picture %}
+        <img class="lp-avatar" src="{{ current_user.picture }}" alt="" referrerpolicy="no-referrer">
+        {% endif %}
+        <span>{{ current_user.name }}</span>
+        <a href="/auth/logout">로그아웃</a>
+    </div>
+    {% endif %}
+</header>
+
+<div class="lp-body">
+    <div class="lp-league-bar" id="lp-league-bar">
+        <div class="lp-loading">리그 목록 로딩 중…</div>
+    </div>
+
+    <div class="lp-control-bar">
+        <div class="lp-section-tabs" id="lp-section-tabs">
+            <button class="lp-sec-btn active" data-sec="standings">📋 순위표</button>
+            <button class="lp-sec-btn" data-sec="team-rankings">📊 팀 지표</button>
+            <button class="lp-sec-btn" data-sec="top-performers">⭐ TOP 퍼포머</button>
+        </div>
+        <div class="lp-year-wrap">
+            <span class="lp-year-label">시즌</span>
+            <select id="lp-year" class="lp-year-select">
+                <option value="2025">2025/26</option>
+                <option value="2024">2024/25</option>
+                <option value="2023">2023/24</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="lp-content" id="lp-content">
+        <div class="lp-loading">로딩 중…</div>
+    </div>
+</div>
+
+<script>
+// ── 상태 ──
+const LP = {
+    leagues: [],
+    activeLeague: null,
+    activeYear: '2025',
+    activeSection: 'standings',
+    activePerfMetric: 'goals',
+};
+const _lpCache = {};
+
+const content = () => document.getElementById('lp-content');
+
+// ── 초기화 ──
+async function lpInit() {
+    try {
+        const res = await fetch('/api/leagues');
+        LP.leagues = (await res.json()).filter(l => l.code !== 'kleague');
+    } catch {
+        document.getElementById('lp-league-bar').innerHTML = '<div class="lp-error">리그 목록 로드 실패</div>';
+        return;
+    }
+
+    if (!LP.leagues.length) {
+        document.getElementById('lp-league-bar').innerHTML = '<div class="lp-error">등록된 해외 리그 없음</div>';
+        return;
+    }
+
+    LP.activeLeague = LP.leagues[0].code;
+    renderLeagueBar();
+    bindControls();
+    await lpLoadSection();
+}
+
+// ── 리그 버튼 ──
+function renderLeagueBar() {
+    const bar = document.getElementById('lp-league-bar');
+    bar.innerHTML = '';
+    LP.leagues.forEach(l => {
+        const btn = document.createElement('button');
+        btn.className = 'lp-league-chip' + (l.code === LP.activeLeague ? ' active' : '');
+        btn.dataset.code = l.code;
+        btn.innerHTML = `<span class="lp-flag">${l.flag || ''}</span>${l.label}`;
+        btn.addEventListener('click', async () => {
+            LP.activeLeague = l.code;
+            document.querySelectorAll('.lp-league-chip').forEach(b =>
+                b.classList.toggle('active', b.dataset.code === l.code));
+            await lpLoadSection();
+        });
+        bar.appendChild(btn);
+    });
+}
+
+// ── 컨트롤 바인딩 ──
+function bindControls() {
+    document.querySelectorAll('.lp-sec-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            LP.activeSection = btn.dataset.sec;
+            document.querySelectorAll('.lp-sec-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            await lpLoadSection();
+        });
+    });
+    document.getElementById('lp-year').addEventListener('change', async e => {
+        LP.activeYear = e.target.value;
+        await lpLoadSection();
+    });
+}
+
+// ── 섹션 로드 ──
+async function lpLoadSection() {
+    content().innerHTML = '<div class="lp-loading">로딩 중…</div>';
+    const code = LP.activeLeague;
+    const qs   = `?year=${LP.activeYear}`;
+    try {
+        if (LP.activeSection === 'standings')      await lpStandings(code, qs);
+        else if (LP.activeSection === 'team-rankings') await lpTeamRankings(code, qs);
+        else if (LP.activeSection === 'top-performers') await lpTopPerformers(code, qs);
+    } catch (e) {
+        content().innerHTML = `<div class="lp-error">데이터 로드 실패: ${e.message}</div>`;
+    }
+}
+
+// ── 현재 리그 메타 ──
+function activeLeagueMeta() {
+    return LP.leagues.find(l => l.code === LP.activeLeague) || {};
+}
+
+function seasonLabel(year) {
+    return year === '2025' ? '2025/26' : year === '2024' ? '2024/25' : year + '/선택';
+}
+
+function headingHtml() {
+    const m = activeLeagueMeta();
+    return `
+        <div class="lp-league-heading">
+            <span class="lp-league-flag">${m.flag || '🌍'}</span>
+            <span class="lp-league-name">${m.label || LP.activeLeague}</span>
+            <span class="lp-league-season">${seasonLabel(LP.activeYear)}</span>
+        </div>`;
+}
+
+// ── 순위표 ──
+async function lpStandings(code, qs) {
+    const cKey = `st|${code}|${qs}`;
+    if (!_lpCache[cKey]) {
+        const r = await fetch(`/api/league/${code}/standings${qs}`);
+        _lpCache[cKey] = await r.json();
+    }
+    const data = _lpCache[cKey];
+    if (!data.length) { content().innerHTML = headingHtml() + noDataHtml(code, 'standings'); return; }
+
+    content().innerHTML = headingHtml() + `
+        <div class="gl-table-wrap">
+            <table class="gl-table">
+                <thead>
+                    <tr>
+                        <th>#</th><th>팀</th><th>경기</th>
+                        <th>승</th><th>무</th><th>패</th>
+                        <th>득</th><th>실</th><th>득실</th>
+                        <th class="pts-col">승점</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.map(r => `
+                        <tr>
+                            <td class="gl-rank">${r.rank}</td>
+                            <td class="gl-team-name">${r.team}</td>
+                            <td>${r.played}</td>
+                            <td class="w-col">${r.wins}</td>
+                            <td>${r.draws}</td>
+                            <td class="l-col">${r.losses}</td>
+                            <td>${r.gf}</td>
+                            <td>${r.ga}</td>
+                            <td class="${r.gd > 0 ? 'pos-gd' : r.gd < 0 ? 'neg-gd' : ''}">
+                                ${r.gd > 0 ? '+' : ''}${r.gd}
+                            </td>
+                            <td class="pts-col"><strong>${r.pts}</strong></td>
+                        </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>`;
+}
+
+// ── 팀 지표 ──
+async function lpTeamRankings(code, qs) {
+    const cKey = `tr|${code}|${qs}`;
+    if (!_lpCache[cKey]) {
+        const r = await fetch(`/api/league/${code}/team-rankings${qs}`);
+        _lpCache[cKey] = await r.json();
+    }
+    const data = _lpCache[cKey];
+    if (!data.length) { content().innerHTML = headingHtml() + noDataHtml(code, 'team-rankings'); return; }
+
+    const isSeason = data[0] && data[0].source === 'player_stats';
+    content().innerHTML = headingHtml() + `
+        <div class="gl-table-wrap">
+            ${isSeason ? '<div class="gl-src-badge">📡 SofaScore 시즌 누적 (선수 집계)</div>' : ''}
+            <table class="gl-table">
+                <thead>
+                    <tr>
+                        <th>팀</th><th>경기</th>
+                        <th class="num-col gl-perf-primary">xG</th>
+                        <th>득점</th><th>슈팅</th><th>유효슈팅</th>
+                        <th>키패스</th><th>태클</th><th>평점</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.map(r => `
+                        <tr>
+                            <td class="gl-team-name">${r.team}</td>
+                            <td>${r.matches}</td>
+                            <td class="num-col gl-perf-primary"><strong>${r.xg}</strong></td>
+                            <td class="num-col">${r.goals}</td>
+                            <td>${r.shots}</td>
+                            <td>${r.shotsOn}</td>
+                            <td>${r.keyPasses ?? '-'}</td>
+                            <td>${r.tackles}</td>
+                            <td class="rating-col">${r.avgRating || '-'}</td>
+                        </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>`;
+}
+
+// ── TOP 퍼포머 ──
+const PERF_METRICS = [
+    { key: 'goals',      label: '⚽ 득점'   },
+    { key: 'assists',    label: '🤝 도움'   },
+    { key: 'xg',         label: '🎯 xG'    },
+    { key: 'key_passes', label: '🔑 키패스' },
+    { key: 'tackles',    label: '🛡️ 태클'  },
+    { key: 'rating',     label: '⭐ 평점'   },
+];
+const PERF_COLS = {
+    goals:      [['득점','goals'],    ['도움','assists'],    ['xG','xg'],        ['평점','avgRating']],
+    assists:    [['도움','assists'],   ['키패스','keyPasses'],['득점','goals'],   ['평점','avgRating']],
+    xg:         [['xG','xg'],         ['득점','goals'],      ['도움','assists'],  ['평점','avgRating']],
+    key_passes: [['키패스','keyPasses'],['도움','assists'],  ['득점','goals'],    ['평점','avgRating']],
+    tackles:    [['태클','tackles'],   ['키패스','keyPasses'],['도움','assists'], ['평점','avgRating']],
+    rating:     [['평점','avgRating'], ['득점','goals'],      ['도움','assists'],  ['xG','xg']],
+};
+function posLabel(pos) { return { F: '공', M: '미', D: '수', G: '골' }[pos] || pos || '-'; }
+
+async function lpTopPerformers(code, qs) {
+    content().innerHTML = headingHtml() + `
+        <div class="gl-perf-wrap2">
+            <div class="gl-perf-metrics" id="lp-perf-metrics">
+                ${PERF_METRICS.map(m =>
+                    `<button class="gl-perf-btn${LP.activePerfMetric === m.key ? ' active' : ''}"
+                             data-metric="${m.key}">${m.label}</button>`
+                ).join('')}
+            </div>
+            <div id="lp-perf-table" class="gl-perf-table-area">
+                <div class="lp-loading">로딩 중…</div>
+            </div>
+        </div>`;
+
+    document.querySelectorAll('#lp-perf-metrics .gl-perf-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            LP.activePerfMetric = btn.dataset.metric;
+            document.querySelectorAll('#lp-perf-metrics .gl-perf-btn')
+                .forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            await _lpPerfTable(code, qs, LP.activePerfMetric);
+        });
+    });
+
+    await _lpPerfTable(code, qs, LP.activePerfMetric);
+}
+
+async function _lpPerfTable(code, qs, metric) {
+    const area = document.getElementById('lp-perf-table');
+    if (!area) return;
+    area.innerHTML = '<div class="lp-loading">로딩 중…</div>';
+
+    const cKey = `tp|${code}|${qs}|${metric}`;
+    if (!_lpCache[cKey]) {
+        try {
+            const r = await fetch(`/api/league/${code}/top-performers${qs}&metric=${metric}&limit=20`);
+            _lpCache[cKey] = await r.json();
+        } catch {
+            area.innerHTML = '<div class="lp-error">데이터 로드 실패</div>';
+            return;
+        }
+    }
+
+    const data = _lpCache[cKey];
+    if (!data.length) {
+        area.innerHTML = `
+            <div class="lp-no-player-note">⚠️ 이 리그는 선수 스탯을 수집하지 못했습니다 (SofaScore 제한)</div>
+            ${noDataHtml(code, 'top-performers')}`;
+        return;
+    }
+
+    const cols     = PERF_COLS[metric] || PERF_COLS.goals;
+    const isSeason = data[0] && data[0].source === 'season_stats';
+
+    area.innerHTML = `
+        <div class="gl-table-wrap">
+            ${isSeason ? '<div class="gl-src-badge">📡 SofaScore 시즌 누적 스탯</div>' : ''}
+            <table class="gl-table gl-perf-tbl">
+                <thead>
+                    <tr>
+                        <th>#</th><th>선수</th><th>팀</th><th>POS</th><th>경기</th>
+                        ${cols.map((c, i) =>
+                            `<th class="num-col${i === 0 ? ' gl-perf-primary' : ''}">${c[0]}</th>`
+                        ).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.slice(0, 20).map((p, i) => {
+                        const cells = cols.map((c, ci) => {
+                            const val  = p[c[1]];
+                            const disp = (val === null || val === undefined) ? '-' : val;
+                            const cls  = `num-col${ci === 0 ? ' gl-perf-primary' : ''}`;
+                            return `<td class="${cls}">${ci === 0 ? `<strong>${disp}</strong>` : disp}</td>`;
+                        }).join('');
+                        return `
+                            <tr>
+                                <td class="gl-rank">${i + 1}</td>
+                                <td class="gl-player-name">${p.name}</td>
+                                <td class="gl-team-sub">${p.team}</td>
+                                <td class="gl-pos">${posLabel(p.position)}</td>
+                                <td>${p.games}</td>
+                                ${cells}
+                            </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>`;
+}
+
+// ── 데이터 없음 ──
+function noDataHtml(code, section) {
+    return `
+        <div class="lp-empty">
+            <p>아직 <strong>${code.toUpperCase()}</strong> 데이터가 없습니다.</p>
+            <p class="lp-empty-sub">크롤러를 실행하세요:</p>
+            <code>python crawlers/crawl_league.py --league ${code} --year 2025</code>
+        </div>`;
+}
+
+// ── 시작 ──
+document.addEventListener('DOMContentLoaded', lpInit);
+</script>
+</body>
+</html>

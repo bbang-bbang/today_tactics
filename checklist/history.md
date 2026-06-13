@@ -95,6 +95,32 @@
 
 ---
 
+## 2026-06-14 | 해외리그 독립 페이지 `/leagues` + team-rankings 수정
+
+### 배경
+- 해외리그 탭(🌍)이 워크스페이스에 묻혀 있고, 팀 지표 섹션이 `match_player_stats`(해외DB 0건) 기반이라 빈 화면.
+- PM 판단: 해외리그 데이터 충분(EPL/라리가/분데스 선수 900+명), 전용 페이지로 분리해 진입 접근성 향상.
+
+### ① team-rankings API 수정 (`main.py`)
+- 기존: `match_player_stats` JOIN events 집계 → 해외DB에서 항상 0행.
+- 변경: 1순위 `player_stats` 팀 집계(xG/goals/shots/shotsOn/keyPasses/tackles/avgRating) → `source: player_stats` 반환.
+- 2순위: 기존 `match_player_stats` fallback 유지(K리그용).
+- 결과: EPL 20팀·라리가 20팀·분데스 18팀 team-rankings 정상 반환. Serie A/Ligue 1은 player_stats 0 → 빈 배열.
+
+### ② 해외리그 독립 페이지 (`/leagues`, `templates/leagues.html`)
+- `main.py`: `@app.route("/leagues")` 신규 → `leagues.html` 렌더링, `no-cache` 헤더.
+- `leagues.html`: Sticky 헤더(← 전술판 back 링크) + 리그 칩 버튼 + 섹션 탭(순위표/팀 지표/TOP 퍼포머) + 연도 셀렉터.
+- 인라인 JS 자립 구조(global_league.js 미의존) — `_lpCache` 캐시, 동일 PERF_METRICS/PERF_COLS 로직.
+- `style.css`: `.league-tab-ext` 추가 — K리그1/2 필터 옆 해외리그 진입 링크 버튼.
+- `templates/index.html`: `#league-tabs` 안에 `<a href="/leagues" class="league-tab-ext">🌍 해외리그</a>` 추가.
+
+### 검증
+- `/leagues` 200 OK, 페이지 길이 19 KB.
+- EPL team-rankings: 20행, `source=player_stats`, xG·keyPasses 정상.
+- 브라우저 `http://127.0.0.1:5000/leagues` → 데이터 확인 필요 (서버 실행 중).
+
+---
+
 ## 2026-06-12 | 🆕 K리그 심화 ② 슛맵·xG 분석 — 미활용 match_shotmap 활용
 
 ### 백엔드 `/api/team-shotmap?teamId=&year=&side=for|against`
@@ -4012,3 +4038,6 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-12 15:45:37 | BASE=https://www.today-football-tactics.xyz; sleep 5 / curl -s -o /dev/null -w "health: %{http_code}\n" --max-time 20 "$BASE/health" / curl -s -o /dev/null -w "team page: %{http_code}\n" --max-time 20 "$BASE/"
 - 2026-06-13 23:43:52 | curl -s "http://127.0.0.1:5000/api/league/laliga/top-performers?metric=goals&limit=5&year=2025" | python3 -c " / import sys,json / d=json.load(sys.stdin) / for r in d: /     name = r['name'].encode('ascii','replace').decode() /     team = r['team'].encode('ascii','replace').decode() /     print(f'{name:25} | {team:25} | G:{r[\"goals\"]} xG:{r[\"xg\"]} Apps:{r[\"games\"]}') / "
 - 2026-06-13 23:43:56 | curl -s "http://127.0.0.1:5000/api/league/bundesliga/top-performers?metric=rating&limit=5&year=2025" | python3 -c " / import sys,json / d=json.load(sys.stdin) / for r in d: /     name = r['name'].encode('ascii','replace').decode() /     team = r['team'].encode('ascii','replace').decode() /     print(f'{name:25} | {team:25} | Rating:{r[\"avgRating\"]} G:{r[\"goals\"]} Apps:{r[\"games\"]}') / "
+- 2026-06-13 23:59:10 | curl -s "http://127.0.0.1:5000/api/league/epl/top-performers?metric=key_passes&year=2025&limit=5" | python3 -c " / import sys,json / d=json.load(sys.stdin) / for r in d: /     n=r['name'].encode('ascii','replace').decode() /     t=r['team'].encode('ascii','replace').decode() /     print(f'{n:25} | {t:25} | KP:{r[\"keyPasses\"]} A:{r[\"assists\"]} G:{r[\"goals\"]} src:{r.get(\"source\",\"?\")}') / "
+- 2026-06-13 23:59:15 | curl -s "http://127.0.0.1:5000/api/league/bundesliga/top-performers?metric=tackles&year=2025&limit=5" | python3 -c " / import sys,json / d=json.load(sys.stdin) / for r in d: /     n=r['name'].encode('ascii','replace').decode() /     t=r['team'].encode('ascii','replace').decode() /     print(f'{n:25} | {t:25} | Tac:{r[\"tackles\"]} KP:{r[\"keyPasses\"]} Rating:{r[\"avgRating\"]}') / "
+- 2026-06-14 00:00:05 | curl -s "http://127.0.0.1:5000/" | grep -o "gl-root\|ws-global\|initGlobalLeagueView" | head -5

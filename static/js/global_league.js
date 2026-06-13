@@ -190,13 +190,15 @@
       return;
     }
 
+    const isSeason = data[0] && data[0].source === 'player_stats';
     content.innerHTML = `
       <div class="gl-table-wrap">
+        ${isSeason ? '<div class="gl-src-badge">📡 SofaScore 시즌 누적 스탯</div>' : ''}
         <table class="gl-table">
           <thead>
             <tr>
-              <th>팀</th><th>경기</th><th>xG</th><th>득점</th>
-              <th>슈팅</th><th>유효슈팅</th><th>듀얼승</th><th>태클</th><th>평점</th>
+              <th>팀</th><th>경기</th><th class="num-col gl-perf-primary">xG</th><th>득점</th>
+              <th>슈팅</th><th>유효슈팅</th><th>키패스</th><th>태클</th><th>평점</th>
             </tr>
           </thead>
           <tbody>
@@ -204,11 +206,11 @@
               <tr>
                 <td class="gl-team-name">${r.team}</td>
                 <td>${r.matches}</td>
-                <td class="num-col">${r.xg}</td>
+                <td class="num-col gl-perf-primary"><strong>${r.xg}</strong></td>
                 <td class="num-col">${r.goals}</td>
                 <td>${r.shots}</td>
                 <td>${r.shotsOn}</td>
-                <td>${r.duelWon}</td>
+                <td>${r.keyPasses ?? '-'}</td>
                 <td>${r.tackles}</td>
                 <td class="rating-col">${r.avgRating}</td>
               </tr>

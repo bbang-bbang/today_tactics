@@ -657,6 +657,13 @@ def index():
     return resp
 
 
+@app.route("/leagues")
+def leagues_page():
+    resp = app.make_response(render_template("leagues.html", current_user=session.get("user")))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
+
+
 @app.route("/api/formations")
 def formations():
     return jsonify(FORMATIONS)
@@ -8957,29 +8964,76 @@ def league_standings(code):
 
 @app.route("/api/league/<code>/team-rankings")
 def league_team_rankings(code):
-    """팀별 핵심 지표 비교 (xG, 슈팅, 듀얼 등)."""
+    """팀별 핵심 지표 비교.
+    1순위: player_stats 집계 (시즌 누적, 해외리그 기본)
+    2순위: match_player_stats 집계 (K리그 경기별 데이터)
+    """
     cfg, err = _validate_league(code)
     if err:
         return err
-    year = request.args.get("year")
-    year_cond = "AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?" if year else ""
-    yp = [year] if year else []
+    year   = request.args.get("year")
+    season_id = cfg.get("season_ids", {}).get(int(year)) if year else None
 
     with get_league_db(code) as conn:
         tids = [t["id"] for t in cfg["tournaments"]]
         ph   = ",".join("?" * len(tids))
+
+        # 1순위: player_stats 집계 (팀별 합산)
+        sid_cond   = "AND ps.season_id = ?" if season_id else ""
+        sid_params = [season_id] if season_id else []
         rows = conn.execute(f"""
+            SELECT p.team_id,
+                   t.name,
+                   MAX(ls.matches)                        AS matches,
+                   ROUND(SUM(COALESCE(ps.expected_goals, 0)), 2) AS xg,
+                   SUM(COALESCE(ps.goals, 0))             AS goals,
+                   SUM(COALESCE(ps.total_shots, 0))       AS shots,
+                   SUM(COALESCE(ps.shots_on_target, 0))   AS shots_on,
+                   SUM(COALESCE(ps.key_passes, 0))        AS key_passes,
+                   SUM(COALESCE(ps.tackles, 0))           AS tackles,
+                   ROUND(AVG(CASE WHEN COALESCE(ps.rating,0)>0 THEN ps.rating END), 2) AS avg_rating
+            FROM player_stats ps
+            JOIN players p ON p.id = ps.player_id
+            LEFT JOIN teams t ON t.id = p.team_id
+            LEFT JOIN league_standings ls
+                   ON ls.team_id = p.team_id
+                  AND ls.tournament_id = ps.tournament_id
+            WHERE ps.tournament_id IN ({ph})
+              AND COALESCE(ps.appearances, 0) >= 1
+              {sid_cond}
+            GROUP BY p.team_id
+            ORDER BY xg DESC
+        """, (*tids, *sid_params)).fetchall()
+
+        if rows:
+            return jsonify([{
+                "teamId":    r[0],
+                "team":      r[1] or str(r[0]),
+                "matches":   r[2] or 0,
+                "xg":        r[3] or 0,
+                "goals":     r[4] or 0,
+                "shots":     r[5] or 0,
+                "shotsOn":   r[6] or 0,
+                "keyPasses": r[7] or 0,
+                "tackles":   r[8] or 0,
+                "avgRating": r[9] or 0,
+                "source":    "player_stats",
+            } for r in rows])
+
+        # 2순위: match_player_stats (K리그 등 경기별 데이터 있을 때)
+        year_cond = "AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?" if year else ""
+        yp = [year] if year else []
+        rows_mps = conn.execute(f"""
             SELECT m.team_id,
                    t.name,
-                   COUNT(DISTINCT m.event_id)   AS matches,
-                   ROUND(SUM(m.expected_goals),2) AS xg,
-                   SUM(m.goals)                 AS goals,
-                   SUM(m.total_shots)           AS shots,
-                   SUM(m.shots_on_target)       AS shots_on,
-                   SUM(m.duel_won)              AS duel_won,
-                   SUM(m.duel_lost)             AS duel_lost,
-                   SUM(m.tackles)               AS tackles,
-                   ROUND(AVG(m.rating), 2)      AS avg_rating
+                   COUNT(DISTINCT m.event_id)            AS matches,
+                   ROUND(SUM(m.expected_goals), 2)       AS xg,
+                   SUM(m.goals)                          AS goals,
+                   SUM(m.total_shots)                    AS shots,
+                   SUM(m.shots_on_target)                AS shots_on,
+                   SUM(m.key_passes)                     AS key_passes,
+                   SUM(m.tackles)                        AS tackles,
+                   ROUND(AVG(m.rating), 2)               AS avg_rating
             FROM match_player_stats m
             JOIN events e ON e.id = m.event_id
             LEFT JOIN teams t ON t.id = m.team_id
@@ -8997,11 +9051,11 @@ def league_team_rankings(code):
         "goals":     r[4] or 0,
         "shots":     r[5] or 0,
         "shotsOn":   r[6] or 0,
-        "duelWon":   r[7] or 0,
-        "duelLost":  r[8] or 0,
-        "tackles":   r[9] or 0,
-        "avgRating": r[10] or 0,
-    } for r in rows])
+        "keyPasses": r[7] or 0,
+        "tackles":   r[8] or 0,
+        "avgRating": r[9] or 0,
+        "source":    "mps",
+    } for r in rows_mps])
 
 
 @app.route("/api/league/<code>/top-performers")
