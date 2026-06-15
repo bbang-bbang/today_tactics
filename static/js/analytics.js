@@ -376,13 +376,15 @@
         destroyChart("ta-month");
         const el = document.getElementById("ta-month");
         if (!rows.length) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>데이터 없음</p>"; return; }
+        const MIN = 4;   // 이 미만 월은 표본 부족 → 막대 회색(승률 신뢰도 낮음 표시)
         const labels = rows.map(r => r.month + "월");
         const pct = rows.map(r => winPct(r.w, r.games));
+        const colors = rows.map(r => r.games < MIN ? "rgba(120,134,153,0.55)" : winColor(winPct(r.w, r.games)));
         charts["ta-month"] = new Chart(el, {
             type: "bar",
             data: {
                 labels,
-                datasets: [{ label: "승률", data: pct, backgroundColor: pct.map(p => winColor(p)), borderRadius: 4, maxBarThickness: 38 }]
+                datasets: [{ label: "승률", data: pct, backgroundColor: colors, borderRadius: 4, maxBarThickness: 38 }]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
@@ -392,7 +394,7 @@
                         ...BASE_PLUGINS.tooltip,
                         callbacks: {
                             label: c => `승률 ${c.parsed.y}%`,
-                            afterBody: items => { const r = rows[items[0].dataIndex]; return `${r.games}경기  ${r.w}승 ${r.d}무 ${r.l}패`; }
+                            afterBody: items => { const r = rows[items[0].dataIndex]; return `${r.games}경기  ${r.w}승 ${r.d}무 ${r.l}패` + (r.games < MIN ? "  ⚠표본 적음" : ""); }
                         }
                     }
                 },
@@ -434,19 +436,31 @@
         const tbl = document.getElementById("ta-vs-table");
         if (!rows.length) { tbl.innerHTML = "<tr><td class='chart-empty'>데이터 없음</td></tr>"; return; }
 
-        // 승률 높은 상대 → 낮은 순 (만만한 상대가 위)
-        const sorted = [...rows].sort((a, b) => winPct(b.w, b.games) - winPct(a.w, a.games));
+        const MIN = 4;   // 이 미만 상대는 승률 신뢰도 낮음 → 후순위 + 배지 약화
+        // 표본 충분한 상대를 승률순으로 먼저, 소표본 상대는 아래로(1경기 100% 같은 착시 방지)
+        const sorted = [...rows].sort((a, b) => {
+            const ae = a.games >= MIN, be = b.games >= MIN;
+            if (ae !== be) return ae ? -1 : 1;
+            return winPct(b.w, b.games) - winPct(a.w, a.games);
+        });
 
+        let anyLow = false;
         tbl.innerHTML = `<tr><th>상대팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>승률</th></tr>` +
             sorted.map(r => {
                 const p = winPct(r.w, r.games);
+                const low = r.games < MIN;
+                if (low) anyLow = true;
+                const badge = low
+                    ? `<span class="ta-wr-badge ta-wr-low" title="표본 ${r.games}경기 — 참고용">${p}%</span>`
+                    : `<span class="ta-wr-badge" style="background:${winColor(p,0.22)};color:${winColor(p,1)};border:1px solid ${winColor(p,0.5)}">${p}%</span>`;
                 return `<tr>
                     <td class="ta-vs-name">${r.name}</td><td>${r.games}</td>
                     <td style="color:#7bed9f">${r.w}</td><td style="color:#aab">${r.d}</td><td style="color:#e05c5c">${r.l}</td>
                     <td>${r.gf}:${r.ga}</td>
-                    <td><span class="ta-wr-badge" style="background:${winColor(p,0.22)};color:${winColor(p,1)};border:1px solid ${winColor(p,0.5)}">${p}%</span></td>
+                    <td>${badge}</td>
                 </tr>`;
-            }).join("");
+            }).join("")
+            + (anyLow ? `<tr class="ta-vs-note"><td colspan="7">⚠ <b>${MIN}경기 미만</b> 상대의 승률은 표본이 적어 흐리게 표시·후순위 정렬 (전적 W-D-L을 우선 참고)</td></tr>` : "");
     }
 
     // ── 결과 ⑤ 날씨별 승률 ───────────────────────────────────────

@@ -212,26 +212,37 @@
             return;
         }
 
-        // 평점 기준 정렬 (없으면 GA), 최대 8팀
+        // 평점 기준 정렬, 단 표본 충분(MIN+경기)한 상대를 먼저 — 1경기 고평점이 "좋은 상대"로
+        // 오인되지 않게(표본 함정 방지). 최대 8팀.
+        const MIN = 2;
         const sorted = [...data]
             .filter(d => d.games >= 1)
-            .sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0))
+            .sort((a, b) => {
+                const ae = a.games >= MIN, be = b.games >= MIN;
+                if (ae !== be) return ae ? -1 : 1;
+                return (b.avg_rating || 0) - (a.avg_rating || 0);
+            })
             .slice(0, 8);
+        let anyLow = false;
 
         const labels   = sorted.map(d => d.opp_name);
         const ratings  = sorted.map(d => d.avg_rating || 0);
         const gaData   = sorted.map(d => d.ga);
-        const colors   = ratings.map(r => r >= 7.5 ? "rgba(74,222,128,0.8)" : r >= 7.0 ? "rgba(78,164,248,0.8)" : r >= 6.5 ? "rgba(251,191,36,0.8)" : "rgba(248,113,113,0.7)");
+        const colors   = sorted.map(d => d.games < MIN ? "rgba(120,134,153,0.5)"
+            : d.avg_rating >= 7.5 ? "rgba(74,222,128,0.8)" : d.avg_rating >= 7.0 ? "rgba(78,164,248,0.8)" : d.avg_rating >= 6.5 ? "rgba(251,191,36,0.8)" : "rgba(248,113,113,0.7)");
 
         // 테이블 + 차트
         const rows = sorted.map((d, i) => {
-            const ratingColor = d.avg_rating >= 7.5 ? "#4ade80" : d.avg_rating >= 7.0 ? "#4ea4f8" : d.avg_rating >= 6.5 ? "#fbbf24" : "#f87171";
-            return `<tr>
+            const low = d.games < MIN;
+            if (low) anyLow = true;
+            const ratingColor = low ? "#7a8898"
+                : d.avg_rating >= 7.5 ? "#4ade80" : d.avg_rating >= 7.0 ? "#4ea4f8" : d.avg_rating >= 6.5 ? "#fbbf24" : "#f87171";
+            return `<tr${low ? ' title="표본 1경기 — 참고용"' : ''}>
                 <td style="color:#9ab">${d.opp_name}</td>
                 <td style="text-align:center;color:#778">${d.games}</td>
                 <td style="text-align:center;color:#4ade80">${d.goals}</td>
                 <td style="text-align:center;color:#4ea4f8">${d.assists}</td>
-                <td style="text-align:center;font-weight:700;color:${ratingColor}">${d.avg_rating ? d.avg_rating.toFixed(1) : "-"}</td>
+                <td style="text-align:center;font-weight:700;color:${ratingColor}">${d.avg_rating ? d.avg_rating.toFixed(1) : "-"}${low ? '<sup style="color:#f0a25c">*</sup>' : ''}</td>
             </tr>`;
         }).join("");
 
@@ -243,7 +254,7 @@
                 <thead><tr><th>상대</th><th style="text-align:center">경기</th><th style="text-align:center">골</th><th style="text-align:center">도움</th><th style="text-align:center">평점</th></tr></thead>
                 <tbody>${rows}</tbody>
             </table>
-        </div>`;
+        </div>${anyLow ? '<div class="pr-vs-note">* 1경기뿐인 상대는 표본이 적어 참고용(흐리게·후순위)</div>' : ''}`;
 
         const ctx = document.getElementById("pr-vs-chart");
         if (!ctx) return;

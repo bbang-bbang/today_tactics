@@ -6032,6 +6032,7 @@ body.pr-expanded-lock {
 
 /* 최근 폼 테이블 */
 .pr-table-wrap { overflow-x:auto; }
+.pr-vs-note { font-size: 0.64rem; color: #f0a25c; margin-top: 6px; }
 .pr-table {
     width:100%; border-collapse:collapse; font-size:0.78rem; color:#9ab;
 }
@@ -9193,6 +9194,8 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ta-vs-table tr:last-child td { border-bottom: none; }
 .ta-vs-name { text-align: left; color: var(--text-primary); font-weight: 600; }
 .ta-wr-badge { display: inline-block; padding: 2px 9px; border-radius: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ta-wr-badge.ta-wr-low { background: rgba(120,134,153,0.16); color: var(--text-faint); border: 1px dashed rgba(120,134,153,0.5); font-weight: 600; }
+.ta-vs-note td { text-align: left !important; font-size: 0.68rem; color: #f0a25c; padding-top: 8px !important; border-bottom: none !important; }
 
 /* 날씨별 승률 */
 .ta-weather-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
