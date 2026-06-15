@@ -38,6 +38,9 @@ sudo systemctl daemon-reload && sudo systemctl restart today_tactics
 
 ## 🟡 P2 — 시간 날 때 처리
 
+### [ ] 선수 상세 스탯·비교 K1(tid=410) 지원 — 2026-06-15 등록
+`/api/player-stat-report`가 tid=777 하드코딩(K2 전용) → 선수 리포트·⚖️ 선수 비교(`player_compare.js`)가 K2만 가능. mps에 K1 데이터는 있음. 일반화하려면 player의 league로 tid 결정 + 피어/백분위/세부포지션 비교군을 같은 리그로 분기(7곳). **P4 Red(스탯 계산)** — 신중히, 백분위 비교군 정합 검증 필수.
+
 ### [x] ~~5/22 K1 미래 매치 1건 매칭 실패~~ — 5/8 처리 완료
 events.id=90333089 (Jeonbuk vs Daejeon, 슈퍼컵 추정)을 DB에서 직접 삭제. 백업: `players_pre_synthetic_delete_20260508_101752.db`. K1 12팀 모두 12경기로 일관성 회복.
 

@@ -4492,6 +4492,9 @@ def get_player_stat_report():
         "radar":       radar,
         "recent_form": recent_form,
         "peer_count":  len(peers),
+        # 선수 vs 선수 비교(player_compare.js)용 — 포지션 무관 공통 지표 전체.
+        "all_stats":   {k: round(v, 2) for k, v in my.items()},
+        "all_pctiles": pctile,
         "activity": {
             "score":       activity_score,
             "values":      {k: round(v, 1) for k, v in p_act.items()} if p_act else {},

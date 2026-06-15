@@ -9064,6 +9064,93 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .retro-report:hover { background: #25344a; color: #bfdbfe; }
 .retro-report:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
 
+/* ── 선수 vs 선수 비교 모달 ─────────────────────────────────── */
+.ld-header-right { display: flex; align-items: center; gap: 10px; }
+.pc-launch-btn {
+    background: linear-gradient(135deg, #5b9bf3 0%, #f0776c 100%); color: #fff;
+    border: none; border-radius: 8px; padding: 6px 13px; font-size: 12.5px; font-weight: 800;
+    cursor: pointer; transition: filter .15s, transform .1s; white-space: nowrap;
+}
+.pc-launch-btn:hover { filter: brightness(1.08); }
+.pc-launch-btn:active { transform: scale(0.97); }
+.pc-launch-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.pc-content {
+    width: min(900px, 94vw); max-height: 92vh; overflow-y: auto;
+    background: var(--bg-card, #141a22); border: 1px solid var(--border-subtle, #2a3444);
+    border-radius: 16px; padding: 18px 22px 26px; position: relative;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+}
+.pc-close {
+    position: absolute; top: 12px; right: 14px; z-index: 2;
+    background: #232c38; color: #cbd5e1; border: 1px solid #34404f; border-radius: 8px;
+    width: 32px; height: 32px; font-size: 15px; cursor: pointer; transition: all .15s;
+}
+.pc-close:hover { background: #2e3a48; color: #fff; }
+.pc-close:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.pc-title { font-size: 17px; font-weight: 800; color: #fff; margin: 0 0 14px; }
+.pc-sub { font-size: 11.5px; font-weight: 600; color: #8a98a7; margin-left: 6px; }
+/* 검색 피커 */
+.pc-pickers { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin-bottom: 16px; }
+.pc-pick { position: relative; }
+.pc-search {
+    width: 100%; box-sizing: border-box; background: #11161d; border: 1px solid #2c3645;
+    border-radius: 9px; padding: 9px 12px; color: #e6edf5; font-size: 13px;
+}
+.pc-search:focus { outline: none; border-color: #5b9bf3; }
+.pc-vs { font-size: 13px; font-weight: 800; color: #6f7d8c; }
+.pc-results {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 5;
+    background: #1a212b; border: 1px solid #2c3645; border-radius: 9px; overflow: hidden;
+    max-height: 280px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.pc-res {
+    display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+    background: none; border: none; border-bottom: 1px solid #232c38; padding: 8px 11px; cursor: pointer; transition: background .12s;
+}
+.pc-res:hover { background: #232f3e; }
+.pc-res-name { font-size: 13px; font-weight: 700; color: #e6edf5; }
+.pc-res-meta { font-size: 10.5px; color: #8a98a7; }
+.pc-res-empty, .pc-empty, .pc-form-empty { padding: 14px; color: #8a98a7; font-size: 12.5px; text-align: center; }
+.pc-empty { padding: 40px 14px; }
+/* 헤더 카드 */
+.pc-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.pc-card { background: #11161d; border: 1px solid #232c38; border-radius: 11px; padding: 12px 14px; }
+.pc-card-empty { display: flex; align-items: center; justify-content: center; color: #6f7d8c; font-size: 13px; min-height: 92px; }
+.pc-card-name { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+.pc-card-meta { font-size: 11.5px; color: #9aa7b4; margin: 3px 0 9px; }
+.pc-card-warn { font-size: 12px; color: #f0a25c; margin-top: 8px; }
+.pc-kpis { display: flex; gap: 14px; }
+.pc-kpi { text-align: center; }
+.pc-kpi-v { font-size: 18px; font-weight: 800; color: #fff; }
+.pc-kpi-l { font-size: 10px; color: #7c8a99; }
+.pc-warn { font-size: 11.5px; color: #f0a25c; background: #2a2114; border: 1px solid #4a3a1f; border-radius: 8px; padding: 7px 11px; margin-bottom: 12px; }
+/* 섹션 */
+.pc-section { margin-bottom: 20px; }
+.pc-sec-title { font-size: 13.5px; font-weight: 800; color: #e6edf5; margin-bottom: 10px; }
+.pc-sec-sub { font-size: 11px; font-weight: 600; color: #7c8a99; margin-left: 6px; }
+.pc-radar-wrap { position: relative; height: 320px; }
+/* 지표 막대 (다이버징) */
+.pc-bar-row { display: grid; grid-template-columns: 62px 1fr 62px; align-items: center; gap: 10px; margin-bottom: 8px; }
+.pc-bar-v { font-size: 14px; font-weight: 700; color: #cbd5e1; }
+.pc-bar-row > .pc-bar-v:first-child { text-align: right; }
+.pc-bar-row > .pc-bar-v:last-child { text-align: left; }
+.pc-bar-v.win { font-weight: 800; }
+.pc-bar-mid { display: flex; flex-direction: column; gap: 4px; }
+.pc-bar-label { font-size: 11px; color: #9aa7b4; text-align: center; font-weight: 600; }
+.pc-bar-track { display: flex; height: 9px; border-radius: 5px; overflow: hidden; background: #11161d; }
+.pc-bar-a, .pc-bar-b { height: 100%; transition: width .3s ease; }
+.pc-bar-b { opacity: 0.92; }
+/* 최근 폼 */
+.pc-form-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pc-form-col { background: #11161d; border: 1px solid #232c38; border-radius: 10px; padding: 10px; }
+.pc-form-cap { font-size: 12.5px; font-weight: 700; margin-bottom: 7px; text-align: center; }
+.pc-form-row { display: grid; grid-template-columns: 24px 1fr auto auto; align-items: center; gap: 7px; font-size: 11.5px; padding: 3px 0; color: #c3ccd6; }
+.pc-form-res { width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: 5px; font-size: 10px; font-weight: 800; color: #fff; }
+.pc-res-W { background: #16a34a; } .pc-res-D { background: #6b7280; } .pc-res-L { background: #dc2626; } .pc-res-\? { background: #374151; }
+.pc-form-opp { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-form-rating { font-weight: 700; color: #e6edf5; }
+@media (max-width: 720px) { .pc-cards, .pc-form-duo { grid-template-columns: 1fr; } .pc-pickers { grid-template-columns: 1fr; } .pc-vs { display: none; } }
+
 /* 재사용 .tc-panel 다크 오버라이드 (이 모달 스코프 한정) */
 .ta-modal-content .tc-panel {
     background: var(--bg-card);

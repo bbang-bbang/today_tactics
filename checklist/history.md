@@ -4,6 +4,21 @@
 
 ---
 
+## 2026-06-15 | 🆕 K리그 심화 ④ 선수 vs 선수 직접 비교 — player_compare 모달
+
+### 설계 (PM: 기존 player-stat-report 재활용, 가벼운 작업)
+- 두 선수를 나란히 비교. 검색=`heatmap-player-search`(K1+K2), 상세 스탯=`player-stat-report`(K2 전용 tid=777) → 비교도 **K2 기준**으로 일관(단일 선수 리포트와 동일 스코프). K1 상세 비교는 백로그.
+- 백엔드 가산(1곳): `player-stat-report` 응답에 `all_stats`(전체 90분 환산 19지표)·`all_pctiles`(전체 백분위) 추가 — 포지션별 stat_items만으론 두 선수 공통 지표를 못 맞춰서. **하위호환(추가만)**.
+
+### 프론트 `player_compare.js` (신규) + `#player-compare-modal`
+- 두 검색창(A 파랑/B 빨강) → 결과 칩(팀·세부포지션·경기수) 클릭 선택 → `player-stat-report` 2회(캐시) 조합.
+- ① 헤더 카드 2개(이름·세부포지션·팀·경기/골/도움/평점) ② **레이더 오버레이**(Chart.js, 리그 백분위; GK면 선방/공중볼/패스/터치/듀얼, 그 외 득점/키패스/드리블/태클/공중볼%/패스%) ③ **지표 비교 다이버징 바 15종**(90분 환산, 우위 굵게) ④ 최근 5경기 2열(W/D/L·평점).
+- 진입: 선수 탭 헤더 `⚖️ 선수 비교` 버튼(`#btn-player-compare`) → `window.openPlayerCompare()`. ESC/백드롭 닫기, 레이더 destroy.
+- 검증: Playwright(일류첸코 FW vs 김오규 CB) — 헤더 2카드·레이더 paint·지표바 15행·최근폼 2열·콘솔 에러 0. FW↔CB 레이더 대비 정상(일류첸코 득점/드리블 우위, 김오규 공중볼/태클/패스 우위). 검색 결과는 league==='k2'만 노출.
+- **DB 무변경 + 백엔드 가산만 → prod 마이그레이션 불필요**. `player_compare.js` v1 신규, `style.css` v91→92, `index.html`(버튼+모달+스크립트), `main.py`(all_stats 가산).
+
+---
+
 ## 2026-06-15 | 🆕 K리그 심화 ⑤ 경기 단일 심층 리포트 — match-report 모달
 
 ### 배경 & 설계
