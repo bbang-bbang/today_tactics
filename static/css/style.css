@@ -9015,7 +9015,7 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
     border: 1px solid #2c3645; border-radius: 99px; padding: 1px 9px;
 }
 .mr-score { text-align: center; min-width: 130px; }
-.mr-score-num { font-size: 34px; font-weight: 900; color: #fff; line-height: 1; }
+.mr-score-num { font-size: 34px; font-weight: 900; color: #fff; line-height: 1; white-space: nowrap; }
 .mr-score-num span { color: #5b6776; margin: 0 2px; }
 .mr-score-meta { font-size: 11px; color: #8a98a7; margin-top: 7px; line-height: 1.4; }
 /* 섹션 */
@@ -9042,7 +9042,14 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .mr-leg { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #aeb9c6; }
 .mr-leg i { width: 10px; height: 10px; border-radius: 99px; display: inline-block; }
 .mr-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-@media (max-width: 720px) { .mr-duo { grid-template-columns: 1fr; } .mr-header { gap: 8px; } }
+@media (max-width: 720px) {
+    .mr-duo { grid-template-columns: 1fr; }
+    .mr-header { gap: 7px; }
+    .mr-team-name { font-size: 14px; }
+    .mr-score { min-width: 0; }
+    .mr-score-num { font-size: 26px; }
+    .mr-score-meta { font-size: 10px; }
+}
 .mr-duo-cell { background: #11161d; border: 1px solid #232c38; border-radius: 10px; padding: 8px; }
 .mr-duo-cap { font-size: 12px; font-weight: 700; margin-bottom: 6px; text-align: center; }
 .mr-duo-cell canvas { width: 100%; height: auto; display: block; border-radius: 6px; }

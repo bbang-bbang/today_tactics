@@ -20,6 +20,7 @@
   5. **팀 그리드 현 시즌 정리**(K1 12·K2 17, 수원삼성 복원), **선수목록 히트맵 보유·현시즌만·한글명**, **리그탭 race 수정**(`_teamLoadSeq` 가드 — K2탭에 K1팀 뜨던 버그), 경기별보기 5:5 우측배치, 경기장 크기 축소(560), 히트맵 점 경기장 안쪽 매핑.
 - **정적 자산 최신 버전**: `analytics.js?v=13` · `prediction.js?v=60` · `match_report.js?v=1` · `player_compare.js?v=2` · `global_league.js?v=1` · `k2heatmap.js?v=16` · `player_report.js?v=6` · `insights.js?v=38` · `workspace.js?v=7` · `style.css?v=93`. 변경 시 `templates/index.html`의 `?v=` 동반 증가 필수.
 - **선수 상세 스탯은 K1·K2 모두 지원**(`player-stat-report` 리그 자동 판정 = 선수 최근 경기 대회). 비교군·백분위·활동량은 해당 리그 내 계산.
+- **2026-06-15 통합 QA 완료**: 오늘 출시 4종(스카우팅·경기리포트·선수비교·K1지원) 실브라우저·모바일·엣지·회귀 점검 14/14 + `qa_check.py` 31/31 PASS. 모바일 경기리포트 스코어 줄바꿈만 수정(style.css v94).
 - **신규 엔드포인트**(README §API 반영됨): `/api/kleague{1,2}/position-heatmap`(year), `/api/heatmap-player-search`, `/api/kleague{1,2}/heatmap`에 `year`·`venue` 파라미터.
 - **운영**: https://www.today-football-tactics.xyz 라이브. 배포는 **`git push origin main` → GitHub Actions가 forced-command `ci_deploy.sh`(fetch+reset+restart+health) 자동 실행**. prod에서 직접 크롤러/백필 실행 시 `venv/bin/python3` 사용(시스템 python3엔 playwright 없음).
 - **데이터**: 서버가 주기 cron `update_data.py` 자체 수집. **K2 6/7까지 완비**, K1 5/17까지. **다음 라운드 2026-07-04 재개**(월드컵 휴식기) → 그 사이 경기 없음(미수집 아님). 수비 세부 3컬럼은 로컬+prod DB 모두 백필 완료.
