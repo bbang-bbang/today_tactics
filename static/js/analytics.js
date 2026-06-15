@@ -143,8 +143,12 @@
             const panel = document.getElementById("ta-panel-" + btn.dataset.tab);
             if (panel) {
                 panel.classList.remove("hidden");
-                // 숨김 상태에서 만들어진 차트가 0px로 그려지는 문제 방지
-                Object.values(charts).forEach(c => { try { c.resize(); } catch (_) {} });
+                // 숨김 상태에서 만들어진 차트가 0px로 그려지는 문제 방지.
+                // hidden 해제 직후 동기 resize는 reflow 전이라 컨테이너 높이를 0으로 읽음
+                // → rAF로 레이아웃 반영 후 resize (특히 스킬 레이더가 height:0로 안 보이던 버그).
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    Object.values(charts).forEach(c => { try { c.resize(); } catch (_) {} });
+                }));
             }
         });
     });
