@@ -1441,6 +1441,120 @@ def get_team_shotmap():
     })
 
 
+@app.route("/api/match-report")
+@cached_response(ttl=3600)
+def get_match_report():
+    """경기 단일 심층 리포트 — 한 경기 양 팀의 슛맵·평균위치·골 타임라인·집계 지표.
+    shotmap x=골문거리(0=골라인)·y=좌우 / avg_positions x=공격방향(0 자기골문~100)·y=좌우."""
+    try:
+        eid = int(request.args.get("eventId") or 0)
+    except (ValueError, TypeError):
+        return jsonify({})
+    if not eid or not os.path.exists(DB_PATH):
+        return jsonify({})
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    ev = conn.execute("""
+        SELECT id, home_team_id, away_team_id, home_team_name, away_team_name,
+               home_score, away_score, tournament_id, venue_name, round,
+               datetime(date_ts,'unixepoch','localtime') AS dt
+        FROM events WHERE id = ?
+    """, (eid,)).fetchone()
+    if not ev:
+        conn.close()
+        return jsonify({})
+
+    home_ko = _ko_name_by_ss_id(ev["home_team_id"]) or ev["home_team_name"]
+    away_ko = _ko_name_by_ss_id(ev["away_team_id"]) or ev["away_team_name"]
+
+    # 포메이션 (match_lineups 팀별)
+    forms = {}
+    for r in conn.execute("""SELECT is_home, formation FROM match_lineups
+                             WHERE event_id=? AND formation IS NOT NULL GROUP BY is_home""", (eid,)):
+        forms[r["is_home"]] = r["formation"]
+
+    # 슛맵 (양 팀, 시간순)
+    shots = {"home": [], "away": []}
+    for r in conn.execute("""
+        SELECT s.is_home, s.x, s.y, s.xg, s.outcome, s.situation, s.body_part, s.time_min, s.time_sec,
+               COALESCE(p.name_ko, p.name) AS nm
+        FROM match_shotmap s LEFT JOIN players p ON p.id = s.player_id
+        WHERE s.event_id = ? ORDER BY s.time_min, s.time_sec
+    """, (eid,)):
+        shots["home" if r["is_home"] else "away"].append({
+            "x": r["x"], "y": r["y"], "xg": round(r["xg"] or 0, 3),
+            "outcome": r["outcome"] or "miss", "situation": r["situation"] or "",
+            "body": r["body_part"] or "", "min": r["time_min"] or 0, "sec": r["time_sec"] or 0,
+            "name": r["nm"] or "",
+        })
+
+    # 평균 위치 (선발만)
+    avg = {"home": [], "away": []}
+    for r in conn.execute("""
+        SELECT a.is_home, a.x, a.y, COALESCE(p.name_ko, p.name) AS nm
+        FROM match_avg_positions a LEFT JOIN players p ON p.id = a.player_id
+        WHERE a.event_id = ? AND a.is_substitute = 0
+    """, (eid,)):
+        avg["home" if r["is_home"] else "away"].append({
+            "x": round(r["x"], 1), "y": round(r["y"], 1), "name": r["nm"] or "",
+        })
+
+    # 골 타임라인
+    goals = []
+    for r in conn.execute("""
+        SELECT g.is_home, g.minute, g.added_time, g.is_penalty, g.is_own_goal,
+               COALESCE(p.name_ko, p.name, g.player_name) AS nm
+        FROM goal_events g LEFT JOIN players p ON p.id = g.player_id
+        WHERE g.event_id = ? ORDER BY g.minute, g.added_time
+    """, (eid,)):
+        goals.append({
+            "isHome": bool(r["is_home"]), "min": r["minute"], "added": r["added_time"] or 0,
+            "name": r["nm"] or "", "pen": bool(r["is_penalty"]), "own": bool(r["is_own_goal"]),
+        })
+
+    # 집계 지표 — 슛/유효/xG/골은 슛맵 기준(가장 신뢰), 패스/평점은 mps 집계
+    def shot_agg(side):
+        arr = shots[side]
+        n = len(arr)
+        g = sum(1 for s in arr if s["outcome"] == "goal")
+        ot = sum(1 for s in arr if s["outcome"] in ("goal", "save"))
+        xg = round(sum(s["xg"] for s in arr), 2)
+        return {"shots": n, "onTarget": ot, "xg": xg, "goals": g,
+                "conv": round(g / n * 100, 1) if n else 0,
+                "xgDiff": round(g - xg, 2)}
+
+    stats = {"home": shot_agg("home"), "away": shot_agg("away")}
+    for r in conn.execute("""
+        SELECT is_home, ROUND(AVG(rating),2) rating, SUM(key_passes) kp,
+               SUM(total_passes) tp, SUM(accurate_passes) ap
+        FROM match_player_stats WHERE event_id=? GROUP BY is_home
+    """, (eid,)):
+        side = "home" if r["is_home"] else "away"
+        stats[side]["rating"] = r["rating"]
+        stats[side]["keyPasses"] = r["kp"] or 0
+        stats[side]["passes"] = r["tp"] or 0
+        stats[side]["passAcc"] = round((r["ap"] or 0) / r["tp"] * 100) if r["tp"] else 0
+    # 패스 점유(추정) = 총 패스 비중
+    tph, tpa = stats["home"].get("passes", 0), stats["away"].get("passes", 0)
+    tot = tph + tpa
+    stats["home"]["possession"] = round(tph / tot * 100) if tot else 50
+    stats["away"]["possession"] = 100 - stats["home"]["possession"] if tot else 50
+
+    conn.close()
+    tour = "K리그1" if ev["tournament_id"] == 410 else ("K리그2" if ev["tournament_id"] == 777 else "")
+    return jsonify({
+        "event": {
+            "id": eid, "home": home_ko, "away": away_ko,
+            "homeId": ev["home_team_id"], "awayId": ev["away_team_id"],
+            "homeScore": ev["home_score"], "awayScore": ev["away_score"],
+            "date": (ev["dt"] or "")[:16], "venue": ev["venue_name"] or "",
+            "round": ev["round"], "tournament": tour,
+            "homeFormation": forms.get(1, ""), "awayFormation": forms.get(0, ""),
+        },
+        "shots": shots, "avg": avg, "goals": goals, "stats": stats,
+    })
+
+
 _ENG_TO_KO = {t["sofascore_id"]: t["name"] for t in TEAMS}
 
 def _ko_name_by_ss_id(ss_id):

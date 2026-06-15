@@ -4,6 +4,24 @@
 
 ---
 
+## 2026-06-15 | 🆕 K리그 심화 ⑤ 경기 단일 심층 리포트 — match-report 모달
+
+### 배경 & 설계
+- 미활용 데이터 활용: `match_avg_positions`(1,919경기)·`match_shotmap`(1,918경기)·`goal_events`·`match_player_stats`를 한 경기 단위로 종합. (커버리지 우려했으나 절대 경기 수 충분.)
+- 통합 지점: 경기예측 '🎯 예측 후기'(retro)에 이미 있는 `event_id` → `📋 경기 리포트` 버튼 → 모달.
+
+### 백엔드 `/api/match-report?eventId=` (신규, `@cached_response`)
+- 반환: event(팀 한글명·스코어·날짜·경기장·라운드·포메이션) + shots{home,away}(x=골문거리·y·xg·outcome·situation·body·min·sec·name) + avg{home,away}(선발 평균위치) + goals(타임라인) + stats{home,away}(슛·유효·xG·골·결정력 ← 슛맵 / 패스·키패스·평점·패스점유 ← mps 집계).
+- 슛/xG는 슛맵 기준(최신뢰), 패스점유=총패스 비중 추정. 파라미터 바인딩만 사용.
+
+### 프론트 모달 `match_report.js` (신규) + `#match-report-modal`
+- ① 헤더(스코어·포메이션·경기장) ② 핵심 지표 비교 다이버징 바(7지표 + 결정력) ③ **xG 흐름 라인차트**(Chart.js stepped 누적 xG, ⚽ 골 마커) ④ 양 팀 슛맵 2캔버스(xG 버블·outcome 색) ⑤ 양 팀 평균위치 2미니피치 ⑥ 골 타임라인.
+- 홈=파랑#5b9bf3 / 원정=빨강#f0776c 고정. `window.openMatchReport(eventId)` 진입점. ESC/백드롭 닫기, 차트 destroy.
+- 검증: Playwright(화성 1-2 수원삼성) — 5섹션·8지표행·4캔버스 paint(836px)·xG차트·골마커 3개·콘솔 에러 0. 전체 플로우(완료경기 클릭→예측후기→경기 리포트 버튼→모달) PASS. ※ 로컬 retro 지연은 prediction-backtest 콜드 203s(단일스레드 dev 한정, prod는 캐시).
+- **DB 무변경(읽기 전용) → prod 마이그레이션 불필요**. `match_report.js` v1 신규, `prediction.js` v59→60(버튼), `style.css` v90→91, `index.html`(모달+스크립트).
+
+---
+
 ## 2026-06-15 | 🆕 K리그 심화 ③ 상대 스카우팅 리포트 — 형태+슛맵 자동 조합
 
 ### 컨셉 & 설계 (PM 판단: 신규 백엔드 0, 최고 ROI)
@@ -4089,3 +4107,4 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-15 10:09:46 | PYTHONIOENCODING=utf-8 python analysis/_chk_scout.py 2>&1 | tail -5
 - 2026-06-15 10:11:08 | PYTHONIOENCODING=utf-8 python analysis/_chk_scout.py 2>&1 | tail -4
 - 2026-06-15 10:11:46 | cat > /tmp/css_chk.py <<'EOF' / # -*- coding: utf-8 -*- / import sys, io / sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8") / from playwright.sync_api import sync_playwright / with sync_playwright() as p: /     b=p.chromium.launch(); pg=b.new_page() /     pg.goto("http://127.0.0.1:5000/", wait_until="domcontentloaded"); pg.wait_for_timeout(2500) /     pg.evaluate("()=>document.getElementById('btn-analytics').click()") /     pg.wait_for_function("()=>!document.getElementById('team-analysis-modal').classList.contains('hidden')") /     pg.evaluate("""()=>{const s=document.getElementById('ta-team-select');s.value='suwon';s.dispatchEvent(new Event('change',{bubbles:true}));}""") /     pg.wait_for_timeout(3000) /     r=pg.evaluate("""()=>{ /         const t=document.querySelector('#ta-scout .scout-bullet.kind-threat'); /         const o=document.querySelector('#ta-scout .scout-bullet.kind-opp'); /         const cs=e=>e?getComputedStyle(e):null; /         const tag=document.querySelector('#ta-scout .scout-tag'); /         const cols=document.querySelector('#ta-scout .scout-cols'); /         return { /           threatBorder: t?cs(t).borderLeftColor:null, /           oppBorder: o?cs(o).borderLeftColor:null, /           tagBg: tag?cs(tag).backgroundColor:null, /           colsDisplay: cols?cs(cols).display:null, /           colsCols: cols?cs(cols).gridTemplateColumns:null, /           nThreat: document.querySelectorAll('#ta-scout .scout-bullet.kind-threat').length, /           nOpp: document.querySelectorAll('#ta-scout .scout-bullet.kind-opp').length, /         }; /     }""") /     print(r); b.close() / EOF / PYTHONIOENCODING=utf-8 python /tmp/css_chk.py 2>&1
+- 2026-06-15 10:27:22 | BASE=https://www.today-football-tactics.xyz / echo "scout-bullet in prod CSS:"; curl -s --max-time 20 "$BASE/static/css/style.css?v=90" | grep -c "scout-bullet" / echo "renderScout in prod JS:"; curl -s --max-time 20 "$BASE/static/js/analytics.js?v=13" | grep -c "renderScout" / echo "health:"; curl -s -o /dev/null -w "%{http_code}\n" --max-time 20 "$BASE/health"

@@ -1317,6 +1317,9 @@
                     ${hit1x2 ? "✅ 적중" : "❌ 빗나감"}
                 </span>
                 <button class="retro-share" title="이 매치 URL 복사 — 공유" type="button">🔗 공유</button>
+                ${retro.event_id ? `<button class="retro-report" type="button"
+                    data-eid="${retro.event_id}"
+                    title="경기 단일 심층 리포트 — 슛맵·xG 흐름·평균위치">📋 경기 리포트</button>` : ""}
                 ${retro.event_id ? `<a class="retro-export"
                     href="/api/match-lineup.csv?event_id=${retro.event_id}"
                     title="라인업 CSV 다운로드 — 분석가/코치 export"
@@ -1364,6 +1367,13 @@
                 } catch (e) {
                     shareBtn.textContent = "복사 실패";
                 }
+            });
+        }
+        // 경기 리포트 버튼 — 단일 경기 심층 리포트 모달
+        const reportBtn = wrap.querySelector(".pred-retro:last-child .retro-report");
+        if (reportBtn) {
+            reportBtn.addEventListener("click", () => {
+                if (window.openMatchReport) window.openMatchReport(reportBtn.dataset.eid);
             });
         }
     }

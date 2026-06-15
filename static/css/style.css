@@ -8986,6 +8986,84 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
     content: "▸"; position: absolute; left: 10px; top: 6px; color: #60a5fa; font-weight: 800;
 }
 
+/* ── 경기 단일 심층 리포트 모달 ─────────────────────────────── */
+.mr-content {
+    width: min(940px, 94vw); max-height: 92vh; overflow-y: auto;
+    background: var(--bg-card, #141a22); border: 1px solid var(--border-subtle, #2a3444);
+    border-radius: 16px; padding: 20px 22px 26px; position: relative;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+}
+.mr-close {
+    position: absolute; top: 12px; right: 14px; z-index: 2;
+    background: #232c38; color: #cbd5e1; border: 1px solid #34404f; border-radius: 8px;
+    width: 32px; height: 32px; font-size: 15px; cursor: pointer; transition: all .15s;
+}
+.mr-close:hover { background: #2e3a48; color: #fff; }
+.mr-close:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.mr-loading { padding: 60px 0; text-align: center; color: #9aa7b4; font-size: 14px; }
+/* 헤더 */
+.mr-header {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px;
+    padding: 6px 4px 18px; border-bottom: 1px solid #28323f; margin-bottom: 16px;
+}
+.mr-team { display: flex; flex-direction: column; gap: 5px; }
+.mr-team-home { align-items: flex-start; text-align: left; }
+.mr-team-away { align-items: flex-end; text-align: right; }
+.mr-team-name { font-size: 19px; font-weight: 800; letter-spacing: -0.01em; }
+.mr-form {
+    font-size: 11px; font-weight: 700; color: #9aa7b4; background: #1b222c;
+    border: 1px solid #2c3645; border-radius: 99px; padding: 1px 9px;
+}
+.mr-score { text-align: center; min-width: 130px; }
+.mr-score-num { font-size: 34px; font-weight: 900; color: #fff; line-height: 1; }
+.mr-score-num span { color: #5b6776; margin: 0 2px; }
+.mr-score-meta { font-size: 11px; color: #8a98a7; margin-top: 7px; line-height: 1.4; }
+/* 섹션 */
+.mr-section { margin-bottom: 22px; }
+.mr-sec-title { font-size: 14px; font-weight: 800; color: #e6edf5; margin-bottom: 11px; }
+.mr-sec-sub { font-size: 11px; font-weight: 600; color: #7c8a99; margin-left: 6px; }
+/* 지표 비교 바 */
+.mr-stat-row { display: grid; grid-template-columns: 56px 1fr 56px; align-items: center; gap: 10px; margin-bottom: 9px; }
+.mr-stat-v { font-size: 15px; font-weight: 700; color: #cbd5e1; }
+.mr-stat-row > .mr-stat-v:first-child { text-align: right; }
+.mr-stat-row > .mr-stat-v:last-child { text-align: left; }
+.mr-stat-v.win { font-weight: 800; }
+.mr-stat-mid { display: flex; flex-direction: column; gap: 4px; }
+.mr-stat-label { font-size: 11.5px; color: #9aa7b4; text-align: center; font-weight: 600; }
+.mr-stat-bar { display: flex; height: 9px; border-radius: 5px; overflow: hidden; background: #11161d; }
+.mr-bar-h { height: 100%; transition: width .3s ease; }
+.mr-bar-a { height: 100%; transition: width .3s ease; opacity: 0.92; }
+.mr-stat-clin { margin-top: 4px; padding-top: 9px; border-top: 1px dashed #2a3444; }
+.mr-clin-hint { font-size: 10px; color: #6f7d8c; text-align: center; }
+/* xG 흐름 차트 */
+.mr-chart-wrap { position: relative; height: 250px; }
+/* 슛맵/평균위치 듀오 */
+.mr-leg-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 9px; }
+.mr-leg { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #aeb9c6; }
+.mr-leg i { width: 10px; height: 10px; border-radius: 99px; display: inline-block; }
+.mr-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 720px) { .mr-duo { grid-template-columns: 1fr; } .mr-header { gap: 8px; } }
+.mr-duo-cell { background: #11161d; border: 1px solid #232c38; border-radius: 10px; padding: 8px; }
+.mr-duo-cap { font-size: 12px; font-weight: 700; margin-bottom: 6px; text-align: center; }
+.mr-duo-cell canvas { width: 100%; height: auto; display: block; border-radius: 6px; }
+/* 골 타임라인 */
+.mr-timeline { position: relative; height: 64px; margin: 8px 6px 2px; }
+.mr-tl-axis { position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: #34404f; border-radius: 2px; }
+.mr-tl-half { position: absolute; top: 18%; bottom: 18%; width: 1px; background: #4a586a; }
+.mr-tl-goal { position: absolute; top: 50%; transform: translate(-50%, -50%); }
+.mr-tl-dot { display: block; width: 11px; height: 11px; border-radius: 99px; border: 2px solid #0e1319; margin: 0 auto; }
+.mr-tl-label { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 10px; color: #c3ccd6; }
+.mr-tl-goal.home .mr-tl-label { bottom: 14px; }
+.mr-tl-goal.away .mr-tl-label { top: 14px; }
+.mr-tl-legend { display: flex; gap: 16px; justify-content: center; font-size: 11px; font-weight: 700; margin-top: 4px; }
+/* retro 경기 리포트 버튼 */
+.retro-report {
+    background: #1e2a3a; color: #93c5fd; border: 1px solid #2f4860; border-radius: 7px;
+    padding: 3px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; transition: all .15s;
+}
+.retro-report:hover { background: #25344a; color: #bfdbfe; }
+.retro-report:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+
 /* 재사용 .tc-panel 다크 오버라이드 (이 모달 스코프 한정) */
 .ta-modal-content .tc-panel {
     background: var(--bg-card);
