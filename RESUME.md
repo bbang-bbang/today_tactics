@@ -20,6 +20,7 @@
   5. **팀 그리드 현 시즌 정리**(K1 12·K2 17, 수원삼성 복원), **선수목록 히트맵 보유·현시즌만·한글명**, **리그탭 race 수정**(`_teamLoadSeq` 가드 — K2탭에 K1팀 뜨던 버그), 경기별보기 5:5 우측배치, 경기장 크기 축소(560), 히트맵 점 경기장 안쪽 매핑.
 - **정적 자산 최신 버전**: `analytics.js?v=13` · `prediction.js?v=60` · `match_report.js?v=1` · `player_compare.js?v=2` · `global_league.js?v=1` · `k2heatmap.js?v=16` · `player_report.js?v=6` · `insights.js?v=38` · `workspace.js?v=7` · `style.css?v=93`. 변경 시 `templates/index.html`의 `?v=` 동반 증가 필수.
 - **선수 상세 스탯은 K1·K2 모두 지원**(`player-stat-report` 리그 자동 판정 = 선수 최근 경기 대회). 비교군·백분위·활동량은 해당 리그 내 계산.
+- **포지션 분류는 세부그룹(detail_pos) 우선**(`eff_pos = DETAIL_TO_BROAD[detail_grp] or mps최빈`). mps.position이 윙어를 M으로 묶는 불일치(133명) 해소 — 라벨·지표세트·레이더 모두 eff_pos 기준. 비교군 풀 쿼리만 pos_raw(mps) 유지.
 - **2026-06-15 통합 QA 완료**: 오늘 출시 4종(스카우팅·경기리포트·선수비교·K1지원) 실브라우저·모바일·엣지·회귀 점검 14/14 + `qa_check.py` 31/31 PASS. 모바일 경기리포트 스코어 줄바꿈만 수정(style.css v94).
 - **🔴 events 스코어 12경기 좌우반전 교정**: QA 중 발견(SofaScore 크롤 유입, 공식 JSON 대조 210중 12 반전). `crawlers/fix_swapped_scores.py`로 교정 + `sync_results_to_events.py` 자가치유 패치(JSON과 다르면 갱신). **운영 DB도 동일 버그 → SSH로 `fix_swapped_scores.py --apply` 실행 필요**(코드 배포만으론 기존 DB 안 고쳐짐, 다음 update_data 또는 수동 실행).
 - **신규 엔드포인트**(README §API 반영됨): `/api/kleague{1,2}/position-heatmap`(year), `/api/heatmap-player-search`, `/api/kleague{1,2}/heatmap`에 `year`·`venue` 파라미터.

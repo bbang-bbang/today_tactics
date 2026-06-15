@@ -4210,6 +4210,13 @@ def get_player_stat_report():
     detail_members = {p for p, g in _detail_map.items() if g == detail_grp} if detail_grp else None
     detail_label = DETAIL_POS_LABELS.get(detail_grp) if detail_grp else None
 
+    # ── 표시·집계용 대분류 통일 (P4 정합성) ──────────────────────
+    # mps.position은 윙어를 미드필더(M)로 묶는 경향 → 세부그룹(W→F 등)이 있으면 그 대분류를
+    # 우선 사용. 지표 세트(POS_GROUPS)·레이더(RADAR_KEYS)·포지션 라벨이 세부 분류와 일치하게.
+    # 세부 없으면(서브 전용) mps 최빈으로 폴백. 비교군 풀 쿼리는 pos_raw(mps) 유지.
+    eff_pos = DETAIL_TO_BROAD.get(detail_grp) or pos_raw
+    pos_label = {"G": "GK", "D": "DF", "M": "MF", "F": "FW"}.get(eff_pos, eff_pos or "?")
+
     # ── 같은 포지션 선수 집계 (퍼센타일 기준) ──────────────────
     cur.execute(f"""
         SELECT mps.player_id,
@@ -4276,9 +4283,9 @@ def get_player_stat_report():
             peers = _filtered
             peer_label = detail_label
         else:
-            peer_label = BROAD_POS_LABELS.get(pos_raw, pos_label)
+            peer_label = BROAD_POS_LABELS.get(eff_pos, pos_label)
     else:
-        peer_label = BROAD_POS_LABELS.get(pos_raw, pos_label)
+        peer_label = BROAD_POS_LABELS.get(eff_pos, pos_label)
 
     def percentile(key, val, higher_is_better=True):
         vals = [v[key] for v in peers.values() if v[key] is not None]
@@ -4356,7 +4363,7 @@ def get_player_stat_report():
         ],
     }
 
-    stat_groups = POS_GROUPS.get(pos_raw, POS_GROUPS["M"])
+    stat_groups = POS_GROUPS.get(eff_pos, POS_GROUPS["M"])
     stat_items = []
     for sg in stat_groups:
         k = sg["key"]
@@ -4427,7 +4434,7 @@ def get_player_stat_report():
         "M": ["key_passes","pass_pct","drib_s","tackles","goals"],
         "F": ["goals","shots","drib_s","aer_w","assists"],
     }
-    radar_keys = RADAR_KEYS.get(pos_raw, RADAR_KEYS["M"])
+    radar_keys = RADAR_KEYS.get(eff_pos, RADAR_KEYS["M"])
     RADAR_LABELS = {
         "goals":"득점","assists":"도움","shots":"슈팅","sot":"유효슈팅",
         "pass_pct":"패스%","key_passes":"키패스","drib_s":"드리블",
@@ -4476,7 +4483,7 @@ def get_player_stat_report():
         })
 
     conn.close()
-    pos_label = {"G":"GK","D":"DF","M":"MF","F":"FW"}.get(pos_raw, pos_raw or "?")
+    # pos_label은 위에서 eff_pos(세부 우선) 기준으로 이미 설정됨.
     return jsonify({
         "found":      True,
         "player": {
@@ -4484,7 +4491,7 @@ def get_player_stat_report():
             "name":     matched,
             "team":     team_name,
             "league":   "K1" if tid == 410 else "K2",
-            "pos":      pos_raw,
+            "pos":      eff_pos,
             "pos_label": pos_label,
             "detail_pos":   detail_grp,
             "detail_label": detail_label,
