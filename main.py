@@ -4097,6 +4097,19 @@ def get_player_stat_report():
     year_clause = "AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime'))=?" if year else ""
     yp = (year,) if year else ()
 
+    # ── 선수 리그 판정 (K1=410 / K2=777) ──────────────────────────
+    # 가장 '최근' 경기의 대회 기준 — 검색(heatmap-player-search)이 MAX(date_ts)로
+    # 매기는 리그 배지와 일치시켜 혼선 방지(이적 선수도 현 소속 리그로 귀속).
+    # 비교군·백분위·활동량 모두 이 리그 내에서 계산해야 통계가 정합(P4). year 지정 시 그 해.
+    cur.execute(f"""
+        SELECT e.tournament_id AS tid
+        FROM match_player_stats mps JOIN events e ON mps.event_id=e.id
+        WHERE mps.player_id=? AND e.tournament_id IN (410, 777) {year_clause}
+        ORDER BY e.date_ts DESC LIMIT 1
+    """, (pid,) + yp)
+    _trow = cur.fetchone()
+    tid = _trow["tid"] if _trow else 777
+
     # 선수 기본 정보
     cur.execute("SELECT * FROM players WHERE id=?", (pid,))
     prow = cur.fetchone()
@@ -4107,9 +4120,9 @@ def get_player_stat_report():
     cur.execute(f"""
         SELECT mps.position, COUNT(*) cnt
         FROM match_player_stats mps JOIN events e ON mps.event_id=e.id
-        WHERE mps.player_id=? AND e.tournament_id=777 {year_clause}
+        WHERE mps.player_id=? AND e.tournament_id=? {year_clause}
         GROUP BY mps.position ORDER BY cnt DESC LIMIT 1
-    """, (pid,) + yp)
+    """, (pid, tid) + yp)
     pr = cur.fetchone()
     pos_raw = pr[0] if pr else (prow["position"] if prow else "?")
 
@@ -4117,8 +4130,8 @@ def get_player_stat_report():
     cur.execute("""
         SELECT DISTINCT strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) yr
         FROM match_player_stats mps JOIN events e ON mps.event_id=e.id
-        WHERE mps.player_id=? AND e.tournament_id=777 ORDER BY yr
-    """, (pid,))
+        WHERE mps.player_id=? AND e.tournament_id=? ORDER BY yr
+    """, (pid, tid))
     available_years = [r[0] for r in cur.fetchall()]
 
     # 대상 선수 집계 (90분 환산)
@@ -4145,8 +4158,8 @@ def get_player_stat_report():
                SUM(mps.accurate_crosses) cross_s, SUM(mps.total_crosses) cross_a,
                SUM(mps.big_chances_missed) bcm
         FROM match_player_stats mps JOIN events e ON mps.event_id=e.id
-        WHERE mps.player_id=? AND e.tournament_id=777 {year_clause}
-    """, (pid,) + yp)
+        WHERE mps.player_id=? AND e.tournament_id=? {year_clause}
+    """, (pid, tid) + yp)
     p = cur.fetchone()
     mins = p["mins"] or 1
     games = p["games"] or 0
@@ -4176,8 +4189,8 @@ def get_player_stat_report():
             FROM players p2
             WHERE p2.{col} IS NOT NULL AND p2.{col} > 0
               AND EXISTS (SELECT 1 FROM match_player_stats m2 JOIN events e2 ON m2.event_id=e2.id
-                          WHERE m2.player_id=p2.id AND e2.tournament_id=777)
-        """, (val,))
+                          WHERE m2.player_id=p2.id AND e2.tournament_id=?)
+        """, (val, tid))
         row = cur.fetchone()
         above, total = row[0] or 0, row[1] or 0
         return {"rank": above+1, "total": total, "pct": round((1 - above/total)*100) if total else None}
@@ -4188,7 +4201,7 @@ def get_player_stat_report():
     # ── 세부 포지션 비교군 — 풀백을 전체 수비수가 아닌 풀백끼리 비교(통계 정확성, P4) ──
     # 선발 detail_pos 최빈 그룹으로 피어를 좁힌다. 서브 전용 등 detail 없는 선수는
     # detail_grp=None → 기존 대분류(mps.position) 비교로 자동 폴백.
-    _detail_map = _player_detail_groups(conn, 777, year_clause, yp)
+    _detail_map = _player_detail_groups(conn, tid, year_clause, yp)
     try:
         _pid_int = int(pid)
     except (TypeError, ValueError):
@@ -4224,10 +4237,10 @@ def get_player_stat_report():
                SUM(mps.touches)                     touches,
                COUNT(*)                             games
         FROM match_player_stats mps JOIN events e ON mps.event_id=e.id
-        WHERE e.tournament_id=777 AND mps.position=? {year_clause}
+        WHERE e.tournament_id=? AND mps.position=? {year_clause}
         GROUP BY mps.player_id
         HAVING mins >= 270 AND games >= 5
-    """, (pos_raw,) + yp)
+    """, (tid, pos_raw) + yp)
 
     peers = {}
     for r in cur.fetchall():
@@ -4368,10 +4381,10 @@ def get_player_stat_report():
                SUM(mps.minutes_played)                       AS mins2,
                COUNT(*)                                      AS games2
         FROM match_player_stats mps JOIN events e ON mps.event_id=e.id
-        WHERE e.tournament_id=777 {year_clause}
+        WHERE e.tournament_id=? {year_clause}
         GROUP BY mps.player_id
         HAVING games2 >= 3 AND mins2 >= 150
-    """, yp)
+    """, (tid,) + yp)
 
     all_activity = {}
     for r in cur.fetchall():
@@ -4432,9 +4445,9 @@ def get_player_stat_report():
                mps.tackles, mps.interceptions, mps.clearances, mps.aerial_won,
                mps.saves, mps.shots_on_target, mps.key_passes
         FROM match_player_stats mps JOIN events e ON mps.event_id=e.id
-        WHERE mps.player_id=? AND e.tournament_id=777 AND e.date_ts IS NOT NULL
+        WHERE mps.player_id=? AND e.tournament_id=? AND e.date_ts IS NOT NULL
         ORDER BY e.date_ts DESC LIMIT 5
-    """, (pid,))
+    """, (pid, tid))
     recent_form = []
     for r in cur.fetchall():
         d = _dt.datetime.utcfromtimestamp(r[0])
@@ -4470,6 +4483,7 @@ def get_player_stat_report():
             "id":       pid,
             "name":     matched,
             "team":     team_name,
+            "league":   "K1" if tid == 410 else "K2",
             "pos":      pos_raw,
             "pos_label": pos_label,
             "detail_pos":   detail_grp,

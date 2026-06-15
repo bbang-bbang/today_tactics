@@ -9109,6 +9109,9 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 }
 .pc-res:hover { background: #232f3e; }
 .pc-res-name { font-size: 13px; font-weight: 700; color: #e6edf5; }
+.pc-lg { font-size: 9.5px; font-weight: 800; font-style: normal; padding: 1px 5px; border-radius: 4px; vertical-align: middle; margin-left: 2px; }
+.pc-lg-k1, .pc-lg-K1 { background: #1e3a5f; color: #93c5fd; }
+.pc-lg-k2, .pc-lg-K2 { background: #3a2f1e; color: #fcd34d; }
 .pc-res-meta { font-size: 10.5px; color: #8a98a7; }
 .pc-res-empty, .pc-empty, .pc-form-empty { padding: 14px; color: #8a98a7; font-size: 12.5px; text-align: center; }
 .pc-empty { padding: 40px 14px; }

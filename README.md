@@ -182,8 +182,8 @@ K리그 (players.db)
 | `/api/standings` | K1/K2 순위표 |
 | `/api/heatmap` | 선수 히트맵 좌표 (이름 기반) |
 | `/api/player-matches` | 선수 경기별 스탯 |
-| `/api/player-stat-report` | 선수 스탯 리포트 — 퍼센타일 비교군이 **세부 포지션**(풀백↔풀백 등, 표본<5는 대분류 폴백). 응답에 `detail_label`·`peer_label` + `all_stats`·`all_pctiles`(선수 비교용 공통 90분 지표 전체) |
-| (프론트) ⚖️ 선수 비교 | 신규 API 없음 — `heatmap-player-search`로 두 K2 선수 검색 → `player-stat-report` 2회 호출을 클라이언트에서 조합(레이더 오버레이·90분 지표 다이버징 바·최근 폼). `player_compare.js`. 선수 탭 헤더 '⚖️ 선수 비교' 버튼. ※ 상세 스탯은 K2(tid=777) 한정 |
+| `/api/player-stat-report` | 선수 스탯 리포트 — **K1·K2 자동 판정**(선수 최근 경기 리그 기준, 비교군·백분위·활동량 모두 해당 리그 내 계산). 퍼센타일 비교군이 **세부 포지션**(풀백↔풀백 등, 표본<5는 대분류 폴백). 응답에 `league`·`detail_label`·`peer_label` + `all_stats`·`all_pctiles`(선수 비교용 공통 90분 지표 전체) |
+| (프론트) ⚖️ 선수 비교 | 신규 API 없음 — `heatmap-player-search`로 두 선수(K1·K2) 검색 → `player-stat-report` 2회 호출을 클라이언트에서 조합(레이더 오버레이·90분 지표 다이버징 바·최근 폼). `player_compare.js`. 선수 탭 헤더 '⚖️ 선수 비교' 버튼. 교차 리그(K1↔K2) 비교 시 백분위는 각자 자기 리그 기준(참고용) 명시 |
 | `/api/player-analytics` | 선수 개인 분석 (활동량 지수) |
 | `/api/player-vs-teams` | 선수 상대팀별 성적 |
 | `/api/player-status` (CRUD) | 부상/출전정지/출전의문 관리 |

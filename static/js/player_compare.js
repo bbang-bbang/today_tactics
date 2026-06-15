@@ -71,15 +71,15 @@
         let list = [];
         try {
             const r = await fetch("/api/heatmap-player-search?q=" + encodeURIComponent(q));
-            list = (await r.json()).filter(p => p.league === "k2");   // K2 전용(상세 스탯 한정)
+            list = await r.json();                                    // K1+K2 (상세 스탯은 각 리그 내에서 계산)
         } catch (_) { list = []; }
         if (!list.length) {
-            results.innerHTML = '<div class="pc-res-empty">K리그2 선수 검색 결과 없음</div>';
+            results.innerHTML = '<div class="pc-res-empty">선수 검색 결과 없음</div>';
             results.classList.remove("hidden"); return;
         }
         results.innerHTML = list.slice(0, 12).map(p =>
             `<button type="button" class="pc-res" data-pid="${p.playerId}">
-                <span class="pc-res-name">${p.name}</span>
+                <span class="pc-res-name">${p.name} <em class="pc-lg pc-lg-${p.league}">${p.league === "k1" ? "K1" : "K2"}</em></span>
                 <span class="pc-res-meta">${p.teamShort || p.teamName || ""}${p.detailLabel ? " · " + p.detailLabel : (p.position ? " · " + p.position : "")} · ${p.games}경기</span>
             </button>`).join("");
         results.classList.remove("hidden");
@@ -133,8 +133,12 @@
         if (warn.length) html += `<div class="pc-warn">⚠ ${warn.join(" · ")}</div>`;
 
         if (okA && okB) {
+            const crossLg = ra.player.league && rb.player.league && ra.player.league !== rb.player.league;
+            const radarSub = crossLg
+                ? "백분위는 <b>각자 자기 리그·포지션 내</b> 기준(K1↔K2 교차 비교는 참고용)"
+                : "리그 백분위(각 포지션 내) · 100=리그 1위";
             html += `<div class="pc-section">
-                        <div class="pc-sec-title">📡 레이더 <span class="pc-sec-sub">리그 백분위(각 포지션 내) · 100=리그 1위</span></div>
+                        <div class="pc-sec-title">📡 레이더 <span class="pc-sec-sub">${radarSub}</span></div>
                         <div class="pc-radar-wrap"><canvas id="pc-radar"></canvas></div>
                      </div>`;
             html += `<div class="pc-section">
@@ -155,10 +159,11 @@
         if (!r) return `<div class="pc-card"><div class="pc-card-name" style="color:${col}">${selp.name}</div>
             <div class="pc-card-warn">K리그2 상세 스탯 없음</div></div>`;
         const p = r.player;
+        const lg = p.league ? `<em class="pc-lg pc-lg-${p.league.toLowerCase()}">${p.league}</em>` : "";
         const posTxt = (p.detail_label || p.pos_label || "") + (p.team ? " · " + p.team : "");
         const kpi = (v, l) => `<div class="pc-kpi"><div class="pc-kpi-v">${v}</div><div class="pc-kpi-l">${l}</div></div>`;
         return `<div class="pc-card" style="border-top:3px solid ${col}">
-            <div class="pc-card-name" style="color:${col}">${p.name}</div>
+            <div class="pc-card-name" style="color:${col}">${p.name} ${lg}</div>
             <div class="pc-card-meta">${posTxt}</div>
             <div class="pc-kpis">
                 ${kpi(p.games, "경기")}${kpi(p.goals, "골")}${kpi(p.assists, "도움")}
