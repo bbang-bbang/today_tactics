@@ -129,13 +129,15 @@ def main():
 
         # 이미 같은 날짜 + 팀 조합이 있으면 score 보강만 시도, 없으면 INSERT
         cur.execute(
-            "SELECT id, home_score FROM events WHERE home_team_id=? AND away_team_id=? AND date_ts BETWEEN ? AND ?",
+            "SELECT id, home_score, away_score FROM events WHERE home_team_id=? AND away_team_id=? AND date_ts BETWEEN ? AND ?",
             (hm[0], am[0], ts - 43200, ts + 43200)
         )
         row = cur.fetchone()
         if row:
-            existing_eid, existing_score = row
-            if existing_score is None:
+            existing_eid, ex_hs, ex_as = row
+            # NULL 채움 + 공식 JSON과 다르면 교정(SofaScore 크롤 단계 스코어 반전 등 자가치유).
+            # K리그 공식 결과(JSON)가 스코어 진실 소스 — 팀 매칭(home/away id) 일치 시 score만 신뢰.
+            if ex_hs is None or ex_hs != g["home_score"] or ex_as != g["away_score"]:
                 cur.execute(
                     "UPDATE events SET home_score=?, away_score=? WHERE id=?",
                     (g["home_score"], g["away_score"], existing_eid)
