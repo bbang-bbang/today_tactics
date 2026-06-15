@@ -459,18 +459,29 @@
         const host = document.getElementById("ta-weather");
         const hasAny = groups.some(g => g.rows.length);
         if (!hasAny) { host.innerHTML = "<p class='chart-empty'>날씨 표본 없음</p>"; return; }
-        host.innerHTML = groups.map(g => {
+        const MIN = 4;   // 이 미만 구간은 승률 신뢰도 낮음(표본 부족) → 약화 표시
+        let anyLow = false;
+        const body = groups.map(g => {
             if (!g.rows.length) return "";
             const bars = g.rows.map(r => {
                 const p = winPct(r.w, r.games);
-                return `<div class="ta-wx-row">
+                const low = r.games < MIN;
+                if (low) anyLow = true;
+                // 표본 부족: 막대 회색 + 승률 흐리게 + 경기수만 강조(수치 오해 방지)
+                const val = low
+                    ? `<span class="ta-wx-faint">${p}%</span> <em>${r.games}경기</em>`
+                    : `${p}% <em>(${r.w}-${r.d}-${r.l})</em>`;
+                return `<div class="ta-wx-row${low ? " ta-wx-low" : ""}">
                     <span class="ta-wx-label">${r.label}</span>
-                    <div class="ta-wx-bar-track"><div class="ta-wx-bar" style="width:${p}%;background:${winColor(p)}"></div></div>
-                    <span class="ta-wx-val">${p}% <em>(${r.w}-${r.d}-${r.l})</em></span>
+                    <div class="ta-wx-bar-track"><div class="ta-wx-bar" style="width:${p}%;background:${low ? "#566072" : winColor(p)}"></div></div>
+                    <span class="ta-wx-val">${val}</span>
                 </div>`;
             }).join("");
             return `<div class="ta-wx-group"><div class="ta-wx-title">${g.title}</div>${bars}</div>`;
         }).join("");
+        host.innerHTML = body + (anyLow
+            ? `<p class="tc-hint">⚠ <b>${MIN}경기 미만</b> 구간은 표본이 적어 승률을 참고용(흐리게·경기수만)으로 표시 — 시즌이 진행될수록 정확해집니다.</p>`
+            : "");
     }
 
     // ══ 심화 인사이트 ═══════════════════════════════════════════════

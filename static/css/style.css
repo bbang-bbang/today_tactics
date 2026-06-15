@@ -9204,6 +9204,9 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ta-wx-bar { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
 .ta-wx-val { font-size: 0.72rem; color: var(--text-secondary); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ta-wx-val em { color: var(--text-faint); font-style: normal; font-weight: 500; }
+.ta-wx-low .ta-wx-label { opacity: 0.7; }
+.ta-wx-low .ta-wx-val .ta-wx-faint { color: var(--text-faint); font-weight: 600; }
+.ta-wx-low .ta-wx-val em { color: #f0a25c; font-weight: 700; }
 
 /* 스킬 지표 바 */
 .ta-metric-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 22px; }
