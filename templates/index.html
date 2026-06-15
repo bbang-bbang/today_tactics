@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today Tactics - 축구 전술판</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=89">
+    <link rel="stylesheet" href="/static/css/style.css?v=90">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -795,6 +795,7 @@
                 <!-- 탭 -->
                 <div class="ta-tabs">
                     <button class="ta-tab-btn active" data-tab="results">📋 결과 분석</button>
+                    <button class="ta-tab-btn" data-tab="scout">🎯 스카우팅</button>
                     <button class="ta-tab-btn" data-tab="insights">📈 심화 인사이트</button>
                     <button class="ta-tab-btn" data-tab="shape">🧭 팀 형태</button>
                     <button class="ta-tab-btn" data-tab="shotmap">📍 슛맵</button>
@@ -838,6 +839,12 @@
                         <div class="ta-weather-grid" id="ta-weather"></div>
                         <p class="tc-hint">경기 당시 실측 기상(Open-Meteo) 기준 · 표본 있는 구간만 표시</p>
                     </div>
+                </div>
+
+                <!-- 스카우팅 리포트 (형태 + 슛맵 for/against 조합 · 자동 분석) -->
+                <div class="ta-tab-panel hidden" id="ta-panel-scout">
+                    <div id="ta-scout"></div>
+                    <p class="tc-hint" style="margin-top:8px">⚠ 경계할 점 = 상대 강점(공격·결정력) · 🎯 공략 포인트 = 상대 약점(피슈팅·실점 패턴) · 모두 같은 리그·시즌 평균 대비 자동 도출. 슛맵 커버 경기 기준이라 표본이 적으면 신중히 해석하세요.</p>
                 </div>
 
                 <!-- 심화 인사이트 -->
@@ -941,7 +948,7 @@
     <script src="/static/js/global_league.js?v=1"></script>
     <script src="/static/js/banner_stats.js?v=3"></script>
     <script src="/static/js/team_compare.js?v=12"></script>
-    <script src="/static/js/analytics.js?v=12"></script>
+    <script src="/static/js/analytics.js?v=13"></script>
     <script src="/static/js/prediction.js?v=59"></script>
 
     <!-- 선수 분석 모달 -->

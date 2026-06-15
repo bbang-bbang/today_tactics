@@ -192,6 +192,8 @@
             // 슛맵
             _shotmapData = { for: smFor, against: smAgainst };
             renderShotmap();
+            // 스카우팅 리포트 (형태+슛맵 조합)
+            renderScout(shape, smFor, smAgainst, meta);
             // 스킬 프로필
             renderSkill(rankings, meta);
         }).catch(err => {
@@ -846,6 +848,173 @@
                     barSection(isFor ? "👟 슈터 TOP" : "🥅 실점 허용 상대 TOP", rep.topShooters, true);
             }
         }
+    }
+
+    // ── 상대 스카우팅 리포트 (형태 + 슛맵 for/against 자동 조합) ──────
+    const SET_LABELS = ["코너", "프리킥", "세트피스", "페널티"];
+    const LVL_W = { high: 3, med: 2, low: 1 };
+    function renderScout(shape, smFor, smAgainst, meta) {
+        const host = document.getElementById("ta-scout");
+        if (!host) return;
+        const M = (shape && shape.metrics) || {}, LG = (shape && shape.league) || {};
+        const F = (smFor && smFor.summary) || {}, A = (smAgainst && smAgainst.summary) || {};
+        const Frep = (smFor && smFor.report) || {}, Arep = (smAgainst && smAgainst.report) || {};
+        const FL = F.league || {}, AL = A.league || {};
+        const name = (meta && (meta.short || meta.name)) || (shape && shape.team) || "이 팀";
+
+        const hasData = (smFor && (smFor.shots || []).length) ||
+                        (smAgainst && (smAgainst.shots || []).length) ||
+                        (shape && (shape.nodes || []).length);
+        if (!hasData) {
+            host.innerHTML = '<div class="tc-panel"><p class="tc-hint">스카우팅 리포트를 만들 슛맵·형태 데이터가 부족합니다 (이 시즌 표본 없음).</p></div>';
+            return;
+        }
+        const pctDev = (v, lv) => (lv ? (v - lv) / lv : 0);   // 리그 평균 대비 비율 편차
+
+        // 게임플랜 도출용 플래그
+        const flag = { highLine: false, lowBlock: false, wide: false, narrow: false,
+                       setThreat: false, setWeak: false, boxWeak: false,
+                       highFire: false, lowShotVol: false, clinical: false };
+
+        // ── 헤드라인 태그 ──
+        const idTags = [];
+        if (M.defLine != null && LG.defLine != null) {
+            const d = Math.round((M.defLine - LG.defLine) * 10) / 10;
+            if (d >= 2) { idTags.push("높은 라인"); flag.highLine = true; }
+            else if (d <= -2) { idTags.push("낮은 블록"); flag.lowBlock = true; }
+        }
+        if (M.width != null && LG.width != null) {
+            const d = M.width - LG.width;
+            if (d >= 3) { idTags.push("넓은 측면 전개"); flag.wide = true; }
+            else if (d <= -3) { idTags.push("중앙 집중"); flag.narrow = true; }
+        }
+        if (F.xgPerGame != null && FL.xgPerGame) {
+            const p = pctDev(F.xgPerGame, FL.xgPerGame);
+            if (p >= 0.12) { idTags.push("화력 상위"); flag.highFire = true; }
+            else if (p <= -0.12) idTags.push("공격 빈곤");
+        }
+        if (A.xgPerGame != null && AL.xgPerGame) {
+            const p = pctDev(A.xgPerGame, AL.xgPerGame);
+            if (p >= 0.12) idTags.push("수비 불안");
+            else if (p <= -0.12) idTags.push("수비 견고");
+        }
+
+        // ── 경계할 점 (상대 강점) — smFor + 공격 형태 ──
+        const threats = [];
+        const topF = (Frep.topShooters || [])[0];
+        if (topF && topF.shots) threats.push({
+            lvl: topF.goals >= 5 ? "high" : topF.goals >= 2 ? "med" : "low",
+            text: `핵심 슈터 <b>${topF.name}</b> — ${topF.shots}슛 ${topF.goals}골 (xG ${topF.xg})`,
+            tag: topF.goals >= 5 ? "집중 마크" : topF.goals >= 2 ? "주시" : "",
+        });
+        const routeF = (Frep.bySituation || []).filter(s => s.goals > 0).sort((a, b) => b.goals - a.goals)[0];
+        if (routeF) {
+            const isSet = SET_LABELS.includes(routeF.label);
+            if (isSet && routeF.goals >= 2) flag.setThreat = true;
+            threats.push({
+                lvl: routeF.goals >= 4 ? "high" : "med",
+                text: `주 득점 루트 <b>${routeF.label}</b> — ${routeF.goals}골 / ${routeF.shots}슛`,
+                tag: isSet ? "세트피스 경계" : "",
+            });
+        }
+        if (F.xgPerGame != null && FL.xgPerGame) {
+            const p = pctDev(F.xgPerGame, FL.xgPerGame);
+            if (p >= 0.1) threats.push({
+                lvl: p >= 0.2 ? "high" : "med",
+                text: `경기당 기대득점 <b>${F.xgPerGame}</b> (리그 ${FL.xgPerGame}) — 리그 평균 이상 화력`,
+                tag: p >= 0.2 ? "화력 상위" : "",
+            });
+        }
+        if (F.xgDiff != null && F.xgDiff >= 2) { flag.clinical = true; threats.push({
+            lvl: "med",
+            text: `마무리 효율 높음 — 실제 골이 xG보다 <b>+${F.xgDiff}</b> (적은 찬스도 골로)`, tag: "",
+        }); }
+        const boxF = (Frep.byZone || []).find(z => z.label === "박스 안");
+        if (boxF && boxF.goals >= 4) threats.push({
+            lvl: boxF.goals >= 8 ? "high" : "med",
+            text: `박스 안 득점 ${boxF.goals} — 침투·크로스 마무리 활발`, tag: "",
+        });
+
+        // ── 공략 포인트 (상대 약점) — smAgainst + 수비 형태 ──
+        const weak = [];
+        if (A.perGame != null && AL.perGame) {
+            const p = pctDev(A.perGame, AL.perGame);
+            if (p >= 0.08) { flag.lowShotVol = false; weak.push({
+                lvl: p >= 0.2 ? "high" : "med",
+                text: `경기당 피슈팅 <b>${A.perGame}회</b> 허용 (리그 ${AL.perGame}) — 슛 기회를 많이 내줌`,
+                tag: "슛 적극",
+            }); }
+        }
+        const routeA = (Arep.bySituation || []).filter(s => s.goals > 0).sort((a, b) => b.goals - a.goals)[0];
+        if (routeA) {
+            const isSet = SET_LABELS.includes(routeA.label);
+            if (isSet && routeA.goals >= 2) flag.setWeak = true;
+            weak.push({
+                lvl: routeA.goals >= 4 ? "high" : "med",
+                text: `실점 多 상황 <b>${routeA.label}</b> — ${routeA.goals}실점`,
+                tag: isSet ? "세트피스 기회" : "",
+            });
+        }
+        const boxA = (Arep.byZone || []).find(z => z.label === "박스 안");
+        if (boxA && boxA.goals >= 3) { flag.boxWeak = true; weak.push({
+            lvl: boxA.goals >= 6 ? "high" : "med",
+            text: `박스 안 실점 ${boxA.goals} — 침투·크로스 마무리에 취약`, tag: "박스 침투",
+        }); }
+        if (A.xgDiff != null && A.xgDiff >= 1) weak.push({
+            lvl: "med",
+            text: `xG보다 많이 실점 (+${A.xgDiff}) — 수비 위기관리 불안`, tag: "",
+        });
+        if (flag.highLine) weak.push({
+            lvl: "high",
+            text: `높은 수비라인 (리그 +${Math.round((M.defLine - LG.defLine) * 10) / 10}) — 배후 공간 노릴 수 있음`,
+            tag: "배후 침투",
+        });
+        else if (flag.lowBlock) weak.push({
+            lvl: "med",
+            text: `낮은 블록 — 측면 폭·중거리로 끌어내 공략`, tag: "측면/중거리",
+        });
+
+        threats.sort((a, b) => LVL_W[b.lvl] - LVL_W[a.lvl]);
+        weak.sort((a, b) => LVL_W[b.lvl] - LVL_W[a.lvl]);
+
+        // ── 게임플랜 ──
+        const plan = [];
+        if (flag.highLine) plan.push("수비 배후로 빠른 스루패스·역습 — 라인 뒤 공간을 1순위로 공략");
+        else if (flag.lowBlock) plan.push("낮은 블록 상대 — 측면 폭을 넓혀 끌어내고 중거리·세컨볼로 균열 만들기");
+        if (flag.setWeak) plan.push("세트피스 공격 기회 多 — 코너·프리킥 루틴을 미리 준비");
+        if (flag.setThreat) plan.push("상대 세트피스 경계 — 박스 안 마크 정리 + 세컨볼 차단");
+        if (flag.boxWeak) plan.push("박스 안 침투·크로스로 마무리 기회를 늘려라");
+        if (flag.highFire) plan.push("상대 화력 상위 — 볼 점유로 상대 공격 빈도를 줄이고 역습 차단 우선");
+        if (flag.clinical) plan.push("상대는 적은 찬스도 골로 연결 — 결정적 기회 자체를 내주지 말 것");
+        if (flag.wide) plan.push("측면 의존도 높음 — 풀백·윙 견제로 크로스 차단");
+
+        // ── 렌더 ──
+        const headline = idTags.length ? idTags.join(" · ") : "표본 기준 뚜렷한 스타일 특징은 약함";
+        const bullet = (b, kind) => `<div class="scout-bullet kind-${kind} lvl-${b.lvl}">
+            <span class="scout-dot"></span>
+            <span class="scout-text">${b.text}</span>
+            ${b.tag ? `<span class="scout-tag">${b.tag}</span>` : ""}</div>`;
+        host.innerHTML =
+            `<div class="tc-panel scout-head" style="--tc-accent:#f59e0b">
+                <p class="tc-panel-label" style="margin:0 0 6px">🎯 ${name} 스카우팅 요약</p>
+                <div class="scout-headline">${headline}</div>
+                <p class="tc-hint" style="margin:6px 0 0">${(shape && shape.year) || ""} · 공격 ${F.games || 0}경기 / 수비 ${A.games || 0}경기(슛맵 보유 기준) · 리그 평균 대비 자동 분석</p>
+            </div>
+            <div class="scout-cols">
+                <div class="tc-panel" style="--tc-accent:#f87171">
+                    <p class="tc-panel-label">⚠️ 경계할 점 <span class="scout-sub">상대 강점</span></p>
+                    ${threats.slice(0, 5).map(b => bullet(b, "threat")).join("") || '<p class="tc-hint">뚜렷한 위협 패턴 없음</p>'}
+                </div>
+                <div class="tc-panel" style="--tc-accent:#22c55e">
+                    <p class="tc-panel-label">🎯 공략 포인트 <span class="scout-sub">상대 약점</span></p>
+                    ${weak.slice(0, 5).map(b => bullet(b, "opp")).join("") || '<p class="tc-hint">뚜렷한 약점 패턴 없음</p>'}
+                </div>
+            </div>
+            <div class="tc-panel" style="--tc-accent:#60a5fa">
+                <p class="tc-panel-label">📝 권장 대응 <span class="scout-sub">게임플랜</span></p>
+                ${plan.length ? `<ul class="scout-plan">${plan.slice(0, 4).map(p => `<li>${p}</li>`).join("")}</ul>`
+                    : '<p class="tc-hint">데이터 기반 제안 생성 조건 미충족 (표본 부족)</p>'}
+            </div>`;
     }
 
     // ── 스킬 프로필 (레이더 + 지표 바) ────────────────────────────

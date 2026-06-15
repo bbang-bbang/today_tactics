@@ -4,6 +4,23 @@
 
 ---
 
+## 2026-06-15 | 🆕 K리그 심화 ③ 상대 스카우팅 리포트 — 형태+슛맵 자동 조합
+
+### 컨셉 & 설계 (PM 판단: 신규 백엔드 0, 최고 ROI)
+- "이 팀을 **상대할 때** 알아야 할 것"을 한 화면에 자동 요약. 기존 `team-shape`(형태) + `team-shotmap` for/against가 이미 `loadAll()`서 페치 중 → **프론트에서만 조합**(신규 쿼리·캐시·정합성 리스크 0).
+- 4블록: ① 헤드라인(스타일 태그) ② ⚠️ 경계할 점(상대 강점=공격) ③ 🎯 공략 포인트(상대 약점=수비) ④ 📝 권장 대응(게임플랜). 모든 항목 **같은 리그·시즌 평균 대비 편차**로 심각도(high/med/low) 산출 → 색상.
+
+### UI — 팀 분석 모달 `🎯 스카우팅` 탭 (analytics.js `renderScout`)
+- 헤드라인 태그: 수비라인(±2)·팀폭(±3)·경기당 xG 편차(±12%)·피xG 편차로 "높은 라인/낮은 블록·넓은 전개/중앙 집중·화력 상위/수비 불안" 자동 조합.
+- 경계할 점(smFor+형태): 핵심 슈터(골≥5 집중마크)·주 득점 루트(세트피스 경계 태그)·경기당 xG vs 리그·마무리 효율(xG대비 +2↑)·박스 안 득점.
+- 공략 포인트(smAgainst+형태): 피슈팅 허용량 vs 리그·실점 多 상황(세트피스 기회)·박스 안 실점·실점 효율(xG대비)·높은 라인(배후 공간)/낮은 블록(측면·중거리).
+- 게임플랜: 플래그(highLine/lowBlock/setWeak/setThreat/boxWeak/highFire/clinical/wide)에서 전술 제안 최대 4개 파생.
+- 색상: 위협=붉은 계열(lvl-high #ef4444), 기회=초록 계열(lvl-high #16a34a), 태그칩·게임플랜 ▸리스트. `scout-bullet`/`scout-cols`(2단)/`scout-plan`.
+- 검증: Playwright(수원 삼성) — 헤드라인 "높은 라인·중앙 집중·화력 상위", 위협 5/기회 4/게임플랜 4 생성, 컴퓨티드 border 색상(red/green) 적용 확인, **콘솔 에러 0**.
+- **DB·백엔드 무변경 → prod 마이그레이션 불필요**. `analytics.js` v12→13, `style.css` v89→90(원격 해외리그 gl-* v89와 충돌 회피로 +1), `index.html`(탭+패널). ※ 리베이스로 원격 해외리그 작업(06-13/06-14)과 병합.
+
+---
+
 ## 2026-06-13 | 해외 리그 확장 아키텍처 — LEAGUE_REGISTRY + 제네릭 API + 크롤러 + 해외리그 탭
 
 ### 배경
@@ -4062,3 +4079,13 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-13 23:59:10 | curl -s "http://127.0.0.1:5000/api/league/epl/top-performers?metric=key_passes&year=2025&limit=5" | python3 -c " / import sys,json / d=json.load(sys.stdin) / for r in d: /     n=r['name'].encode('ascii','replace').decode() /     t=r['team'].encode('ascii','replace').decode() /     print(f'{n:25} | {t:25} | KP:{r[\"keyPasses\"]} A:{r[\"assists\"]} G:{r[\"goals\"]} src:{r.get(\"source\",\"?\")}') / "
 - 2026-06-13 23:59:15 | curl -s "http://127.0.0.1:5000/api/league/bundesliga/top-performers?metric=tackles&year=2025&limit=5" | python3 -c " / import sys,json / d=json.load(sys.stdin) / for r in d: /     n=r['name'].encode('ascii','replace').decode() /     t=r['team'].encode('ascii','replace').decode() /     print(f'{n:25} | {t:25} | Tac:{r[\"tackles\"]} KP:{r[\"keyPasses\"]} Rating:{r[\"avgRating\"]}') / "
 - 2026-06-14 00:00:05 | curl -s "http://127.0.0.1:5000/" | grep -o "gl-root\|ws-global\|initGlobalLeagueView" | head -5
+- 2026-06-15 09:44:03 | ls players.db 2>/dev/null && echo "DB exists" || echo "NO DB"
+- 2026-06-15 10:00:06 | DISABLE_SCHEDULER=1 LOGIN_REQUIRED=0 PYTHONIOENCODING=utf-8 python main.py > /tmp/scout_srv.log 2>&1 & / echo "started"
+- 2026-06-15 10:03:39 | for i in $(seq 1 20); do /   if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/health 2>/dev/null | grep -q 200; then /     echo "UP"; break /   fi /   sleep 1 / done / curl -s "http://127.0.0.1:5000/api/teams" -o /dev/null -w "teams:%{http_code}\n"
+- 2026-06-15 10:03:46 | curl -s "http://127.0.0.1:5000/api/teams" | python -c "import sys,json; d=json.load(sys.stdin); ts=d if isinstance(d,list) else d.get('teams',d); print(json.dumps([{'id':t.get('id'),'name':t.get('name'),'league':t.get('league')} for t in ts if t.get('league')=='K2'][:6], ensure_ascii=False))"
+- 2026-06-15 10:05:27 | curl -s -o /dev/null -w "root:%{http_code}\n" http://127.0.0.1:5000/
+- 2026-06-15 10:06:25 | cat > /tmp/dbg.py <<'EOF' / # -*- coding: utf-8 -*- / import sys, io / sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8") / from playwright.sync_api import sync_playwright / with sync_playwright() as p: /     b = p.chromium.launch(); pg = b.new_page() /     pg.goto("http://127.0.0.1:5000/", wait_until="domcontentloaded") /     pg.wait_for_timeout(2500) /     info = pg.evaluate("""()=>{ /         const btn=document.getElementById('btn-analytics'); /         const modal=document.getElementById('team-analysis-modal'); /         const sel=document.getElementById('ta-team-select'); /         return {btn:!!btn, btnVisible: btn? (btn.offsetParent!==null):null, /                 modal:!!modal, modalClass: modal?modal.className:null, /                 hasSelect:!!sel, /                 triggers: [...document.querySelectorAll('[id*=analytic],[class*=analytic]')].map(e=>e.id||e.className).slice(0,15)}; /     }""") /     print(info) /     # try clicking and re-check /     pg.evaluate("()=>document.getElementById('btn-analytics') && document.getElementById('btn-analytics').click()") /     pg.wait_for_timeout(800) /     print("after click modalClass:", pg.evaluate("()=>document.getElementById('team-analysis-modal').className")) /     b.close() / EOF / PYTHONIOENCODING=utf-8 python /tmp/dbg.py 2>&1
+- 2026-06-15 10:08:19 | PYTHONIOENCODING=utf-8 python analysis/_chk_scout.py 2>&1
+- 2026-06-15 10:09:46 | PYTHONIOENCODING=utf-8 python analysis/_chk_scout.py 2>&1 | tail -5
+- 2026-06-15 10:11:08 | PYTHONIOENCODING=utf-8 python analysis/_chk_scout.py 2>&1 | tail -4
+- 2026-06-15 10:11:46 | cat > /tmp/css_chk.py <<'EOF' / # -*- coding: utf-8 -*- / import sys, io / sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8") / from playwright.sync_api import sync_playwright / with sync_playwright() as p: /     b=p.chromium.launch(); pg=b.new_page() /     pg.goto("http://127.0.0.1:5000/", wait_until="domcontentloaded"); pg.wait_for_timeout(2500) /     pg.evaluate("()=>document.getElementById('btn-analytics').click()") /     pg.wait_for_function("()=>!document.getElementById('team-analysis-modal').classList.contains('hidden')") /     pg.evaluate("""()=>{const s=document.getElementById('ta-team-select');s.value='suwon';s.dispatchEvent(new Event('change',{bubbles:true}));}""") /     pg.wait_for_timeout(3000) /     r=pg.evaluate("""()=>{ /         const t=document.querySelector('#ta-scout .scout-bullet.kind-threat'); /         const o=document.querySelector('#ta-scout .scout-bullet.kind-opp'); /         const cs=e=>e?getComputedStyle(e):null; /         const tag=document.querySelector('#ta-scout .scout-tag'); /         const cols=document.querySelector('#ta-scout .scout-cols'); /         return { /           threatBorder: t?cs(t).borderLeftColor:null, /           oppBorder: o?cs(o).borderLeftColor:null, /           tagBg: tag?cs(tag).backgroundColor:null, /           colsDisplay: cols?cs(cols).display:null, /           colsCols: cols?cs(cols).gridTemplateColumns:null, /           nThreat: document.querySelectorAll('#ta-scout .scout-bullet.kind-threat').length, /           nOpp: document.querySelectorAll('#ta-scout .scout-bullet.kind-opp').length, /         }; /     }""") /     print(r); b.close() / EOF / PYTHONIOENCODING=utf-8 python /tmp/css_chk.py 2>&1

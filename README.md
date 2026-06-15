@@ -173,6 +173,7 @@ K리그 (players.db)
 | `/api/team-goal-timing` | 팀 득점 시간대 분석 |
 | `/api/team-shape` | 팀 평균 진형(Shape) — avg_positions 기반 평균위치 + 형태지표(수비라인·공격라인·팀길이·팀폭·무게중심) + 리그평균 baseline |
 | `/api/team-shotmap` | 팀 슛맵 — match_shotmap 기반 `side=for\|against`, 슛 좌표·xG·outcome + 요약(슛·골·xG·유효슛%·결정력) |
+| (프론트) 🎯 스카우팅 탭 | 신규 API 없음 — `team-shape` + `team-shotmap`(for/against)를 클라이언트에서 조합해 경계할 점(상대 강점)·공략 포인트(상대 약점)·게임플랜을 리그 평균 대비 자동 도출 (`analytics.js renderScout`) |
 | `/api/match-prediction` | 경기 예측 |
 | `/api/prediction-backtest` | 예측 모델 백테스트 |
 | `/api/season-simulation` | 시즌 시뮬레이션 |

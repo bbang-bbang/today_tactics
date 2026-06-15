@@ -8937,6 +8937,55 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ta-sm-bar-num { font-size: 10.5px; color: #9aa7b4; white-space: nowrap; }
 .ta-sm-bar-num b { color: #22c55e; font-weight: 700; }
 
+/* ── 스카우팅 리포트 ───────────────────────────────────────── */
+#ta-scout { display: flex; flex-direction: column; gap: 12px; }
+.scout-head .scout-headline {
+    font-size: 16px; font-weight: 800; color: #fff; line-height: 1.4;
+    letter-spacing: -0.01em;
+}
+.scout-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 820px) { .scout-cols { grid-template-columns: 1fr; } }
+.scout-sub {
+    font-size: 10.5px; font-weight: 600; color: #8a98a7; margin-left: 6px;
+    padding: 1px 6px; border: 1px solid #2c3645; border-radius: 99px; vertical-align: middle;
+}
+.scout-bullet {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 12.5px; line-height: 1.5; color: #dbe4ee;
+    background: #1b222c; border: 1px solid #2a3444; border-left-width: 3px;
+    border-radius: 8px; padding: 8px 10px; margin-bottom: 7px;
+}
+.scout-bullet:last-child { margin-bottom: 0; }
+.scout-bullet b { color: #fff; font-weight: 700; }
+.scout-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 99px; margin-top: 5px; }
+.scout-text { flex: 1 1 auto; }
+.scout-tag {
+    flex: 0 0 auto; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px;
+    align-self: center; white-space: nowrap;
+}
+/* 경계할 점 = 위협(붉은 계열) */
+.scout-bullet.kind-threat { border-left-color: #f87171; }
+.scout-bullet.kind-threat .scout-dot { background: #f87171; }
+.scout-bullet.kind-threat.lvl-high { background: #2a1c1f; border-left-color: #ef4444; }
+.scout-bullet.kind-threat .scout-tag { background: #3a1f23; color: #fca5a5; }
+/* 공략 포인트 = 기회(초록 계열) */
+.scout-bullet.kind-opp { border-left-color: #22c55e; }
+.scout-bullet.kind-opp .scout-dot { background: #22c55e; }
+.scout-bullet.kind-opp.lvl-high { background: #16271c; border-left-color: #16a34a; }
+.scout-bullet.kind-opp .scout-tag { background: #163224; color: #86efac; }
+/* 심각도 낮음 — 점 흐리게 */
+.scout-bullet.lvl-low .scout-dot { opacity: 0.5; }
+.scout-plan { margin: 4px 0 0; padding-left: 0; list-style: none; }
+.scout-plan li {
+    position: relative; font-size: 12.5px; line-height: 1.55; color: #dbe4ee;
+    padding: 6px 10px 6px 26px; margin-bottom: 6px;
+    background: #1a212b; border: 1px solid #28323f; border-radius: 8px;
+}
+.scout-plan li:last-child { margin-bottom: 0; }
+.scout-plan li::before {
+    content: "▸"; position: absolute; left: 10px; top: 6px; color: #60a5fa; font-weight: 800;
+}
+
 /* 재사용 .tc-panel 다크 오버라이드 (이 모달 스코프 한정) */
 .ta-modal-content .tc-panel {
     background: var(--bg-card);
