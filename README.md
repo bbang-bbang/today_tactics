@@ -51,7 +51,7 @@ today_tactics/
     css/style.css
     js/
       app.js                     # 전술판 코어 (Canvas, 드래그, 화살표, 애니메이션)
-      analytics.js               # 팀 분석 차트
+      analytics.js               # 팀 분석 차트 (결과·인사이트·🧭팀형태·📍슛맵·🎯스카우팅·📡스킬)
       banner_stats.js            # 배너 스탯
       global_league.js           # 해외리그 워크스페이스 탭 (🌍) — 리그 스위처·순위표·팀지표·TOP퍼포머
       info.js                    # 정보 패널
@@ -59,7 +59,9 @@ today_tactics/
       k2heatmap.js               # 히트맵 분석 뷰: 통합검색·비교 오버레이(포지션평균/타선수/홈vs원정)
       workspace.js               # 워크스페이스 탭 컨트롤러 (전술판/예측/팀/선수/히트맵/해외리그)
       player_analytics.js        # 선수 개인 분석 모달
-      player_report.js           # 선수 리포트 (레이더 차트, 스탯 바)
+      player_report.js           # 선수 리포트 (레이더 차트, 스탯 바, 상대팀별 성적)
+      player_compare.js          # ⚖️ 선수 vs 선수 비교 모달 (레이더 오버레이·90분 지표 바·최근폼, K1·K2)
+      match_report.js            # 📋 경기 단일 심층 리포트 모달 (xG 흐름·양팀 슛맵·평균위치·골 타임라인)
       prediction.js              # 경기 예측 + 시즌 시뮬레이션
       team_compare.js            # 팀 비교 모달 (Chart.js 레이더)
     img/emblems/                 # 팀 엠블럼 (K01~K42)
@@ -75,6 +77,9 @@ today_tactics/
     init_league_db.py            # 해외리그 DB 초기화 (5개 DB, 12개 테이블)
     crawl_sofascore.py           # K리그 선수·히트맵·이벤트
     crawl_match_stats.py         # K리그 경기별 선수 세부 스탯
+    sync_results_to_events.py    # K리그 공식결과 JSON → events 동기화 (NULL채움 + 공식과 다르면 교정·자가치유)
+    fix_swapped_scores.py        # events 스코어 좌우반전 교정 (공식 JSON 기준 멱등, 1회성/재실행 안전)
+    normalize_mps_team.py        # mps.team_id 정규화 (이벤트 유도 팀 기준)
     fetch_venues.py / fetch_weather.py / ...  # 메타 보완 스크립트
   analysis/                      # 분석/검증 스크립트 (읽기 전용)
   deploy/                        # 운영 배포 (nginx/systemd/setup.sh)
@@ -182,7 +187,7 @@ K리그 (players.db)
 | `/api/standings` | K1/K2 순위표 |
 | `/api/heatmap` | 선수 히트맵 좌표 (이름 기반) |
 | `/api/player-matches` | 선수 경기별 스탯 |
-| `/api/player-stat-report` | 선수 스탯 리포트 — **K1·K2 자동 판정**(선수 최근 경기 리그 기준, 비교군·백분위·활동량 모두 해당 리그 내 계산). 퍼센타일 비교군이 **세부 포지션**(풀백↔풀백 등, 표본<5는 대분류 폴백). 응답에 `league`·`detail_label`·`peer_label` + `all_stats`·`all_pctiles`(선수 비교용 공통 90분 지표 전체) |
+| `/api/player-stat-report` | 선수 스탯 리포트 — **K1·K2 자동 판정**(선수 최근 경기 리그 기준, 비교군·백분위·활동량 모두 해당 리그 내 계산). 퍼센타일 비교군이 **세부 포지션**(풀백↔풀백 등, 표본<5는 대분류 폴백). **포지션 대분류는 세부그룹 우선**(`eff_pos` — 윙어=공격수, mps가 M으로 묶는 불일치 해소)로 지표세트·레이더·라벨 결정. 응답에 `league`·`detail_label`·`peer_label` + `all_stats`·`all_pctiles`(선수 비교용 공통 90분 지표 전체) |
 | (프론트) ⚖️ 선수 비교 | 신규 API 없음 — `heatmap-player-search`로 두 선수(K1·K2) 검색 → `player-stat-report` 2회 호출을 클라이언트에서 조합(레이더 오버레이·90분 지표 다이버징 바·최근 폼). `player_compare.js`. 선수 탭 헤더 '⚖️ 선수 비교' 버튼. 교차 리그(K1↔K2) 비교 시 백분위는 각자 자기 리그 기준(참고용) 명시 |
 | `/api/player-analytics` | 선수 개인 분석 (활동량 지수) |
 | `/api/player-vs-teams` | 선수 상대팀별 성적 |
@@ -270,3 +275,10 @@ python update_data.py
 - K리그 부상 정보는 SofaScore 미제공 → `data/player_status.json` 수동 관리
 - `requirements.txt`는 ASCII 전용 (Windows pip cp949 인코딩 충돌 방지)
 - 크롤러 실행 시 Flask 서버와 별도 터미널 사용 권장
+
+## 데이터 정합성 (2026-06-15 점검)
+
+- **events 스코어 좌우반전**: SofaScore 크롤 단계에서 일부 경기 home/away 스코어가 뒤바뀜 → K리그 공식 JSON 기준으로 `fix_swapped_scores.py` 교정 + `sync_results_to_events.py`가 공식과 다르면 자동 갱신(자가치유). 순위표·전적·예측에 직결.
+- **mps.team_id**: 이벤트 유도 팀(is_home) 기준 정규화 완료(0 불일치). 스탯 값·리그 태그·중복행·고아 0건.
+- **포지션 분류**: `detail_pos`(세부, 윙어=W→F) 우선, 없으면 `mps.position` 폴백으로 통일 — 화면 간 불일치(윙어가 미드필더로 보임) 해소.
+- **표본 함정 가드**: 날씨·월별·상대팀별·선수 상대팀별 등 소표본 비율은 일정 경기수 미만이면 흐리게·후순위·경고 표시(1~2경기 승률을 신뢰 지표로 오인 방지). 인사이트(per-90·공중볼 등)는 최소 표본 필터 기존 적용.
