@@ -7,14 +7,18 @@
 
     let currentName = null;
     let currentYear = null;
+    let currentDob  = "";
+    let currentShirt = null;
     let radarChart    = null;
     let activityChart = null;
     let vsTeamsChart  = null;
 
     /* ── 이벤트 수신 ─────────────────────────────────────── */
     document.addEventListener("openPlayerReport", (e) => {
-        currentName = e.detail.name;
-        currentYear = null;
+        currentName  = e.detail.name;
+        currentDob   = e.detail.dob || "";
+        currentShirt = e.detail.shirt || null;
+        currentYear  = null;
         load();
     });
 
@@ -22,7 +26,10 @@
     function load() {
         if (!currentName) return;
         body.innerHTML = `<div class="pr-loading">분석 중...</div>`;
-        const url = `/api/player-stat-report?name=${encodeURIComponent(currentName)}${currentYear ? `&year=${currentYear}` : ""}`;
+        let url = `/api/player-stat-report?name=${encodeURIComponent(currentName)}`;
+        if (currentDob)   url += `&dob=${encodeURIComponent(currentDob)}`;
+        if (currentShirt) url += `&shirt=${encodeURIComponent(currentShirt)}`;
+        if (currentYear)  url += `&year=${currentYear}`;
         fetch(url)
             .then(r => r.json())
             .then(d => {

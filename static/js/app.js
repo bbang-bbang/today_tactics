@@ -1145,9 +1145,12 @@
     editReport.addEventListener("click", () => {
         if (!editingPlayer) return;
         const name = editingPlayer.name;
+        // 이름 매칭 실패 대비 — 생년+등번호 확정키도 함께 전달(깨진 name_ko·영문전용 레코드 구제)
+        const dob = editingPlayer.dob || "";
+        const shirt = editingPlayer.number || null;
         closeEditPopup();
         if (name && name !== "선수") {
-            document.dispatchEvent(new CustomEvent("openPlayerReport", { detail: { name } }));
+            document.dispatchEvent(new CustomEvent("openPlayerReport", { detail: { name, dob, shirt } }));
             document.getElementById("player-report-section")?.scrollIntoView({ behavior: "smooth" });
         }
     });

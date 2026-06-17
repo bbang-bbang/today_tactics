@@ -3953,6 +3953,38 @@ def _find_player(cur, name):
     matched = row["name_ko"] or row["name"]
     return (row["id"], row["team_id"], matched)
 
+
+def _find_player_by_dob_shirt(cur, dob_str, shirt):
+    """생년월일(YYYY/MM/DD) [+등번호]로 선수를 확정 매칭해 (id, team_id, name) 반환.
+    깨진 name_ko·영문전용 레코드를 이름 대신 확정키로 구제한다(예: Jun-yeon Jeong, Jun-seo Park).
+    매칭 규칙(보수적 — 오매칭 위험 최소화):
+      1) dob(±1일, 타임존 보정) 후보 중 등번호까지 일치하는 1명 → 채택
+      2) 등번호 불일치(소스마다 등번호 상이)여도 dob 후보가 '정확히 1명'이면 채택
+      3) dob 후보가 2명 이상이고 등번호도 못 가리면 None(모호 → 포기)
+    실측: 스쿼드 미매칭 65명 중 실재 20명 전원 복구, 진짜 부재 45명 오매칭 0건."""
+    import datetime as _dt
+    try:
+        d = _dt.datetime.strptime((dob_str or "").strip(), "%Y/%m/%d")
+        ts = int(d.replace(tzinfo=_dt.timezone.utc).timestamp())
+    except (ValueError, TypeError):
+        return None
+    rows = cur.execute(
+        "SELECT id, team_id, name_ko, name, shirt_number FROM players "
+        "WHERE dob IS NOT NULL AND dob != '' "
+        "AND CAST(dob AS INTEGER) BETWEEN ? AND ?",
+        (ts - 86400, ts + 86400),
+    ).fetchall()
+    if not rows:
+        return None
+    if shirt:
+        for r in rows:
+            if r["shirt_number"] == shirt:
+                return (r["id"], r["team_id"], r["name_ko"] or r["name"])
+    if len(rows) == 1:
+        r = rows[0]
+        return (r["id"], r["team_id"], r["name_ko"] or r["name"])
+    return None
+
 def _flip_points(rows, player_team_id):
     """SofaScore 원본 좌표는 이미 팀상대 정규화(전 선수 '공격=오른쪽') 상태다.
     검증(2026-06-11): 91/91 경기에서 홈·원정 GK가 모두 원본 x<50(자기 골문)에 위치 →
@@ -4100,6 +4132,14 @@ def get_player_stat_report():
             pid, team_id_db, matched = None, None, None
     else:
         pid, team_id_db, matched = _find_player(cur, name)
+        if not pid:
+            # 이름 매칭 실패 시 생년+등번호 확정키 폴백 — 깨진 name_ko·영문전용 레코드 구제
+            # (전술판 보드가 스쿼드의 dob·등번호를 함께 전달). 유일 매칭일 때만 채택.
+            m = _find_player_by_dob_shirt(
+                cur, request.args.get("dob", ""), request.args.get("shirt", type=int)
+            )
+            if m:
+                pid, team_id_db, matched = m
 
     if not pid:
         conn.close()

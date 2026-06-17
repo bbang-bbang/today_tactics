@@ -59,7 +59,7 @@ today_tactics/
       k2heatmap.js               # 히트맵 분석 뷰: 통합검색·비교 오버레이(포지션평균/타선수/홈vs원정)
       workspace.js               # 워크스페이스 탭 컨트롤러 (전술판/예측/팀/선수/히트맵/해외리그)
       player_analytics.js        # 선수 개인 분석 모달
-      player_report.js           # 선수 리포트 (레이더 차트, 스탯 바, 상대팀별 성적)
+      player_report.js           # 선수 리포트 (레이더 차트, 스탯 바, 상대팀별 성적) — 이름 매칭 실패 시 생년+등번호 폴백 조회
       player_compare.js          # ⚖️ 선수 vs 선수 비교 모달 (레이더 오버레이·90분 지표 바·최근폼, K1·K2)
       match_report.js            # 📋 경기 단일 심층 리포트 모달 (xG 흐름·양팀 슛맵·평균위치·골 타임라인)
       prediction.js              # 경기 예측 + 시즌 시뮬레이션
