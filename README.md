@@ -46,14 +46,14 @@ today_tactics/
   requirements.txt               # Python 의존성
   templates/
     index.html                   # 메인 SPA (전술판)
-    leagues.html                 # 해외리그 독립 페이지 (/leagues)
+    leagues.html                 # 해외리그 독립 페이지 (/leagues) ※ UI 진입점 일시 비활성화 (2026-06-17, 아직 이른 단계)
   static/
     css/style.css
     js/
       app.js                     # 전술판 코어 (Canvas, 드래그, 화살표, 애니메이션)
       analytics.js               # 팀 분석 차트 (결과·인사이트·🧭팀형태·📍슛맵·🎯스카우팅·📡스킬)
       banner_stats.js            # 배너 스탯
-      global_league.js           # 해외리그 워크스페이스 탭 (🌍) — 리그 스위처·순위표·팀지표·TOP퍼포머
+      global_league.js           # 해외리그 워크스페이스 탭 (🌍) — 리그 스위처·순위표·팀지표·TOP퍼포머 ※ index.html에서 일시 로드 해제(복구: 주석 4곳 해제)
       info.js                    # 정보 패널
       insights.js                # 인사이트 뷰 (대시보드/순위 통합)
       k2heatmap.js               # 히트맵 분석 뷰: 통합검색·비교 오버레이(포지션평균/타선수/홈vs원정)

@@ -92,7 +92,8 @@
             <div id="league-tabs">
                 <button class="league-tab-btn active" data-league="k2">K리그2</button>
                 <button class="league-tab-btn" data-league="k1">K리그1</button>
-                <a href="/leagues" class="league-tab-ext" title="해외 리그 통계 페이지">🌍 해외리그</a>
+                <!-- 해외리그 진입점 일단 비활성화 (아직 이른 단계) — 복구 시 아래 링크 복원
+                <a href="/leagues" class="league-tab-ext" title="해외 리그 통계 페이지">🌍 해외리그</a> -->
             </div>
             <div id="k2-schedule-banner-wrap" class="league-tab-panel active"></div>
             <div id="k1-schedule-banner-wrap" class="league-tab-panel"></div>
@@ -124,9 +125,10 @@
             <button class="ws-tab" data-ws="heatmap" role="tab" aria-selected="false" tabindex="-1">
                 <span class="ws-tab-icon" aria-hidden="true">🔥</span><span class="ws-tab-label">히트맵</span>
             </button>
+            <!-- 해외리그 탭 일단 비활성화 (아직 이른 단계) — 복구 시 아래 버튼 복원
             <button class="ws-tab" data-ws="global" role="tab" aria-selected="false" tabindex="-1">
                 <span class="ws-tab-icon" aria-hidden="true">🌍</span><span class="ws-tab-label">해외리그</span>
-            </button>
+            </button> -->
         </nav>
         <div id="workspace-panels">
             <section class="ws-panel" id="ws-tactics" data-ws="tactics" role="tabpanel" aria-label="전술판"></section>
@@ -142,10 +144,10 @@
             <section class="ws-panel hidden" id="ws-heatmap" data-ws="heatmap" role="tabpanel" aria-label="선수 히트맵 분석">
                 <!-- #k2-heatmap-modal 이 workspace.js 에 의해 여기로 재배치됨 -->
             </section>
-            <!-- 해외리그 탭 패널 -->
+            <!-- 해외리그 탭 패널 일단 비활성화 (아직 이른 단계) — 복구 시 아래 섹션 복원
             <section class="ws-panel hidden" id="ws-global" data-ws="global" role="tabpanel" aria-label="해외 리그 분석">
                 <div id="gl-root"></div>
-            </section>
+            </section> -->
         </div>
 
         <div id="board-report-wrap">
@@ -949,7 +951,8 @@
 
     <script src="/static/js/info.js?v=7"></script>
     <script src="/static/js/k2heatmap.js?v=16"></script>
-    <script src="/static/js/global_league.js?v=1"></script>
+    <!-- 해외리그 일단 비활성화 (아직 이른 단계) — 복구 시 아래 스크립트 복원
+    <script src="/static/js/global_league.js?v=1"></script> -->
     <script src="/static/js/banner_stats.js?v=3"></script>
     <script src="/static/js/team_compare.js?v=12"></script>
     <script src="/static/js/analytics.js?v=16"></script>

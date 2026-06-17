@@ -3935,6 +3935,17 @@ def _find_player(cur, name):
         cur.execute("SELECT id, team_id, name_ko, name FROM players WHERE REPLACE(name_ko, ' ', '') = ?", (name_no_space,))
         row = cur.fetchone()
     if not row:
+        # 동명이인 구분용 끝 숫자 접미사 제거 후 정확 재매칭 (예: '이정문1' -> '이정문').
+        # 정확 매칭만 유지하므로 엉뚱한 선수가 잡힐 위험은 없다.
+        name_base = re.sub(r"\d+$", "", name).strip()
+        if name_base and name_base != name:
+            cur.execute(
+                "SELECT id, team_id, name_ko, name FROM players "
+                "WHERE name_ko = ? OR REPLACE(name_ko, ' ', '') = ?",
+                (name_base, name_base.replace(" ", "")),
+            )
+            row = cur.fetchone()
+    if not row:
         cur.execute("SELECT id, team_id, name_ko, name FROM players WHERE name LIKE ?", (f"%{name}%",))
         row = cur.fetchone()
     if not row:

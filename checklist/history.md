@@ -4,6 +4,27 @@
 
 ---
 
+## 2026-06-17 | 🌍 해외리그 UI 일시 비활성화 + 🔧 선수 리포트 조회 진단·개선
+
+사용자 제보: "선수 개인 조회가 잘 안 나오고 에러도 많다 / 해외리그는 일단 제거".
+
+### 해외리그 제거 (`index.html`, UI 진입점만 — 백엔드 무변경)
+- 4곳 주석 비활성화: 일정 배너 `🌍 해외리그` 링크 · 작업공간 `해외리그` 탭 버튼 · `ws-global` 패널 · `global_league.js` 로드.
+- `/leagues` 라우트·`/api/leagues`·league DB는 그대로 보존 → **복구 = 주석 4곳 해제**.
+- Playwright 검증: 탭 5개(전술판·예측·팀·선수·히트맵)로 정리, "해외리그" 흔적 0, 전 탭 전환 콘솔 에러 0.
+
+### 선수 조회 진단 — "이름 매칭 버그"가 아니라 "데이터 커버리지"
+- 4개 표면 실브라우저 점검: **선수 탭 드로어·선수 비교·히트맵 검색은 정상**(ID 기반·검색이 데이터 보유 선수만 반환 → 오매칭/에러 없음).
+- **전술판 리포트**만 임의 스쿼드 선수 클릭 가능 → 실패율 6.6%(66/1004). 그중 **65명은 `players` 테이블에 부재**(신규·유스·미출전). 매칭 개선으로 해결 불가, 데이터 커버리지 이슈.
+- 느슨한 부분일치는 **오히려 엉뚱한 선수 스탯 노출** 위험이라 의도적 배제(P4).
+
+### 수정
+- **`main.py` `_find_player`**: 끝 숫자 접미사 제거 후 **정확 재매칭** 폴백(`이정문1`→`이정문`). 정확 매칭만 유지 → 오매칭 0. 라이브 (200/found:True), 회귀(세징야·조현우·김영권) 정상.
+- **`player_report.js` + `style.css`**: 데이터 없을 때 "📭 …수집된 경기 데이터가 아직 없습니다(신규·유스…)" **안내형** 메시지로 교체(에러처럼 안 보이게) + 이름 `innerHTML` XSS 이스케이프.
+- README 갱신(해외리그 비활성화 명시).
+
+---
+
 ## 2026-06-15 | 🔧 표본 함정 가드 확대 — 월별·상대팀별·선수 상대팀별
 
 날씨 함정 후속: "비율을 소표본에서 뽑는" 다른 곳 전수 점검 후 동일 가드 적용.
@@ -4239,3 +4260,5 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-15 10:11:46 | cat > /tmp/css_chk.py <<'EOF' / # -*- coding: utf-8 -*- / import sys, io / sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8") / from playwright.sync_api import sync_playwright / with sync_playwright() as p: /     b=p.chromium.launch(); pg=b.new_page() /     pg.goto("http://127.0.0.1:5000/", wait_until="domcontentloaded"); pg.wait_for_timeout(2500) /     pg.evaluate("()=>document.getElementById('btn-analytics').click()") /     pg.wait_for_function("()=>!document.getElementById('team-analysis-modal').classList.contains('hidden')") /     pg.evaluate("""()=>{const s=document.getElementById('ta-team-select');s.value='suwon';s.dispatchEvent(new Event('change',{bubbles:true}));}""") /     pg.wait_for_timeout(3000) /     r=pg.evaluate("""()=>{ /         const t=document.querySelector('#ta-scout .scout-bullet.kind-threat'); /         const o=document.querySelector('#ta-scout .scout-bullet.kind-opp'); /         const cs=e=>e?getComputedStyle(e):null; /         const tag=document.querySelector('#ta-scout .scout-tag'); /         const cols=document.querySelector('#ta-scout .scout-cols'); /         return { /           threatBorder: t?cs(t).borderLeftColor:null, /           oppBorder: o?cs(o).borderLeftColor:null, /           tagBg: tag?cs(tag).backgroundColor:null, /           colsDisplay: cols?cs(cols).display:null, /           colsCols: cols?cs(cols).gridTemplateColumns:null, /           nThreat: document.querySelectorAll('#ta-scout .scout-bullet.kind-threat').length, /           nOpp: document.querySelectorAll('#ta-scout .scout-bullet.kind-opp').length, /         }; /     }""") /     print(r); b.close() / EOF / PYTHONIOENCODING=utf-8 python /tmp/css_chk.py 2>&1
 - 2026-06-15 10:27:22 | BASE=https://www.today-football-tactics.xyz / echo "scout-bullet in prod CSS:"; curl -s --max-time 20 "$BASE/static/css/style.css?v=90" | grep -c "scout-bullet" / echo "renderScout in prod JS:"; curl -s --max-time 20 "$BASE/static/js/analytics.js?v=13" | grep -c "renderScout" / echo "health:"; curl -s -o /dev/null -w "%{http_code}\n" --max-time 20 "$BASE/health"
 - 2026-06-15 13:14:10 | BASE=https://www.today-football-tactics.xyz / sleep 3 / for i in 1 2 3; do /   code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 "$BASE/health") /   echo "health attempt $i: $code" /   [ "$code" = "200" ] && break /   sleep 5 / done / curl -s -o /dev/null -w "root: %{http_code}\n" --max-time 25 "$BASE/" / echo "K1 player report:" && curl -s --max-time 25 "$BASE/api/player-stat-report?playerId=1025770" | python -c "import sys,json;d=json.load(sys.stdin);print('found',d.get('found'),'league',d.get('player',{}).get('league'))"
+- 2026-06-17 11:14:36 | ls -la players.db 2>/dev/null && echo "---DB EXISTS---" || echo "---NO DB---"; ls static/js/ | grep -i player
+- 2026-06-17 11:15:10 | DISABLE_SCHEDULER=1 python main.py > /tmp/flask.log 2>&1 & / sleep 6 / echo "--- server log tail ---" / tail -20 /tmp/flask.log

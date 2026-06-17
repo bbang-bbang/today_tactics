@@ -26,10 +26,19 @@
         fetch(url)
             .then(r => r.json())
             .then(d => {
-                if (!d.found) { body.innerHTML = `<div class="pr-empty">선수 데이터를 찾을 수 없습니다.</div>`; return; }
+                if (!d.found) {
+                    const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+                    const who = currentName ? `<b>${esc(currentName)}</b> 선수의 ` : "";
+                    body.innerHTML =
+                        `<div class="pr-empty">` +
+                        `📭 ${who}수집된 경기 데이터가 아직 없습니다.<br>` +
+                        `<span class="pr-empty-sub">신규 영입·유스·출전 기록이 없는 선수는 SofaScore 스탯이 집계되지 않습니다.</span>` +
+                        `</div>`;
+                    return;
+                }
                 render(d);
             })
-            .catch(() => { body.innerHTML = `<div class="pr-empty">오류가 발생했습니다.</div>`; });
+            .catch(() => { body.innerHTML = `<div class="pr-empty">⚠️ 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>`; });
     }
 
     /* ── 렌더링 ──────────────────────────────────────────── */
