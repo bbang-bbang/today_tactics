@@ -2459,7 +2459,12 @@ def get_team_insights():
     """, (ss_id, tid, ss_id, ss_id, *yp))
     cum_xg = 0.0
     cum_g = 0
+    xg_with = 0   # xG 데이터가 실제로 있는 경기 수
+    xg_total = 0  # 누적에 포함된 전체 완료경기 수
     for i, (eid, ts, xg, goals) in enumerate(cur.fetchall(), start=1):
+        xg_total += 1
+        if xg is not None:   # SUM(expected_goals)이 NULL이면 해당 경기 xG 전무
+            xg_with += 1
         cum_xg += (xg or 0.0)
         cum_g += (goals or 0)
         xg_cumulative.append({"i": i, "xg": round(cum_xg, 2), "goals": cum_g})
@@ -2489,6 +2494,7 @@ def get_team_insights():
         "goal_timing": {"for": gf_buckets, "against": ga_buckets, "total": timing_total},
         "first_goal": first_goal,
         "xg_cumulative": xg_cumulative,
+        "xg_coverage": {"with_xg": xg_with, "total": xg_total},
         "scorers": scorers,
     })
 

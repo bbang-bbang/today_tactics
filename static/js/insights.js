@@ -989,12 +989,19 @@
   }
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
-    fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(() => {});
-    fetch(`/api/insights/clutch?${qs}`).then(r => r.json()).then(renderClutch).catch(() => {});
-    fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(() => {});
-    fetch(`/api/insights/substitution?${qs}`).then(r => r.json()).then(renderSubstitution).catch(() => {});
-    fetch(`/api/insights/goalkeeper?${qs}`).then(r => r.json()).then(renderGoalkeeper).catch(() => {});
-    fetch(`/api/insights/duels?${qs}`).then(r => r.json()).then(renderDuels).catch(() => {});
+    // 무음 실패 → 가시화: 실패한 인사이트명을 모아 1회 토스트 + console.warn (P5 견고성)
+    const failed = [];
+    const warn = name => e => { failed.push(name); console.warn("[insights] 로드 실패:", name, e); };
+    const flushed = { v: false };
+    const notify = () => { if (!flushed.v && failed.length && window.showToast) { flushed.v = true; window.showToast(`일부 인사이트를 불러오지 못했습니다: ${failed.join(", ")} (새로고침 해보세요)`); } };
+    Promise.allSettled([
+      fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(warn("날씨")),
+      fetch(`/api/insights/clutch?${qs}`).then(r => r.json()).then(renderClutch).catch(warn("클러치")),
+      fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(warn("슈팅")),
+      fetch(`/api/insights/substitution?${qs}`).then(r => r.json()).then(renderSubstitution).catch(warn("교체")),
+      fetch(`/api/insights/goalkeeper?${qs}`).then(r => r.json()).then(renderGoalkeeper).catch(warn("골키퍼")),
+      fetch(`/api/insights/duels?${qs}`).then(r => r.json()).then(renderDuels).catch(warn("듀얼")),
+    ]).then(notify);
   }
 
   /* ── 인사이트 탭 (랭킹 / 심화 / 규율) — 활성 탭만 지연 로드 ── */

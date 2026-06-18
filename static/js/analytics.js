@@ -175,11 +175,17 @@
             fetch(`/api/team-analytics?teamId=${currentTeamId}${yp}`).then(r => r.json()),
             fetch(`/api/team-trend?teamId=${currentTeamId}${yp}`).then(r => r.json()),
             fetch(`/api/league-rankings?league=${currentLeague}${yp}`).then(r => r.json()),
-            fetch(`/api/team-insights?teamId=${currentTeamId}${yp}`).then(r => r.json()).catch(() => ({})),
-            fetch(`/api/team-shape?teamId=${currentTeamId}${yp}`).then(r => r.json()).catch(() => ({})),
-            fetch(`/api/team-shotmap?teamId=${currentTeamId}&side=for${yp}`).then(r => r.json()).catch(() => ({})),
-            fetch(`/api/team-shotmap?teamId=${currentTeamId}&side=against${yp}`).then(r => r.json()).catch(() => ({})),
+            fetch(`/api/team-insights?teamId=${currentTeamId}${yp}`).then(r => r.json()).catch(e => ({ __err: "심화 인사이트", _e: e })),
+            fetch(`/api/team-shape?teamId=${currentTeamId}${yp}`).then(r => r.json()).catch(e => ({ __err: "팀 형태", _e: e })),
+            fetch(`/api/team-shotmap?teamId=${currentTeamId}&side=for${yp}`).then(r => r.json()).catch(e => ({ __err: "슛맵(공격)", _e: e })),
+            fetch(`/api/team-shotmap?teamId=${currentTeamId}&side=against${yp}`).then(r => r.json()).catch(e => ({ __err: "슛맵(수비)", _e: e })),
         ]).then(([analytics, trend, rankings, insights, shape, smFor, smAgainst]) => {
+            // 선택 데이터 로드 실패 가시화: 빈 결과("데이터 없음")와 "불러오기 실패"를 구분 (P5 견고성)
+            const failed = [insights, shape, smFor, smAgainst].filter(x => x && x.__err);
+            if (failed.length) {
+                failed.forEach(x => console.warn("[team-analysis] 로드 실패:", x.__err, x._e));
+                if (window.showToast) window.showToast(`일부 분석 데이터를 불러오지 못했습니다: ${failed.map(x => x.__err).join(", ")} (새로고침 해보세요)`);
+            }
             buildYearFilter(analytics.available_years || []);
             renderIdentity(meta, analytics, trend, rankings);
             // 결과 분석
@@ -503,7 +509,7 @@
         ins = ins || {};
         renderGoalTiming(ins.goal_timing || {}, meta);
         renderFirstGoal(ins.first_goal || {});
-        renderXgCumulative(ins.xg_cumulative || [], meta);
+        renderXgCumulative(ins.xg_cumulative || [], meta, ins.xg_coverage);
         renderScorers(ins.scorers || [], meta);
     }
 
@@ -604,14 +610,24 @@
     }
 
     // ③ xG vs 실제 득점 (누적 라인)
-    function renderXgCumulative(rows, meta) {
+    function renderXgCumulative(rows, meta, cov) {
         destroyChart("ta-xg");
         const el = document.getElementById("ta-xg");
         const scope = document.getElementById("ta-xg-scope");
         if (!rows.length) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>xG 데이터 없음</p>"; if (scope) scope.textContent = ""; return; }
         const last = rows[rows.length - 1];
         const diff = (last.goals - last.xg);
-        if (scope) scope.textContent = `실득점 ${last.goals} vs xG ${last.xg.toFixed(1)} (${diff >= 0 ? "+" : ""}${diff.toFixed(1)})`;
+        if (scope) {
+            let txt = `실득점 ${last.goals} vs xG ${last.xg.toFixed(1)} (${diff >= 0 ? "+" : ""}${diff.toFixed(1)})`;
+            // xG 커버리지: 일부 경기 xG 미집계 시 비교가 과소평가됨을 명시 (분석 신뢰도)
+            if (cov && cov.total) {
+                const pct = Math.round(cov.with_xg / cov.total * 100);
+                txt += (cov.with_xg < cov.total)
+                    ? `  ·  ⚠ xG ${cov.with_xg}/${cov.total}경기(${pct}%) 기준 — 나머지 경기는 xG 미집계로 누적 xG가 실제보다 낮음`
+                    : `  ·  xG 전 ${cov.total}경기 집계`;
+            }
+            scope.textContent = txt;
+        }
         const ink = readableInk(meta.primary || "#34d399");
         charts["ta-xg"] = new Chart(el, {
             data: {

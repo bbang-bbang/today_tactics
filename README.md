@@ -178,6 +178,7 @@ K리그 (players.db)
 | `/api/team-goal-timing` | 팀 득점 시간대 분석 |
 | `/api/team-shape` | 팀 평균 진형(Shape) — avg_positions 기반 평균위치 + 형태지표(수비라인·공격라인·팀길이·팀폭·무게중심) + 리그평균 baseline |
 | `/api/team-shotmap` | 팀 슛맵 — match_shotmap 기반 `side=for\|against`, 슛 좌표·xG·outcome + 요약(슛·골·xG·유효슛%·결정력) |
+| `/api/team-insights` | 팀 심화 인사이트 — 득점 시간대·선제골·xG 누적·득점기여. `xg_coverage:{with_xg,total}` 동봉 → 프론트(`analytics.js`)가 "⚠ xG N/M경기(%) 기준" 라벨 표시(xG 미집계 경기로 누적 xG 과소평가되는 함정 방지) |
 | (프론트) 🎯 스카우팅 탭 | 신규 API 없음 — `team-shape` + `team-shotmap`(for/against)를 클라이언트에서 조합해 경계할 점(상대 강점)·공략 포인트(상대 약점)·게임플랜을 리그 평균 대비 자동 도출 (`analytics.js renderScout`) |
 | `/api/match-report?eventId=` | 경기 단일 심층 리포트 — 한 경기 양 팀의 슛맵·평균위치·골 타임라인 + 집계 지표(슛·유효·xG·결정력·패스점유·정확도·키패스·평점). 경기예측 '예측 후기'의 📋 경기 리포트 버튼 → 모달(`match_report.js`: xG 흐름 차트·양팀 슛맵·평균위치·골 타임라인) |
 | `/api/match-prediction` | 경기 예측 |

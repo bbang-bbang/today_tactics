@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-06-18 (검증+개선) | ✅ 정합성 재검증 + 7인 관점 평가 + xG 커버리지 라벨·무음에러 가시화
+
+사용자 요청(PM 주도): 데이터 정합성 확인 → 분석 페이지 7인 전문가 평가 → 도출된 개선 진행.
+
+### 데이터 정합성 (실측, 로컬 players.db)
+- `qa_check.py` **31/31 PASS** (API 구조·예측 확률합 100%·백테스트 brier<0.35·SQL injection 방어).
+- 참조 무결성 고아 **0**, 중복 경기 0, 스탯 범위 위반 0.
+- `result`(2승/1무/0패) vs 실스코어 **99.74% 일치**(17,135행 중 45건). `result=-1` 18행은 단일 경기(ev=13522851) 이상치.
+- 커버리지: 날씨 100%, rating 80.1%, **xG 44.2%**(절반 미만). `goals_conceded` 전 행 0(GK 7,547행 포함) → **미수집 확정**(score 유도 필수).
+- 신선도: 최신 완료경기 2026-06-07(약 10일 전) — 로컬 lag, prod 자체수집이 더 최신일 수 있음.
+- 정리 후보: `players_pre_rollback_20260507_151849`(1,728행 백업 테이블) — 데이터 삭제=Red, 별도 승인 대기.
+
+### 7인 관점 평가 — 분석 페이지
+- 최고 강점(P4): 표본 함정 가드(MIN=4·소표본 약화/후순위·최소표본 필터)·방법론 공개. 빈 상태 처리 촘촘.
+- 도출 개선: ①xG/result **커버리지 투명성**(P4) ②무음 에러 가시화(P5) ③innerHTML XSS 표면(P7, LOW·백로그) ④한글명 178명 누락(P2).
+
+### 구현
+- **P1 xG 커버리지 라벨**: `main.py /api/team-insights`에 `xg_coverage:{with_xg,total}` 추가(누적 계산 불변, additive). `analytics.js renderXgCumulative`가 "⚠ xG N/M경기(%) 기준 — 나머지 xG 미집계로 누적 xG 과소" 라벨 표시. (검증: busan 88/126·70% 등 실측 확인)
+- **P2 무음 에러 가시화**: `app.js` `showToast` 전역 노출 → `analytics.js`(선택 fetch 4종)·`insights.js`(고급 인사이트 6종) 실패 시 실패명 모아 1회 toast + `console.warn`. 빈 결과("데이터 없음")와 "불러오기 실패" 구분.
+- 회귀: 3개 JS `node --check` OK, main.py `ast.parse` OK, 편집 후 `qa_check` 31/31 재확인.
+- P0(XSS): 사용자 입력(저장명)은 이미 escapeHtml 적용 → 활성 취약점 없음. API명 raw 삽입은 신뢰소스라 LOW, 백로그.
+
+---
+
 ## 2026-06-17 (검증) | ✅ DB 정합성 종합 점검 + 🔍 전 페이지 오류 스윕
 
 사용자 요청: "DB 데이터 정합성 검증 + 웹페이지 오류 발생 페이지 알려줘".
@@ -4293,3 +4317,7 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-15 13:14:10 | BASE=https://www.today-football-tactics.xyz / sleep 3 / for i in 1 2 3; do /   code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 "$BASE/health") /   echo "health attempt $i: $code" /   [ "$code" = "200" ] && break /   sleep 5 / done / curl -s -o /dev/null -w "root: %{http_code}\n" --max-time 25 "$BASE/" / echo "K1 player report:" && curl -s --max-time 25 "$BASE/api/player-stat-report?playerId=1025770" | python -c "import sys,json;d=json.load(sys.stdin);print('found',d.get('found'),'league',d.get('player',{}).get('league'))"
 - 2026-06-17 11:14:36 | ls -la players.db 2>/dev/null && echo "---DB EXISTS---" || echo "---NO DB---"; ls static/js/ | grep -i player
 - 2026-06-17 11:15:10 | DISABLE_SCHEDULER=1 python main.py > /tmp/flask.log 2>&1 & / sleep 6 / echo "--- server log tail ---" / tail -20 /tmp/flask.log
+- 2026-06-18 11:29:15 | for url in "https://today-tactics.co.kr/" "https://www.today-football-tactics.xyz/"; do code=$(curl -s -o /dev/null -w "%{http_code}" -m 15 "$url" 2>/dev/null); echo "$url -> HTTP $code"; done
+- 2026-06-18 11:35:08 | i=0; until curl -s -o /dev/null -m 3 "http://127.0.0.1:5000/health" 2>/dev/null || curl -s -o /dev/null -m 3 "http://127.0.0.1:5000/" 2>/dev/null; do i=$((i+1)); if [ $i -ge 30 ]; then echo "TIMEOUT after ${i}s"; break; fi; sleep 2; done; echo "server responding after ~$((i*2))s"; curl -s -o /dev/null -w "health=%{http_code} root=" -m 5 "http://127.0.0.1:5000/health"; curl -s -o /dev/null -w "%{http_code}\n" -m 5 "http://127.0.0.1:5000/"
+- 2026-06-18 11:36:15 | echo "=== warming backtest endpoints (cold compute) ==="; for q in "league=k2&year=2026" "league=k1&year=2026"; do t=$(curl -s -o /dev/null -w "%{http_code} %{time_total}s" -m 90 "http://127.0.0.1:5000/api/prediction-backtest?$q"); echo "backtest $q -> $t"; done
+- 2026-06-18 13:06:57 | for t in ulsan jeonbuk gwangju suwon busan; do echo -n "$t: "; curl -s -m 20 "http://127.0.0.1:5000/api/team-insights?teamId=$t" 2>/dev/null | python -c "import sys,json; d=json.load(sys.stdin); c=d.get('xg_coverage'); print('xg_coverage=',c, ' last_cum=', (d.get('xg_cumulative') or [{}])[-1])" 2>/dev/null || echo "(parse fail)"; done

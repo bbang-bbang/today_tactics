@@ -1521,6 +1521,7 @@
     let toastEl = document.createElement("div"); toastEl.className = "toast"; document.body.appendChild(toastEl);
     let toastTimer = null;
     function showToast(msg) { toastEl.textContent = msg; toastEl.classList.remove("toast-has-action"); toastEl.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2000); }
+    if (typeof window !== "undefined") window.showToast = showToast;  // 다른 모듈(analytics/insights)에서 토스트 재사용
 
     function copyShareLink(id) {
         const url = `${location.origin}${location.pathname}?share=${encodeURIComponent(id)}`;
