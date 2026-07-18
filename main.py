@@ -6652,10 +6652,25 @@ KLEAGUE_TEAM_CODE = {
     "K22": "gwangju", "K26": "bucheon", "K27": "anyang",  "K35": "gimcheon",
 }
 
-def _fetch_k2_all_games(year=None):
-    """K리그 공식 API에서 K2 전체 경기(완료+예정) 수집 — 1~12월. 결과 30분 메모이즈."""
-    import urllib.request, datetime
+def _fetch_kleague_month(league_id, year, month):
+    """K리그 공식 API에서 단일 월 경기 목록 반환 (병렬 호출용)."""
+    import urllib.request
     url = "https://www.kleague.com/getScheduleList.do"
+    payload = json.dumps({"leagueId": str(league_id), "year": str(year), "month": str(month).zfill(2)}).encode("utf-8")
+    req = urllib.request.Request(url, data=payload,
+        headers={"Content-Type": "application/json; charset=UTF-8", "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data.get("data", {}).get("scheduleList", [])
+    except Exception:
+        return []
+
+
+def _fetch_k2_all_games(year=None):
+    """K리그 공식 API에서 K2 전체 경기(완료+예정) 수집 — 1~12월 병렬. 결과 30분 메모이즈."""
+    import datetime
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     if year is None:
         year = datetime.datetime.now().year
     _ck = f"k2|{year}"
@@ -6665,18 +6680,11 @@ def _fetch_k2_all_games(year=None):
         if _hit and _hit[0] > _now:
             return _hit[1]
     games = []
-    # 시즌 전체 12개월 fetch — 라운드 일정 전체 확보 (R1~R38 등)
-    for m in range(1, 13):
-        payload = json.dumps({"leagueId": "2", "year": str(year), "month": str(m).zfill(2)}).encode("utf-8")
-        req = urllib.request.Request(url, data=payload,
-            headers={"Content-Type": "application/json; charset=UTF-8", "Accept": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                games += data.get("data", {}).get("scheduleList", [])
-        except Exception:
-            pass
-    if games:  # 빈 결과(네트워크 실패)는 캐시하지 않음
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futs = {ex.submit(_fetch_kleague_month, "2", year, m): m for m in range(1, 13)}
+        for fut in as_completed(futs):
+            games += fut.result()
+    if games:
         with _GAMES_CACHE_LOCK:
             _GAMES_CACHE[_ck] = (_now + _GAMES_CACHE_TTL, games)
     return games
@@ -6777,9 +6785,9 @@ def get_k2_rounds():
 
 
 def _fetch_k1_all_games(year=None):
-    """K리그 공식 API에서 K1 전체 경기(완료+예정) 수집 — 1~12월. 결과 30분 메모이즈."""
-    import urllib.request, datetime
-    url = "https://www.kleague.com/getScheduleList.do"
+    """K리그 공식 API에서 K1 전체 경기(완료+예정) 수집 — 1~12월 병렬. 결과 30분 메모이즈."""
+    import datetime
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     if year is None:
         year = datetime.datetime.now().year
     _ck = f"k1|{year}"
@@ -6789,18 +6797,11 @@ def _fetch_k1_all_games(year=None):
         if _hit and _hit[0] > _now:
             return _hit[1]
     games = []
-    # 시즌 전체 12개월 fetch — 라운드 일정 전체 확보 (R1~R38 등)
-    for m in range(1, 13):
-        payload = json.dumps({"leagueId": "1", "year": str(year), "month": str(m).zfill(2)}).encode("utf-8")
-        req = urllib.request.Request(url, data=payload,
-            headers={"Content-Type": "application/json; charset=UTF-8", "Accept": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                games += data.get("data", {}).get("scheduleList", [])
-        except Exception:
-            pass
-    if games:  # 빈 결과(네트워크 실패)는 캐시하지 않음
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futs = {ex.submit(_fetch_kleague_month, "1", year, m): m for m in range(1, 13)}
+        for fut in as_completed(futs):
+            games += fut.result()
+    if games:
         with _GAMES_CACHE_LOCK:
             _GAMES_CACHE[_ck] = (_now + _GAMES_CACHE_TTL, games)
     return games

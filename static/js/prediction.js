@@ -585,11 +585,15 @@
     }
 
     function _inferLeague(homeId, awayId) {
-        // teamId → league 매핑: K1 스케줄 캐시에 있으면 k1, 아니면 k2
+        // K1 스케줄 캐시에 있으면 k1, K2 캐시에 있으면 k2, 둘 다 없으면 k2 기본
         const scan = (cache) => cache && (cache.upcoming || []).some(
             g => g.home_id === homeId || g.away_id === homeId || g.home_id === awayId || g.away_id === awayId
         );
         if (scan(k1ScheduleCache)) return "k1";
+        if (scan(scheduleCache)) return "k2";
+        // 캐시 미스 시: next_by_team 기준으로 재확인
+        const scanNbt = (cache) => cache && (cache.next_by_team || {})[homeId] != null;
+        if (scanNbt(k1ScheduleCache)) return "k1";
         return "k2";
     }
 
@@ -1835,8 +1839,9 @@
         canvas.onmouseleave = () => { tooltip.hidden = true; };
     }
 
-    // 페이지 로드 시 K2 일정 불러오기 + 백테스트 캐시 워밍 + 헤더 정확도 표시
+    // 페이지 로드 시 K1+K2 일정 모두 프리로드 + 백테스트 캐시 워밍 + 헤더 정확도 표시
     loadSchedule();
+    loadScheduleK1();
     Promise.all([loadBacktest("k1"), loadBacktest("k2")]).then(([k1, k2]) => {
         renderHeaderAccuracy(k1, k2);
     });
