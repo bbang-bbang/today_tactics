@@ -4323,3 +4323,5 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-06-18 13:06:57 | for t in ulsan jeonbuk gwangju suwon busan; do echo -n "$t: "; curl -s -m 20 "http://127.0.0.1:5000/api/team-insights?teamId=$t" 2>/dev/null | python -c "import sys,json; d=json.load(sys.stdin); c=d.get('xg_coverage'); print('xg_coverage=',c, ' last_cum=', (d.get('xg_cumulative') or [{}])[-1])" 2>/dev/null || echo "(parse fail)"; done
 - 2026-07-18 14:46:25 | cat "C:/Users/BANGEU~1/AppData/Local/Temp/claude/C--Users-BangEunHo-OneDrive-------project-today-tatics/976815ae-c920-46c3-bbba-0820ca776b7c/tasks/b5bk0pms8.output" | tail -10
 - 2026-07-18 15:43:09 | tail -5 "C:/Users/BANGEU~1/AppData/Local/Temp/claude/C--Users-BangEunHo-OneDrive-------project-today-tatics/976815ae-c920-46c3-bbba-0820ca776b7c/tasks/b506nm25d.output"
+- 2026-07-18 16:23:45 | ls ~/.ssh/ 2>/dev/null
+- 2026-07-18 16:29:01 | ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes rocky@<PROD_IP> "echo connected" 2>&1 | head -5

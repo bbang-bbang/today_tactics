@@ -23,9 +23,9 @@ _API_CACHE_LOCK = threading.Lock()  # 다중 스레드(gunicorn thread-worker) �
 
 # K리그 공식 스케줄 원본 캐시 — _fetch_k1/k2_all_games는 호출마다 월별 12회 HTTP를
 # 반복하므로(라운드 예측·일정 등 여러 엔드포인트가 사용) 결과를 메모이즈해 콜드 호출을 가속.
-# 스케줄은 하루 단위로만 바뀌므로 30분 TTL이면 충분. 데이터 업데이트 시 invalidate_api_cache가 함께 비움.
+# 스케줄은 하루 단위로만 바뀜 → 6시간 TTL. 데이터 업데이트 시 invalidate_api_cache가 함께 비움.
 _GAMES_CACHE = {}            # key: f"{league}|{year}" → (expires_at, games)
-_GAMES_CACHE_TTL = 1800      # 30분
+_GAMES_CACHE_TTL = 21600     # 6시간 (기존 30분 → cold start 빈도 12×감소)
 _GAMES_CACHE_LOCK = threading.Lock()
 
 
@@ -3900,6 +3900,9 @@ def _ensure_indexes():
         #   - (detail_pos, is_starter, event_id): 세부 포지션 풀링(detail_pos IN .. 드라이버)
         "CREATE INDEX IF NOT EXISTS idx_mlu_player_detail ON match_lineups(player_id, detail_pos)",
         "CREATE INDEX IF NOT EXISTS idx_mlu_detail ON match_lineups(detail_pos, is_starter, event_id)",
+        # _team_xg 서브쿼리 covering index: GROUP BY event_id + team_id/expected_goals 조건
+        # 추가 전: 70k 풀스캔 34ms → 추가 후: 인덱스 전용 9ms (×12 호출 → 428ms→~110ms)
+        "CREATE INDEX IF NOT EXISTS idx_mps_xg_cover ON match_player_stats(event_id, team_id, expected_goals)",
     ]
     for sql in indexes:
         try:
@@ -6651,6 +6654,11 @@ KLEAGUE_TEAM_CODE = {
     "K09": "fcseoul", "K10": "daejeon", "K18": "incheon", "K21": "gangwon",
     "K22": "gwangju", "K26": "bucheon", "K27": "anyang",  "K35": "gimcheon",
 }
+# kid(K01…) → SofaScore 팀 ID — round 조인용
+_KID_TO_SSID = {
+    kid: next((t["sofascore_id"] for t in TEAMS if t["id"] == slug), None)
+    for kid, slug in KLEAGUE_TEAM_CODE.items()
+}
 
 def _fetch_kleague_month(league_id, year, month):
     """K리그 공식 API에서 단일 월 경기 목록 반환 (병렬 호출용)."""
@@ -6667,10 +6675,55 @@ def _fetch_kleague_month(league_id, year, month):
         return []
 
 
+def _fetch_all_games_db(league_id, year):
+    """kleague_schedule DB + events round 조회 → API 호환 형식 리스트 반환."""
+    import sqlite3
+    try:
+        con = sqlite3.connect(DB_PATH)
+        cur = con.cursor()
+        cur.execute("""
+            SELECT game_date, game_time, home_kid, away_kid,
+                   home_team_name, away_team_name, home_goal, away_goal, end_yn
+            FROM kleague_schedule
+            WHERE year=? AND league_id=?
+            ORDER BY game_date, game_time
+        """, (year, league_id))
+        ks_rows = cur.fetchall()
+        cur.execute("""
+            SELECT date(date_ts, 'unixepoch'), home_team_id, round
+            FROM events
+            WHERE round IS NOT NULL AND strftime('%Y', date(date_ts, 'unixepoch'))=?
+        """, (str(year),))
+        round_map = {(r[0], r[1]): r[2] for r in cur.fetchall()}
+        con.close()
+    except Exception:
+        return []
+    games = []
+    for row in ks_rows:
+        gdate, gtime, hkid, akid, hname, aname, hgoal, agoal, end_yn = row
+        home_ssid = _KID_TO_SSID.get(hkid)
+        rnd = round_map.get((gdate, home_ssid)) if home_ssid else None
+        finished = end_yn == 'Y'
+        games.append({
+            "gameDate":     gdate.replace('-', '.'),
+            "gameTime":     gtime or "",
+            "homeTeam":     hkid,
+            "awayTeam":     akid,
+            "homeTeamName": hname or hkid,
+            "awayTeamName": aname or akid,
+            "homeGoal":     hgoal,
+            "awayGoal":     agoal,
+            "endYn":        end_yn,
+            "gameStatus":   "FE" if finished else "SC",
+            "roundId":      rnd,
+            "fieldName":    "",
+        })
+    return games
+
+
 def _fetch_k2_all_games(year=None):
-    """K리그 공식 API에서 K2 전체 경기(완료+예정) 수집 — 1~12월 병렬. 결과 30분 메모이즈."""
+    """K2 전체 경기(완료+예정) — kleague_schedule DB 기반, 외부 API 미사용."""
     import datetime
-    from concurrent.futures import ThreadPoolExecutor, as_completed
     if year is None:
         year = datetime.datetime.now().year
     _ck = f"k2|{year}"
@@ -6679,11 +6732,7 @@ def _fetch_k2_all_games(year=None):
         _hit = _GAMES_CACHE.get(_ck)
         if _hit and _hit[0] > _now:
             return _hit[1]
-    games = []
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        futs = {ex.submit(_fetch_kleague_month, "2", year, m): m for m in range(1, 13)}
-        for fut in as_completed(futs):
-            games += fut.result()
+    games = _fetch_all_games_db(2, year)
     if games:
         with _GAMES_CACHE_LOCK:
             _GAMES_CACHE[_ck] = (_now + _GAMES_CACHE_TTL, games)
@@ -6717,7 +6766,7 @@ def _parse_k2_game(g):
     }
 
 @app.route("/api/k2/schedule")
-@cached_response(ttl=600)  # 10분 (스케줄은 거의 안 바뀜)
+@cached_response(ttl=21600)  # 6시간 (_GAMES_CACHE와 동일)
 def get_k2_schedule():
     """K2 예정 경기 + 팀별 다음 경기"""
     import datetime
@@ -6747,7 +6796,7 @@ def get_k2_schedule():
 
 
 @app.route("/api/k2/rounds")
-@cached_response(ttl=600)
+@cached_response(ttl=21600)
 def get_k2_rounds():
     """K2 라운드 목록 + 각 라운드 경기 결과/예정"""
     import datetime
@@ -6785,9 +6834,8 @@ def get_k2_rounds():
 
 
 def _fetch_k1_all_games(year=None):
-    """K리그 공식 API에서 K1 전체 경기(완료+예정) 수집 — 1~12월 병렬. 결과 30분 메모이즈."""
+    """K1 전체 경기(완료+예정) — kleague_schedule DB 기반, 외부 API 미사용."""
     import datetime
-    from concurrent.futures import ThreadPoolExecutor, as_completed
     if year is None:
         year = datetime.datetime.now().year
     _ck = f"k1|{year}"
@@ -6796,11 +6844,7 @@ def _fetch_k1_all_games(year=None):
         _hit = _GAMES_CACHE.get(_ck)
         if _hit and _hit[0] > _now:
             return _hit[1]
-    games = []
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        futs = {ex.submit(_fetch_kleague_month, "1", year, m): m for m in range(1, 13)}
-        for fut in as_completed(futs):
-            games += fut.result()
+    games = _fetch_all_games_db(1, year)
     if games:
         with _GAMES_CACHE_LOCK:
             _GAMES_CACHE[_ck] = (_now + _GAMES_CACHE_TTL, games)
@@ -6836,7 +6880,7 @@ def _parse_k1_game(g):
 
 
 @app.route("/api/k1/schedule")
-@cached_response(ttl=600)
+@cached_response(ttl=21600)
 def get_k1_schedule():
     """K1 예정 경기 + 팀별 다음 경기"""
     import datetime
@@ -6866,7 +6910,7 @@ def get_k1_schedule():
 
 
 @app.route("/api/k1/rounds")
-@cached_response(ttl=600)
+@cached_response(ttl=21600)
 def get_k1_rounds():
     """K1 라운드 목록 + 각 라운드 경기 결과/예정"""
     try:
@@ -9045,7 +9089,7 @@ def _warm_cache():
         "http://127.0.0.1:5000/api/insights/clutch?year=2026&league=all",
         "http://127.0.0.1:5000/api/insights/card-rankings?year=2026&league=all",
     ]
-    _t.sleep(2)  # 서버 listen 대기 (3→2초)
+    _t.sleep(0.5)  # 서버 listen 대기
     def _fetch(u):
         try:
             urllib.request.urlopen(u, timeout=120).read()
