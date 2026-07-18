@@ -6689,11 +6689,13 @@ def _fetch_all_games_db(league_id, year):
             ORDER BY game_date, game_time
         """, (year, league_id))
         ks_rows = cur.fetchall()
+        # date_ts 범위 조건 → idx_events_date 인덱스 활용
         cur.execute("""
             SELECT date(date_ts, 'unixepoch'), home_team_id, round
             FROM events
-            WHERE round IS NOT NULL AND strftime('%Y', date(date_ts, 'unixepoch'))=?
-        """, (str(year),))
+            WHERE round IS NOT NULL
+              AND date_ts >= strftime('%s', ?) AND date_ts < strftime('%s', ?)
+        """, (f"{year}-01-01", f"{year+1}-01-01"))
         round_map = {(r[0], r[1]): r[2] for r in cur.fetchall()}
         con.close()
     except Exception:
@@ -9059,22 +9061,34 @@ def trigger_update():
 
 def _warm_cache():
     """서버 시작 시 백그라운드로 무거운 API 미리 호출 — 첫 사용자 대기 시간 제거.
-    K1/K2 백테스트 + 스케줄/라운드 + 시즌 시뮬 + 라운드 예측 — 워밍업 후 영구 빠름.
-    모든 URL을 병렬 스레드로 동시 호출 → 총 대기 시간 = max(개별 시간).
+
+    2단계 전략:
+    1) DB 게임캐시 직접 채우기 + 가벼운 엔드포인트 병렬 HTTP 캐싱 (즉시)
+    2) 무거운 백테스트·시뮬 딜레이 5s 후 별도 처리 (worker 점유로 인한 대기 방지)
     """
     import urllib.request, time as _t, json as _json
-    warm_urls = [
-        # 시즌 시뮬 + 백테스트 (가장 무거움, 15s 단위)
-        "http://127.0.0.1:5000/api/prediction-backtest?league=k1&year=2026",
-        "http://127.0.0.1:5000/api/prediction-backtest?league=k2&year=2026",
-        "http://127.0.0.1:5000/api/season-simulation?league=k1&n=500",
-        "http://127.0.0.1:5000/api/season-simulation?league=k2&n=500",
-        # K리그 스케줄·라운드 (첫 화면 진입 호출)
+
+    _t.sleep(0.5)  # 서버 listen 대기
+
+    # ── 1단계: _GAMES_CACHE 직접 채우기 (HTTP 없이, worker 불필요) ──────────
+    try:
+        _fetch_k1_all_games()
+        _fetch_k2_all_games()
+    except Exception:
+        pass
+
+    def _fetch(u):
+        try:
+            urllib.request.urlopen(u, timeout=120).read()
+        except Exception:
+            pass
+
+    # ── 2단계: 가벼운 핵심 엔드포인트 병렬 HTTP 캐싱 ─────────────────────────
+    core_urls = [
         "http://127.0.0.1:5000/api/k1/schedule",
         "http://127.0.0.1:5000/api/k2/schedule",
         "http://127.0.0.1:5000/api/k1/rounds",
         "http://127.0.0.1:5000/api/k2/rounds",
-        # 첫 화면 핵심 위젯 (순위·다음 라운드·매치 by date·대시보드)
         "http://127.0.0.1:5000/api/standings?league=K1",
         "http://127.0.0.1:5000/api/standings?league=K2",
         "http://127.0.0.1:5000/api/next-round?league=K1",
@@ -9082,34 +9096,40 @@ def _warm_cache():
         "http://127.0.0.1:5000/api/league-dashboard?league=K1",
         "http://127.0.0.1:5000/api/league-dashboard?league=K2",
         "http://127.0.0.1:5000/api/matches-by-date",
-        # 인사이트 섹션 — 프런트 기본값(year=2026&league=all)과 정확히 일치시켜 콜드 방지.
-        # activity(히트맵)는 콜드 ~5s라 특히 워밍 필수.
         "http://127.0.0.1:5000/api/insights/top-performers?year=2026&league=all",
         "http://127.0.0.1:5000/api/insights/weather?year=2026&league=all",
         "http://127.0.0.1:5000/api/insights/clutch?year=2026&league=all",
         "http://127.0.0.1:5000/api/insights/card-rankings?year=2026&league=all",
     ]
-    _t.sleep(0.5)  # 서버 listen 대기
-    def _fetch(u):
-        try:
-            urllib.request.urlopen(u, timeout=120).read()
-        except Exception:
-            pass
-    # 라운드별 사전 예측 — 현재 라운드를 동적으로 워밍업(_predict_core가 무거워 콜드 시 수십초).
-    # rounds 호출로 현재 라운드 확보(게임 캐시도 함께 채움) 후 해당 라운드 예측을 워밍 목록에 추가.
-    for _lg in ("k1", "k2"):
-        try:
-            _rd = _json.loads(urllib.request.urlopen(
-                f"http://127.0.0.1:5000/api/{_lg}/rounds", timeout=60).read())
-            _cr = _rd.get("current_round")
-            if _cr:
-                warm_urls.append(f"http://127.0.0.1:5000/api/round-predictions?league={_lg}&round={_cr}")
-        except Exception:
-            pass
-    threads = [threading.Thread(target=_fetch, args=(u,), daemon=True) for u in warm_urls]
+    threads = [threading.Thread(target=_fetch, args=(u,), daemon=True) for u in core_urls]
     for t in threads:
         t.start()
     for t in threads:
+        t.join(timeout=30)
+
+    # ── 3단계: 라운드 예측 + 무거운 백테스트·시뮬 (딜레이 후 실행) ─────────────
+    # 5s 딜레이: 핵심 엔드포인트 캐싱 완료 후 worker 자원을 확보한 뒤 시작
+    _t.sleep(5)
+    heavy_urls = [
+        "http://127.0.0.1:5000/api/prediction-backtest?league=k1&year=2026",
+        "http://127.0.0.1:5000/api/prediction-backtest?league=k2&year=2026",
+        "http://127.0.0.1:5000/api/season-simulation?league=k1&n=500",
+        "http://127.0.0.1:5000/api/season-simulation?league=k2&n=500",
+    ]
+    # 현재 라운드 예측 추가
+    for _lg in ("k1", "k2"):
+        try:
+            _rd = _json.loads(urllib.request.urlopen(
+                f"http://127.0.0.1:5000/api/{_lg}/rounds", timeout=10).read())
+            _cr = _rd.get("current_round")
+            if _cr:
+                heavy_urls.append(f"http://127.0.0.1:5000/api/round-predictions?league={_lg}&round={_cr}")
+        except Exception:
+            pass
+    hthreads = [threading.Thread(target=_fetch, args=(u,), daemon=True) for u in heavy_urls]
+    for t in hthreads:
+        t.start()
+    for t in hthreads:
         t.join(timeout=120)
 
 
