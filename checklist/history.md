@@ -4325,3 +4325,8 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-07-18 15:43:09 | tail -5 "C:/Users/BANGEU~1/AppData/Local/Temp/claude/C--Users-BangEunHo-OneDrive-------project-today-tatics/976815ae-c920-46c3-bbba-0820ca776b7c/tasks/b506nm25d.output"
 - 2026-07-18 16:23:45 | ls ~/.ssh/ 2>/dev/null
 - 2026-07-18 16:29:01 | ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes rocky@<PROD_IP> "echo connected" 2>&1 | head -5
+- 2026-08-02 23:19:57 | find ~/ -iname "*today-project*" 2>/dev/null; find "/c/Users/BangEunHo" -iname "*<SSH_KEY>.pem" 2>/dev/null | head -20
+- 2026-08-02 23:27:00 | which rsync 2>&1; which scp 2>&1; which ssh 2>&1
+- 2026-08-02 23:27:20 | which tar 2>&1
+- 2026-08-02 23:30:25 | curl -sk -o /dev/null -w 'https HTTP %{http_code}\n' https://<PROD_IP>/ 2>&1 / curl -sk https://<PROD_IP>/api/results 2>&1 | head -c 500
+- 2026-08-02 23:38:09 | for ep in "/api/standings?league=K1" "/api/team-ranking?league=K1" "/health"; do /   echo "== $ep ==" /   curl -sk "https://<PROD_IP>$ep" 2>&1 | head -c 300 /   echo / done
