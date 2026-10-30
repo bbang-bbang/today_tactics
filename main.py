@@ -34,7 +34,7 @@ def _api_cache_evict_if_full():
     if len(_API_CACHE) < _API_CACHE_MAX_KEYS:
         return
     now = _time_mod.time()
-    expired = [k for k, v in _API_CACHE.items() if v[0] <= now]
+    expired = [k for k, v in _API_CACHE.items() if v[0] + _API_STALE_GRACE <= now]
     for k in expired:
         _API_CACHE.pop(k, None)
     overflow = len(_API_CACHE) - _API_CACHE_MAX_KEYS + 128  # 한 번에 128개 헤드룸
@@ -43,38 +43,68 @@ def _api_cache_evict_if_full():
             _API_CACHE.pop(k, None)
 
 
+_API_STALE_GRACE = 86400          # 만료 후 24h까지는 stale 응답을 즉시 서빙 + 백그라운드 갱신
+_API_REFRESHING = set()           # 갱신 중인 키 (중복 갱신 방지)
+
+
+def _api_cache_store(key, now, ttl, resp):
+    """응답을 캐시에 저장 (2xx만). 저장 성공 여부 반환."""
+    if hasattr(resp, "get_data"):
+        body, mimetype, status = resp.get_data(as_text=True), resp.mimetype, resp.status_code
+    else:
+        body, mimetype, status = resp, "application/json", 200
+    if not (200 <= status < 300):   # 4xx/5xx는 캐시하지 않음 (일시 오류가 굳지 않도록)
+        return False
+    with _API_CACHE_LOCK:
+        _api_cache_evict_if_full()
+        _API_CACHE[key] = (now + ttl, (body, mimetype, status))
+    return True
+
+
 def cached_response(ttl=_API_CACHE_TTL):
-    """request.full_path를 키로 응답 객체 캐싱. JSON 직렬화 결과(text)를 저장."""
+    """request.full_path를 키로 응답 캐싱 (stale-while-revalidate).
+
+    TTL 안: 캐시 즉시 반환. TTL 만료 후 24h 이내: stale 즉시 반환 + 백그라운드 1회 갱신
+    → 무거운 엔드포인트(백테스트 등)도 만료 직후 첫 사용자가 콜드 계산을 기다리지 않는다.
+    """
     def deco(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
             try:
                 from flask import request as _req, Response
                 key = f"{fn.__name__}|{_req.full_path}"
+                path = _req.full_path
             except Exception:
                 return fn(*args, **kwargs)
             now = _time_mod.time()
             with _API_CACHE_LOCK:
                 ent = _API_CACHE.get(key)
-                if ent and ent[0] > now:
-                    body, mimetype, status = ent[1]
-                    return Response(body, status=status, mimetype=mimetype)
+            if ent and ent[0] > now:
+                body, mimetype, status = ent[1]
+                return Response(body, status=status, mimetype=mimetype)
+            if ent and ent[0] + _API_STALE_GRACE > now:
+                # stale 서빙 + 백그라운드 갱신 (키당 1개)
+                with _API_CACHE_LOCK:
+                    start = key not in _API_REFRESHING
+                    if start:
+                        _API_REFRESHING.add(key)
+                if start:
+                    def _refresh():
+                        try:
+                            with app.test_request_context(path):
+                                r = fn(*args, **kwargs)
+                            _api_cache_store(key, _time_mod.time(), ttl, r)
+                        except Exception:
+                            pass            # 실패 시 기존 stale 유지, 다음 요청에서 재시도
+                        finally:
+                            with _API_CACHE_LOCK:
+                                _API_REFRESHING.discard(key)
+                    threading.Thread(target=_refresh, daemon=True).start()
+                body, mimetype, status = ent[1]
+                return Response(body, status=status, mimetype=mimetype)
             resp = fn(*args, **kwargs)
             try:
-                # Response 객체 또는 tuple 처리
-                if hasattr(resp, "get_data"):
-                    body = resp.get_data(as_text=True)
-                    mimetype = resp.mimetype
-                    status = resp.status_code
-                else:
-                    body = resp
-                    mimetype = "application/json"
-                    status = 200
-                # 4xx/5xx는 캐시하지 않음 (일시 오류가 굳지 않도록)
-                if 200 <= status < 300:
-                    with _API_CACHE_LOCK:
-                        _api_cache_evict_if_full()
-                        _API_CACHE[key] = (now + ttl, (body, mimetype, status))
+                _api_cache_store(key, now, ttl, resp)
             except Exception:
                 pass
             return resp
