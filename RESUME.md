@@ -24,7 +24,7 @@
 - **2026-06-15 통합 QA 완료**: 오늘 출시 4종(스카우팅·경기리포트·선수비교·K1지원) 실브라우저·모바일·엣지·회귀 점검 14/14 + `qa_check.py` 31/31 PASS. 모바일 경기리포트 스코어 줄바꿈만 수정(style.css v94).
 - **🔴 events 스코어 12경기 좌우반전 교정**: QA 중 발견(SofaScore 크롤 유입, 공식 JSON 대조 210중 12 반전). `crawlers/fix_swapped_scores.py`로 교정 + `sync_results_to_events.py` 자가치유 패치(JSON과 다르면 갱신). **운영 DB도 동일 버그 → SSH로 `fix_swapped_scores.py --apply` 실행 필요**(코드 배포만으론 기존 DB 안 고쳐짐, 다음 update_data 또는 수동 실행).
 - **신규 엔드포인트**(README §API 반영됨): `/api/kleague{1,2}/position-heatmap`(year), `/api/heatmap-player-search`, `/api/kleague{1,2}/heatmap`에 `year`·`venue` 파라미터.
-- **운영**: https://www.today-football-tactics.xyz 라이브. 배포는 **`git push origin main` → GitHub Actions가 forced-command `ci_deploy.sh`(fetch+reset+restart+health) 자동 실행**. prod에서 직접 크롤러/백필 실행 시 `venv/bin/python3` 사용(시스템 python3엔 playwright 없음).
+- **운영**: https://suwon.today-tactics.co.kr 라이브. 배포는 **`git push origin main` → GitHub Actions가 forced-command `ci_deploy.sh`(fetch+reset+restart+health) 자동 실행**. prod에서 직접 크롤러/백필 실행 시 `venv/bin/python3` 사용(시스템 python3엔 playwright 없음).
 - **데이터**: 서버가 주기 cron `update_data.py` 자체 수집. **K2 6/7까지 완비**, K1 5/17까지. **다음 라운드 2026-07-04 재개**(월드컵 휴식기) → 그 사이 경기 없음(미수집 아님). 수비 세부 3컬럼은 로컬+prod DB 모두 백필 완료.
 - **⚠️ 남은 미완 1건**: 새 도메인 **OAuth 콘솔 redirect URI 등록 안 됨 → 로그인만 깨진 상태**(사이트 본체·데이터는 정상). §7 참조.
 
@@ -62,7 +62,7 @@ ssh -i $KEY $R "sudo systemctl restart today_tactics"   # 템플릿 변경 시 �
 
 ## 4. 다음 작업 (백로그)
 2026-06-05 종료 시점 후속 후보:
-1. **(우선) 새 도메인 OAuth 콘솔 등록** — Google/Kakao/Naver 각 콘솔에 `https://www.today-football-tactics.xyz/auth/callback/{provider}` redirect URI 추가. 미등록 시 로그인 불가. 등록 후 로그인 플로우 검증. (코드 변경 불필요 — `url_for(_external=True)`로 Host 동적.)
+1. **(우선) 새 도메인 OAuth 콘솔 등록** — Google/Kakao/Naver 각 콘솔에 `https://suwon.today-tactics.co.kr/auth/callback/{provider}` redirect URI 추가. 미등록 시 로그인 불가. 등록 후 로그인 플로우 검증. (코드 변경 불필요 — `url_for(_external=True)`로 Host 동적.)
 2. **mps team_id 오태깅 영향 점검** — `match_player_stats.team_id`에 팀 비참가 경기 오태깅 행 존재(ulsan 382건, §10). team-insights는 참가 필터로 처리했으나 **league-rankings의 xG/태클 등 mps 집계도 같은 패턴이라 잠재 오염**(미점검). 점검 후 필요 시 동일 필터 적용. → Claude 메모리 `reference_mps_team_id_contamination`.
 3. **R16 재개(07-04) 후 데이터 검증** — 월드컵 휴식 후 첫 수집. 06/08·06/15 등 월요일 cron이 빈 수집으로 무해한지, 07-04 이후 정상 증분되는지 확인.
 4. **부팅 워밍업 동시성 완화** — 재시작 직후 ~60~90s 워밍업이 2vCPU 포화 → 일시 지연/502. 워밍업 순차화/사전집계 검토. (team-insights는 워밍업 URL 미포함 — 팀 선택 후 호출이라 무관.)
@@ -84,7 +84,8 @@ ssh -i $KEY $R "sudo systemctl restart today_tactics"   # 템플릿 변경 시 �
 - 배포: GitHub Actions → `deploy/ci_deploy.sh`(forced-command). 수동은 `deploy/deploy.sh <IP>`(rocky) 또는 변경 파일 scp(§3).
 
 ## 7. 운영 도메인 전환 (2026-06-04 완료)
-- canonical = **`www.today-football-tactics.xyz`**. apex(`today-football-tactics.xyz`)·구 도메인(`today-tactics.co.kr`)·IP 직접 접근은 전부 **301 → canonical** 통합.
+- **[2026-10-31 변경] canonical = `suwon.today-tactics.co.kr`**. 기존 `www.today-football-tactics.xyz`는 등록 소멸(NXDOMAIN, RDAP 404)로 접속 불가가 되어 전환. HTTP·IP 직접 접근은 301 → canonical. 인증서: `/etc/letsencrypt/live/suwon.today-tactics.co.kr/` (webroot 방식, 자동 갱신). 아래 항목은 6/4 당시 기록(.xyz 기준, 현재 무효).
+- (이전) canonical = `www.today-football-tactics.xyz`. apex·구 도메인·IP 접근은 301 → canonical 통합.
 - 가비아 DNS A레코드(apex/www) → 운영 IP. 가비아 네임서버(ns/ns1/ns2.gabia.co.kr).
 - Let's Encrypt 인증서: `/etc/letsencrypt/live/today-football-tactics.xyz/` (apex 첫 `-d` → live 디렉터리명), SAN apex+www, `certbot certonly --webroot -w /var/www/certbot`, **자동 갱신 등록**, 만료 2026-09-02.
 - nginx: `deploy/today_tactics.nginx` 재작성(canonical www 본서버 + apex/구도메인/HTTP 301 블록). 서버 `/etc/nginx/conf.d/today_tactics.conf`. 구 nginx는 서버 `/tmp/today_tactics.conf.bak.*` 백업.
