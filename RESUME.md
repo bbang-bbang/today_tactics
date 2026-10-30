@@ -6,9 +6,12 @@
 ---
 
 ## 0. ⏭ 재개 지점 (NEXT)
-**열린 작업 없음.** 직전 보류건(히트맵 비교 필터 세분화)은 2026-06-12 **B안으로 완료·배포**됨:
-- `match_lineups.detail_pos`(formation+slot 결정론적 유도, 재크롤링 불필요) → 비교 필터 8그룹(GK/CB/FB/DM/CM/AM/W/ST). 로컬=origin=prod `12ab462`, 라이브 200 검증. prod DB도 백필 완료(SSH 1회 + `update_data.py` STEP 18 자동화).
-- 다음 작업은 §4 백로그 참조.
+**열린 작업 없음 (2026-10-31 종료).** 운영 = https://suwon.today-tactics.co.kr (canonical 전환·지연 로딩·SWR 캐시 배포 완료, 서버 `ceff931`+). 상세는 `checklist/history.md` 2026-10-31 항목.
+- **다음 작업 후보 (우선순위: 감독 → 분석가 → 팬)** — `checklist/backlog.md` 「분석 보고서 확장」 참조:
+  1. 감독: 프리매치 상대 스카우팅 한 장 요약 (`/api/pre-match-brief`, 경기예측 탭 영역, 인쇄/PDF) — 설계안 확정 대기(Yellow: 새 API 라우트).
+  2. 분석가: xG 기반 "운 보정" 순위, 휴식일·연전 영향, 교체 효과 확장.
+  3. 팬: 경기 후 요약·팀/선수 스토리형 카드.
+- 선택 잔여: nginx brotli(서버 sudo), OAuth 콘솔 redirect URI(로그인 사용 시).
 
 ## 1. 현재 상태 (2026-06-11 종료 시점)
 - **브랜치/HEAD**: `main` (2026-06-15 심화 ③스카우팅·⑤경기리포트·④선수비교 완료). **origin push + 운영 git 동기화 완료**(로컬=origin=prod 일치 · 서비스 active · 헬스 200). 로컬 트리는 `checklist/history.md` 자동로그(마스킹 훅)로 수시 dirty(감사 로그 — 배포 무관).
