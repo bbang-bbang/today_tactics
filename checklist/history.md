@@ -25,6 +25,7 @@
 - 커밋(본 항목): `cached_response`를 **stale-while-revalidate**로 개선 — TTL 만료 후 24h 이내엔 stale을 즉시 반환(1ms)하고 백그라운드 스레드가 키당 1회 갱신(실패 시 stale 유지). 캐시 eviction은 24h 유예 키를 보존. 검증: 콜드 3.96s → 만료 후 1ms → 갱신 후 신규 TTL 확인, `qa_check` 31/31 PASS.
 - 완료(아래 커밋): JS 지연 로딩. 보류: nginx brotli(서버 모듈·sudo 필요, 효과 10~20%).
 - 커밋(JS 지연 로딩): 초기 로드에서 6개 모듈(k2heatmap·team_compare·analytics·match_report·player_compare·insights, 원본 ~245KB/gzip ~60KB) 제외. `index.html`의 `TT_LAZY`(이름→버전 URL) + `workspace.js` 로더(`lazyLoad`/`lazyButton`): 팀·선수·히트맵 탭 최초 노출 시 로드, `btn-analytics`/`btn-team-compare`/`btn-player-compare` 첫 클릭은 가로채 로드 후 재클릭, `openMatchReport`는 스텁이 로드 후 실제 함수로 교체. 이벤트 결합 모듈(info/prediction/player_analytics/player_report/banner_stats)은 `teamsSelected`·`playerSelected` 유실 위험으로 제외. 검증(Playwright): 초기 JS 7개만 로드, 각 탭·버튼에서 해당 모듈 로드 + 화면 정상 렌더, JS 에러 0, 선수 탭 렌더가 운영과 동일, `qa_check` 31/31.
+- **운영 동기화 확인(가비아 서버)**: 서버 코드 = `ceff931`, 서비스 active, https://suwon.today-tactics.co.kr 에서 지연 로딩 점검(초기 JS 7개·탭/버튼 로드·JS 에러 0) 통과. 이 세션 작업 종료 — 잔여: nginx brotli(선택, sudo 필요), OAuth 콘솔 redirect URI 등록(로그인 사용 시).
 
 ---
 
