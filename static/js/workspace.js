@@ -20,6 +20,52 @@
     };
     if (!panels.tactics) return; // 셸 미존재 시 무동작(레거시 안전)
 
+    // ── 0) 지연 로딩 (TT_LAZY: 이름 → 스크립트 URL) ──────────────────
+    // 초기 로드에서 제외한 모듈(히트맵·팀 분석/비교·인사이트·경기 리포트·선수 비교)을
+    // 탭 최초 노출 또는 진입 버튼 첫 클릭 시 1회만 로드. 로드 완료 전 클릭은 가로채서
+    // 로드 후 재클릭하므로 기존 모듈 로직은 그대로 재사용된다.
+    const _lazyMap = window.TT_LAZY || {};
+    const _lazyState = {};   // name → { promise, done }
+    function lazyLoad(name) {
+        if (!_lazyMap[name]) return Promise.resolve();            // 정적 로드된 모듈
+        let st = _lazyState[name];
+        if (!st) {
+            st = _lazyState[name] = { done: false };
+            st.promise = new Promise((res, rej) => {
+                const el = document.createElement("script");
+                el.src = _lazyMap[name];
+                el.onload = () => { st.done = true; res(); };
+                el.onerror = () => { delete _lazyState[name]; el.remove(); rej(new Error("load " + name)); };
+                document.body.appendChild(el);
+            });
+        }
+        return st.promise;
+    }
+    // 순서 의존 모듈은 직렬 로드 (team_compare → analytics 원래 순서 유지)
+    async function lazyLoadSeq(names) { for (const n of names) await lazyLoad(n); }
+    const lazyReady = (names) => names.every((n) => !_lazyMap[n] || (_lazyState[n] && _lazyState[n].done));
+    function lazyFail(e) {
+        console.warn("lazy load failed:", e);
+        if (window.showToast) window.showToast("화면 모듈을 불러오지 못했습니다. 네트워크를 확인해 주세요.");
+    }
+    function lazyButton(id, names) {
+        const b = $(id);
+        if (!b) return;
+        b.addEventListener("click", (e) => {
+            if (lazyReady(names)) return;
+            e.preventDefault(); e.stopImmediatePropagation();
+            lazyLoadSeq(names).then(() => b.click()).catch(lazyFail);
+        }, true);
+    }
+    lazyButton("btn-analytics", ["analytics"]);
+    lazyButton("btn-team-compare", ["team_compare"]);
+    lazyButton("btn-player-compare", ["player_compare"]);
+    // prediction.js 가 `if (window.openMatchReport)` 로 호출 → 스텁이 로드 후 실제 함수로 교체됨
+    if (_lazyMap.match_report) {
+        window.openMatchReport = (id) =>
+            lazyLoad("match_report").then(() => window.openMatchReport(id)).catch(lazyFail);
+    }
+
     // ── 1) 기존 요소를 탭 패널로 재배치 (id/리스너 보존) ──────────────
     const move = (name, ids) => ids.forEach((id) => {
         const el = $(id);
@@ -88,14 +134,21 @@
             requestAnimationFrame(() => resizeChartsIn(panels.predict));
         },
         team() {
-            setTeamMode(_teamMode);   // 현재 모드 콘텐츠 노출 + 최초 1회 초기화
+            // 모듈 로드 후 현재 모드 콘텐츠 노출 + 최초 1회 초기화 (탭 이탈 시 늦은 완료는 무시)
+            lazyLoadSeq(["team_compare", "analytics"]).then(() => {
+                if (_current === "team") setTeamMode(_teamMode);
+            }).catch(lazyFail);
         },
         player() {
-            requestAnimationFrame(() => resizeChartsIn(panels.player));
+            lazyLoadSeq(["insights"]).then(() => {
+                requestAnimationFrame(() => resizeChartsIn(panels.player));
+            }).catch(lazyFail);
         },
         heatmap() {
             // 인라인 히트맵 뷰 최초 노출 시 초기화(팀 그리드 로드 + 검색 포커스)
-            if (window.initK2HeatmapView) window.initK2HeatmapView();
+            lazyLoadSeq(["k2heatmap"]).then(() => {
+                if (_current === "heatmap" && window.initK2HeatmapView) window.initK2HeatmapView();
+            }).catch(lazyFail);
         },
         global() {
             if (window.initGlobalLeagueView) window.initGlobalLeagueView();

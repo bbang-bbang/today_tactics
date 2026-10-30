@@ -951,12 +951,9 @@
     <script src="/static/js/app.js?v=17"></script>
 
     <script src="/static/js/info.js?v=7"></script>
-    <script src="/static/js/k2heatmap.js?v=16"></script>
     <!-- 해외리그 일단 비활성화 (아직 이른 단계) — 복구 시 아래 스크립트 복원
     <script src="/static/js/global_league.js?v=1"></script> -->
     <script src="/static/js/banner_stats.js?v=3"></script>
-    <script src="/static/js/team_compare.js?v=12"></script>
-    <script src="/static/js/analytics.js?v=16"></script>
     <script src="/static/js/prediction.js?v=60"></script>
 
     <!-- 선수 분석 모달 -->
@@ -1035,12 +1032,21 @@
 
     <script src="/static/js/player_analytics.js?v=6"></script>
     <script src="/static/js/player_report.js?v=7"></script>
-    <script src="/static/js/match_report.js?v=1"></script>
-    <script src="/static/js/player_compare.js?v=2"></script>
-    <script src="/static/js/insights.js?v=38"></script>
+
+    <!-- 지연 로딩 모듈 (탭/버튼 최초 사용 시 workspace.js 의 ttLazy 가 로드). 버전은 캐시 무효화용 -->
+    <script>
+    window.TT_LAZY = {
+        k2heatmap: "/static/js/k2heatmap.js?v=16",
+        team_compare: "/static/js/team_compare.js?v=12",
+        analytics: "/static/js/analytics.js?v=16",
+        match_report: "/static/js/match_report.js?v=1",
+        player_compare: "/static/js/player_compare.js?v=2",
+        insights: "/static/js/insights.js?v=38"
+    };
+    </script>
 
     <!-- 작업공간 탭 컨트롤러 — 반드시 모든 모듈 스크립트 뒤에 로드 -->
-    <script src="/static/js/workspace.js?v=7"></script>
+    <script src="/static/js/workspace.js?v=8"></script>
 
     <!-- 온보딩 오버레이 -->
     <div id="onboarding-overlay" class="ob-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Today Tactics 소개">
