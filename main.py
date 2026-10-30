@@ -9095,7 +9095,6 @@ def _warm_cache():
         "http://127.0.0.1:5000/api/next-round?league=K2",
         "http://127.0.0.1:5000/api/league-dashboard?league=K1",
         "http://127.0.0.1:5000/api/league-dashboard?league=K2",
-        "http://127.0.0.1:5000/api/matches-by-date",
         "http://127.0.0.1:5000/api/insights/top-performers?year=2026&league=all",
         "http://127.0.0.1:5000/api/insights/weather?year=2026&league=all",
         "http://127.0.0.1:5000/api/insights/clutch?year=2026&league=all",
