@@ -49,6 +49,8 @@ _API_REFRESHING = set()           # 갱신 중인 키 (중복 갱신 방지)
 
 def _api_cache_store(key, now, ttl, resp):
     """응답을 캐시에 저장 (2xx만). 저장 성공 여부 반환."""
+    if isinstance(resp, tuple):     # (response, status) 튜플 — 에러 응답 등. 200으로 오인 캐시되면 이후 히트가 500
+        return False
     if hasattr(resp, "get_data"):
         body, mimetype, status = resp.get_data(as_text=True), resp.mimetype, resp.status_code
     else:
@@ -3849,6 +3851,288 @@ def setpiece_efficiency():
             "by_type": league_avg,
             "total":   _setpiece_total_avg(league_avg),
         },
+    })
+
+
+# ═══════════════════════════════════════════════════════════════
+# /api/pre-match-brief — 감독용 프리매치 상대 스카우팅 한 장 요약
+#   기존 엔드포인트(match-prediction·team-insights·league-rankings·team-shape)를
+#   내부 호출로 재사용 → 새 스탯 계산 공식 없음. 규칙 기반 문장 + 근거 수치.
+# ═══════════════════════════════════════════════════════════════
+
+_BRIEF_BUCKETS = ["0~15분", "15~30분", "30~45분", "45~60분", "60~75분", "75분~"]
+# 지표별 (강점일 때 해석, 약점일 때 해석)
+_BRIEF_METRIC_HINT = {
+    "xg_conversion":          ("찬스를 골로 연결하는 결정력", "찬스 대비 마무리가 무딤"),
+    "xg_per_game":            ("양질의 득점 기회를 꾸준히 창출", "득점 기회 창출이 적음"),
+    "shot_accuracy":          ("슈팅 정확도가 높음", "슈팅 정확도가 낮음"),
+    "big_miss_per_game":      ("빅찬스를 잘 놓치지 않음", "빅찬스를 자주 놓침"),
+    "duel_won_pct":           ("경합 싸움에서 우위", "경합에서 밀림 → 피지컬 대결 유도 가능"),
+    "tackles_per_game":       ("압박·태클 개입이 적극적", "수비 개입이 소극적"),
+    "gf_per_game":            ("경기당 득점력 상위", "경기당 득점력 하위"),
+    "ga_per_game":            ("실점이 적은 견고한 수비", "실점이 많은 불안한 수비"),
+    "form_ppg_last5":         ("최근 5경기 상승세", "최근 5경기 하락세"),
+    "first_goal_win_pct":     ("선제골을 넣으면 지켜내는 힘", "선제골을 넣고도 승리를 못 지킴"),
+    "first_conceded_win_pct": ("실점해도 뒤집는 저력", "먼저 실점하면 쉽게 무너짐"),
+}
+
+
+def _brief_call(view, path):
+    """같은 앱의 캐시된 뷰를 내부 호출해 JSON dict로 받는다 (실패 시 None)."""
+    try:
+        with app.test_request_context(path):
+            r = view()
+        if isinstance(r, tuple):
+            if len(r) > 1 and not (200 <= r[1] < 300):
+                return None
+            r = r[0]
+        if hasattr(r, "status_code") and r.status_code != 200:
+            return None
+        return r.get_json(silent=True)
+    except Exception:
+        return None
+
+
+def _brief_fmt(val, fmt):
+    if val is None:
+        return "-"
+    if fmt == "pct1":
+        return f"{val:.1f}%"
+    if fmt == "num1":
+        return f"{val:.1f}"
+    if fmt == "ratio2":
+        return f"{val:.2f}배"
+    return f"{val:.2f}"
+
+
+def _brief_formations(ss_id, tid, year):
+    """시즌 주 포메이션 + 최근 5경기 포메이션 (선발 라인업 기준)."""
+    out = {"main": None, "recent": []}
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        ys, ye = _year_range(year)
+        rows = conn.execute("""
+            SELECT ml.event_id, ml.formation, MAX(e.date_ts)
+            FROM match_lineups ml JOIN events e ON e.id = ml.event_id
+            WHERE ml.team_id = ? AND e.tournament_id = ?
+              AND e.date_ts >= ? AND e.date_ts < ?
+              AND e.home_score IS NOT NULL AND ml.formation IS NOT NULL AND ml.formation != ''
+            GROUP BY ml.event_id, ml.formation
+            ORDER BY MAX(e.date_ts) DESC
+        """, (ss_id, tid, ys, ye)).fetchall()
+    except (sqlite3.OperationalError, ValueError, TypeError):
+        rows = []
+    finally:
+        conn.close()
+    if rows:
+        cnt = {}
+        for _eid, f, _ts in rows:
+            cnt[f] = cnt.get(f, 0) + 1
+        top = max(cnt.items(), key=lambda kv: kv[1])
+        out["main"] = {"formation": top[0], "games": top[1], "of": len(rows)}
+        out["recent"] = [f for _e, f, _t in rows[:5]]
+    return out
+
+
+def _brief_peak_bucket(arr):
+    """분포에서 가장 큰 구간 → (idx, 비중%, 총합). 총합 0이면 None."""
+    tot = sum(arr or [])
+    if not tot:
+        return None
+    i = max(range(len(arr)), key=lambda k: arr[k])
+    return i, round(arr[i] / tot * 100), tot
+
+
+@app.route("/api/pre-match-brief")
+@cached_response(ttl=1800)
+def get_pre_match_brief():
+    """team=우리 팀, opp=상대 팀, home=1(우리 홈, 기본)|0(우리 원정)."""
+    team_id = request.args.get("team")
+    opp_id = request.args.get("opp")
+    our_home = request.args.get("home", "1") != "0"
+    us_info = next((t for t in TEAMS if t["id"] == team_id), None)
+    op_info = next((t for t in TEAMS if t["id"] == opp_id), None)
+    if not us_info or not op_info or team_id == opp_id:
+        return jsonify({"error": "team and opp required (different valid team ids)"}), 400
+    if us_info.get("league") != op_info.get("league"):
+        return jsonify({"error": "teams must be in the same league"}), 400
+    if not os.path.exists(DB_PATH):
+        return jsonify({"error": "db not ready"}), 503
+
+    league = op_info.get("league", "K2")
+    tid = 410 if league == "K1" else 777
+    ss_op = op_info["sofascore_id"]
+
+    # 시즌 연도 = 해당 리그 최신 종료 경기 연도
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        row = conn.execute(
+            "SELECT MAX(strftime('%Y', datetime(date_ts,'unixepoch','localtime'))) "
+            "FROM events WHERE tournament_id = ? AND home_score IS NOT NULL", (tid,)).fetchone()
+    finally:
+        conn.close()
+    year = (row[0] if row and row[0] else str(datetime.now().year))
+
+    h_id, a_id = (team_id, opp_id) if our_home else (opp_id, team_id)
+    pred = _brief_call(get_match_prediction, f"/api/match-prediction?homeTeam={h_id}&awayTeam={a_id}")
+    if not pred or "home" not in pred:
+        return jsonify({"error": "prediction unavailable"}), 503
+    us, op = (pred["home"], pred["away"]) if our_home else (pred["away"], pred["home"])
+
+    ins = _brief_call(get_team_insights, f"/api/team-insights?teamId={opp_id}&year={year}") or {}
+    rk = _brief_call(get_league_rankings, f"/api/league-rankings?league={league}&year={year}") or {}
+    shape = _brief_call(get_team_shape, f"/api/team-shape?teamId={opp_id}&year={year}") or {}
+    forms = _brief_formations(ss_op, tid, year)
+
+    # ── ① 폼·순위 ──
+    def side(t):
+        st = t.get("standing") or {}
+        return {"id": t.get("id"), "name": t.get("name"), "rank": st.get("rank"), "played": st.get("played"),
+                "pts": st.get("pts"), "w": st.get("w"), "d": st.get("d"), "l": st.get("l"),
+                "gd": st.get("gd"), "form": t.get("form") or []}
+    standing_total = len((rk.get("teams") or [])) or None
+
+    # ── ② 전술 정체성 ──
+    identity = {"formation": forms["main"], "recent_formations": forms["recent"], "traits": []}
+    sm, sl = shape.get("metrics") or {}, shape.get("league") or {}
+    for key, hi, lo, unit in (("defLine", "높은 수비라인(전진 압박형)", "낮은 수비라인(내려앉는 블록)", "수비라인"),
+                              ("width", "넓게 벌려 공간 활용", "좁은 간격의 밀집형", "폭"),
+                              ("length", "라인 간격이 길게 늘어짐", "라인 간격이 촘촘함", "종적 길이")):
+        if isinstance(sm.get(key), (int, float)) and isinstance(sl.get(key), (int, float)):
+            diff = sm[key] - sl[key]
+            if diff >= 3:
+                identity["traits"].append({"text": hi, "detail": f"{unit} {sm[key]:.1f} (리그 평균 {sl[key]:.1f})"})
+            elif diff <= -3:
+                identity["traits"].append({"text": lo, "detail": f"{unit} {sm[key]:.1f} (리그 평균 {sl[key]:.1f})"})
+    st = op.get("style") or {}
+    sr = st.get("ranks") or {}
+    for key, nm, hi_txt, lo_txt in (("long_ball_pct", "롱볼 정확도", "롱볼 정확도 상위 — 롱볼 빌드업 위협", "롱볼 정확도 하위 — 롱볼 시 소유권 잃기 쉬움"),
+                                    ("cross_pct", "크로스 정확도", "크로스 정확도 상위 — 측면 공략 위협", None)):
+        r = sr.get(key) or {}
+        if r.get("rank") and r.get("total"):
+            if r["rank"] <= max(2, r["total"] // 4):
+                identity["traits"].append({"text": hi_txt, "detail": f"{nm} 리그 {r['rank']}/{r['total']}위"})
+            elif lo_txt and r["rank"] > r["total"] - max(2, r["total"] // 4):
+                identity["traits"].append({"text": lo_txt, "detail": f"{nm} 리그 {r['rank']}/{r['total']}위"})
+    identity["traits"] = identity["traits"][:4]
+
+    # ── ③ 강점3·약점3 (리그 내 순위 기반) ──
+    strengths, weaknesses = [], []
+    my_row = next((t for t in (rk.get("teams") or []) if t.get("id") == opp_id), None)
+    metric_defs = {m["key"]: m for m in (rk.get("metrics") or [])}
+    sample_ok = bool(my_row and my_row.get("eligible"))
+    if my_row and sample_ok:
+        items = []
+        for k, rank in (my_row.get("ranks") or {}).items():
+            tot = (rk.get("totals") or {}).get(k)
+            m = metric_defs.get(k)
+            # 선제골 관련 두 지표는 리그 내 상대순위가 절대 수치와 어긋나 보일 수 있어(예: 18%인데 1위)
+            # 강점·약점 순위에서 제외하고 ④ 선제골 영향에서 절대 수치로 보여준다.
+            if k in ("first_goal_win_pct", "first_conceded_win_pct"):
+                continue
+            if not rank or not tot or tot < 4 or not m or k not in _BRIEF_METRIC_HINT:
+                continue
+            items.append({"key": k, "label": m.get("label"), "rank": rank, "total": tot,
+                          "value": _brief_fmt((my_row.get("values") or {}).get(k), m.get("format")),
+                          "pct": (rank - 1) / (tot - 1)})
+        third = lambda it: max(1, round(it["total"] / 3))  # noqa: E731
+        for it in sorted(items, key=lambda x: x["pct"]):
+            if len(strengths) < 3 and it["rank"] <= third(it):
+                strengths.append({**it, "hint": _BRIEF_METRIC_HINT[it["key"]][0]})
+        for it in sorted(items, key=lambda x: -x["pct"]):
+            if len(weaknesses) < 3 and it["rank"] > it["total"] - third(it):
+                weaknesses.append({**it, "hint": _BRIEF_METRIC_HINT[it["key"]][1]})
+
+    # ── ④ 득실 시간대·선제골 영향 (상대, 올 시즌) ──
+    gt = ins.get("goal_timing") or {}
+    fg = ins.get("first_goal") or {}
+    timing = {"buckets": _BRIEF_BUCKETS, "for": gt.get("for") or [0] * 6,
+              "against": gt.get("against") or [0] * 6, "total": gt.get("total") or 0}
+    def fg_pack(d):
+        n = sum((d or {}).values())
+        return {"w": (d or {}).get("w", 0), "d": (d or {}).get("d", 0), "l": (d or {}).get("l", 0),
+                "games": n, "win_pct": round((d or {}).get("w", 0) / n * 100) if n else None}
+    first_goal = {"scored": fg_pack(fg.get("scored")), "conceded": fg_pack(fg.get("conceded"))}
+
+    # ── ⑤ 핵심 위협 선수 (G+A 상위 3) ──
+    scorers = sorted(ins.get("scorers") or [], key=lambda s: -((s.get("g") or 0) + (s.get("a") or 0)))
+    id_by_name = {s.get("name"): s.get("id") for s in (op.get("top_scorers") or [])}
+    threats = [{"name": s.get("name"), "goals": s.get("g") or 0, "assists": s.get("a") or 0,
+                "id": id_by_name.get(s.get("name"))}
+               for s in scorers[:3] if (s.get("g") or 0) + (s.get("a") or 0) > 0]
+    team_goals = (op.get("standing") or {}).get("gf") or 0
+
+    # ── ⑥ 상성 (H2H·예측 — 우리 팀 시점으로 방향 정규화) ──
+    h2h_raw = pred.get("h2h") or {}
+    pr = pred.get("prediction") or {}
+    h2h = {"games": h2h_raw.get("games", 0), "win": h2h_raw.get("home_w" if our_home else "away_w", 0),
+           "draw": h2h_raw.get("draw", 0), "loss": h2h_raw.get("away_w" if our_home else "home_w", 0)}
+    matchup = {"h2h": h2h, "venue": "home" if our_home else "away",
+               "win_pct": pr.get("home" if our_home else "away"), "draw_pct": pr.get("draw"),
+               "loss_pct": pr.get("away" if our_home else "home"),
+               "lambda_us": (pred.get("poisson") or {}).get("lambda_home" if our_home else "lambda_away"),
+               "lambda_opp": (pred.get("poisson") or {}).get("lambda_away" if our_home else "lambda_home"),
+               "rest_days_us": us.get("rest_days"), "rest_days_opp": op.get("rest_days")}
+
+    # ── ⑦ 규칙 기반 결론 (근거 수치 동반, 최대 3개) ──
+    cands = []   # (우선순위, 제목, 근거)
+    pk = _brief_peak_bucket(timing["against"])
+    if pk and pk[2] >= 6 and pk[1] >= 28:
+        cands.append((80 + pk[1] // 5, f"상대는 {_BRIEF_BUCKETS[pk[0]]}에 가장 많이 실점 — 이 시간대 공격 강도를 높여라",
+                      f"올 시즌 실점 {pk[2]}골 중 {timing['against'][pk[0]]}골({pk[1]}%)이 이 구간"))
+    pk = _brief_peak_bucket(timing["for"])
+    if pk and pk[2] >= 6 and pk[1] >= 28:
+        cands.append((70 + pk[1] // 5, f"상대는 {_BRIEF_BUCKETS[pk[0]]}에 득점이 몰림 — 이 시간대 집중력 유지",
+                      f"올 시즌 득점 {pk[2]}골 중 {timing['for'][pk[0]]}골({pk[1]}%)이 이 구간"))
+    s_, c_ = first_goal["scored"], first_goal["conceded"]
+    if s_["games"] >= 5 and s_["win_pct"] is not None and s_["win_pct"] >= 75:
+        cands.append((90, "상대에게 선제골을 내주면 사실상 패배 — 초반 실점 방지가 최우선",
+                      f"상대가 먼저 득점한 {s_['games']}경기 중 {s_['w']}승({s_['win_pct']}%)"))
+    if c_["games"] >= 5 and c_["win_pct"] is not None and c_["win_pct"] <= 25:
+        cands.append((85, "상대는 먼저 실점하면 무너짐 — 선제골을 노리는 초반 압박",
+                      f"상대가 먼저 실점한 {c_['games']}경기 중 {c_['w']}승({c_['win_pct']}%)"))
+    for w in weaknesses[:2]:
+        if w["key"] in ("duel_won_pct", "ga_per_game", "first_conceded_win_pct", "tackles_per_game"):
+            cands.append((75 - w["rank"] * 0, f"상대 약점 — {w['hint']}",
+                          f"{w['label']} {w['value']} (리그 {w['rank']}/{w['total']}위)"))
+    if threats and team_goals >= 10:
+        t0 = threats[0]
+        share = round(t0["goals"] / team_goals * 100)
+        if share >= 25:
+            cands.append((72, f"{t0['name']} 봉쇄가 관건 — 팀 득점의 {share}%를 책임",
+                          f"{t0['goals']}골 {t0['assists']}도움 / 팀 {team_goals}골"))
+    spp = (op.get("setpiece") or {}).get("setpiece_pct")
+    if isinstance(spp, (int, float)) and spp >= 25:
+        cands.append((68, "상대는 세트피스 득점 비중이 높음 — 코너·프리킥 수비 조직 점검",
+                      f"득점의 {spp:.0f}%가 세트피스"))
+    cands.sort(key=lambda c: -c[0])
+    conclusions = [{"title": t, "evidence": e} for _p, t, e in cands[:3]]
+
+    # ── 신뢰도 경고 ──
+    warnings = []
+    played = (op.get("standing") or {}).get("played") or 0
+    if played < 4:
+        warnings.append(f"상대의 올 시즌 경기 수가 {played}경기로 적어 해석에 주의가 필요합니다.")
+    if not sample_ok:
+        warnings.append("리그 지표 표본이 부족해 강점·약점 분석을 생략했습니다.")
+    xc = ins.get("xg_coverage") or {}
+    if xc.get("total") and xc.get("with_xg") is not None and xc["with_xg"] / xc["total"] < 0.6:
+        warnings.append(f"xG 데이터가 {xc['with_xg']}/{xc['total']}경기에만 있어 xG 기반 수치는 참고용입니다.")
+    if timing["total"] and timing["total"] < 10:
+        warnings.append(f"골 시간대 표본이 {timing['total']}골로 적습니다.")
+    if h2h["games"] < 4:
+        warnings.append(f"상대 전적이 {h2h['games']}경기뿐이라 상성 판단은 제한적입니다.")
+    if not conclusions:
+        conclusions = [{"title": "뚜렷한 편향이 없는 균형형 상대 — 기본 전술에 충실",
+                        "evidence": "시간대·선제골·지표에서 임계 기준을 넘는 항목이 없음"}]
+
+    return jsonify({
+        "year": year, "league": league, "our_home": our_home,
+        "us": side(us), "opp": side(op), "league_teams": standing_total,
+        "identity": identity, "strengths": strengths, "weaknesses": weaknesses,
+        "timing": timing, "first_goal": first_goal, "threats": threats, "team_goals": team_goals,
+        "matchup": matchup, "conclusions": conclusions, "warnings": warnings,
+        "confidence": pred.get("confidence"),
     })
 
 

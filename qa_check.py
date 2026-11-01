@@ -1,4 +1,4 @@
-import urllib.request, json, sqlite3, sys
+import urllib.request, urllib.error, json, sqlite3, sys
 sys.stdout.reconfigure(encoding='utf-8')
 
 base = 'http://127.0.0.1:5000'
@@ -47,6 +47,24 @@ qa('K2 decay season_games>=39', lambda: assert_(d_p2['confidence']['season_games
 # 신규 K2 팀 (2025 K2 데이터 없음) — cold-start 대신 2026 데이터만 사용
 d_p3 = get('/api/match-prediction?homeTeam=cheongju&awayTeam=gimhae')
 qa('K2 신규팀 cold-start 방어', lambda: assert_('prediction' in d_p3))
+
+# ── 2-b. 프리매치 스카우팅 요약 ──
+d_b = get('/api/pre-match-brief?team=jeonbuk&opp=ulsan&home=1')
+qa('brief 키 완전성', lambda: assert_(all(k in d_b for k in ['opp', 'us', 'identity', 'strengths', 'weaknesses', 'timing', 'first_goal', 'threats', 'matchup', 'conclusions', 'warnings'])))
+qa('brief 결론 1~3개 + 근거', lambda: assert_(1 <= len(d_b['conclusions']) <= 3 and all(c['title'] and c['evidence'] for c in d_b['conclusions'])))
+qa('brief 강점·약점 <=3', lambda: assert_(len(d_b['strengths']) <= 3 and len(d_b['weaknesses']) <= 3))
+qa('brief 상성 확률합=100%', lambda: assert_(abs(d_b['matchup']['win_pct'] + d_b['matchup']['draw_pct'] + d_b['matchup']['loss_pct'] - 100) <= 1))
+d_b_away = get('/api/pre-match-brief?team=jeonbuk&opp=ulsan&home=0')
+qa('brief 홈/원정 상성 방향 반영', lambda: assert_(d_b_away['matchup']['venue'] == 'away' and d_b_away['matchup']['h2h']['win'] == d_b['matchup']['h2h']['win']))
+d_b_new = get('/api/pre-match-brief?team=gimhae&opp=cheongju')
+qa('brief 신규팀 표본부족 경고', lambda: assert_(len(d_b_new['conclusions']) >= 1))
+def _brief_status(q):
+    try:
+        urllib.request.urlopen(base + q, timeout=10); return 200
+    except urllib.error.HTTPError as e:
+        return e.code
+qa('brief 리그 불일치 400', lambda: assert_(_brief_status('/api/pre-match-brief?team=suwon&opp=ulsan') == 400))
+qa('brief 동일팀/인젝션 400', lambda: assert_(_brief_status('/api/pre-match-brief?team=ulsan&opp=ulsan') == 400 and _brief_status("/api/pre-match-brief?team=x'+OR+'1'='1&opp=ulsan") == 400))
 
 # ── 3. 백테스트 ──
 d_bt2 = get('/api/prediction-backtest?league=k2&year=2026')

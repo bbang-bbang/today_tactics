@@ -8,7 +8,12 @@
 
 ### [ ] 분석 보고서 확장 — 사용자 순서: 감독 → 분석가 → 팬 (2026-10-31 결정)
 
-**1) 감독 — 프리매치 상대 스카우팅 한 장 요약** (설계안, 구현 전 확인 대기)
+**1) 감독 — 프리매치 상대 스카우팅 한 장 요약** — ✅ 2026-11-01 구현 완료 (미커밋)
+- 구현: `main.py` `/api/pre-match-brief?team=&opp=&home=1|0` (내부 호출 재사용, 30분 캐시) + `prediction.js` `renderScoutBriefCard`(경기예측 탭, 우리 팀 홈/원정 토글, 인쇄/PDF) + `style.css` `.scout-brief`. qa_check 39/39 PASS.
+- 설계 대비 변경: team-ranking(K2 전용) 대신 match-prediction 순위 재사용 / 선제골 지표 2개는 강점·약점 순위에서 제외(절대 수치와 순위가 어긋나 보이는 모순 방지, ④에서 표시) / "한 줄 결론"→"핵심 결론".
+- 부수 수정: `_api_cache_store`가 `(resp, status)` 튜플을 200으로 오인 캐시 → 이후 히트 500 되던 잠복 버그 수정(match-prediction 404 등 기존 경로 포함).
+- 남은 것: 브라우저 크로스 확인(Firefox/Edge 미검증, Chromium만 확인), 감독 피드백 후 임계값(강점·약점 상위 1/3, 시간대 28% 등) 튜닝, 워밍업 미등록(팀 쌍 의존이라 의도적).
+- (원 설계안, 참고)
 - 새 API `/api/pre-match-brief?team=&opp=` — 기존 계산 재사용(team-ranking·team-analytics·team-shape·league-rankings·team-insights·goal-timing·match-prediction/h2h). 캐시·워밍업은 기존 방식.
 - 구성: ①상대 폼·순위 ②전술 정체성(포메이션/라인) ③강점3·약점3(리그 평균 대비 편차 자동 선별) ④득실 시간대·선제골 영향 ⑤핵심 위협 선수 ⑥우리 팀 대비 상성(H2H·예측) ⑦규칙 기반 한 줄 결론 3개(근거 수치 동반).
 - 화면: 경기예측 탭 내 "스카우팅 요약" + 인쇄/PDF. 내 팀 선택 → 상대 선택 방식. 표본<4경기·xG 커버리지 낮음 경고 표시.

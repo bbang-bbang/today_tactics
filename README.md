@@ -182,6 +182,7 @@ K리그 (players.db)
 | (프론트) 🎯 스카우팅 탭 | 신규 API 없음 — `team-shape` + `team-shotmap`(for/against)를 클라이언트에서 조합해 경계할 점(상대 강점)·공략 포인트(상대 약점)·게임플랜을 리그 평균 대비 자동 도출 (`analytics.js renderScout`) |
 | `/api/match-report?eventId=` | 경기 단일 심층 리포트 — 한 경기 양 팀의 슛맵·평균위치·골 타임라인 + 집계 지표(슛·유효·xG·결정력·패스점유·정확도·키패스·평점). 경기예측 '예측 후기'의 📋 경기 리포트 버튼 → 모달(`match_report.js`: xG 흐름 차트·양팀 슛맵·평균위치·골 타임라인) |
 | `/api/match-prediction` | 경기 예측 |
+| `/api/pre-match-brief` | 프리매치 상대 스카우팅 요약 (`team`=우리, `opp`=상대, `home`=1/0) |
 | `/api/prediction-backtest` | 예측 모델 백테스트 |
 | `/api/season-simulation` | 시즌 시뮬레이션 |
 | `/api/predicted-lineup` | 예상 라인업 |

@@ -643,6 +643,8 @@
                     report.innerHTML = `<div class="pred-loading" style="color:#f87171">렌더 오류: ${err.message}</div>`;
                     return;
                 }
+                try { renderScoutBriefCard(data, homeId, awayId); }
+                catch (err) { console.error("[스카우팅 요약 렌더 실패]", err); }
                 if (retro && retro.ready) {
                     try { renderRetroCard(data, retro, homeId, awayId); }
                     catch (err) { console.error("[사후분석 렌더 실패]", err); }
@@ -1192,6 +1194,168 @@
                 return;
             }
         });
+    }
+
+    // ── 프리매치 스카우팅 요약 (감독용) ─────────────────────────
+    // /api/pre-match-brief: 우리 팀(홈/원정 토글) 기준으로 상대 한 장 요약. 인쇄/PDF 지원.
+    const _scoutCache = {};   // "us|opp|home" → brief (성공 응답만 캐시)
+    let _scoutSide = "home";  // 우리 팀이 홈팀(home)인지 원정팀(away)인지
+
+    function _scoutEsc(s) {
+        const d = document.createElement("div");
+        d.textContent = s == null ? "" : String(s);
+        return d.innerHTML;
+    }
+
+    function renderScoutBriefCard(data, homeId, awayId) {
+        const wrap = report.querySelector(".pred-extras");
+        if (!wrap) return;
+        let card = wrap.querySelector(".scout-brief");
+        if (!card) {
+            card = document.createElement("section");
+            card.className = "scout-brief";
+            card.setAttribute("aria-label", "프리매치 스카우팅 요약");
+            wrap.prepend(card);
+            card.addEventListener("click", (e) => {
+                const t = e.target.closest("[data-scout-side]");
+                if (t) { _scoutSide = t.dataset.scoutSide; loadScoutBrief(card); return; }
+                if (e.target.closest(".sb-print")) printScoutBrief(card);
+            });
+        }
+        card._ctx = { data, homeId, awayId };
+        loadScoutBrief(card);
+    }
+
+    // 인쇄: 카드 복제본을 body 직속에 붙여 그것만 출력 (위치 지정된 조상 영향 없이 1페이지 상단부터)
+    function printScoutBrief(card) {
+        const root = document.createElement("div");
+        root.id = "scout-print-root";
+        root.appendChild(card.cloneNode(true));
+        document.body.appendChild(root);
+        document.body.classList.add("sb-printing");
+        const cleanup = () => {
+            document.body.classList.remove("sb-printing");
+            root.remove();
+            window.removeEventListener("afterprint", cleanup);
+        };
+        window.addEventListener("afterprint", cleanup);
+        window.print();
+    }
+
+    function loadScoutBrief(card) {
+        const { data, homeId, awayId } = card._ctx;
+        const isHome = _scoutSide === "home";
+        const usId = isHome ? homeId : awayId, opId = isHome ? awayId : homeId;
+        const key = `${usId}|${opId}|${isHome ? 1 : 0}`;
+        const head = scoutHeadHtml(data, opId === homeId ? data.home.name : data.away.name);
+        if (_scoutCache[key]) { card.innerHTML = head + scoutBodyHtml(_scoutCache[key]); return; }
+        card.innerHTML = head + `<div class="sb-loading" role="status">스카우팅 요약 분석 중...</div>`;
+        fetch(`/api/pre-match-brief?team=${encodeURIComponent(usId)}&opp=${encodeURIComponent(opId)}&home=${isHome ? 1 : 0}`)
+            .then(r => { if (!r.ok) throw new Error(`brief ${r.status}`); return r.json(); })
+            .then(b => {
+                _scoutCache[key] = b;
+                if (card._ctx.homeId !== homeId || card._ctx.awayId !== awayId || _scoutSide !== (isHome ? "home" : "away")) return;
+                card.innerHTML = head + scoutBodyHtml(b);
+            })
+            .catch(err => {
+                console.error("[스카우팅 요약 실패]", err);
+                card.innerHTML = head + `<div class="sb-error" role="alert">스카우팅 요약을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</div>`;
+            });
+    }
+
+    function scoutHeadHtml(data, oppName) {
+        const side = (k, name) => `<button type="button" class="sb-toggle${_scoutSide === k ? " is-on" : ""}"
+            data-scout-side="${k}" aria-pressed="${_scoutSide === k}">${_scoutEsc(name)}</button>`;
+        return `<div class="sb-head">
+            <div class="sb-title"><span class="sb-title-main">🔍 상대 스카우팅 요약</span>
+                <span class="sb-title-sub">${_scoutEsc(oppName)} 분석</span></div>
+            <div class="sb-controls">
+                <span class="sb-controls-lbl">우리 팀</span>
+                ${side("home", data.home.name)}${side("away", data.away.name)}
+                <button type="button" class="sb-print" title="인쇄 / PDF로 저장">🖨 인쇄</button>
+            </div>
+        </div>`;
+    }
+
+    function scoutBodyHtml(b) {
+        const e = _scoutEsc;
+        const o = b.opp, u = b.us, tot = b.league_teams;
+        const rec = (t) => `${t.w}승 ${t.d}무 ${t.l}패`;
+        const warn = (b.warnings || []).length
+            ? `<div class="sb-warn" role="note">${b.warnings.map(w => `<div>⚠ ${e(w)}</div>`).join("")}</div>` : "";
+
+        const concl = `<ol class="sb-concl">${b.conclusions.map(c => `
+            <li><div class="sb-concl-t">${e(c.title)}</div><div class="sb-concl-e">근거: ${e(c.evidence)}</div></li>`).join("")}</ol>`;
+
+        const form = `<div class="sb-block">
+            <div class="sb-h">① 상대 폼·순위</div>
+            <div class="sb-big">${o.rank ? `${o.rank}위` : "-"}<span class="sb-sub">/${tot || "-"}팀 · ${o.pts ?? "-"}pts</span></div>
+            <div class="sb-line">${o.played ? `${rec(o)} · 득실 ${o.gd > 0 ? "+" : ""}${o.gd}` : "경기 기록 없음"}</div>
+            <div class="pred-badges">${formBadges(o.form)}</div>
+            <div class="sb-line sb-muted">우리 팀 ${u.rank ? `${u.rank}위 · ${u.pts}pts` : "-"}</div>
+        </div>`;
+
+        const idn = b.identity || {};
+        const fm = idn.formation;
+        const identity = `<div class="sb-block">
+            <div class="sb-h">② 전술 정체성</div>
+            <div class="sb-big">${fm ? e(fm.formation) : "-"}<span class="sb-sub">${fm ? `시즌 ${fm.games}/${fm.of}경기` : "라인업 없음"}</span></div>
+            ${(idn.recent_formations || []).length ? `<div class="sb-line">최근 ${idn.recent_formations.length}경기: ${idn.recent_formations.map(f => `<span class="sb-chip">${e(f)}</span>`).join("")}</div>` : ""}
+            <ul class="sb-list">${(idn.traits || []).map(t => `<li>${e(t.text)}<span class="sb-muted"> · ${e(t.detail)}</span></li>`).join("") || `<li class="sb-muted">뚜렷한 특징 없음 (리그 평균 수준)</li>`}</ul>
+        </div>`;
+
+        const swItem = (it, cls) => `<li class="${cls}"><div class="sb-sw-top"><span class="sb-sw-lbl">${e(it.label)}</span>
+            <span class="sb-sw-val">${e(it.value)}<span class="sb-rank"> · ${it.rank}/${it.total}위</span></span></div>
+            <div class="sb-sw-hint">${e(it.hint)}</div></li>`;
+        const sw = `<div class="sb-block sb-wide">
+            <div class="sb-h">③ 강점 · 약점 <span class="sb-muted">(리그 내 순위 기준)</span></div>
+            <div class="sb-sw">
+                <div><div class="sb-sw-h sb-up">▲ 강점</div><ul class="sb-sw-list">${b.strengths.map(i => swItem(i, "sb-s")).join("") || `<li class="sb-muted">뚜렷한 강점 없음</li>`}</ul></div>
+                <div><div class="sb-sw-h sb-down">▼ 약점</div><ul class="sb-sw-list">${b.weaknesses.map(i => swItem(i, "sb-w")).join("") || `<li class="sb-muted">뚜렷한 약점 없음</li>`}</ul></div>
+            </div>
+        </div>`;
+
+        const tm = b.timing, mx = Math.max(1, ...tm.for, ...tm.against);
+        const peakF = tm.for.indexOf(Math.max(...tm.for)), peakA = tm.against.indexOf(Math.max(...tm.against));
+        const col = (i) => `<div class="sb-tcol">
+            <div class="sb-tbars">
+                <span class="sb-tbar sb-tf${i === peakF && tm.for[i] ? " is-peak" : ""}" style="height:${tm.for[i] / mx * 100}%" title="득점 ${tm.for[i]}"><i>${tm.for[i]}</i></span>
+                <span class="sb-tbar sb-ta${i === peakA && tm.against[i] ? " is-peak" : ""}" style="height:${tm.against[i] / mx * 100}%" title="실점 ${tm.against[i]}"><i>${tm.against[i]}</i></span>
+            </div><div class="sb-tlbl">${e(tm.buckets[i])}</div></div>`;
+        const fg = b.first_goal;
+        const fgTxt = (x) => x.games ? `${x.w}승 ${x.d}무 ${x.l}패 <span class="sb-muted">(${x.games}경기, 승률 ${x.win_pct}%)</span>` : `<span class="sb-muted">표본 없음</span>`;
+        const timing = `<div class="sb-block sb-wide">
+            <div class="sb-h">④ 득실 시간대 · 선제골 영향 <span class="sb-muted">(상대, 올 시즌 ${tm.total}골)</span></div>
+            <div class="sb-timing">
+                <div class="sb-tchart" role="img" aria-label="상대 시간대별 득점과 실점 분포">
+                    <div class="sb-tlegend"><span class="sb-lg sb-lg-f">■ 득점</span><span class="sb-lg sb-lg-a">■ 실점</span></div>
+                    <div class="sb-tcols">${tm.buckets.map((_, i) => col(i)).join("")}</div>
+                </div>
+                <div class="sb-fg">
+                    <div class="sb-fg-row"><span class="sb-fg-k">상대가 먼저 득점하면</span><span>${fgTxt(fg.scored)}</span></div>
+                    <div class="sb-fg-row"><span class="sb-fg-k">상대가 먼저 실점하면</span><span>${fgTxt(fg.conceded)}</span></div>
+                </div>
+            </div>
+        </div>`;
+
+        const threats = `<div class="sb-block">
+            <div class="sb-h">⑤ 핵심 위협 선수</div>
+            <ul class="sb-list">${b.threats.map(t => `<li>${t.id ? `<span class="scorer-link sb-player" data-player-id="${t.id}" tabindex="0" role="button">${e(t.name)}</span>` : e(t.name)}
+                <span class="sb-muted"> · ${t.goals}골 ${t.assists}도움${b.team_goals ? ` (팀 득점의 ${Math.round(t.goals / b.team_goals * 100)}%)` : ""}</span></li>`).join("") || `<li class="sb-muted">득점 기록 없음</li>`}</ul>
+        </div>`;
+
+        const m = b.matchup, h = m.h2h;
+        const matchup = `<div class="sb-block">
+            <div class="sb-h">⑥ 우리 팀 상성 <span class="sb-muted">(${m.venue === "home" ? "홈" : "원정"})</span></div>
+            <div class="sb-prob"><span><b>${m.win_pct ?? "-"}%</b> 승</span><span><b>${m.draw_pct ?? "-"}%</b> 무</span><span><b>${m.loss_pct ?? "-"}%</b> 패</span></div>
+            <div class="sb-line">${h.games ? `상대 전적 ${h.games}경기: ${h.win}승 ${h.draw}무 ${h.loss}패` : "상대 전적 없음"}</div>
+            <div class="sb-line sb-muted">예상 득점 λ ${m.lambda_us ?? "-"} : ${m.lambda_opp ?? "-"}${m.rest_days_us != null ? ` · 휴식일 ${m.rest_days_us}일 vs ${m.rest_days_opp ?? "-"}일` : ""}</div>
+        </div>`;
+
+        return `${warn}
+            <div class="sb-concl-wrap"><div class="sb-h">핵심 결론</div>${concl}</div>
+            <div class="sb-grid">${form}${identity}${sw}${timing}${threats}${matchup}</div>
+            <div class="sb-foot">${b.year} 시즌 · ${b.league} 기준 · 규칙 기반 자동 요약 (근거 수치 병기)</div>`;
     }
 
     function formBadges(form) {
