@@ -57,7 +57,7 @@
             lazyLoadSeq(names).then(() => b.click()).catch(lazyFail);
         }, true);
     }
-    lazyButton("btn-analytics", ["analytics"]);
+    lazyButton("btn-analytics", ["analytics", "pass_network"]);
     lazyButton("btn-team-compare", ["team_compare"]);
     lazyButton("btn-player-compare", ["player_compare"]);
     // prediction.js 가 `if (window.openMatchReport)` 로 호출 → 스텁이 로드 후 실제 함수로 교체됨
@@ -135,7 +135,7 @@
         },
         team() {
             // 모듈 로드 후 현재 모드 콘텐츠 노출 + 최초 1회 초기화 (탭 이탈 시 늦은 완료는 무시)
-            lazyLoadSeq(["team_compare", "analytics"]).then(() => {
+            lazyLoadSeq(["team_compare", "analytics", "pass_network"]).then(() => {
                 if (_current === "team") setTeamMode(_teamMode);
             }).catch(lazyFail);
         },

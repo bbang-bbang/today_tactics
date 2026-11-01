@@ -4682,6 +4682,70 @@ body {
     .pred-style-cards-grid { grid-template-columns: 1fr; }
 }
 
+/* ── 패스 네트워크 (팀 분석 탭) ───────────────────────────── */
+#pn-root {
+    --pn-text: #e8f2ff; --pn-muted: #9fb3cf; --pn-line: rgba(255,255,255,0.1); --pn-accent: #a78bfa;
+    --pn-gk: #fbbf24; --pn-df: #60a5fa; --pn-mf: #4ade80; --pn-fw: #f87171;   /* 포지션색(글자 G·D·M·F를 항상 병기) */
+    color: var(--pn-text); line-height: 1.5; letter-spacing: -0.01em;
+}
+.pn-empty { padding: 22px 6px; font-size: 0.85rem; color: var(--pn-muted); }
+.pn-error { color: #fca5a5; }
+.pn-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin-bottom: 10px; }
+.pn-modes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.pn-mode, #pn-match { font: inherit; font-size: 0.78rem; font-weight: 600; color: var(--pn-text); background: rgba(255,255,255,0.05);
+    border: 1px solid var(--pn-line); border-radius: 6px; padding: 4px 10px; cursor: pointer; transition: background 0.15s ease-in-out, border-color 0.15s ease-in-out; }
+.pn-mode:hover { background: rgba(255,255,255,0.12); }
+.pn-mode:active { background: rgba(255,255,255,0.2); }
+.pn-mode.is-on { background: var(--pn-accent); border-color: var(--pn-accent); color: #1a1030; }
+.pn-mode:focus-visible, #pn-match:focus-visible, #pn-th:focus-visible, .pn-node:focus-visible { outline: 2px solid #fde68a; outline-offset: 2px; }
+#pn-match { max-width: 260px; }
+.pn-scope { font-size: 0.78rem; color: var(--pn-muted); }
+.pn-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 900px) { .pn-grid { grid-template-columns: minmax(0, 1fr); } }
+.pn-pitch-wrap { min-width: 0; }
+.pn-pitch { display: block; width: 100%; height: auto; max-height: 640px; border-radius: 8px; background: linear-gradient(180deg, #0e2a22 0%, #0b2019 100%); border: 1px solid var(--pn-line); }
+.pn-line { fill: none; stroke: rgba(255,255,255,0.22); stroke-width: 1.2; }
+.pn-edge { stroke: color-mix(in srgb, var(--pn-team, #7ecfff) 55%, #fff); stroke-linecap: round; cursor: help; transition: opacity 0.15s ease-in-out; }
+.pn-edge.is-hot { stroke: #fde68a; }
+.pn-node { cursor: pointer; }
+.pn-node circle { stroke: #0b1220; stroke-width: 2; transition: stroke 0.15s ease-in-out, stroke-width 0.15s ease-in-out; }
+.pn-node:hover circle { stroke: #fff; stroke-width: 3; }
+.pn-node.is-sel circle { stroke: #fde68a; stroke-width: 4; }
+.pn-n-GK circle, .pn-lg.pn-n-GK::before { fill: var(--pn-gk); background: var(--pn-gk); }
+.pn-n-DF circle, .pn-lg.pn-n-DF::before { fill: var(--pn-df); background: var(--pn-df); }
+.pn-n-MF circle, .pn-lg.pn-n-MF::before { fill: var(--pn-mf); background: var(--pn-mf); }
+.pn-n-FW circle, .pn-lg.pn-n-FW::before { fill: var(--pn-fw); background: var(--pn-fw); }
+.pn-n-NA circle { fill: #94a3b8; }
+.pn-pos { fill: #0b1220; font-size: 12px; font-weight: 800; text-anchor: middle; pointer-events: none; }
+.pn-name { fill: #e8f2ff; font-size: 12px; font-weight: 700; text-anchor: middle; pointer-events: none;
+    paint-order: stroke; stroke: #0b1220; stroke-width: 3px; stroke-linejoin: round; }
+.pn-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin-top: 8px; font-size: 0.75rem; color: var(--pn-muted); }
+.pn-lg { display: inline-flex; align-items: center; gap: 5px; }
+.pn-lg::before { content: ""; width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.pn-lg-note { flex-basis: 100%; }
+.pn-slider { margin-top: 8px; font-size: 0.78rem; }
+.pn-slider label { display: block; margin-bottom: 4px; }
+.pn-slider input[type=range] { width: 100%; accent-color: var(--pn-accent); }
+.pn-side { display: grid; gap: 10px; min-width: 0; }
+.pn-box { padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); min-width: 0; }
+.pn-box h4 { margin: 0 0 6px; font-size: 0.8rem; font-weight: 700; color: var(--pn-accent); }
+.pn-sel { border-color: rgba(253,230,138,0.45); }
+.pn-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pn-note { padding: 7px 9px; border-radius: 6px; background: rgba(167,139,250,0.08); border-left: 3px solid var(--pn-accent); }
+.pn-note-dependence { border-left-color: #fbbf77; background: rgba(251,191,119,0.08); }
+.pn-note-t { font-size: 0.84rem; font-weight: 700; }
+.pn-note-e { font-size: 0.75rem; color: var(--pn-muted); margin-top: 2px; }
+.pn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.8rem; }
+.pn-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; }
+.pn-rank { display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; border-radius: 50%; background: rgba(255,255,255,0.1); font-size: 0.72rem; font-weight: 800; }
+.pn-val { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pn-muted { color: var(--pn-muted); font-weight: 400; font-size: 0.75rem; }
+.pn-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pn-sub { font-size: 0.75rem; color: var(--pn-muted); margin-bottom: 3px; }
+.pn-warn { font-size: 0.75rem; color: var(--pn-muted); display: grid; gap: 2px; }
+@media (max-width: 480px) { .pn-cols { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .pn-edge, .pn-node circle, .pn-mode { transition: none; } }
+
 /* ── 경기 요약 카드 (팬용, 종료된 경기) ───────────────────── */
 .recap-card {
     --rc-text: #e8f2ff; --rc-muted: #9fb3cf; --rc-line: rgba(255,255,255,0.1); --rc-accent: #7ecfff;

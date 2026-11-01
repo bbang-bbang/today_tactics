@@ -21,6 +21,8 @@
     let currentTeamId = null;
     let currentLeague = null;
     let currentYear = "전체";
+    // 다른 모듈(pass_network.js)이 현재 팀/시즌을 읽을 수 있도록 노출
+    window.taState = () => ({ teamId: currentTeamId, year: currentYear, league: currentLeague });
     let _shotmapData = { for: null, against: null };   // 슛맵 캐시 (토글 재렌더용)
     let _shotmapSide = "for";
     let _shotFilter = { goal: true, save: true, post: true, block: true, miss: true };  // 결과별 표시 필터
@@ -206,6 +208,8 @@
             renderScout(shape, smFor, smAgainst, meta);
             // 스킬 프로필
             renderSkill(rankings, meta);
+            // 팀/시즌 로드 완료 알림 (패스 네트워크 탭 등 후행 모듈용)
+            document.dispatchEvent(new CustomEvent("teamAnalyticsLoaded", { detail: { teamId: currentTeamId, year: currentYear, league: currentLeague } }));
         }).catch(err => {
             document.getElementById("ta-team-name").textContent = "데이터 로드 실패";
             console.error("[team-analysis]", err);

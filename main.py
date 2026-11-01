@@ -4137,6 +4137,211 @@ def get_pre_match_brief():
     })
 
 
+# ═══════════════════════════════════════════════════════════════
+# /api/pass-network — 선수 간 패스 네트워크 (K리그 공식 getPassData 기반)
+#   kleague_pass_edge/player/match 테이블(crawlers/collect_kleague_passes.py)을 시즌 또는 단일 경기로 집계.
+#   행=패스한 선수, 열=받은 선수의 '성공 패스 횟수'. 좌표는 선발 라인업 배치(실제 평균 위치 아님).
+# ═══════════════════════════════════════════════════════════════
+
+_PN_LINE = {"GK": 0, "DF": 1, "MF": 2, "FW": 3}
+_PN_LINE_KO = {"GK": "골키퍼", "DF": "수비", "MF": "미드필더", "FW": "공격"}
+
+
+def _pn_hub_notes(nodes, total_passes, matches):
+    """허브·의존도에 대한 규칙 기반 문장(근거 수치 병기)."""
+    notes = []
+    if not nodes or not total_passes:
+        return notes
+    top = nodes[:3]
+    top3 = sum(n["share"] for n in top)
+    names = "·".join(f"{n['name']}({n['share'] * 100:.0f}%)" for n in top)
+    notes.append({"kind": "hub", "text": f"패스 허브 상위 3명 {names} — 팀 패스 관여의 {top3 * 100:.0f}%",
+                  "evidence": f"관여=패스한 횟수+받은 횟수, 팀 총 패스 {total_passes:,}회 기준(한 패스가 두 선수에 각각 반영)"})
+    if top[0]["share"] >= 0.14:
+        notes.append({"kind": "dependence", "text": f"{top[0]['name']} 한 명에 대한 의존도가 높음 — 이 선수를 막으면 연결이 크게 끊김",
+                      "evidence": f"관여 비중 {top[0]['share'] * 100:.1f}% (균등 분배 시 약 9%)"})
+    return notes
+
+
+def _pn_assemble(conn, ss_id, event_ids, min_passes):
+    """event_ids의 (team_id=ss_id) 패스 엣지·로스터를 집계해 nodes/edges/insights 딕셔너리를 만든다."""
+    ph = ",".join("?" * len(event_ids))
+    edge_rows = conn.execute(
+        f"SELECT passer_kid, receiver_kid, SUM(passes) FROM kleague_pass_edge "
+        f"WHERE team_id = ? AND event_id IN ({ph}) GROUP BY passer_kid, receiver_kid", (ss_id, *event_ids)).fetchall()
+    roster = conn.execute(
+        f"SELECT player_kid, player_name, position, is_starter, pos_top, pos_left, event_id FROM kleague_pass_player "
+        f"WHERE team_id = ? AND event_id IN ({ph})", (ss_id, *event_ids)).fetchall()
+    n_matches = len(event_ids)
+
+    made, recv = {}, {}
+    for a, b, n in edge_rows:
+        made[a] = made.get(a, 0) + n
+        recv[b] = recv.get(b, 0) + n
+    total = sum(made.values())
+
+    info = {}
+    for kid, name, pos, st, top, left, _eid in roster:
+        d = info.setdefault(kid, {"names": {}, "pos": {}, "matches": 0, "starts": 0, "tops": [], "lefts": []})
+        d["names"][name] = d["names"].get(name, 0) + 1
+        if pos:
+            d["pos"][pos] = d["pos"].get(pos, 0) + 1
+        d["matches"] += 1
+        if st and top is not None and left is not None:
+            d["starts"] += 1
+            d["tops"].append(top)
+            d["lefts"].append(left)
+
+    nodes = []
+    for kid, d in info.items():
+        inv = made.get(kid, 0) + recv.get(kid, 0)
+        nodes.append({
+            "kid": kid, "name": max(d["names"], key=d["names"].get),
+            "pos": max(d["pos"], key=d["pos"].get) if d["pos"] else None,
+            "x": round(sum(d["lefts"]) / len(d["lefts"]), 1) if d["lefts"] else None,
+            "y": round(sum(d["tops"]) / len(d["tops"]), 1) if d["tops"] else None,
+            "coord_matches": d["starts"], "matches": d["matches"],
+            "made": made.get(kid, 0), "received": recv.get(kid, 0), "involvement": inv,
+            "share": round(inv / (2 * total), 4) if total else 0.0,
+            "made_pg": round(made.get(kid, 0) / n_matches, 1)})
+    nodes.sort(key=lambda n: -n["involvement"])
+    by_kid = {n["kid"]: n for n in nodes}
+
+    edges = [{"from": a, "to": b, "passes": n, "per_match": round(n / n_matches, 2)}
+             for a, b, n in edge_rows if n >= min_passes and a in by_kid and b in by_kid]
+    edges.sort(key=lambda e: -e["passes"])
+
+    # 라인별 흐름: 패스한 선수 → 받은 선수의 라인(GK<DF<MF<FW) 비교
+    fwd = lat = back = known = 0
+    for a, b, n in edge_rows:
+        la, lb = _PN_LINE.get(by_kid.get(a, {}).get("pos")), _PN_LINE.get(by_kid.get(b, {}).get("pos"))
+        if la is None or lb is None:
+            continue
+        known += n
+        if lb > la:
+            fwd += n
+        elif lb < la:
+            back += n
+        else:
+            lat += n
+    insights = {"hubs": nodes[:3], "top_links": edges[:5],
+                "line_flow": ({"forward": round(fwd / known, 3), "lateral": round(lat / known, 3), "backward": round(back / known, 3)}
+                              if known else None),
+                "notes": _pn_hub_notes(nodes, total, n_matches)}
+    if known:
+        insights["notes"].append({"kind": "flow", "text": f"전진 패스 {fwd / known * 100:.0f}% · 같은 라인 {lat / known * 100:.0f}% · 후방 {back / known * 100:.0f}%",
+                                  "evidence": "라인 이동 기준(골키퍼<수비<미드필더<공격), 포지션이 확인된 패스만"})
+    return {"nodes": nodes, "edges": edges, "total_passes": total, "insights": insights,
+            "max_edge": max((n for _a, _b, n in edge_rows), default=0)}
+
+
+@app.route("/api/pass-network")
+@cached_response(ttl=3600)
+def get_pass_network():
+    """team=팀 slug, year=시즌(기본 데이터가 있는 최신 연도) 또는 eventId=단일 경기, minPasses=엣지 최소 횟수."""
+    team_id = request.args.get("teamId", "")
+    t = next((x for x in TEAMS if x["id"] == team_id), None)
+    if not t:
+        return jsonify({"error": "unknown teamId"}), 400
+    ss_id = t["sofascore_id"]
+    event_arg = request.args.get("eventId", "").strip()
+    year = request.args.get("year", "").strip()
+    if event_arg and not event_arg.isdigit():
+        return jsonify({"error": "eventId must be int"}), 400
+    if year and not year.isdigit():
+        return jsonify({"error": "year must be YYYY"}), 400
+    try:
+        min_passes = max(1, min(500, int(request.args.get("minPasses") or (1 if event_arg else 5))))
+    except ValueError:
+        return jsonify({"error": "minPasses must be int"}), 400
+
+    team_out = {"id": t["id"], "name": t["name"], "short": t.get("short", t["name"]), "primary": t.get("primary")}
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        try:
+            if event_arg:
+                eid = int(event_arg)
+                ev = conn.execute("""SELECT e.date_ts, e.home_team_id, e.away_team_id, e.home_score, e.away_score
+                                     FROM events e JOIN kleague_pass_match p ON p.event_id = e.id AND p.team_id = ?
+                                     WHERE e.id = ?""", (ss_id, eid)).fetchone()
+                if not ev:
+                    return jsonify({"ready": False, "reason": "no_pass_data", "team": team_out}), 404
+                opp_ss = ev[2] if ev[1] == ss_id else ev[1]
+                opp = next((x for x in TEAMS if x["sofascore_id"] == opp_ss), None)
+                out = _pn_assemble(conn, ss_id, [eid], min_passes)
+                out.update({"scope": "match", "matches": 1, "team_matches": 1, "year": datetime.fromtimestamp(ev[0]).year,
+                            "match": {"event_id": eid, "date_ts": ev[0], "home": ev[1] == ss_id,
+                                      "opponent": (opp or {}).get("short"), "score": [ev[3], ev[4]]}})
+            else:
+                if not year:
+                    row = conn.execute("""SELECT MAX(strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')))
+                                          FROM events e JOIN kleague_pass_match p ON p.event_id = e.id AND p.team_id = ?""",
+                                       (ss_id,)).fetchone()
+                    year = row[0] if row and row[0] else ""
+                if not year:
+                    return jsonify({"ready": False, "reason": "no_pass_data", "team": team_out})
+                lo, hi = _year_range(year)
+                eids = [r[0] for r in conn.execute(
+                    """SELECT e.id FROM events e JOIN kleague_pass_match p ON p.event_id = e.id AND p.team_id = ?
+                       WHERE e.date_ts >= ? AND e.date_ts < ? ORDER BY e.date_ts""", (ss_id, lo, hi))]
+                team_matches = conn.execute(
+                    """SELECT COUNT(*) FROM events e WHERE e.tournament_id IN (410, 777) AND e.home_score IS NOT NULL
+                       AND (e.home_team_id = ? OR e.away_team_id = ?) AND e.date_ts >= ? AND e.date_ts < ?""",
+                    (ss_id, ss_id, lo, hi)).fetchone()[0]
+                if not eids:
+                    return jsonify({"ready": False, "reason": "no_pass_data", "team": team_out, "year": int(year),
+                                    "team_matches": team_matches})
+                out = _pn_assemble(conn, ss_id, eids, min_passes)
+                out.update({"scope": "season", "matches": len(eids), "team_matches": team_matches, "year": int(year)})
+        except sqlite3.OperationalError:
+            return jsonify({"ready": False, "reason": "no_pass_data", "team": team_out})   # 테이블 미생성(수집 전)
+    finally:
+        conn.close()
+
+    warnings = ["좌표는 선발 라인업 배치의 평균이며 실제 평균 위치가 아닙니다.",
+                "패스 횟수는 성공한 패스만 포함합니다 (실패 패스·길이·방향 정보 없음)."]
+    if out["scope"] == "season":
+        if out["matches"] < out["team_matches"]:
+            warnings.insert(0, f"패스 데이터가 {out['matches']}/{out['team_matches']}경기에 있습니다 (경기 다음 날 공개 · 미수집 경기 제외).")
+        if out["matches"] < 5:
+            warnings.insert(0, f"표본이 {out['matches']}경기뿐이라 해석에 주의가 필요합니다.")
+    out.update({"ready": True, "team": team_out, "min_passes": min_passes, "warnings": warnings})
+    return jsonify(out)
+
+
+@app.route("/api/pass-network/matches")
+@cached_response(ttl=1800)
+def get_pass_network_matches():
+    """팀의 해당 시즌 종료 경기 목록 + 패스 데이터 공개 여부 (단일 경기 선택용)."""
+    team_id = request.args.get("teamId", "")
+    t = next((x for x in TEAMS if x["id"] == team_id), None)
+    year = request.args.get("year", "").strip()
+    if not t or not year.isdigit():
+        return jsonify({"error": "teamId and year required"}), 400
+    ss_id = t["sofascore_id"]
+    lo, hi = _year_range(year)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        try:
+            rows = conn.execute(
+                """SELECT e.id, e.date_ts, e.home_team_id, e.away_team_id, e.home_score, e.away_score,
+                          EXISTS (SELECT 1 FROM kleague_pass_match p WHERE p.event_id = e.id AND p.team_id = ?)
+                   FROM events e WHERE e.tournament_id IN (410, 777) AND e.home_score IS NOT NULL
+                     AND (e.home_team_id = ? OR e.away_team_id = ?) AND e.date_ts >= ? AND e.date_ts < ?
+                   ORDER BY e.date_ts DESC""", (ss_id, ss_id, ss_id, lo, hi)).fetchall()
+        except sqlite3.OperationalError:
+            rows = []
+    finally:
+        conn.close()
+    by_ss = {x["sofascore_id"]: x for x in TEAMS}
+    out = []
+    for eid, ts, h, a, hs, as_, has in rows:
+        opp = by_ss.get(a if h == ss_id else h)
+        out.append({"event_id": eid, "date_ts": ts, "home": h == ss_id, "opponent": (opp or {}).get("short", "-"),
+                    "score": [hs, as_], "has_data": bool(has)})
+    return jsonify({"team": t["id"], "year": int(year), "matches": out})
+
+
 @app.route("/api/standings")
 @cached_response(ttl=1800)
 def get_standings():

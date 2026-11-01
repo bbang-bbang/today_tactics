@@ -160,6 +160,35 @@ cur.execute("SELECT COUNT(*) FROM goal_events WHERE is_own_goal = 1 AND is_penal
 qa('자책골·PK 동시 표기 없음', lambda: assert_(cur.fetchone()[0] == 0))
 qa('recap 복구 경기 타임라인 (K2 10/24)', lambda: assert_(get('/api/match-recap?date=2026.10.24&home_slug=jeonnam&away_slug=daegu')['goals_complete'] is True))
 
+# ── 패스 네트워크 (K리그 공식 getPassData) 정합성 ──
+cur.execute("SELECT COUNT(*) FROM kleague_pass_match")
+_pn_rows = cur.fetchone()[0]
+qa('패스 원장 존재', lambda: assert_(_pn_rows > 0, '수집된 경기 없음 — collect_kleague_passes.py --apply'))
+cur.execute("SELECT COUNT(*) FROM kleague_pass_edge WHERE passer_kid = receiver_kid")
+_pn_self = cur.fetchone()[0]
+qa('패스 엣지 자기 자신 없음', lambda: assert_(_pn_self == 0, f'{_pn_self}건'))
+cur.execute("""SELECT COUNT(*) FROM kleague_pass_match m WHERE m.total_passes !=
+    (SELECT COALESCE(SUM(e.passes),0) FROM kleague_pass_edge e WHERE e.event_id = m.event_id AND e.team_id = m.team_id)""")
+_pn_sum = cur.fetchone()[0]
+qa('원장 총 패스 = 엣지 합계', lambda: assert_(_pn_sum == 0, f'불일치 {_pn_sum}팀-경기'))
+cur.execute("""SELECT COUNT(*) FROM kleague_pass_edge e WHERE NOT EXISTS (SELECT 1 FROM kleague_pass_player p
+    WHERE p.event_id = e.event_id AND p.team_id = e.team_id AND p.player_kid = e.passer_kid)""")
+_pn_orphan = cur.fetchone()[0]
+qa('엣지 패서가 로스터에 존재', lambda: assert_(_pn_orphan == 0, f'로스터 없는 패서 엣지 {_pn_orphan}건'))
+cur.execute("""SELECT COUNT(*) FROM kleague_pass_match m WHERE NOT EXISTS (SELECT 1 FROM events e WHERE e.id = m.event_id)""")
+_pn_noev = cur.fetchone()[0]
+qa('원장 경기가 events에 존재', lambda: assert_(_pn_noev == 0, f'{_pn_noev}건'))
+d_pn = get('/api/pass-network?teamId=ulsan&minPasses=1')
+qa('pass-network API 키', lambda: assert_(d_pn.get('ready') and all(k in d_pn for k in ['nodes', 'edges', 'insights', 'warnings', 'matches', 'total_passes'])))
+cur.execute("""SELECT COALESCE(SUM(ed.passes),0) FROM kleague_pass_edge ed JOIN events e ON e.id = ed.event_id
+    WHERE ed.team_id = (SELECT 7653) AND e.date_ts >= strftime('%s', ?) AND e.date_ts < strftime('%s', ?)""", (f"{d_pn['year']}-01-01", f"{d_pn['year'] + 1}-01-01"))
+_pn_db_total = cur.fetchone()[0]
+qa('pass-network 시즌 합계 = DB 합계', lambda: assert_(d_pn['total_passes'] == _pn_db_total, f"API {d_pn['total_passes']} vs DB {_pn_db_total}"))
+qa('pass-network 노드 share 합 ≈ 1', lambda: assert_(abs(sum(n['share'] for n in d_pn['nodes']) - 1) < 0.02, f"{sum(n['share'] for n in d_pn['nodes']):.3f}"))
+qa('pass-network 잘못된 입력 400/404', lambda: assert_(_brief_status('/api/pass-network?teamId=zzz') == 400 and _brief_status('/api/pass-network?teamId=ulsan&year=abc') == 400
+    and _brief_status("/api/pass-network?teamId=ulsan&eventId=x'+OR+1=1--") == 400 and _brief_status('/api/pass-network?teamId=ulsan&eventId=1') == 404))
+qa('pass-network/matches 구조', lambda: assert_(get(f"/api/pass-network/matches?teamId=ulsan&year={d_pn['year']}")['matches'] and _brief_status('/api/pass-network/matches?teamId=ulsan') == 400))
+
 cur.execute('SELECT COUNT(*) FROM match_player_stats WHERE expected_goals IS NOT NULL')
 xg = cur.fetchone()[0]
 qa('xG 데이터 존재', lambda: assert_(xg > 0, f'{xg}건'))
