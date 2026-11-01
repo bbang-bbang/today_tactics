@@ -6393,6 +6393,16 @@ body.pr-expanded-lock {
 .ins-sb-dot { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #4ea4f8; border: 1px solid #0b1220; }
 .ins-sb-val { margin-left: 8px; font-weight: 700; color: #e8f2ff; font-variant-numeric: tabular-nums; }
 .ins-sb-star { color: #facc15; }
+/* 세트피스 공수 프로필 */
+.ins-spp-hls { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; }
+@media (max-width: 760px) { .ins-spp-hls { grid-template-columns: minmax(0, 1fr); } }
+.ins-spp-hl { font-size: 0.76rem; color: #d2deed; padding: 5px 9px; border-radius: 6px; background: rgba(255,255,255,0.03); border-left: 3px solid #7ecfff; }
+.ins-spp-defence { border-left-color: #fbbf77; }
+.ins-spp-tag { display: inline-block; margin-right: 6px; font-weight: 800; color: #e8f2ff; }
+.ins-spp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.ins-spp-chip { font-size: 0.72rem; color: #b8c8dc; padding: 2px 8px; border-radius: 10px; background: rgba(255,255,255,0.06); }
+.ins-spp-chip b { color: #e8f2ff; }
+.ins-spp-small { color: #fbbf77; margin-left: 2px; cursor: help; }
 .ins-xl-warn { margin: 4px 0 8px; padding: 6px 9px; border-radius: 6px; font-size: 0.74rem; color: #fde68a; background: rgba(250,204,21,0.1); border: 1px solid rgba(250,204,21,0.3); }
 /* 산식/근거 캡션 — 신빙성 표시 */
 .ins-method { margin-top: 9px; padding-top: 7px; border-top: 1px dashed rgba(255,255,255,0.10); font-size: 0.68rem; color: #8090a6; line-height: 1.5; }

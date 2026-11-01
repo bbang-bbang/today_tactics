@@ -6528,6 +6528,127 @@ def insights_substitution_impact():
     })
 
 
+_SPP_TYPES = (("corner", "코너"), ("free-kick", "프리킥"), ("throw-in-set-piece", "스로인"), ("set-piece", "기타"))
+_SPP_MIN_GAMES = 8          # 팀당 슈팅맵 보유 경기가 이 미만이면 순위 제외
+_SPP_MIN_GOALS = 8          # 세트피스 득점·실점 비중은 골이 이 미만이면 소표본 표시
+_SPP_XG_COVERAGE = 0.8      # 세트피스 슈팅 중 xG가 있는 비율이 이 미만이면 xG 대신 슈팅 수로 순위
+
+
+@app.route("/api/insights/setpiece-profile")
+@cached_response(ttl=3600)
+def insights_setpiece_profile():
+    """팀별 세트피스 공수 프로필 — 코너·프리킥·스로인·기타(PK 제외)를 공격(생산)과 수비(허용) 양쪽으로.
+    shotmap 기반. 기존 /api/setpiece-efficiency(경기별 양 팀 공격 효율)와 달리 수비·유형 세분화·의존도를 제공."""
+    league = (request.args.get("league") or "k1").lower()
+    if league not in ("k1", "k2"):
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label = "K1" if league == "k1" else "K2"
+    tid = _LEAGUE_TID_BY_KEY[label]
+    year = (request.args.get("year") or "all").strip()
+    if year != "all" and not year.isdigit():
+        year = "all"
+    ycond, yp = "", ()
+    if year != "all":
+        lo, hi = _year_range(year)
+        ycond, yp = " AND e.date_ts >= ? AND e.date_ts < ?", (lo, hi)
+
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        rows = conn.execute(f"""
+            SELECT e.id, e.home_team_id, e.away_team_id, s.is_home, s.situation, s.body_part, s.shot_type, s.xg
+            FROM match_shotmap s JOIN events e ON e.id = s.event_id
+            WHERE e.tournament_id = ? AND e.home_score IS NOT NULL{ycond}""", (tid, *yp)).fetchall()
+    finally:
+        conn.close()
+
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
+    type_keys = [k for k, _ in _SPP_TYPES]
+    def blank():
+        return {"games": set(), "all_goals": 0, "sp_goals": 0, "sp_shots": 0, "sp_xg": 0.0, "sp_head": 0,
+                "by_type": {k: 0 for k in type_keys}}
+    atk = {}; dfn = {}
+    lg_type = {k: {"shots": 0, "goals": 0, "xg": 0.0} for k in type_keys}
+    sp_total_shots = sp_with_xg = 0
+    for eid, h, a, is_home, sit, body, st, xg in rows:
+        if h not in info or a not in info:
+            continue
+        for_t, ag_t = (h, a) if is_home else (a, h)
+        A = atk.setdefault(for_t, blank()); D = dfn.setdefault(ag_t, blank())
+        A["games"].add(eid); D["games"].add(eid)
+        if sit == "own-goal":
+            continue
+        is_goal = st == "goal"
+        if is_goal:
+            A["all_goals"] += 1; D["all_goals"] += 1
+        if sit in type_keys:
+            sp_total_shots += 1
+            if xg is not None:
+                sp_with_xg += 1
+            for S in (A, D):
+                S["sp_shots"] += 1; S["sp_goals"] += is_goal; S["sp_xg"] += xg or 0.0
+                S["sp_head"] += body == "head"; S["by_type"][sit] += 1
+            L = lg_type[sit]; L["shots"] += 1; L["goals"] += is_goal; L["xg"] += xg or 0.0
+
+    xg_ok = bool(sp_total_shots) and sp_with_xg / sp_total_shots >= _SPP_XG_COVERAGE
+    teams = []
+    for ss, t in info.items():
+        A, D = atk.get(ss), dfn.get(ss)
+        if not A:
+            continue
+        # 팀이 속한 경기 집합 = 공격·수비 양쪽에서 본 경기의 합집합
+        g = len(A["games"] | (D["games"] if D else set()))
+        if not g:
+            continue
+        def pack(S, side):
+            S = S or blank()
+            return {"shots_pg": round(S["sp_shots"] / g, 2), "xg_pg": round(S["sp_xg"] / g, 2) if xg_ok else None,
+                    "goals": S["sp_goals"], "goal_share": round(S["sp_goals"] / S["all_goals"] * 100) if S["all_goals"] else None,
+                    "head_share": round(S["sp_head"] / S["sp_shots"] * 100) if S["sp_shots"] else None,
+                    "by_type_pg": {k: round(S["by_type"][k] / g, 2) for k in type_keys},
+                    "small_goals": S["all_goals"] < _SPP_MIN_GOALS}
+        item = {"id": t["id"], "short": t.get("short", t["name"]), "games": g, "eligible": g >= _SPP_MIN_GAMES,
+                "for": pack(A, "for"), "against": pack(D, "against")}
+        key = "xg_pg" if xg_ok else "shots_pg"
+        item["net"] = round(item["for"][key] - item["against"][key], 2)
+        teams.append(item)
+
+    elig = [t for t in teams if t["eligible"]]
+    key = "xg_pg" if xg_ok else "shots_pg"
+    for t in elig:
+        t["rank_for"] = 1 + sum(1 for o in elig if o["for"][key] > t["for"][key])
+        t["rank_against"] = 1 + sum(1 for o in elig if o["against"][key] < t["against"][key])   # 허용 적을수록 1위
+    teams.sort(key=lambda t: (-(t["net"] if t["eligible"] else -99), t["short"]))
+
+    metric = "xG" if xg_ok else "슈팅"
+    unit = "xg_pg" if xg_ok else "shots_pg"
+    highlights = []
+    if len(elig) >= 4:
+        best_for = sorted(elig, key=lambda t: -t["for"][unit])[:2]
+        worst_ag = sorted(elig, key=lambda t: -t["against"][unit])[:2]
+        lg_for = sum(t["for"][unit] for t in elig) / len(elig)
+        for t in best_for:
+            highlights.append({"kind": "attack", "team": t["short"],
+                               "text": f"{t['short']}: 세트피스 {metric} 생산 경기당 {t['for'][unit]:.2f} (리그 평균 {lg_for:.2f}, {t['rank_for']}위)"})
+        for t in worst_ag:
+            highlights.append({"kind": "defence", "team": t["short"],
+                               "text": f"{t['short']}: 세트피스 {metric} 허용 경기당 {t['against'][unit]:.2f} (리그 평균 {lg_for:.2f}) — 세트피스 수비 취약 {t['rank_against']}/{len(elig)}위"})
+    league_types = [{"key": k, "label": lb, "shots": lg_type[k]["shots"], "goals": lg_type[k]["goals"],
+                     "goal_pct": round(lg_type[k]["goals"] / lg_type[k]["shots"] * 100, 1) if lg_type[k]["shots"] else None,
+                     "xg_per_shot": round(lg_type[k]["xg"] / lg_type[k]["shots"], 3) if xg_ok and lg_type[k]["shots"] else None}
+                    for k, lb in _SPP_TYPES]
+    warnings = []
+    if not elig:
+        warnings.append("이 시즌·리그는 슈팅맵 데이터가 부족해 순위를 계산할 수 없습니다.")
+    elif not xg_ok:
+        warnings.append("세트피스 슈팅의 xG 보유율이 낮아 xG 대신 슈팅 수로 비교합니다.")
+    elif league == "k1":
+        warnings.append("K1 xG는 자체 모델 추정치입니다 — 팀 간 상대 비교에만 사용하세요.")
+    return jsonify({"league": label, "year": year, "metric": metric, "xg_ok": xg_ok, "min_games": _SPP_MIN_GAMES,
+                    "min_goals": _SPP_MIN_GOALS, "teams": teams, "highlights": highlights,
+                    "league_types": league_types, "warnings": warnings,
+                    "limits": "PK 제외. 득점·실점 비중은 슈팅맵 골 기준(자책 제외). 공격=팀이 만든 세트피스 슈팅, 수비=상대에게 허용한 슈팅."})
+
+
 @app.route("/api/insights/goalkeeper")
 @cached_response(ttl=1800)
 def insights_goalkeeper():

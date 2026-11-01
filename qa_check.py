@@ -92,6 +92,16 @@ qa('sub-impact 벤치 최소출전 필터', lambda: assert_(all(b['minutes'] >= 
 qa('sub-impact 벤치 90분당 정합', lambda: assert_(all(abs(b['ga_per90'] - (b['goals'] + b['assists']) * 90 / b['minutes']) < 0.011 for b in d_s['bench'])))
 qa('sub-impact 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/substitution-impact?league=zz') == 400))
 
+# ── 2-f. 세트피스 공수 프로필 ──
+d_sp = get('/api/insights/setpiece-profile?league=k2&year=2025')
+qa('setpiece-profile 키 완전성', lambda: assert_(all(k in d_sp for k in ['teams', 'highlights', 'league_types', 'warnings', 'limits']) and len(d_sp['league_types']) == 4))
+_spe = [t for t in d_sp['teams'] if t['eligible']]
+qa('setpiece-profile 공격/수비 순위 범위(공동순위 허용)', lambda: assert_(all(min(t[k] for t in _spe) == 1 and all(1 <= t[k] <= len(_spe) for t in _spe) for k in ('rank_for', 'rank_against'))))
+qa('setpiece-profile 공격 합계 = 수비 합계(폐쇄 리그)', lambda: assert_(abs(sum(t['for']['shots_pg'] * t['games'] for t in d_sp['teams']) - sum(t['against']['shots_pg'] * t['games'] for t in d_sp['teams'])) <= len(d_sp['teams'])))
+qa('setpiece-profile 비중 0~100', lambda: assert_(all(0 <= (t['for']['goal_share'] or 0) <= 100 and 0 <= (t['against']['goal_share'] or 0) <= 100 for t in d_sp['teams'])))
+qa('setpiece-profile xG 미보유 시 슈팅 대체', lambda: assert_(get('/api/insights/setpiece-profile?league=k1&year=2026')['metric'] in ('xG', '슈팅')))
+qa('setpiece-profile 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/setpiece-profile?league=zz') == 400))
+
 # ── 3. 백테스트 ──
 d_bt2 = get('/api/prediction-backtest?league=k2&year=2026')
 qa('backtest K2 n_total>0',   lambda: assert_(d_bt2['n_total'] > 0))

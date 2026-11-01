@@ -1074,6 +1074,34 @@
         </div>`;
     }).join("") + `<div class="ins-method">근거 — 변화=(첫 전술 교체 후 15분 순득실)−(전 15분 순득실), 경기별 평균 · 부상 교체 제외 · 앞뒤 15분이 모두 온전한 경기만 · 막대 점=리그 평균 대비, 선=95% 신뢰구간(0을 가로지르면 차이 단정 불가) · ★은 z≥1.96이나 여러 팀 동시 검정이라 우연히 나올 수 있음(검정당 약 5%) · 교체는 지고 있을 때 많아 경기 상황이 섞임 → 인과 아닌 참고 · 벤치 지표는 소표본 주의</div>`;
   }
+  // 세트피스 공수 프로필 — 공격(생산)·수비(허용)를 한 표에. 순위는 xG(없으면 슈팅 수) 기준.
+  function renderSetpieceProfile(list) {
+    const el = document.getElementById("ins-spp-body"); if (!el) return;
+    el.innerHTML = list.map(d => {
+      if (!d || !d.teams) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      const k = d.xg_ok ? "xg_pg" : "shots_pg", unit = d.metric;
+      const warn = (d.warnings || []).map(w => `<div class="ins-xl-warn" role="note">⚠ ${w}</div>`).join("");
+      const hl = (d.highlights || []).map(h =>
+        `<li class="ins-spp-hl ins-spp-${h.kind}"><span class="ins-spp-tag">${h.kind === "attack" ? "▲ 강점" : "▼ 취약"}</span>${h.text}</li>`).join("");
+      const types = d.league_types.map(t =>
+        `<span class="ins-spp-chip"><b>${t.label}</b> ${t.shots.toLocaleString()}슛 · 득점률 ${t.goal_pct ?? "-"}%${t.xg_per_shot != null ? ` · 슈팅당 xG ${t.xg_per_shot}` : ""}</span>`).join("");
+      const cell = (o, rank, total) => `${o[k].toFixed(2)}<span class="ins-rs-pm"> ${rank ? rank + "위" : ""}</span>`;
+      const share = o => o.goal_share == null ? "-" : `${o.goal_share}%${o.small_goals ? `<span class="ins-spp-small" title="골 ${d.min_goals}개 미만 — 소표본">†</span>` : ""}`;
+      const rows = d.teams.map(t => {
+        if (!t.eligible) {
+          return `<tr class="ins-xl-skip"><td class="ins-xl-team">${t.short}</td><td>${t.games}</td><td colspan="6" class="ins-adv-empty">표본 부족 (${d.min_games}경기 미만)</td></tr>`;
+        }
+        const ty = Object.entries(t.for.by_type_pg).map(([a, v]) => `${a} ${v}`).join(" · ");
+        return `<tr title="공격 유형별 슈팅/경기 — ${ty}"><td class="ins-xl-team">${t.short}</td><td>${t.games}</td>
+          <td>${cell(t.for, t.rank_for)}</td><td>${cell(t.against, t.rank_against)}</td>
+          <td><b class="${t.net > 0 ? "ins-xl-up" : t.net < 0 ? "ins-xl-down" : ""}">${t.net > 0 ? "+" : ""}${t.net.toFixed(2)}</b></td>
+          <td>${share(t.for)}</td><td>${share(t.against)}</td><td>${t.for.head_share ?? "-"}%</td></tr>`;
+      }).join("");
+      return `<div class="ins-adv-sub-h">${d.league} ${d.year === "all" ? "전 시즌" : d.year} <span class="ins-clutch-hint">기준 지표: 경기당 ${unit}</span></div>${warn}
+        <ul class="ins-spp-hls">${hl}</ul><div class="ins-spp-chips">${types}</div>
+        <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th>경기</th><th title="팀이 만든 세트피스 ${unit}/경기">공격 ${unit}</th><th title="상대에게 허용한 세트피스 ${unit}/경기 — 낮을수록 좋음">허용 ${unit}</th><th title="공격−허용">순</th><th title="팀 득점 중 세트피스 비중">득점 SP%</th><th title="팀 실점 중 세트피스 비중 — 높을수록 세트피스 수비 취약">실점 SP%</th><th title="세트피스 슈팅 중 헤더 비율">헤더</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join("") + `<div class="ins-method">근거 — 슈팅맵 기반 · 세트피스=코너+프리킥+스로인+기타(PK 제외) · 순=공격−허용(경기당) · 순위는 정렬 가능한 ${list[0] && list[0].min_games || 8}경기↑ 팀만 · SP%는 득점·실점 중 세트피스 골 비중(†=골 ${list[0] && list[0].min_goals || 8}개 미만 소표본) · 행에 마우스를 올리면 공격 유형별 슈팅/경기</div>`;
+  }
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     // 무음 실패 → 가시화: 실패한 인사이트명을 모아 1회 토스트 + console.warn (P5 견고성)
@@ -1089,6 +1117,8 @@
         .then(renderRestEffect).catch(warn("휴식일")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/substitution-impact?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderSubImpact).catch(warn("교체 효과")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/setpiece-profile?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderSetpieceProfile).catch(warn("세트피스")),
       fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(warn("날씨")),
       fetch(`/api/insights/clutch?${qs}`).then(r => r.json()).then(renderClutch).catch(warn("클러치")),
       fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(warn("슈팅")),
