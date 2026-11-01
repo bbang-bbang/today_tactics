@@ -6361,6 +6361,28 @@ body.pr-expanded-lock {
 .ins-xl-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; background: rgba(255,255,255,0.07); color: #c8d8f0; }
 .ins-xl-lucky { background: rgba(74,222,128,0.14); color: #86efac; }
 .ins-xl-unlucky { background: rgba(248,113,113,0.14); color: #fca5a5; }
+/* 휴식일·연전 — PPG 막대 + 95% 신뢰구간 */
+.ins-rs-verdict { margin: 4px 0 10px; padding: 8px 11px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; line-height: 1.5; }
+.ins-rs-v-none { color: #bbf7d0; background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.3); }
+.ins-rs-v-some { color: #fde68a; background: rgba(250,204,21,0.1); border: 1px solid rgba(250,204,21,0.35); }
+.ins-rs-v-low { color: #9fb3cf; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); }
+.ins-rs-hint { display: block; margin-top: 2px; font-size: 0.74rem; font-weight: 400; opacity: 0.85; }
+.ins-rs-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 900px) { .ins-rs-grid { grid-template-columns: minmax(0, 1fr); } }
+.ins-rs-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 0.76rem; }
+.ins-rs-lbl { color: #cdd8e8; }
+.ins-rs-track { position: relative; height: 12px; background: rgba(255,255,255,0.05); border-radius: 3px; }
+.ins-rs-bar { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(78,164,248,0.55); border-radius: 3px; }
+.ins-rs-ci { position: absolute; top: 50%; height: 2px; margin-top: -1px; background: #f1f5f9; }
+.ins-rs-ci::before, .ins-rs-ci::after { content: ""; position: absolute; top: -4px; width: 2px; height: 10px; background: #f1f5f9; }
+.ins-rs-ci::before { left: 0; } .ins-rs-ci::after { right: 0; }
+.ins-rs-val b { color: #e8f2ff; font-variant-numeric: tabular-nums; }
+.ins-rs-pm, .ins-rs-n { color: #8aa0b8; font-size: 0.72rem; }
+.ins-rs-low { grid-template-columns: 96px 1fr; }
+.ins-rs-note { color: #7a8aa0; font-style: italic; font-size: 0.74rem; }
+.ins-rs-cmp { margin-top: 4px; font-size: 0.74rem; color: #9fb4cc; }
+.ins-rs-cmp b { color: #e8f2ff; }
+@media (max-width: 480px) { .ins-rs-row { grid-template-columns: 78px minmax(0, 1fr) auto; gap: 6px; } }
 .ins-xl-warn { margin: 4px 0 8px; padding: 6px 9px; border-radius: 6px; font-size: 0.74rem; color: #fde68a; background: rgba(250,204,21,0.1); border: 1px solid rgba(250,204,21,0.3); }
 /* 산식/근거 캡션 — 신빙성 표시 */
 .ins-method { margin-top: 9px; padding-top: 7px; border-top: 1px dashed rgba(255,255,255,0.10); font-size: 0.68rem; color: #8090a6; line-height: 1.5; }

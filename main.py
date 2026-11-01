@@ -6741,6 +6741,128 @@ def insights_xg_luck():
                     "teams": teams, "warnings": warnings})
 
 
+_REST_MAX_GAP_DAYS = 21     # 이보다 긴 공백(시즌 시작·A매치 브레이크)은 '휴식일'로 보지 않음
+_REST_SHORT_DAYS = 3.5      # '3일 이하 휴식' 경계(경기 시각 차이를 일 단위 실수로 비교)
+
+
+def _rest_stat(recs):
+    """팀-경기 레코드 리스트 → 경기수·PPG(±95% CI)·득실·승률. 표본 1 이하면 CI 0."""
+    n = len(recs)
+    if not n:
+        return {"n": 0, "ppg": None, "ci": None, "gf": None, "ga": None, "win_pct": None}
+    pts = [r["pts"] for r in recs]
+    m = sum(pts) / n
+    sd = math.sqrt(sum((p - m) ** 2 for p in pts) / (n - 1)) if n > 1 else 0.0
+    return {"n": n, "ppg": round(m, 2), "ci": round(1.96 * sd / math.sqrt(n), 2) if n > 1 else None,
+            "gf": round(sum(r["gf"] for r in recs) / n, 2), "ga": round(sum(r["ga"] for r in recs) / n, 2),
+            "win_pct": round(sum(1 for r in recs if r["pts"] == 3) / n * 100, 1), "_sd": sd}
+
+
+def _rest_compare(a, b):
+    """두 그룹 PPG 차(a−b)와 z값(Welch). 표본 부족이면 None."""
+    if a["n"] < 20 or b["n"] < 20:
+        return None
+    se = math.sqrt(a["_sd"] ** 2 / a["n"] + b["_sd"] ** 2 / b["n"])
+    if se == 0:
+        return None
+    d = a["ppg"] - b["ppg"]
+    return {"diff": round(d, 2), "z": round(d / se, 1), "significant": abs(d / se) >= 1.96}
+
+
+@app.route("/api/insights/rest-effect")
+@cached_response(ttl=3600)
+def insights_rest_effect():
+    """휴식일·연전이 실제 성적에 영향을 주는지 — 리그 전체 경기 대상 통계 검증.
+    휴식일 = 같은 리그의 직전 경기와의 간격(컵·ACL 미반영). 영향이 없으면 없다고 판정한다."""
+    league = (request.args.get("league") or "k1").lower()
+    if league not in ("k1", "k2"):
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label = "K1" if league == "k1" else "K2"
+    tid = _LEAGUE_TID_BY_KEY[label]
+    year = (request.args.get("year") or "all").strip()
+    if year != "all" and not year.isdigit():
+        year = "all"
+
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        rows = conn.execute("""
+            SELECT home_team_id, away_team_id, date_ts, home_score, away_score FROM events
+            WHERE tournament_id = ? AND home_score IS NOT NULL AND away_score IS NOT NULL
+            ORDER BY date_ts
+        """, (tid,)).fetchall()
+    finally:
+        conn.close()
+
+    y_lo, y_hi = _year_range(year) if year != "all" else (None, None)
+    last, hist, recs, home_recs = {}, {}, [], []
+    for h, a, ts, hs, as_ in rows:
+        rest, cong = {}, {}
+        for t in (h, a):
+            gap = (ts - last[t]) / 86400 if t in last else None
+            rest[t] = gap if gap is not None and gap <= _REST_MAX_GAP_DAYS else None
+            cong[t] = sum(1 for x in hist.get(t, []) if ts - x <= 14 * 86400)
+        if y_lo is None or y_lo <= ts < y_hi:
+            for t, o, gf, ga, is_home in ((h, a, hs, as_, 1), (a, h, as_, hs, 0)):
+                if rest[t] is None:
+                    continue
+                r = {"rest": rest[t], "orest": rest[o], "cong": cong[t], "gf": gf, "ga": ga,
+                     "pts": 3 if gf > ga else 1 if gf == ga else 0}
+                recs.append(r)
+                if is_home:
+                    home_recs.append(r)
+        for t in (h, a):
+            last[t] = ts
+            hist.setdefault(t, []).append(ts)
+
+    short = _rest_stat([r for r in recs if r["rest"] <= _REST_SHORT_DAYS])
+    mid = _rest_stat([r for r in recs if _REST_SHORT_DAYS < r["rest"] < 6.5])
+    long_ = _rest_stat([r for r in recs if r["rest"] >= 6.5])
+    normal = _rest_stat([r for r in recs if r["rest"] > _REST_SHORT_DAYS])
+    cmp_short = _rest_compare(short, normal)
+
+    # 휴식 격차 — 홈팀 시점(경기당 1건이라 중복 없음)
+    gap_groups = (("home_more", "홈이 2일↑ 더 쉼", lambda r: r["orest"] is not None and r["rest"] - r["orest"] >= 2),
+                  ("even", "비슷 (±1일)", lambda r: r["orest"] is not None and abs(r["rest"] - r["orest"]) < 2),
+                  ("away_more", "원정이 2일↑ 더 쉼", lambda r: r["orest"] is not None and r["rest"] - r["orest"] <= -2))
+    gaps = [{"key": k, "label": lb, **{x: v for x, v in _rest_stat([r for r in home_recs if f(r)]).items() if x != "_sd"}}
+            for k, lb, f in gap_groups]
+    gs = {k: _rest_stat([r for r in home_recs if f(r)]) for k, _lb, f in gap_groups}
+    cmp_gap = _rest_compare(gs["home_more"], gs["away_more"])
+
+    cong_groups = (("low", "14일 내 0~1경기", lambda r: r["cong"] <= 1), ("mid", "14일 내 2경기", lambda r: r["cong"] == 2),
+                   ("high", "14일 내 3경기↑", lambda r: r["cong"] >= 3))
+    cs = {k: _rest_stat([r for r in recs if f(r)]) for k, _lb, f in cong_groups}
+    congestion = [{"key": k, "label": lb, **{x: v for x, v in cs[k].items() if x != "_sd"}} for k, lb, _f in cong_groups]
+    cmp_cong = _rest_compare(cs["high"], cs["low"])
+
+    def clean(s):
+        return {k: v for k, v in s.items() if k != "_sd"}
+
+    def verdict():
+        sig = [c for c in (cmp_short, cmp_gap, cmp_cong) if c and c["significant"]]
+        if cmp_short is None:
+            return {"level": "insufficient", "text": "표본이 부족해 판정할 수 없습니다."}
+        if not sig:
+            return {"level": "none", "text": "휴식일·연전이 성적에 영향을 준다는 통계적 근거는 확인되지 않았습니다 (차이가 표본 오차 범위 안)."}
+        worst = max(sig, key=lambda c: abs(c["z"]))
+        return {"level": "some", "text": f"일부 항목에서 유의한 차이가 있습니다 (PPG {worst['diff']:+.2f}, z={worst['z']:+.1f})."}
+
+    total_matches = len(recs)
+    warnings = []
+    if short["n"] < 60:
+        warnings.append(f"3일 이하 휴식 표본이 {short['n']}건뿐이라 오차가 큽니다.")
+    return jsonify({
+        "league": label, "year": year, "team_matches": total_matches,
+        "buckets": [{"key": "short", "label": "3일 이하", **clean(short)},
+                    {"key": "mid", "label": "4~6일", **clean(mid)},
+                    {"key": "long", "label": "7일 이상", **clean(long_)}],
+        "short_vs_normal": cmp_short, "gap": gaps, "gap_compare": cmp_gap,
+        "congestion": congestion, "congestion_compare": cmp_cong,
+        "verdict": verdict(), "warnings": warnings,
+        "limits": "휴식일은 같은 리그 직전 경기 기준 — 컵·ACL 등 다른 대회는 반영되지 않음",
+    })
+
+
 @app.route("/api/insights/xg-efficiency")
 @cached_response(ttl=1800)
 def insights_xg_efficiency():

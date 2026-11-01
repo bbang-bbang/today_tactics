@@ -1009,6 +1009,37 @@
         <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>실제</th><th>팀</th><th>승점</th><th>xG 순위</th><th>차이</th><th title="경기당 승점: 실제 / 기대">PPG 실제/기대</th><th>판정</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }).join("") + `<div class="ins-method">근거 — 기대 승점=경기별 양 팀 xG를 포아송 분포로 환산한 승·무 확률(3·1점) · <b>xG가 있는 경기만</b> 실제·기대 모두 같은 경기로 비교 · 차이=xG 기준으론 몇 계단 더 위(▲)/아래(▼)인지 · 판정 ±${list[0] && list[0].ppg_band || 0.25} PPG 이상 · 팀당 ${list[0] && list[0].min_games || 5}경기 미만 제외 · 소표본이라 참고용</div>`;
   }
+  // 휴식일·연전 영향 — 막대=PPG, 가는 선=95% 신뢰구간. 구간이 겹치면 차이를 단정할 수 없다.
+  function renderRestEffect(list) {
+    const el = document.getElementById("ins-rest-body"); if (!el) return;
+    const MAXP = 3, MIN_N = 20;
+    const pctW = v => Math.max(0, Math.min(100, v / MAXP * 100));
+    const row = r => {
+      if (!r.n || r.n < MIN_N) {
+        return `<div class="ins-rs-row ins-rs-low"><span class="ins-rs-lbl">${r.label}</span><span class="ins-rs-note">표본 부족 (${r.n}경기)</span></div>`;
+      }
+      const lo = Math.max(0, r.ppg - (r.ci || 0)), hi = r.ppg + (r.ci || 0);
+      return `<div class="ins-rs-row"><span class="ins-rs-lbl">${r.label}</span>
+        <span class="ins-rs-track" role="img" aria-label="${r.label} 경기당 승점 ${r.ppg.toFixed(2)}, 95% 구간 ${lo.toFixed(2)}~${hi.toFixed(2)}">
+          <i class="ins-rs-bar" style="width:${pctW(r.ppg)}%"></i>
+          <i class="ins-rs-ci" style="left:${pctW(lo)}%;width:${pctW(hi) - pctW(lo)}%"></i></span>
+        <span class="ins-rs-val"><b>${r.ppg.toFixed(2)}</b><span class="ins-rs-pm"> ±${(r.ci || 0).toFixed(2)}</span><span class="ins-rs-n"> · ${r.n}경기</span></span></div>`;
+    };
+    const cmpTxt = (c, a, b) => c ? `<div class="ins-rs-cmp">${a} − ${b}: <b>${c.diff > 0 ? "+" : ""}${c.diff.toFixed(2)} PPG</b> (z=${c.z > 0 ? "+" : ""}${c.z.toFixed(1)}) · ${c.significant ? "유의한 차이" : "오차 범위 안 — 차이 단정 불가"}</div>` : "";
+    const VERDICT = { none: ["ins-rs-v-none", "✔"], some: ["ins-rs-v-some", "❗"], insufficient: ["ins-rs-v-low", "…"] };
+    el.innerHTML = list.map(d => {
+      if (!d || !d.buckets) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      const [vc, vi] = VERDICT[d.verdict.level] || VERDICT.insufficient;
+      const warn = (d.warnings || []).map(w => `<div class="ins-xl-warn" role="note">⚠ ${w}</div>`).join("");
+      return `<div class="ins-adv-sub-h">${d.league} ${d.year === "all" ? "전 시즌" : d.year} <span class="ins-clutch-hint">팀-경기 ${d.team_matches.toLocaleString()}건</span></div>
+        <div class="ins-rs-verdict ${vc}" role="status"><span aria-hidden="true">${vi}</span> ${d.verdict.text}${d.year !== "all" ? ` <span class="ins-rs-hint">단일 시즌은 표본이 작아, 상단 시즌 필터를 '전체'로 두면 더 정확합니다.</span>` : ""}</div>${warn}
+        <div class="ins-rs-grid">
+          <div><div class="ins-adv-sub-h">직전 경기와의 간격</div>${d.buckets.map(row).join("")}${cmpTxt(d.short_vs_normal, "3일 이하", "4일 이상")}</div>
+          <div><div class="ins-adv-sub-h">홈·원정 휴식 격차 <span class="ins-clutch-hint">홈팀 PPG</span></div>${d.gap.map(row).join("")}${cmpTxt(d.gap_compare, "홈이 더 쉼", "원정이 더 쉼")}</div>
+          <div><div class="ins-adv-sub-h">연전 (직전 14일 경기 수)</div>${d.congestion.map(row).join("")}${cmpTxt(d.congestion_compare, "3경기↑", "0~1경기")}</div>
+        </div>`;
+    }).join("") + `<div class="ins-method">근거 — 막대=경기당 승점(PPG)·가는 선=95% 신뢰구간(정규근사) · z≥1.96일 때만 '유의' · 휴식일=<b>같은 리그</b> 직전 경기 간격(컵·ACL 미반영, 21일 초과 공백 제외) · 각 팀-경기를 1건으로 집계(한 경기가 양 팀에 1건씩) · 20경기 미만 구간은 판정 제외</div>`;
+  }
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     // 무음 실패 → 가시화: 실패한 인사이트명을 모아 1회 토스트 + console.warn (P5 견고성)
@@ -1020,6 +1051,8 @@
     Promise.allSettled([
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/xg-luck?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderXgLuck).catch(warn("xG 운 보정")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/rest-effect?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderRestEffect).catch(warn("휴식일")),
       fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(warn("날씨")),
       fetch(`/api/insights/clutch?${qs}`).then(r => r.json()).then(renderClutch).catch(warn("클러치")),
       fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(warn("슈팅")),

@@ -76,6 +76,14 @@ qa('xg-luck xPPG 범위 0~3', lambda: assert_(all(0 <= t['xppg'] <= 3 for t in _
 qa('xg-luck 기대승점 평균≈실제(±0.25PPG)', lambda: assert_(abs(sum(t['ppg'] - t['xppg'] for t in _el) / len(_el)) < 0.25))
 qa('xg-luck 데이터 없는 시즌 경고', lambda: assert_(get('/api/insights/xg-luck?league=k2&year=2021')['warnings']))
 
+# ── 2-d. 휴식일·연전 영향 ──
+d_r = get('/api/insights/rest-effect?league=k1&year=all')
+qa('rest-effect 키·버킷 3개', lambda: assert_(len(d_r['buckets']) == 3 and all(k in d_r for k in ['verdict', 'gap', 'congestion', 'limits'])))
+qa('rest-effect 표본 합계 일치', lambda: assert_(sum(b['n'] for b in d_r['buckets']) == d_r['team_matches']))
+qa('rest-effect PPG 범위 0~3', lambda: assert_(all(0 <= b['ppg'] <= 3 for b in d_r['buckets'] if b['n'])))
+qa('rest-effect 표본부족 시 판정 보류', lambda: assert_(get('/api/insights/rest-effect?league=k2&year=2021')['verdict']['level'] == 'insufficient'))
+qa('rest-effect 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/rest-effect?league=zz') == 400))
+
 # ── 3. 백테스트 ──
 d_bt2 = get('/api/prediction-backtest?league=k2&year=2026')
 qa('backtest K2 n_total>0',   lambda: assert_(d_bt2['n_total'] > 0))
