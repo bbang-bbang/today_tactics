@@ -102,6 +102,15 @@ qa('setpiece-profile 비중 0~100', lambda: assert_(all(0 <= (t['for']['goal_sha
 qa('setpiece-profile xG 미보유 시 슈팅 대체', lambda: assert_(get('/api/insights/setpiece-profile?league=k1&year=2026')['metric'] in ('xG', '슈팅')))
 qa('setpiece-profile 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/setpiece-profile?league=zz') == 400))
 
+# ── 2-g. 경기 요약 카드 (팬용) ──
+d_rc = get('/api/match-recap?date=2026.10.24&home_slug=incheon&away_slug=jeju')
+qa('recap 키 완전성', lambda: assert_(d_rc.get('ready') and all(k in d_rc for k in ['headline', 'result', 'teams', 'goals', 'badges', 'table', 'notes'])))
+qa('recap 헤드라인 비어있지 않음', lambda: assert_(bool(d_rc['headline'])))
+qa('recap 스탯 비음수·양쪽 존재', lambda: assert_(all(s['home'] >= 0 and s['away'] >= 0 for s in d_rc['stats'])))
+qa('recap 순위 변동 정합', lambda: assert_(d_rc['table']['home']['after']['played'] == d_rc['table']['home']['before']['played'] + 1))
+qa('recap 타임라인 마지막 스코어=최종', lambda: assert_(all((not g['goals_complete']) or not g['goals'] or g['goals'][-1]['score'] == f"{g['result']['home']}-{g['result']['away']}" for g in [get('/api/match-recap?date=2026.07.26&home_slug=gwangju&away_slug=jeju')])))
+qa('recap 잘못된 입력 400/404', lambda: assert_(_brief_status('/api/match-recap?event_id=abc') == 400 and _brief_status('/api/match-recap?event_id=1') == 404 and _brief_status('/api/match-recap') == 400))
+
 # ── 3. 백테스트 ──
 d_bt2 = get('/api/prediction-backtest?league=k2&year=2026')
 qa('backtest K2 n_total>0',   lambda: assert_(d_bt2['n_total'] > 0))

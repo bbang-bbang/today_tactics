@@ -616,6 +616,11 @@
                 fetch(`/api/match-retrospective?date=${encodeURIComponent(gameDate)}&home_slug=${encodeURIComponent(homeId)}&away_slug=${encodeURIComponent(awayId)}`)
                     .then(r => r.ok ? r.json() : null).catch(() => null))
             : Promise.resolve(null);
+        const recapFetch = (isFinished && gameDate)
+            ? _cachedFetch(_recapCache, retroKey, () =>
+                fetch(`/api/match-recap?date=${encodeURIComponent(gameDate)}&home_slug=${encodeURIComponent(homeId)}&away_slug=${encodeURIComponent(awayId)}`)
+                    .then(r => r.ok ? r.json() : null).catch(() => null))
+            : Promise.resolve(null);
         const speFetch = _cachedFetch(_speCache, `${homeId}|${awayId}`, () =>
             fetch(`/api/setpiece-efficiency?home_slug=${encodeURIComponent(homeId)}&away_slug=${encodeURIComponent(awayId)}`)
                 .then(r => r.json()).catch(() => null));
@@ -628,8 +633,9 @@
             extrasFetch,
             retroFetch,
             speFetch,
+            recapFetch,
         ])
-            .then(([data, bt, extras, retro, spe]) => {
+            .then(([data, bt, extras, retro, spe, recap]) => {
                 if (homeId !== _lastHome || awayId !== _lastAway) return;
                 if (!data || !data.home || !data.away) {
                     console.error("[예측] data 누락:", data);
@@ -645,6 +651,10 @@
                 }
                 try { renderScoutBriefCard(data, homeId, awayId); }
                 catch (err) { console.error("[스카우팅 요약 렌더 실패]", err); }
+                if (recap && recap.ready) {
+                    try { renderRecapCard(recap); }
+                    catch (err) { console.error("[경기 요약 렌더 실패]", err); }
+                }
                 if (retro && retro.ready) {
                     try { renderRetroCard(data, retro, homeId, awayId); }
                     catch (err) { console.error("[사후분석 렌더 실패]", err); }
@@ -1194,6 +1204,109 @@
                 return;
             }
         });
+    }
+
+    // ── 경기 요약 카드 (팬용, 종료된 경기) ───────────────────────
+    // /api/match-recap: 헤드라인·득점 타임라인·MVP·핵심 스탯·순위 변동·스토리 뱃지. 요약 텍스트 복사 지원.
+    const _recapCache = {};   // "date|homeId|awayId" → recap
+
+    function recapText(r) {
+        const e = r.result, T = r.teams;
+        const lines = [`📰 ${r.headline}`, `${T.home.short} ${e.home} - ${e.away} ${T.away.short} (${r.league} ${r.round ?? ""}R)`];
+        if (r.goals_complete && r.goals.length) {
+            lines.push("⚽ " + r.goals.map(g => `${g.minute}${g.added ? "+" + g.added : ""}' ${g.player || T[g.side].short}${g.own_goal ? "(자책)" : g.penalty ? "(PK)" : ""}`).join(" · "));
+        }
+        if (r.mom) lines.push(`⭐ MVP ${r.mom.name} (${r.mom.team}, 평점 ${r.mom.rating})`);
+        if (r.badges.length) lines.push("🔖 " + r.badges.map(b => b.text).join(" · "));
+        lines.push(location.origin + location.pathname);
+        return lines.join("\n");
+    }
+
+    function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+        return new Promise((resolve, reject) => {
+            const ta = document.createElement("textarea");
+            ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+            document.body.appendChild(ta); ta.select();
+            try { document.execCommand("copy") ? resolve() : reject(new Error("copy failed")); }
+            catch (err) { reject(err); }
+            finally { ta.remove(); }
+        });
+    }
+
+    function renderRecapCard(r) {
+        const wrap = report.querySelector(".pred-extras");
+        if (!wrap) return;
+        const old = wrap.querySelector(".recap-card");
+        if (old) old.remove();
+        const e = _scoutEsc, T = r.teams, sc = r.result;
+        const d = new Date(r.date_ts * 1000);
+        const meta = `${r.league}${r.round ? ` ${r.round}R` : ""} · ${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}${r.venue ? ` · ${e(r.venue)}` : ""}`;
+
+        const pos = g => Math.min(100, (g.minute + (g.added || 0)) / 95 * 100);
+        const marks = r.goals_complete ? r.goals.map(g => {
+            const tag = g.own_goal ? " (자책)" : g.penalty ? " (PK)" : "";
+            const lbl = `${g.minute}${g.added ? "+" + g.added : ""}' ${g.player || T[g.side].short}${tag}`;
+            return `<span class="rc-mark rc-mark-${g.side}" style="left:${pos(g)}%" title="${e(lbl)}" aria-label="${e(lbl)}">⚽</span>`;
+        }).join("") : "";
+        const timeline = (r.goals_complete && r.goals.length) ? `
+            <div class="rc-sec"><div class="rc-h">득점 흐름</div>
+                <div class="rc-track" role="img" aria-label="득점 타임라인">
+                    <span class="rc-axis"></span><span class="rc-ht"></span>${marks}
+                    <span class="rc-tick" style="left:0%">0'</span><span class="rc-tick" style="left:${45 / 95 * 100}%">45'</span><span class="rc-tick" style="left:${90 / 95 * 100}%">90'</span>
+                </div>
+                <ol class="rc-goals">${r.goals.map(g => `<li class="rc-g-${g.side}"><span class="rc-g-min">${g.minute}${g.added ? "+" + g.added : ""}'</span>
+                    <span class="rc-g-nm">${e(g.player || T[g.side].short)}${g.own_goal ? " (자책)" : g.penalty ? " (PK)" : ""}</span>
+                    <span class="rc-g-team">${e(T[g.side].short)}</span><span class="rc-g-sc">${g.score}</span></li>`).join("")}</ol>
+                ${r.reds.length ? `<div class="rc-reds">${r.reds.map(x => `🟥 ${x.minute}' ${e(x.player || T[x.side].short)} 퇴장 (${e(T[x.side].short)})`).join(" · ")}</div>` : ""}
+            </div>` : "";
+
+        const mom = r.mom ? `<div class="rc-box"><div class="rc-h">⭐ MVP <span class="rc-sub">경기 최고 평점</span></div>
+                <div class="rc-mom-nm scorer-link" data-player-id="${r.mom.player_id}" tabindex="0" role="button">${e(r.mom.name)}</div>
+                <div class="rc-mom-meta">${e(r.mom.team)} · 평점 <b>${r.mom.rating}</b>${r.mom.goals ? ` · ${r.mom.goals}골` : ""}${r.mom.assists ? ` · ${r.mom.assists}도움` : ""}</div></div>` : "";
+
+        const stats = r.stats.length ? `<div class="rc-box rc-stats"><div class="rc-h">핵심 스탯</div>${r.stats.map(s => {
+            const tot = (s.home + s.away) || 1, hp = Math.round(s.home / tot * 100);
+            return `<div class="rc-stat"><span class="rc-sv">${s.home}</span>
+                <span class="rc-sbar" role="img" aria-label="${s.label} 홈 ${s.home} 원정 ${s.away}"><i class="rc-sb-h" style="width:${hp}%"></i><i class="rc-sb-a" style="width:${100 - hp}%"></i></span>
+                <span class="rc-sv">${s.away}</span><span class="rc-sl">${s.label}</span></div>`; }).join("")}</div>` : "";
+
+        const rk = side => {
+            const t = r.table[side]; if (!t.before || !t.after) return "";
+            const mv = t.moved > 0 ? `<b class="rc-up">▲${t.moved}</b>` : t.moved < 0 ? `<b class="rc-down">▼${-t.moved}</b>` : `<span class="rc-flat">–</span>`;
+            return `<div class="rc-rank"><span class="rc-rk-t">${e(T[side].short)}</span><span>${t.before.rank}위 → <b>${t.after.rank}위</b> ${mv}</span><span class="rc-sub">${t.after.pts}pts (${t.after.pts - t.before.pts >= 0 ? "+" : ""}${t.after.pts - t.before.pts})</span></div>`;
+        };
+        const table = (rk("home") || rk("away")) ? `<div class="rc-box"><div class="rc-h">순위 변동 <span class="rc-sub">${r.league} 시즌 기준</span></div>${rk("home")}${rk("away")}</div>` : "";
+
+        const card = document.createElement("section");
+        card.className = "recap-card";
+        card.setAttribute("aria-label", "경기 요약");
+        // 두 팀 색이 너무 비슷하면(예: 노랑 vs 주황) 원정 쪽을 대체 색으로 — 막대·마커 구분용
+        const rgb = c => { const m = /^#?([0-9a-f]{6})$/i.exec(c || ""); if (!m) return null; const n = parseInt(m[1], 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+        const hc = T.home.primary || "#4ea4f8";
+        let ac = T.away.primary || "#b87ef8";
+        const ra = rgb(hc), rb = rgb(ac);
+        if (ra && rb && Math.hypot(ra[0] - rb[0], ra[1] - rb[1], ra[2] - rb[2]) < 110) ac = "#b87ef8";
+        card.style.setProperty("--rc-home", hc);
+        card.style.setProperty("--rc-away", ac);
+        card.innerHTML = `
+            <div class="rc-top"><span class="rc-title">📰 경기 요약</span><span class="rc-meta">${meta}</span>
+                <button type="button" class="rc-copy" title="요약을 텍스트로 복사 (공유용)">📋 요약 복사</button></div>
+            <div class="rc-score"><span class="rc-tm rc-tm-home">${e(T.home.short)}</span>
+                <span class="rc-sc"><b>${sc.home}</b><i>:</i><b>${sc.away}</b></span><span class="rc-tm rc-tm-away">${e(T.away.short)}</span></div>
+            <div class="rc-headline">${e(r.headline)}</div>
+            ${r.badges.length ? `<div class="rc-badges">${r.badges.map(b => `<span class="rc-badge rc-b-${b.kind}">${e(b.text)}</span>`).join("")}</div>` : ""}
+            ${timeline}
+            <div class="rc-grid">${mom}${table}${stats}</div>
+            ${r.notes.length ? `<div class="rc-notes" role="note">${r.notes.map(n => `<div>ⓘ ${e(n)}</div>`).join("")}</div>` : ""}`;
+        const btn = card.querySelector(".rc-copy");
+        btn.addEventListener("click", () => {
+            copyText(recapText(r)).then(() => {
+                btn.textContent = "✓ 복사됨"; btn.classList.add("is-done");
+                setTimeout(() => { btn.textContent = "📋 요약 복사"; btn.classList.remove("is-done"); }, 1800);
+            }).catch(() => { btn.textContent = "복사 실패"; setTimeout(() => { btn.textContent = "📋 요약 복사"; }, 1800); });
+        });
+        wrap.prepend(card);
     }
 
     // ── 프리매치 스카우팅 요약 (감독용) ─────────────────────────

@@ -9697,6 +9697,251 @@ def match_extras():
     })
 
 
+def _recap_table(rows):
+    """(home, away, hs, as) 리스트 → {team: {rank, pts, played}} (승점→득실→다득점)."""
+    st = {}
+    for h, a, hs, as_ in rows:
+        for t, gf, ga in ((h, hs, as_), (a, as_, hs)):
+            s = st.setdefault(t, {"pts": 0, "gd": 0, "gf": 0, "played": 0})
+            s["pts"] += 3 if gf > ga else 1 if gf == ga else 0
+            s["gd"] += gf - ga; s["gf"] += gf; s["played"] += 1
+    order = sorted(st, key=lambda k: (st[k]["pts"], st[k]["gd"], st[k]["gf"]), reverse=True)
+    return {t: {"rank": i + 1, "pts": st[t]["pts"], "played": st[t]["played"]} for i, t in enumerate(order)}
+
+
+def _recap_streak(results):
+    """팀 시점 결과 리스트('W'/'D'/'L', 마지막이 이번 경기) → (연승, 무패, 연패, 직전 연패 후 탈출 길이)."""
+    def trail(pred):
+        n = 0
+        for r in reversed(results):
+            if not pred(r):
+                break
+            n += 1
+        return n
+    wins, unbeaten, losses = trail(lambda r: r == "W"), trail(lambda r: r != "L"), trail(lambda r: r == "L")
+    escaped = 0
+    if results and results[-1] != "L":
+        prev = results[:-1]
+        n = 0
+        for r in reversed(prev):
+            if r != "L":
+                break
+            n += 1
+        escaped = n
+    return wins, unbeaten, losses, escaped
+
+
+@app.route("/api/match-recap")
+@cached_response(ttl=3600)
+def match_recap():
+    """경기 후 요약 카드(팬용) — 헤드라인·득점 타임라인·MVP·핵심 스탯·순위 변동·연승 스토리.
+    규칙 기반(근거 수치 포함). 골 기록이 최종 스코어와 다르면 타임라인 기반 문구는 생략한다."""
+    event_id = request.args.get("event_id", "").strip()
+    date_str = request.args.get("date", "").strip()
+    home_slug = request.args.get("home_slug", "").strip()
+    away_slug = request.args.get("away_slug", "").strip()
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    try:
+        if event_id:
+            if not event_id.isdigit():
+                return jsonify({"error": "event_id must be int"}), 400
+            if int(event_id) in EXCLUDED_EVENT_IDS:
+                return jsonify({"ready": False, "reason": "excluded_event"}), 404
+            ev = cur.execute("SELECT * FROM events WHERE id = ?", (int(event_id),)).fetchone()
+        elif date_str and home_slug and away_slug:
+            try:
+                dt = datetime.strptime(date_str.replace(".", "-"), "%Y-%m-%d")
+            except ValueError:
+                return jsonify({"error": "invalid date"}), 400
+            ht = next((t for t in TEAMS if t["id"] == home_slug), None)
+            at = next((t for t in TEAMS if t["id"] == away_slug), None)
+            if not ht or not at:
+                return jsonify({"error": "unknown team slug"}), 400
+            ev = cur.execute(f"""
+                SELECT * FROM events WHERE id NOT IN {EXCLUDED_EVENT_IDS_SQL}
+                  AND date_ts >= ? AND date_ts < ? AND home_team_id = ? AND away_team_id = ? LIMIT 1
+            """, (int(dt.timestamp()), int(dt.timestamp()) + 86400, ht["sofascore_id"], at["sofascore_id"])).fetchone()
+        else:
+            return jsonify({"error": "event_id or (date+home_slug+away_slug) required"}), 400
+        if not ev or ev["home_score"] is None or ev["away_score"] is None:
+            return jsonify({"ready": False, "reason": "not_finished"}), 404
+
+        eid, ts, tid = ev["id"], ev["date_ts"], ev["tournament_id"]
+        hs, as_ = int(ev["home_score"]), int(ev["away_score"])
+        by_ss = {t["sofascore_id"]: t for t in TEAMS}
+        th, ta = by_ss.get(ev["home_team_id"]), by_ss.get(ev["away_team_id"])
+        if not th or not ta:
+            return jsonify({"ready": False, "reason": "unknown_team"}), 404
+        nm = {"home": th.get("short", th["name"]), "away": ta.get("short", ta["name"])}
+        year = datetime.fromtimestamp(ts).year
+        y_lo, y_hi = _year_range(str(year))
+
+        # ── 득점 타임라인 (is_home = 득점이 인정된 쪽) ──
+        grows = cur.execute("""
+            SELECT g.minute, IFNULL(g.added_time, 0) AS added, g.is_home, g.is_own_goal, g.is_penalty,
+                   COALESCE(p.name_ko, g.player_name) AS pname
+            FROM goal_events g LEFT JOIN players p ON p.id = g.player_id
+            WHERE g.event_id = ? ORDER BY g.minute, added, g.id
+        """, (eid,)).fetchall()
+        goals, rh, ra = [], 0, 0
+        for g in grows:
+            side = "home" if g["is_home"] else "away"
+            rh += side == "home"; ra += side == "away"
+            goals.append({"minute": g["minute"], "added": g["added"], "side": side, "player": g["pname"] or "",
+                          "own_goal": bool(g["is_own_goal"]), "penalty": bool(g["is_penalty"]),
+                          "score": f"{rh}-{ra}"})
+        goals_complete = (rh == hs and ra == as_)
+
+        reds = [{"minute": c["minute"], "side": "home" if c["is_home"] else "away", "player": c["pname"] or ""}
+                for c in cur.execute("""SELECT c.minute, c.is_home, COALESCE(p.name_ko, c.player_name) AS pname
+                    FROM card_events c LEFT JOIN players p ON p.id = c.player_id
+                    WHERE c.event_id = ? AND c.card_type IN ('red','yellowRed') ORDER BY c.minute""", (eid,))]
+
+        # ── 선수 기록: MVP(평점) + 팀 스탯 ──
+        mps = cur.execute("""
+            SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) AS pname, m.is_home, m.rating, m.goals, m.assists,
+                   m.minutes_played, m.total_shots, m.shots_on_target, m.expected_goals, m.total_passes, m.accurate_passes,
+                   m.tackles, m.fouls, m.yellow_cards
+            FROM match_player_stats m LEFT JOIN players p ON p.id = m.player_id
+            WHERE m.event_id = ?""", (eid,)).fetchall()
+        rated = [r for r in mps if r["rating"] and (r["minutes_played"] or 0) >= 30]
+        mom = None
+        if rated:
+            b = max(rated, key=lambda r: (r["rating"], r["goals"] or 0, r["assists"] or 0))
+            mom = {"player_id": b["player_id"], "name": b["pname"] or "", "side": "home" if b["is_home"] else "away",
+                   "team": nm["home" if b["is_home"] else "away"], "rating": round(b["rating"], 1),
+                   "goals": b["goals"] or 0, "assists": b["assists"] or 0}
+        def agg(side_home, col):
+            return sum((r[col] or 0) for r in mps if bool(r["is_home"]) == side_home)
+        stats = []
+        # 한쪽 팀 기록이 없으면(선수 기록 9명 미만) 0으로 보여 오해를 부르므로 스탯 비교 자체를 생략
+        both_sides = all(sum(1 for r in mps if bool(r["is_home"]) == sh and (r["minutes_played"] or 0) > 0) >= 9
+                         for sh in (True, False))
+        if mps and both_sides:
+            for key, label, col in (("shots", "슈팅", "total_shots"), ("sot", "유효슈팅", "shots_on_target"),
+                                    ("xg", "xG", "expected_goals"), ("tackles", "태클", "tackles"),
+                                    ("fouls", "파울", "fouls"), ("yellow", "경고", "yellow_cards")):
+                a, b2 = agg(True, col), agg(False, col)
+                if a or b2:
+                    stats.append({"key": key, "label": label, "home": round(a, 2) if key == "xg" else int(a),
+                                  "away": round(b2, 2) if key == "xg" else int(b2)})
+            ph, pa = agg(True, "total_passes"), agg(False, "total_passes")
+            if ph and pa:
+                stats.insert(3, {"key": "pass_acc", "label": "패스 성공률(%)",
+                                 "home": round(agg(True, "accurate_passes") / ph * 100), "away": round(agg(False, "accurate_passes") / pa * 100)})
+        xg_h = next((s["home"] for s in stats if s["key"] == "xg"), 0)
+        xg_a = next((s["away"] for s in stats if s["key"] == "xg"), 0)
+
+        # ── 순위 변동 (같은 리그·시즌, 이 경기 전/후) ──
+        base = cur.execute("""SELECT id, date_ts, home_team_id, away_team_id, home_score, away_score FROM events
+            WHERE tournament_id = ? AND home_score IS NOT NULL AND away_score IS NOT NULL
+              AND date_ts >= ? AND date_ts < ?""", (tid, y_lo, y_hi)).fetchall()
+        before_rows = [(r["home_team_id"], r["away_team_id"], r["home_score"], r["away_score"]) for r in base
+                       if r["id"] != eid and (r["date_ts"] < ts or (r["date_ts"] == ts and r["id"] < eid))]
+        after_rows = before_rows + [(ev["home_team_id"], ev["away_team_id"], hs, as_)]
+        tb, ta_ = _recap_table(before_rows), _recap_table(after_rows)
+        def tbl(ss):
+            b0, a0 = tb.get(ss), ta_.get(ss)
+            return {"before": b0, "after": a0, "moved": (b0["rank"] - a0["rank"]) if b0 and a0 else None}
+        table = {"home": tbl(ev["home_team_id"]), "away": tbl(ev["away_team_id"]), "teams": len(ta_)}
+
+        # ── 연승·무패·연패 스토리 ──
+        def seq(ss):
+            """팀의 시즌 결과를 시간순으로 이 경기까지 (base에 이 경기가 포함됨)."""
+            out = []
+            for r in sorted(base, key=lambda x: (x["date_ts"], x["id"])):
+                if r["date_ts"] > ts or (r["date_ts"] == ts and r["id"] > eid):
+                    continue
+                if ss not in (r["home_team_id"], r["away_team_id"]):
+                    continue
+                gf, ga = (r["home_score"], r["away_score"]) if r["home_team_id"] == ss else (r["away_score"], r["home_score"])
+                out.append("W" if gf > ga else "D" if gf == ga else "L")
+            return out
+        badges = []
+        for side, ss in (("home", ev["home_team_id"]), ("away", ev["away_team_id"])):
+            w, u, l, esc = _recap_streak(seq(ss))
+            if w >= 3:
+                badges.append({"kind": "streak", "text": f"{nm[side]} {w}연승"})
+            elif u >= 5:
+                badges.append({"kind": "streak", "text": f"{nm[side]} {u}경기 무패"})
+            if l >= 3:
+                badges.append({"kind": "slump", "text": f"{nm[side]} {l}연패"})
+            elif esc >= 3:
+                badges.append({"kind": "streak", "text": f"{nm[side]} {esc}연패 탈출"})
+            t = table[side]
+            if t["before"] and t["after"] and t["after"]["rank"] == 1 and t["before"]["rank"] != 1:
+                badges.append({"kind": "table", "text": f"{nm[side]} 선두 등극"})
+            elif t["moved"] is not None and t["moved"] >= 3:
+                badges.append({"kind": "table", "text": f"{nm[side]} {t['before']['rank']}위→{t['after']['rank']}위 도약"})
+        # 멀티골 / 해트트릭
+        per = {}
+        for g in goals:
+            if not g["own_goal"] and g["player"]:
+                per[(g["side"], g["player"])] = per.get((g["side"], g["player"]), 0) + 1
+        for (side, pl), n in per.items():
+            if n >= 2:
+                badges.append({"kind": "player", "text": f"{pl} {'해트트릭' if n >= 3 else '멀티골'}({n}골)"})
+        for r in reds:
+            if r["minute"] < 70:
+                badges.append({"kind": "red", "text": f"{nm[r['side']]} {r['minute']}' 퇴장"})
+        if xg_h and xg_a and hs != as_:
+            w_side = "home" if hs > as_ else "away"
+            wx, lx = (xg_h, xg_a) if w_side == "home" else (xg_a, xg_h)
+            if lx - wx >= 0.5:
+                badges.append({"kind": "xg", "text": f"xG {wx:.1f} vs {lx:.1f} — 효율의 승리"})
+
+        # ── 헤드라인 (우선순위 규칙) ──
+        headline = None
+        if hs == as_:
+            headline = f"{nm['home']}·{nm['away']} {hs}-{as_} 무승부" + (" — 양 팀 무득점" if hs == 0 else "")
+            if goals_complete and goals and goals[-1]["minute"] + goals[-1]["added"] >= 85 and hs > 0:
+                lg = goals[-1]
+                headline = f"{nm['home']}·{nm['away']} {hs}-{as_} 무승부 — {lg['minute']}' {lg['player'] or nm[lg['side']]} 극적 동점"
+        else:
+            ws = "home" if hs > as_ else "away"
+            ls = "away" if ws == "home" else "home"
+            wg, lg_ = (hs, as_) if ws == "home" else (as_, hs)
+            headline = f"{nm[ws]}, {nm[ls]}에 {wg}-{lg_} 승리"
+            if goals_complete:
+                trailed = False
+                a = b = 0
+                for g in goals:
+                    a += g["side"] == ws; b += g["side"] == ls
+                    if b > a:
+                        trailed = True
+                win_goals = [g for g in goals if g["side"] == ws]
+                decider = win_goals[lg_] if len(win_goals) > lg_ else None   # 승리를 결정짓는 (패자 득점+1)번째 골
+                if trailed:
+                    headline = f"{nm[ws]}, {nm[ls]}에 {wg}-{lg_} 역전승"
+                elif decider and decider["minute"] + decider["added"] >= 85 and wg - lg_ == 1:
+                    headline = f"{nm[ws]} {wg}-{lg_} {nm[ls]} — {decider['minute']}' {decider['player'] or nm[ws]} 결승골"
+                elif wg - lg_ >= 3:
+                    headline = f"{nm[ws]}, {nm[ls]}에 {wg}-{lg_} 대승"
+            elif wg - lg_ >= 3:
+                headline = f"{nm[ws]}, {nm[ls]}에 {wg}-{lg_} 대승"
+        kinds = {"streak": 0, "slump": 1, "table": 2, "player": 3, "red": 4, "xg": 5}
+        badges.sort(key=lambda b: kinds.get(b["kind"], 9))
+
+        return jsonify({
+            "ready": True, "event_id": eid, "date_ts": ts, "round": ev["round"], "venue": ev["venue_name"],
+            "league": "K1" if tid == 410 else "K2", "result": {"home": hs, "away": as_},
+            "teams": {"home": {"id": th["id"], "name": th["name"], "short": nm["home"], "primary": th.get("primary")},
+                      "away": {"id": ta["id"], "name": ta["name"], "short": nm["away"], "primary": ta.get("primary")}},
+            "headline": headline, "badges": badges[:6], "goals": goals, "goals_complete": goals_complete, "reds": reds,
+            "mom": mom, "stats": stats, "table": table,
+            "notes": ([] if goals_complete else
+                      ["득점 상세 기록이 없어 타임라인 기반 요약은 생략했습니다."] if not goals and (hs + as_) > 0 else
+                      ["득점 기록이 최종 스코어와 달라 타임라인 기반 요약은 생략했습니다."])
+                     + (["평점 데이터가 없어 MVP를 표시하지 않습니다."] if not mom else [])
+                     + (["한쪽 팀 선수 기록이 없어 스탯 비교를 생략했습니다."] if mps and not both_sides else []),
+        })
+    finally:
+        conn.close()
+
+
 @app.route("/api/match-retrospective")
 @cached_response(ttl=3600)
 def match_retrospective():
