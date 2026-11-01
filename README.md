@@ -240,7 +240,7 @@ K리그 (players.db)
 | `backfill_detail_positions.py` | `match_lineups.detail_pos` 백필 — formation+slot_order → 세부 포지션(GK/CB/FB/WB/DM/CM/AM/W/ST) 결정론적 유도 (재크롤링 불필요) |
 | `collect_goal_incidents.py` | 골·카드·교체 이벤트 수집 (SofaScore — 2026-08 이후 403 차단으로 중단) |
 | `collect_kleague_events.py` | **K리그 공식 API(`matchInfo.do`)로 득점·카드·교체 복구** — 데이터 없는 경기만, 기본 dry-run, `--apply`로 저장, `--compare N`으로 SofaScore 수집분과 대조 |
-| `collect_kleague_passes.py` | **K리그 공식 `getPassData`로 선수 간 패스 행렬(패스 네트워크) 수집** → `kleague_pass_edge/player/match` (2020~, 경기 다음 날 공개, 미공개는 재시도, 기본 dry-run·`--apply`·`--compare N`) |
+| `collect_kleague_passes.py` | **K리그 공식 `getPassData`로 선수 간 패스 행렬(패스 네트워크) 수집** → `kleague_pass_edge/player/match` (2023~, 경기 다음 날 공개, 미공개는 재시도, 기본 dry-run·`--apply`·`--compare N`) |
 | `fetch_health.py` | SofaScore 차단(403 challenge) 감지 헬퍼 — 크롤러가 조용히 실패하지 않도록 probe + 전부 실패 시 exit 3 |
 
 ---

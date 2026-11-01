@@ -8,11 +8,12 @@
 ## 0. ⏭ 재개 지점 (NEXT)
 **열린 작업: SofaScore 수집 중단 대응 (2026-11-01 발견, `checklist/backlog.md` P1).** 운영 = https://suwon.today-tactics.co.kr (루트 도메인 `today-tactics.co.kr`에는 A 레코드 없음 — canonical은 `suwon.` 서브도메인).
 - **2026-11-01 완료**: 감독 `프리매치 스카우팅 요약`(`/api/pre-match-brief`) · 분석가 4종(xG 운 보정 순위·휴식일/연전·교체 효과·세트피스 공수 — `인사이트 > 심화` 탭) · 팬 `경기 후 요약 카드`(`/api/match-recap`) · **수집 가시화**(`crawlers/fetch_health.py` probe, `update_data.py` 종료 코드 0/1/2, 헤더 배지 `⚠ 일부 미수집`, `analysis/audit_collection_gaps.py`) · **K리그 공식 API 복구 크롤러**(`crawlers/collect_kleague_events.py` → 득점·카드·교체, `update_data.py` STEP 21) · 10/31~11/1 결과 갱신.
+- **2026-11-02 완료**: **패스 네트워크**(`collect_kleague_passes.py` + `/api/pass-network` + 팀 분석 '🕸 패스 네트워크' 탭, 2023~2026 백필 완료, update_data STEP 22). 공식 API는 엔드포인트마다 필드명이 달라(`getPassData`=year/meetSeq/gameId+homeTeam/awayTeam, `getShootData`=MEET_YEAR/MEET_SEQ/GAME_ID+homeTeam/awayTeam, 모두 multipart) 잘못 호출하면 '성공+빈 데이터'가 나오므로 페이지 JS의 formData를 먼저 확인할 것.
 - **남은 결정/작업**:
-  1. **운영 DB 데이터 동기화**: 로컬과 운영 DB는 별개(로컬 `players.db`는 gitignore). 운영에서 `update_data.py` 실행 또는 `POST /api/trigger-update`(헤더 `X-Update-Secret`)로 STEP 21 포함 갱신 필요. 운영의 SofaScore 접근 상태는 미확인(로컬 환경에서만 403 challenge 확인).
+  1. **운영 DB 데이터 동기화**: 로컬과 운영 DB는 별개(로컬 `players.db`는 gitignore, 패스 테이블 포함 +25MB). 운영에서 `update_data.py`(STEP 21·22 포함) 실행 또는 `POST /api/trigger-update`(헤더 `X-Update-Secret`)로 STEP 21 포함 갱신 필요. 운영의 SofaScore 접근 상태는 미확인(로컬 환경에서만 403 challenge 확인).
   2. 슈팅맵/xG·평균 위치·히트맵·평점의 대체 소스(공식 API에 없음 — 라이선스 API 등 별도 결정).
   3. 팬 항목 ②: 팀/선수 스토리형 인사이트(착수 전 `team-trend`·`player-analytics` 중복 확인).
-  4. 선택: `getPassData.do`(K리그 공식 패스 행렬) 기반 패스 네트워크 재평가.
+  4. 선택: 스카우팅 요약에 '패스 허브' 연동 · 슈팅 PK/FK로 `is_penalty` 보정 · 선수 상세 스탯 복구 검토.
 - **정적 자산 수정 시 필수**: nginx가 `/static/`을 `expires 7d` + `immutable`로 내보내므로 JS/CSS를 바꾸면 `templates/index.html`의 `?v=`를 반드시 올릴 것(안 올리면 기존 방문자는 최대 7일간 옛 파일 사용).
 
 ## 1. 현재 상태 (2026-06-11 종료 시점)

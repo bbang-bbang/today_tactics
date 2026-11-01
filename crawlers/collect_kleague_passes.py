@@ -6,7 +6,7 @@
 
 검증된 사실(2026-11-01, 표본):
   - 행=패스한 선수, 열=받은 선수 (행 합계 = 선수 상세의 성공 패스, 20=20·57=57).
-  - 2020~2026 K1·K2 전 시즌에 존재. 행렬 합계 ↔ SofaScore 성공 패스 상관 1.00.
+  - 2020~2026 K1·K2 전 시즌에 존재(수집은 2023~ 만). 행렬 합계 ↔ SofaScore 성공 패스 상관 1.00.
   - 공개 시점은 경기 다음 날 — 빈 응답은 '미공개'로 보고 저장하지 않으며 다음 실행에서 재시도한다(실패로 세지 않음).
   - 이름은 라인업(kleague_lineup)과 '(c)'·공백 제거 후 100% 일치 → 선발 좌표를 붙인다.
 
@@ -45,6 +45,7 @@ REFERER = "https://www.kleague.com/match.do"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 DELAY = 0.4
 TIMEOUT = 25
+DEFAULT_SINCE = "2023-01-01"        # 사용자 결정(2026-11-02): 2020~2022 시즌은 불필요 → 수집 범위에서 제외
 MIN_TOTAL, MAX_TOTAL = 20, 1200      # 팀 총 패스 상식 범위(관측 평균 ≈ 408)
 POSITIONS = {"GK", "DF", "MF", "FW"}
 # 선수 상세의 세부 포지션(playerPos: CF·CM 등) → 4분류. 모르는 코드는 None.
@@ -185,9 +186,11 @@ def parse_side(side: dict) -> tuple[dict | None, list[str]]:
     players = []
     for kid, nm in zip(ids, names):
         p = pos.get(kid)
-        players.append({"kid": int(kid), "name": (nm or "").strip(), "position": p if p in POSITIONS else None})
-        if not nm:
-            problems.append(f"이름 없음 {kid}")
+        if (nm or "").strip():
+            players.append({"kid": int(kid), "name": nm.strip(), "position": p if p in POSITIONS else None})
+        else:
+            unknown.append(int(kid))     # 이름이 비어 온 선수 — 경기 전체를 버리지 않고 선수 상세 API로 이름을 보충한다
+    unknown = sorted(set(unknown))
     return {"players": players, "edges": edges, "total": total, "unknown": unknown, "self_passes": self_passes}, problems
 
 
@@ -268,7 +271,7 @@ def compare(conn, limit: int) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="K리그 공식 API → 패스 네트워크 수집 (기본 dry-run)")
     ap.add_argument("--apply", action="store_true", help="실제 저장 (없으면 dry-run)")
-    ap.add_argument("--since", default="2020-01-01", help="이 날짜 이후 경기만 (YYYY-MM-DD)")
+    ap.add_argument("--since", default=DEFAULT_SINCE, help="이 날짜 이후 경기만 (YYYY-MM-DD, 기본 2023-01-01 — 2020~2022는 수집 대상에서 제외)")
     ap.add_argument("--limit", type=int, default=3000, help="한 번에 처리할 최대 경기 수 (안전장치)")
     ap.add_argument("--compare", type=int, metavar="N", help="선수 상세 성공 패스와 행 합계 대조 (읽기 전용)")
     ap.add_argument("--db", default=DB_PATH)
