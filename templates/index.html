@@ -1133,6 +1133,11 @@
                 if (d.last_result === 'error') {
                     dfbBadge.classList.add('dfb-error');
                     dfbBadge.title = '마지막 업데이트 실패: ' + (d.last_msg || '') + (d.next_run ? ' / 다음: ' + d.next_run : '');
+                } else if (d.last_result === 'partial') {
+                    // 스코어는 갱신됐지만 일부 수집(득점·라인업·슈팅맵 등) 실패 — 'last_run'만 보면 정상처럼 보이므로 경고 표시
+                    dfbBadge.classList.add('dfb-old');
+                    dfbText.textContent = '데이터 ' + d.last_run.replace(' KST','') + ' ⚠ 일부 미수집';
+                    dfbBadge.title = '일부 수집 실패: ' + (d.last_msg || '') + (d.next_run ? ' / 다음: ' + d.next_run : '');
                 } else {
                     dfbBadge.title = '마지막 업데이트: ' + d.last_run + (d.next_run ? ' / 다음: ' + d.next_run : '');
                 }

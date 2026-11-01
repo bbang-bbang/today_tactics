@@ -9341,7 +9341,7 @@ _KST = timezone(timedelta(hours=9))
 
 _UPDATE_STATUS = {
     "last_run":    None,   # ISO 문자열 (KST)
-    "last_result": None,   # "success" | "error"
+    "last_result": None,   # "success" | "partial"(일부 수집 STEP 실패) | "error"
     "last_msg":    "",
     "added":       0,      # 마지막 업데이트 시 추가된 경기 수
     "running":     False,
@@ -9367,7 +9367,9 @@ def _run_update_pipeline(triggered_by="scheduler"):
             timeout=1800, cwd=BASE_DIR,   # full 파이프라인 ~17분, 여유 30분
         )
         output_lines.append(r.stdout.strip())
-        if r.returncode != 0:
+        # 종료 코드: 0 정상 / 1 치명(STEP 0~2) / 2 부분 실패(수집 STEP 일부 실패 — 스코어 등은 갱신됨)
+        partial = (r.returncode == 2)
+        if r.returncode not in (0, 2):
             raise RuntimeError(r.stderr[:300] or "update_data.py 실패")
 
         # 추가 경기 수 파싱 (sync 스크립트 출력에서)
@@ -9380,8 +9382,14 @@ def _run_update_pipeline(triggered_by="scheduler"):
                     added = int(m.group(1))
                     break
 
-        _UPDATE_STATUS["last_result"] = "success"
-        _UPDATE_STATUS["last_msg"]    = f"경기 {added}건 추가 ({triggered_by})"
+        failed_steps = ""
+        if partial:
+            import re as _re
+            m = _re.search(r"실패 STEP:\s*(\[[^\]]*\])", "\n".join(output_lines))
+            failed_steps = m.group(1) if m else ""
+        _UPDATE_STATUS["last_result"] = "partial" if partial else "success"
+        _UPDATE_STATUS["last_msg"]    = (f"경기 {added}건 추가 ({triggered_by})"
+                                         + (f" · 일부 수집 STEP 실패 {failed_steps} — SofaScore 차단 여부 확인 필요" if partial else ""))
         _UPDATE_STATUS["added"]       = added
         # 백테스트 캐시 초기화 (새 데이터 반영)
         _BACKTEST_CACHE.clear()

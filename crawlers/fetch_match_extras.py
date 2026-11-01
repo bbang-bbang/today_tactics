@@ -23,6 +23,8 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
+import fetch_health   # 차단(403 challenge) 감지 — 조용한 skip 방지
+
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -220,6 +222,10 @@ async def main():
         await asyncio.sleep(3)
         log("세션 준비 완료\n")
 
+        # 두 엔드포인트 모두 probe — 엔드포인트별로 차단 정책이 다를 수 있다
+        await fetch_health.abort_if_blocked(page, f"/api/v1/event/{targets[0]}/average-positions", log, "avg-positions")
+        await fetch_health.abort_if_blocked(page, f"/api/v1/event/{targets[0]}/shotmap", log, "shotmap")
+
         for i, eid in enumerate(targets):
             ap_data = await api(page, f"/api/v1/event/{eid}/average-positions")
             await asyncio.sleep(DELAY * 0.5)
@@ -242,6 +248,7 @@ async def main():
 
     log(f"\n완료: avg_pos {ok_pos} / shotmap {ok_shot} / skip {skip} ({time.time()-t0:.1f}s)")
     conn.close()
+    fetch_health.abort_if_all_failed(len(targets) - skip, len(targets), log, "avg-positions+shotmap")
 
 
 if __name__ == "__main__":

@@ -20,6 +20,8 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
+import fetch_health   # 차단(403 challenge) 감지 — 조용한 skip 방지
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = str(BASE_DIR / "players.db")
 DELAY = 0.4
@@ -192,6 +194,9 @@ async def collect(force=False, event_id=None, days=None, limit=None):
         )
         await asyncio.sleep(2)
 
+        # 같은 엔드포인트로 가장 최근 경기 1건 probe — 403이면 즉시 중단
+        await fetch_health.abort_if_blocked(page, f"/api/v1/event/{events[0][0]}/lineups", log, "lineups")
+
         ok, skip, fail = 0, 0, 0
         for eid, home_tid, away_tid, _ts in events:
             data = await api_fetch(page, f"/api/v1/event/{eid}/lineups")
@@ -222,6 +227,7 @@ async def collect(force=False, event_id=None, days=None, limit=None):
 
     conn.close()
     log(f"\n완료: ok={ok} skip={skip} fail={fail}")
+    fetch_health.abort_if_all_failed(ok + skip, ok + skip + fail, log, "lineups")
 
 
 def log(msg):

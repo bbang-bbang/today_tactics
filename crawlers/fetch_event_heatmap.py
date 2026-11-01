@@ -19,6 +19,8 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
+import fetch_health   # 차단(403 challenge) 감지 — 조용한 skip 방지
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = str(BASE_DIR / "players.db")
 DELAY = 0.35
@@ -114,6 +116,10 @@ async def main():
         await asyncio.sleep(3)
         log("세션 준비 완료\n")
 
+        # 같은 엔드포인트로 1건 probe — 403이면 즉시 중단
+        await fetch_health.abort_if_blocked(
+            page, f"/api/v1/event/{targets[0][0]}/player/{targets[0][1]}/heatmap", log, "heatmap")
+
         batch = []
         per_event = {}
         for i, (eid, pid) in enumerate(targets):
@@ -152,6 +158,7 @@ async def main():
     for eid in event_ids:
         log(f"  {eid}: {per_event.get(eid, 0)} pts")
     conn.close()
+    fetch_health.abort_if_all_failed(sum(1 for v in per_event.values() if v > 0), len(per_event), log, "heatmap")
 
 
 if __name__ == "__main__":

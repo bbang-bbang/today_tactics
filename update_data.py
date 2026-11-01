@@ -38,8 +38,15 @@ PYTHON = sys.executable
 
 DEFAULT_DAYS = 14  # 매주 cron이라 14일이면 충분 + 재시도 여유
 
+CRITICAL_STEPS = (0, 1, 2)   # 실패 시 후속 STEP이 의미 없어 중단
+EXIT_CRITICAL = 1
+EXIT_PARTIAL = 2             # main.py 스케줄러가 'partial'로 기록 (캐시는 정상 갱신)
+
 
 def run_step(step_no, label, cmd, fail_ok=False):
+    """STEP 1개 실행. 반환값은 항상 '실제 성공 여부'다 (fail_ok와 무관).
+    fail_ok는 호환용 — 중단할지 계속할지는 호출자(main)가 critical 여부로 결정한다.
+    (이전엔 fail_ok=True면 실패해도 True를 반환해 failures에 안 쌓여 항상 '모든 STEP 정상'으로 끝났다.)"""
     print(f"\n{'='*60}")
     print(f"  STEP {step_no}  {label}")
     print(f"  $ {' '.join(cmd)}")
@@ -47,21 +54,19 @@ def run_step(step_no, label, cmd, fail_ok=False):
     sys.stdout.flush()
 
     t0 = time.time()
+    success = True
     try:
         r = subprocess.run(cmd, cwd=str(BASE))
         dt = time.time() - t0
-        ok = (r.returncode == 0)
-        flag = "OK" if ok else f"FAIL (exit {r.returncode})"
+        success = (r.returncode == 0)
+        flag = "OK" if success else f"FAIL (exit {r.returncode})"
         print(f"  → {flag} ({dt:.1f}s)")
         sys.stdout.flush()
-        if not ok and not fail_ok:
-            return False
     except Exception as e:
         print(f"  → EXCEPTION: {e}")
         sys.stdout.flush()
-        if not fail_ok:
-            return False
-    return True
+        success = False
+    return success
 
 
 def main():
@@ -130,12 +135,14 @@ def main():
             [PYTHON, str(CRAWLERS/"backfill_detail_positions.py")]),
         (19, "mps.team_id 정규화 (경기 실제 소속으로 — 팀 집계 정합성)",
             [PYTHON, str(CRAWLERS/"normalize_mps_team.py")]),
+        (20, "수집 공백 감사 (소스별 마지막 정상 수집일 — 차단/중단 조기 발견)",
+            [PYTHON, str(BASE/"analysis"/"audit_collection_gaps.py"), "--summary-only"]),
     ]
 
     # STEP 0~2 실패 시 후속 의미 없음 → fail_ok=False (기본).
     # STEP 3~8 부분 실패는 다음 주 재시도로 자가복구되므로 fail_ok=True로 진행.
     for i, (no, label, cmd) in enumerate(steps):
-        critical = (no in (0, 1, 2))
+        critical = (no in CRITICAL_STEPS)
         ok = run_step(no, label, cmd, fail_ok=not critical)
         if not ok and critical:
             print(f"\n!! 치명 STEP {no} 실패 — 중단")
@@ -145,19 +152,28 @@ def main():
             failures.append(no)
 
     print(f"\n#### 완료 — {time.time()-t_total:.1f}s ####")
+    critical_failed = any(n in CRITICAL_STEPS for n in failures)
     if failures:
         print(f"  실패 STEP: {failures}")
-        sys.exit(1)
-    print("  모든 STEP 정상")
+    else:
+        print("  모든 STEP 정상")
 
     # API 캐시 무효화 — 신규 매치 반영을 위해 실행 중인 Flask 서버에 hit.
     # prediction-backtest, round-predictions, schedule, rounds 캐시 리셋.
-    try:
-        import urllib.request, urllib.error
-        urllib.request.urlopen("http://127.0.0.1:5000/api/cache-invalidate", timeout=10).read()
-        print("  ✓ API 캐시 무효화 + 워밍업 트리거")
-    except Exception as e:
-        print(f"  (캐시 무효화 skip: {e})")
+    # 부분 실패(STEP 3~)여도 스코어 등은 갱신됐으므로 치명 실패(0~2)가 아니면 무효화한다.
+    if not critical_failed:
+        try:
+            import urllib.request, urllib.error
+            urllib.request.urlopen("http://127.0.0.1:5000/api/cache-invalidate", timeout=10).read()
+            print("  ✓ API 캐시 무효화 + 워밍업 트리거")
+        except Exception as e:
+            print(f"  (캐시 무효화 skip: {e})")
+
+    # 종료 코드: 0=정상 / 1=치명(STEP 0~2) / 2=부분 실패(수집 STEP 일부 실패 — 스코어는 갱신됨)
+    if critical_failed:
+        sys.exit(EXIT_CRITICAL)
+    if failures:
+        sys.exit(EXIT_PARTIAL)
 
 
 if __name__ == "__main__":

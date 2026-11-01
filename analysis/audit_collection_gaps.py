@@ -59,6 +59,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="수집 공백 감사 (읽기 전용)")
     ap.add_argument("--since", default="2026-01-01", help="이 날짜 이후 경기만 (YYYY-MM-DD)")
     ap.add_argument("--max-gap-days", type=int, default=14, help="최신 경기 대비 허용 공백(일)")
+    ap.add_argument("--summary-only", action="store_true", help="월별 표 생략, 소스별 마지막 수집일만 (cron 로그용)")
     args = ap.parse_args()
 
     since_ts = int(dt.datetime.strptime(args.since, "%Y-%m-%d").timestamp())
@@ -92,16 +93,17 @@ def main() -> int:
                 last_ok[(lg, key)] = max(last_ok.get((lg, key), 0), ts)
 
     months = sorted({m for (_lg, m, _k) in cov})
-    print(f"## 월별 커버리지 (%)  — {args.since} 이후, 종료 경기 {len(rows)}건, 최신 경기 {day(latest_ts)}")
-    for lg in ("K1", "K2"):
-        print(f"\n[{lg}]")
-        print("월       " + "".join(f"{lbl[:6]:>9}" for _k, lbl, _d in SOURCES))
-        for m in months:
-            cells = []
-            for key, _lbl, _d in SOURCES:
-                c = cov.get((lg, m, key))
-                cells.append(f"{'-':>9}" if not c or not c[1] else f"{c[0] / c[1] * 100:>8.0f}%")
-            print(f"{m}  " + "".join(cells))
+    if not args.summary_only:
+        print(f"## 월별 커버리지 (%)  — {args.since} 이후, 종료 경기 {len(rows)}건, 최신 경기 {day(latest_ts)}")
+        for lg in ("K1", "K2"):
+            print(f"\n[{lg}]")
+            print("월       " + "".join(f"{lbl[:6]:>9}" for _k, lbl, _d in SOURCES))
+            for m in months:
+                cells = []
+                for key, _lbl, _d in SOURCES:
+                    c = cov.get((lg, m, key))
+                    cells.append(f"{'-':>9}" if not c or not c[1] else f"{c[0] / c[1] * 100:>8.0f}%")
+                print(f"{m}  " + "".join(cells))
 
     print(f"\n## 소스별 마지막 정상 수집 경기 (최신 경기 {day(latest_ts)} 기준 공백)")
     bad = 0

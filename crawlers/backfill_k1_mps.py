@@ -14,6 +14,9 @@ import sqlite3
 import sys
 from playwright.async_api import async_playwright
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import fetch_health   # 차단(403 challenge) 감지 — 조용한 skip 방지
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH  = os.path.join(BASE_DIR, "players.db")
 DELAY    = 0.5
@@ -148,6 +151,9 @@ async def main():
         await asyncio.sleep(3)
         log("세션 준비 완료")
 
+        # 같은 엔드포인트로 가장 최근 대상 1건 probe (events_todo는 date_ts DESC) — 403이면 즉시 중단
+        await fetch_health.abort_if_blocked(page, f"/api/v1/event/{events_todo[0][0]}/lineups", log, "lineups(mps)")
+
         for i, (eid, date_ts, hid, aid) in enumerate(events_todo):
             data = await api_fetch(page, f"/api/v1/event/{eid}/lineups")
             if not isinstance(data, dict) or ("home" not in data and "away" not in data):
@@ -187,6 +193,7 @@ async def main():
 
     conn.close()
     log(f"\n완료: {ok}경기 수집, {skip}경기 스킵")
+    fetch_health.abort_if_all_failed(ok, ok + skip, log, "lineups(mps)")
 
 
 if __name__ == "__main__":

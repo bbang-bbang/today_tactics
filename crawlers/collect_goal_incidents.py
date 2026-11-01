@@ -13,6 +13,8 @@ goal_type:
 import asyncio, sqlite3, sys, argparse
 from playwright.async_api import async_playwright
 
+import fetch_health   # 차단(403 challenge) 감지 — 조용한 skip 방지
+
 DB_PATH = "players.db"
 DELAY   = 0.25
 
@@ -168,6 +170,9 @@ async def main():
         await asyncio.sleep(3)
         log("세션 준비 완료\n")
 
+        if targets:   # 같은 엔드포인트로 1건 probe — 403이면 수천 건을 두드리지 않고 즉시 중단
+            await fetch_health.abort_if_blocked(page, f"/api/v1/event/{targets[-1]['id']}/incidents", log, "incidents")
+
         ok = skip = 0
         consecutive_fails = 0
         for i, ev in enumerate(targets):
@@ -309,6 +314,7 @@ async def main():
     conn.close()
     log(f"\n완료: {ok}경기 처리 / 스킵: {skip}경기")
     log(f"goal_events 총 레코드: {total_g}건 / card_events 총: {total_c}건")
+    fetch_health.abort_if_all_failed(ok, ok + skip, log, "incidents")
 
 if __name__ == "__main__":
     asyncio.run(main())
