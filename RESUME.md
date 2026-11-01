@@ -10,7 +10,7 @@
 - **2026-11-01 완료**: 감독 `프리매치 스카우팅 요약`(`/api/pre-match-brief`) · 분석가 4종(xG 운 보정 순위·휴식일/연전·교체 효과·세트피스 공수 — `인사이트 > 심화` 탭) · 팬 `경기 후 요약 카드`(`/api/match-recap`) · **수집 가시화**(`crawlers/fetch_health.py` probe, `update_data.py` 종료 코드 0/1/2, 헤더 배지 `⚠ 일부 미수집`, `analysis/audit_collection_gaps.py`) · **K리그 공식 API 복구 크롤러**(`crawlers/collect_kleague_events.py` → 득점·카드·교체, `update_data.py` STEP 21) · 10/31~11/1 결과 갱신.
 - **2026-11-02 완료**: **패스 네트워크**(`collect_kleague_passes.py` + `/api/pass-network` + 팀 분석 '🕸 패스 네트워크' 탭, 2023~2026 백필 완료, update_data STEP 22). 공식 API는 엔드포인트마다 필드명이 달라(`getPassData`=year/meetSeq/gameId+homeTeam/awayTeam, `getShootData`=MEET_YEAR/MEET_SEQ/GAME_ID+homeTeam/awayTeam, 모두 multipart) 잘못 호출하면 '성공+빈 데이터'가 나오므로 페이지 JS의 formData를 먼저 확인할 것.
 - **남은 결정/작업**:
-  1. ✅ **운영 DB 동기화 완료(2026-11-02)**: 서버에서 `update_data.py --days 14` 실행 → 10/31~11/1 결과·득점/카드/교체 복구(STEP 21)·패스 네트워크 2023~2026(STEP 22, 1,636경기) 반영. 이후는 **월 05:00 크론**이 자동 처리(첫 동기화는 SSH로 직접 실행 — `/api/trigger-update`는 30분 제한이라 부적합). 접속: `ssh -i ~/.ssh/today-project.pem rocky@1.201.126.200`(키는 `~/.ssh/`), 앱 `/opt/today_tactics`, 파이썬 `./venv/bin/python`. 주의: 업데이트 직후 gunicorn 워커별 메모리 캐시 때문에 일부 API가 옛 응답을 최대 1시간 서빙(백로그 P1 '미해결' 참조).
+  1. ✅ **운영 DB 동기화 완료(2026-11-02)**: 서버에서 `update_data.py --days 14` 실행 → 10/31~11/1 결과·득점/카드/교체 복구(STEP 21)·패스 네트워크 2023~2026(STEP 22, 1,636경기) 반영. 이후는 **월 05:00 크론**이 자동 처리(첫 동기화는 SSH로 직접 실행 — `/api/trigger-update`는 30분 제한이라 부적합). 접속: `ssh -i ~/.ssh/<SSH키> rocky@<운영IP>`(키는 `~/.ssh/`), 앱 `/opt/today_tactics`, 파이썬 `./venv/bin/python`. 주의: 업데이트 직후 gunicorn 워커별 메모리 캐시 때문에 일부 API가 옛 응답을 최대 1시간 서빙(백로그 P1 '미해결' 참조).
   2. 운영에서 막힌 **라인업·히트맵**(9/20~)과 로컬의 전면 중단 대응: 공식 API의 선수 상세(`getMatchRecordPlayerDetail`)·슈팅(`getShootData`, 유효·블록·골만) 활용 검토 또는 라이선스 API. 빗나간 슈팅 포함 전체 슈팅맵은 공식에 없음.
   3. 팬 항목 ②: 팀/선수 스토리형 인사이트(착수 전 `team-trend`·`player-analytics` 중복 확인).
   4. 선택: 스카우팅 요약에 '패스 허브' 연동 · 슈팅 PK/FK로 `is_penalty` 보정 · 선수 상세 스탯 복구 검토.
@@ -39,8 +39,8 @@ git clone/pull 후 아래를 별도로 확보해야 **로컬 실행/배포** 가
 
 | 항목 | 비고 | 확보 방법 |
 |------|------|-----------|
-| `players.db` (~200MB) | SQLite DB (gitignored). **prod DB가 최신** — K2 6/7까지 + 수비 세부 3컬럼(won_tackle/ball_recovery/challenge_lost) 백필 포함 | `scp -i ~/.ssh/today-project.pem rocky@1.201.126.200:/opt/today_tactics/players.db .` (권장) / 또는 `python update_data.py` 재수집(오래 걸림) |
-| `today-project.pem` (+ `.pub` 사이드카) | 가비아 SSH 키 (gitignored). Windows ssh는 `.pub` 없으면 키 제시 실패 | 안전 보관처에서 복사 → `~/.ssh/`에 두고 `icacls`로 권한 제한. 없으면 `ssh-keygen -y -f <key> > <key>.pub` |
+| `players.db` (~200MB) | SQLite DB (gitignored). **prod DB가 최신** — K2 6/7까지 + 수비 세부 3컬럼(won_tackle/ball_recovery/challenge_lost) 백필 포함 | `scp -i ~/.ssh/<SSH키> rocky@<운영IP>:/opt/today_tactics/players.db .` (권장) / 또는 `python update_data.py` 재수집(오래 걸림) |
+| `<SSH키>` (+ `.pub` 사이드카) | 가비아 SSH 키 (gitignored). Windows ssh는 `.pub` 없으면 키 제시 실패 | 안전 보관처에서 복사 → `~/.ssh/`에 두고 `icacls`로 권한 제한. 없으면 `ssh-keygen -y -f <key> > <key>.pub` |
 | Python venv + 의존성 | (gitignored) | `python -m venv venv && pip install -r requirements.txt` |
 | Playwright chromium | 크롤러/`update_data.py` 실행 시 필수 | `playwright install chromium` (이 PC도 이번 세션에 설치함) |
 | `.update_secret_local.txt` | update 트리거 시크릿 (gitignored) | 필요 시 재생성 |
@@ -57,7 +57,7 @@ python main.py                      # http://127.0.0.1:5000
 python update_data.py --days 14
 
 # 배포(이번 세션 방식: 변경 파일만 scp + 재시작) — rocky 계정
-KEY=~/.ssh/today-project.pem; R=rocky@<운영IP>; APP=/opt/today_tactics
+KEY=~/.ssh/<SSH키>; R=rocky@<운영IP>; APP=/opt/today_tactics
 scp -i $KEY static/js/analytics.js static/js/workspace.js $R:$APP/static/js/
 scp -i $KEY static/css/style.css   $R:$APP/static/css/
 scp -i $KEY templates/index.html   $R:$APP/templates/

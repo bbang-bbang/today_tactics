@@ -83,7 +83,7 @@
 
 **Gabia 서버 적용 명령** (발급 후 SSH로 실행):
 ```bash
-ssh -i ~/today-project.pem rocky@1.201.126.200
+ssh -i ~/.ssh/<SSH키> rocky@<운영IP>
 sudo systemctl edit today_tactics
 # 아래 3줄 추가:
 # Environment="GOOGLE_CLIENT_ID=<발급값>"
