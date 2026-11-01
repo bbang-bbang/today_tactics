@@ -1,17 +1,19 @@
 # RESUME — 다른 PC / 새 세션에서 작업 재개 가이드
 
 > 이 파일 + `checklist/work-log-*.md` + git 커밋 기록만 보고 작업을 이어갈 수 있도록 정리.
-> 최종 갱신: 2026-06-12 (history: `checklist/history.md` 2026-06-12 섹션 — 세부 포지션 비교 필터)
+> 최종 갱신: 2026-11-01 (이후 상세: `checklist/backlog.md` P1 'SofaScore 수집 중단' · `checklist/history.md` 2026-11-01)
 
 ---
 
 ## 0. ⏭ 재개 지점 (NEXT)
-**열린 작업 없음 (2026-10-31 종료).** 운영 = https://suwon.today-tactics.co.kr (canonical 전환·지연 로딩·SWR 캐시 배포 완료, 서버 `ceff931`+). 상세는 `checklist/history.md` 2026-10-31 항목.
-- **다음 작업 후보 (우선순위: 감독 → 분석가 → 팬)** — `checklist/backlog.md` 「분석 보고서 확장」 참조:
-  1. 감독: 프리매치 상대 스카우팅 한 장 요약 (`/api/pre-match-brief`, 경기예측 탭 영역, 인쇄/PDF) — 설계안 확정 대기(Yellow: 새 API 라우트).
-  2. 분석가: xG 기반 "운 보정" 순위, 휴식일·연전 영향, 교체 효과 확장.
-  3. 팬: 경기 후 요약·팀/선수 스토리형 카드.
-- 선택 잔여: nginx brotli(서버 sudo), OAuth 콘솔 redirect URI(로그인 사용 시).
+**열린 작업: SofaScore 수집 중단 대응 (2026-11-01 발견, `checklist/backlog.md` P1).** 운영 = https://suwon.today-tactics.co.kr (루트 도메인 `today-tactics.co.kr`에는 A 레코드 없음 — canonical은 `suwon.` 서브도메인).
+- **2026-11-01 완료**: 감독 `프리매치 스카우팅 요약`(`/api/pre-match-brief`) · 분석가 4종(xG 운 보정 순위·휴식일/연전·교체 효과·세트피스 공수 — `인사이트 > 심화` 탭) · 팬 `경기 후 요약 카드`(`/api/match-recap`) · **수집 가시화**(`crawlers/fetch_health.py` probe, `update_data.py` 종료 코드 0/1/2, 헤더 배지 `⚠ 일부 미수집`, `analysis/audit_collection_gaps.py`) · **K리그 공식 API 복구 크롤러**(`crawlers/collect_kleague_events.py` → 득점·카드·교체, `update_data.py` STEP 21) · 10/31~11/1 결과 갱신.
+- **남은 결정/작업**:
+  1. **운영 DB 데이터 동기화**: 로컬과 운영 DB는 별개(로컬 `players.db`는 gitignore). 운영에서 `update_data.py` 실행 또는 `POST /api/trigger-update`(헤더 `X-Update-Secret`)로 STEP 21 포함 갱신 필요. 운영의 SofaScore 접근 상태는 미확인(로컬 환경에서만 403 challenge 확인).
+  2. 슈팅맵/xG·평균 위치·히트맵·평점의 대체 소스(공식 API에 없음 — 라이선스 API 등 별도 결정).
+  3. 팬 항목 ②: 팀/선수 스토리형 인사이트(착수 전 `team-trend`·`player-analytics` 중복 확인).
+  4. 선택: `getPassData.do`(K리그 공식 패스 행렬) 기반 패스 네트워크 재평가.
+- **정적 자산 수정 시 필수**: nginx가 `/static/`을 `expires 7d` + `immutable`로 내보내므로 JS/CSS를 바꾸면 `templates/index.html`의 `?v=`를 반드시 올릴 것(안 올리면 기존 방문자는 최대 7일간 옛 파일 사용).
 
 ## 1. 현재 상태 (2026-06-11 종료 시점)
 - **브랜치/HEAD**: `main` (2026-06-15 심화 ③스카우팅·⑤경기리포트·④선수비교 완료). **origin push + 운영 git 동기화 완료**(로컬=origin=prod 일치 · 서비스 active · 헬스 200). 로컬 트리는 `checklist/history.md` 자동로그(마스킹 훅)로 수시 dirty(감사 로그 — 배포 무관).
@@ -21,7 +23,7 @@
   3. **히트맵을 5번째 워크스페이스 탭으로**(팝업 제거, `workspace.js` 인라인). 전술판 툴바 `btn-k2-heatmap` 제거.
   4. **년도(시즌) 필터** + **시즌별 소속팀 표시**(이적 선수). **이적 선수 데이터 정규화**: mps.team_id가 현 소속 고정이라 부정확 → 시즌팀을 event home/away+is_home로 유도, 리그 무관(player 중심) 통합(광주 K1→수원 K2 과거시즌도 조회). 다중시즌은 기본 최신시즌(전체누적 과포화 방지).
   5. **팀 그리드 현 시즌 정리**(K1 12·K2 17, 수원삼성 복원), **선수목록 히트맵 보유·현시즌만·한글명**, **리그탭 race 수정**(`_teamLoadSeq` 가드 — K2탭에 K1팀 뜨던 버그), 경기별보기 5:5 우측배치, 경기장 크기 축소(560), 히트맵 점 경기장 안쪽 매핑.
-- **정적 자산 최신 버전**: `analytics.js?v=13` · `prediction.js?v=60` · `match_report.js?v=1` · `player_compare.js?v=2` · `global_league.js?v=1` · `k2heatmap.js?v=16` · `player_report.js?v=6` · `insights.js?v=38` · `workspace.js?v=7` · `style.css?v=93`. 변경 시 `templates/index.html`의 `?v=` 동반 증가 필수.
+- **정적 자산 최신 버전** (`templates/index.html` 기준, 2026-11-01): `style.css?v=97` · `app.js?v=17` · `info.js?v=7` · `global_league.js?v=1` · `banner_stats.js?v=3` · `prediction.js?v=61` · `player_analytics.js?v=6` · `player_report.js?v=7` · `k2heatmap.js?v=16` · `team_compare.js?v=12` · `analytics.js?v=16` · `match_report.js?v=1` · `player_compare.js?v=2` · `insights.js?v=39` · `workspace.js?v=8`. 변경 시 `?v=` 동반 증가 필수.
 - **선수 상세 스탯은 K1·K2 모두 지원**(`player-stat-report` 리그 자동 판정 = 선수 최근 경기 대회). 비교군·백분위·활동량은 해당 리그 내 계산.
 - **포지션 분류는 세부그룹(detail_pos) 우선**(`eff_pos = DETAIL_TO_BROAD[detail_grp] or mps최빈`). mps.position이 윙어를 M으로 묶는 불일치(133명) 해소 — 라벨·지표세트·레이더 모두 eff_pos 기준. 비교군 풀 쿼리만 pos_raw(mps) 유지.
 - **2026-06-15 통합 QA 완료**: 오늘 출시 4종(스카우팅·경기리포트·선수비교·K1지원) 실브라우저·모바일·엣지·회귀 점검 14/14 + `qa_check.py` 31/31 PASS. 모바일 경기리포트 스코어 줄바꿈만 수정(style.css v94).
