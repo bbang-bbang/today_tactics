@@ -237,7 +237,9 @@ K리그 (players.db)
 | `backfill_match_stats.py` | match_player_stats 일반 누락분 보완 |
 | `backfill_events.py` | events 테이블 누락분 보완 |
 | `backfill_detail_positions.py` | `match_lineups.detail_pos` 백필 — formation+slot_order → 세부 포지션(GK/CB/FB/WB/DM/CM/AM/W/ST) 결정론적 유도 (재크롤링 불필요) |
-| `collect_goal_incidents.py` | 골 이벤트 수집 |
+| `collect_goal_incidents.py` | 골·카드·교체 이벤트 수집 (SofaScore — 2026-08 이후 403 차단으로 중단) |
+| `collect_kleague_events.py` | **K리그 공식 API(`matchInfo.do`)로 득점·카드·교체 복구** — 데이터 없는 경기만, 기본 dry-run, `--apply`로 저장, `--compare N`으로 SofaScore 수집분과 대조 |
+| `fetch_health.py` | SofaScore 차단(403 challenge) 감지 헬퍼 — 크롤러가 조용히 실패하지 않도록 probe + 전부 실패 시 exit 3 |
 
 ---
 
@@ -277,6 +279,7 @@ python update_data.py
 - K리그 부상 정보는 SofaScore 미제공 → `data/player_status.json` 수동 관리
 - `requirements.txt`는 ASCII 전용 (Windows pip cp949 인코딩 충돌 방지)
 - 크롤러 실행 시 Flask 서버와 별도 터미널 사용 권장
+- **SofaScore는 2026-08 이후 봇 차단(403 challenge)으로 incidents·라인업·슈팅맵·평균 위치·히트맵 수집이 멈춤** — `python analysis/audit_collection_gaps.py`로 소스별 공백 확인. 득점·카드·교체는 `collect_kleague_events.py`(K리그 공식 API)로 복구, 슈팅맵/xG/평균 위치/히트맵/평점은 대체 소스 없음(백로그 P1 참조)
 
 ## 데이터 정합성 (2026-06-15 점검)
 

@@ -15,6 +15,8 @@ STEP 5  K2 mps 백필
 STEP 6  최근 N일 히트맵 수집 (K1+K2)
 STEP 7  K1 골/카드 incidents
 STEP 8  K2 골/카드 incidents
+STEP 21 K리그 공식 API로 득점·카드·교체 복구 (SofaScore incidents 차단 대체 — STEP 16 매핑 직후 실행)
+STEP 20 수집 공백 감사 (마지막에 실행; 종료 코드 0 정상 / 1 치명 / 2 부분 실패)
 
 레거시는 update_data.py.legacy_*.bak에 백업.
 """
@@ -129,6 +131,8 @@ def main():
             [PYTHON, str(CRAWLERS/"fill_formation_from_kleague.py")]),
         (16, "K리그 포털 스케줄 + 라인업 (현재 시즌)",
             [PYTHON, str(CRAWLERS/"crawl_kleague_lineup.py"), "all", "--years", "2026"]),
+        (21, "K리그 공식 API → 득점·카드·교체 복구 (SofaScore incidents 차단 대체, 데이터 없는 경기만)",
+            [PYTHON, str(CRAWLERS/"collect_kleague_events.py"), "--apply"]),
         (17, "events.round 백필 (K리그 roundId → 백테스트 per_round)",
             [PYTHON, str(CRAWLERS/"backfill_rounds.py")]),
         (18, "세부 포지션 백필 (formation+slot → detail_pos, 비교 필터용)",

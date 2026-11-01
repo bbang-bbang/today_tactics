@@ -16,13 +16,15 @@
 **방침 / 선택지** (사용자 결정 대기):
 1. ✅ **가시화 — 2026-11-01 적용 (사용자 승인)**: ①`crawlers/fetch_health.py` — 크롤러 5종(incidents·lineups·avg-positions/shotmap·mps 백필·heatmap)이 본 수집 전에 **같은 엔드포인트로 1건 probe**해 403이면 즉시 `exit 3`, 5건↑ 시도에 성공 0이면 `exit 3`(우회 아님, 감지만). ②`update_data.py` — `run_step`이 fail_ok여도 실패를 `failures`에 집계(기존엔 항상 '모든 STEP 정상'), 종료 코드 0=정상/1=치명(STEP 0~2)/**2=부분 실패**, 부분 실패여도 캐시 무효화 유지, 마지막에 STEP 20 `audit_collection_gaps --summary-only`. ③`main.py` 스케줄러 — 종료 코드 2를 `last_result="partial"`로 기록(캐시 초기화·경기 추가 반영은 정상 수행), ④헤더 신선도 배지에 `⚠ 일부 미수집` 표시. 모의 실패 주입으로 종료 코드·캐시 동작 3개 시나리오 검증, 실제 차단 환경에서 크롤러 4종 exit 3 확인.
    - 알려진 잔여: `fetch_event_heatmap.py`는 대상을 `match_lineups`/mps에서 유도해, 라인업이 비면 "이미 모두 수집됨"(exit 0)이라고 오인 보고 — 라인업 차단의 연쇄 증상(근본 해결은 소스 복구).
-2. 🔎 **소스 대체 — K리그 공식 API 조사 완료 (2026-11-01), 구현은 승인 대기(Red: 신규 크롤러가 goal/card/sub_events에 쓰기)**
+2. ✅ **소스 대체 — K리그 공식 API로 득점·카드·교체 복구 구현 완료 (2026-11-01, 사용자 승인)**
    - **발견**: `kleague.com` 경기 페이지가 내부적으로 호출하는 JSON API `POST /api/ddf/match/*.do` (form: year, meetSeq, gameId — 값은 `kleague_event_map`에 이미 있음). 7~10월 K1·K2 **전 경기 100% 매핑**, SofaScore 차단과 무관하게 동작(기존 `getScheduleList.do`와 같은 계열).
    - **`matchInfo.do`** = 전·후반 이벤트 피드: 득점·**도움**·경고·퇴장·교체(IN/OUT, 일반/부상 구분)·자책골·유효슈팅·파울 + 팀 K-ID·선수 K-ID·등번호·이름·시각. **SofaScore 수집분과 8경기 대조 결과**: 득점자 이름 8/8 일치·득점 수/팀 일치, 카드·교체는 종류·팀 일치하고 **공식이 더 완전**(SofaScore에 빠진 교체 2건·경고 1건 보유). 시각은 득점 ±1분, 교체는 SofaScore가 1~3분 늦게 기록하는 체계 차이 → 시기 혼합 시 교체 전후 15분 분석에 ≤3분 오차.
    - **복구 가능**: 득점/카드/교체 incidents(→ 경기 요약 타임라인·교체 효과·카드 분석), 도움, 팀 스탯(`matchRecord.do`: 슈팅·유효슈팅·코너·파울·점유율·오프사이드·카드), 시간대별 점유(`possession.do`).
    - **복구 불가(공식 API로는)**: 슈팅맵 좌표/xG, 평균 위치, 히트맵, 선수 평점·상세 스탯 — `getShootData`·`getHeatmapData`·`getMatchRecordAllDetail`은 빈 응답, `getMatchRecordPlayerDetail`은 500. → xG 기반 분석의 2026 공백은 이 경로로 해결되지 않음.
    - **신규 가능성**: `getPassData.do` = **선수 간 패스 행렬 + 포지션 맵**(패스 네트워크). P3 '패스맵 미공개' 판단 재평가 대상.
-   - **구현 계획(승인 시)**: `crawlers/collect_kleague_events.py` — 매핑된 경기 중 goal/card/sub 행이 없는 경기만 대상, dry-run 기본, 예의 있는 간격(≥0.4s), 선수 ID는 `players(name_ko, team_id)`로 매핑(모호하면 NULL), 시각은 clock 기준 변환 규칙 문서화, `update_data.py`에 fail_ok STEP 추가. 검증: 7월 SofaScore 수집분과 재대조 후 8월 이후 적용.
+   - **구현 결과**: `crawlers/collect_kleague_events.py` (기본 dry-run, `--apply` 저장, `--compare N` 대조) + `update_data.py` STEP 21(STEP 16 매핑 직후, fail_ok). 대상=SofaScore 이벤트 데이터가 전혀 없는 종료 경기만, 경기 단위 트랜잭션·`INSERT OR IGNORE`, **득점 이벤트 스코어가 공식·DB 스코어와 다르면 그 경기는 저장 안 함**, 요청 간격 0.4s. 자책골 저장 규칙은 SofaScore 수집기와 동일(`is_home`=득점 인정 팀, `team_id`=자책한 선수 팀). **대조 80경기: 득점 수 80/80·득점자명 79/80(외국인 표기 차)·선수ID 220/220·카드 75/80·교체 71/80(공식이 더 완전)**. 로컬 적용: **157경기, 득점 +412·카드 +530·교체 +1,495**, 재실행 0건(멱등), 무결성 불일치 0, 응답 실패 0. 감사 결과 K1·K2 득점/카드/교체 공백 0~1일.
+   - **한계**: ①시각은 clock 분(득점·카드 ±1분, 교체는 SofaScore보다 1~3분 이르게 기록 — 시기 혼합 시 교체 전후 15분 분석에 ≤3분 오차) ②PK 구분 없음(`is_penalty=0`) ③선수 ID 해석률(8/3 이후): K1 득점 98%·카드 99%·교체 OUT 99%, **교체 IN 63%, K2 43~54%**(K2 최근 mps 없음, `players.name_ko`가 외국인에서 중복 → 모호하면 NULL, 이름은 항상 저장) — supersub 등 선수ID 기반 분석은 일부 과소집계 ④도움은 파싱만 하고 저장 테이블 없음(향후 확장 가능).
+   - **여전히 복구 불가**: 슈팅맵/xG, 평균 위치, 히트맵, 선수 평점·상세 스탯(K2 mps 포함), SofaScore 라인업 → xG 기반 분석의 2026 공백은 그대로(감사 스크립트가 계속 ✗ 표시, 신선도 배지 '⚠ 일부 미수집' 유지). 대체는 라이선스 API 등 별도 결정 필요.
    - **주의**: kleague.com 데이터 API의 이용약관(상업 이용·재배포) 미확인 — 기존 포털 수집과 동일 리스크 수준이나 서비스 규모가 커지면 리그 측 확인 권장.
 3. **하지 않음**: 안티봇 챌린지 우회(스텔스/프록시 등) — ToS·차단 심화 위험, 정책상 부적절.
 **운영 확인 필요**: 운영 서버 `update_data.py` 최근 로그, cron 실제 주기(월요일 05:00 주간인지), 운영 IP의 현재 응답.

@@ -144,6 +144,22 @@ cur.execute('SELECT COUNT(*) FROM heatmap_points')
 hp = cur.fetchone()[0]
 qa('heatmap_points 100K+', lambda: assert_(hp > 100000, f'{hp}개'))
 
+# ── K리그 공식 API 복구 데이터(2026-08-03 이후) 정합성 ──
+cur.execute("""SELECT COUNT(*) FROM events e WHERE e.tournament_id IN (410,777) AND e.home_score IS NOT NULL
+    AND e.date_ts >= strftime('%s','2026-08-03')
+    AND EXISTS (SELECT 1 FROM goal_events g WHERE g.event_id = e.id)
+    AND (SELECT COUNT(*) FROM goal_events g WHERE g.event_id = e.id) != e.home_score + e.away_score""")
+_bad_goals = cur.fetchone()[0]
+qa('복구 득점 = 최종 스코어 (8/3 이후 불일치 0)', lambda: assert_(_bad_goals == 0, f'불일치 {_bad_goals}경기'))
+cur.execute("""SELECT COUNT(*) FROM events e WHERE e.tournament_id IN (410,777) AND e.home_score IS NOT NULL AND e.home_score + e.away_score > 0
+    AND e.date_ts >= strftime('%s','2026-08-03')
+    AND NOT EXISTS (SELECT 1 FROM goal_events g WHERE g.event_id = e.id)""")
+_no_goal = cur.fetchone()[0]
+qa('득점 기록 없는 경기 비율 (8/3 이후, 복구 후 5% 미만)', lambda: assert_(_no_goal < 12, f'{_no_goal}경기 누락 — 복구 크롤러 확인'))
+cur.execute("SELECT COUNT(*) FROM goal_events WHERE is_own_goal = 1 AND is_penalty = 1")
+qa('자책골·PK 동시 표기 없음', lambda: assert_(cur.fetchone()[0] == 0))
+qa('recap 복구 경기 타임라인 (K2 10/24)', lambda: assert_(get('/api/match-recap?date=2026.10.24&home_slug=jeonnam&away_slug=daegu')['goals_complete'] is True))
+
 cur.execute('SELECT COUNT(*) FROM match_player_stats WHERE expected_goals IS NOT NULL')
 xg = cur.fetchone()[0]
 qa('xG 데이터 존재', lambda: assert_(xg > 0, f'{xg}건'))
