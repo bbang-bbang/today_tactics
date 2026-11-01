@@ -279,7 +279,7 @@ python update_data.py
 - K리그 부상 정보는 SofaScore 미제공 → `data/player_status.json` 수동 관리
 - `requirements.txt`는 ASCII 전용 (Windows pip cp949 인코딩 충돌 방지)
 - 크롤러 실행 시 Flask 서버와 별도 터미널 사용 권장
-- **SofaScore는 2026-08 이후 봇 차단(403 challenge)으로 incidents·라인업·슈팅맵·평균 위치·히트맵 수집이 멈춤** — `python analysis/audit_collection_gaps.py`로 소스별 공백 확인. 득점·카드·교체는 `collect_kleague_events.py`(K리그 공식 API)로 복구, 슈팅맵/xG/평균 위치/히트맵/평점은 대체 소스 없음(백로그 P1 참조)
+- **SofaScore는 2026-08 이후 봇 차단(403 challenge)으로 incidents·라인업·슈팅맵·평균 위치·히트맵 수집이 멈춤** — `python analysis/audit_collection_gaps.py`로 소스별 공백 확인. 득점·카드·교체는 `collect_kleague_events.py`(K리그 공식 API)로 복구, 슈팅(유효·블록·골만, 공식 xG 포함)·패스 행렬·선수 상세 스탯은 공식 API에서 추가로 가져올 수 있음(미구현, 백로그 P1 '정정' 참조). 빗나간 슈팅 포함 전체 슈팅맵·평균 위치·히트맵은 여전히 대체 소스 없음
 
 ## 데이터 정합성 (2026-06-15 점검)
 
