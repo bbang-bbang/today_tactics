@@ -1040,6 +1040,40 @@
         </div>`;
     }).join("") + `<div class="ins-method">근거 — 막대=경기당 승점(PPG)·가는 선=95% 신뢰구간(정규근사) · z≥1.96일 때만 '유의' · 휴식일=<b>같은 리그</b> 직전 경기 간격(컵·ACL 미반영, 21일 초과 공백 제외) · 각 팀-경기를 1건으로 집계(한 경기가 양 팀에 1건씩) · 20경기 미만 구간은 판정 제외</div>`;
   }
+  // 교체 효과 심화 — 팀별 '첫 전술 교체 후−전 15분 순득실'을 리그 평균 대비로. 선이 0을 가로지르면 차이 단정 불가.
+  function renderSubImpact(list) {
+    const el = document.getElementById("ins-subimp-body"); if (!el) return;
+    const RANGE = 1.0;   // 트랙 눈금: 리그 평균 대비 ±1.0골
+    const pos = v => Math.max(0, Math.min(100, (v + RANGE) / (2 * RANGE) * 100));
+    const sg = v => (v > 0 ? "+" : "") + v.toFixed(2);
+    const VERDICT = { none: ["ins-rs-v-none", "✔"], some: ["ins-rs-v-some", "❗"], insufficient: ["ins-rs-v-low", "…"] };
+    el.innerHTML = list.map(d => {
+      if (!d || !d.teams) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      const [vc, vi] = VERDICT[d.verdict.level] || VERDICT.insufficient;
+      const rows = d.teams.map(t => {
+        if (!t.z && t.z !== 0) {
+          return `<tr class="ins-xl-skip"><td class="ins-xl-team">${t.short}</td><td>${t.n}</td><td colspan="2" class="ins-adv-empty">표본 부족 (${d.min_team_n}경기 미만)</td></tr>`;
+        }
+        const lo = t.vs_league - t.ci, hi = t.vs_league + t.ci;
+        return `<tr><td class="ins-xl-team">${t.short}${t.significant ? ` <span class="ins-sb-star" title="유의 기준 초과 (z≥1.96)">★</span>` : ""}</td>
+          <td>${t.n}</td><td>${t.avg_first_min.toFixed(0)}분</td>
+          <td><span class="ins-sb-track" role="img" aria-label="${t.short} 리그 평균 대비 ${sg(t.vs_league)}골, 95% 구간 ${sg(lo)}~${sg(hi)}">
+              <i class="ins-sb-zero"></i><i class="ins-sb-ci" style="left:${pos(lo)}%;width:${pos(hi) - pos(lo)}%"></i><i class="ins-sb-dot" style="left:${pos(t.vs_league)}%"></i></span>
+              <span class="ins-sb-val">${sg(t.vs_league)}<span class="ins-rs-pm"> ±${t.ci.toFixed(2)}</span></span></td></tr>`;
+      }).join("");
+      const bench = d.bench.map((b, i) =>
+        `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${b.name}</span><span class="ins-adv-sub">${b.team} · ${b.minutes}분 ${b.goals}골 ${b.assists}도움</span><b>${b.ga_per90.toFixed(2)}</b></li>`).join("");
+      return `<div class="ins-adv-sub-h">${d.league} ${d.year === "all" ? "전 시즌" : d.year} <span class="ins-clutch-hint">첫 전술 교체 ${d.first_sub_samples.toLocaleString()}건</span></div>
+        <div class="ins-rs-verdict ${vc}" role="status"><span aria-hidden="true">${vi}</span> ${d.verdict.text}
+          <span class="ins-rs-hint">리그 전체 평균: 교체 후 순득실 ${sg(d.league_mean)}골${d.league_ci != null ? ` ±${d.league_ci.toFixed(2)}` : ""} (교체 전 15분 대비)${d.year !== "all" ? " · 단일 시즌은 표본이 작아 시즌 필터 '전체' 권장" : ""}</span></div>
+        <div class="ins-rs-grid ins-sb-grid">
+          <div><div class="ins-adv-sub-h">팀별 교체 후 득실 변화 <span class="ins-clutch-hint">리그 평균 대비</span></div>
+            <div class="ins-top-scroll"><table class="ins-table ins-xl-table ins-sb-table"><thead><tr><th>팀</th><th>경기</th><th>첫 교체</th><th>변화 (골)</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+          <div><div class="ins-adv-sub-h">🪑 벤치 선수 90분당 득점+도움 <span class="ins-clutch-hint">교체 출전 ${d.bench_min_minutes}분↑·${d.bench_min_apps}경기↑ · 리그 평균 ${d.league_ga_per90 ?? "-"}</span></div>
+            <ol class="ins-adv-list">${bench || '<li class="ins-adv-empty">조건을 넘는 선수 없음</li>'}</ol></div>
+        </div>`;
+    }).join("") + `<div class="ins-method">근거 — 변화=(첫 전술 교체 후 15분 순득실)−(전 15분 순득실), 경기별 평균 · 부상 교체 제외 · 앞뒤 15분이 모두 온전한 경기만 · 막대 점=리그 평균 대비, 선=95% 신뢰구간(0을 가로지르면 차이 단정 불가) · ★은 z≥1.96이나 여러 팀 동시 검정이라 우연히 나올 수 있음(검정당 약 5%) · 교체는 지고 있을 때 많아 경기 상황이 섞임 → 인과 아닌 참고 · 벤치 지표는 소표본 주의</div>`;
+  }
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     // 무음 실패 → 가시화: 실패한 인사이트명을 모아 1회 토스트 + console.warn (P5 견고성)
@@ -1053,6 +1087,8 @@
         .then(renderXgLuck).catch(warn("xG 운 보정")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/rest-effect?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderRestEffect).catch(warn("휴식일")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/substitution-impact?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderSubImpact).catch(warn("교체 효과")),
       fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(warn("날씨")),
       fetch(`/api/insights/clutch?${qs}`).then(r => r.json()).then(renderClutch).catch(warn("클러치")),
       fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(warn("슈팅")),

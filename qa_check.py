@@ -84,6 +84,14 @@ qa('rest-effect PPG 범위 0~3', lambda: assert_(all(0 <= b['ppg'] <= 3 for b in
 qa('rest-effect 표본부족 시 판정 보류', lambda: assert_(get('/api/insights/rest-effect?league=k2&year=2021')['verdict']['level'] == 'insufficient'))
 qa('rest-effect 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/rest-effect?league=zz') == 400))
 
+# ── 2-e. 교체 효과 심화 ──
+d_s = get('/api/insights/substitution-impact?league=k1&year=all')
+qa('sub-impact 키 완전성', lambda: assert_(all(k in d_s for k in ['teams', 'verdict', 'bench', 'league_mean', 'first_sub_samples', 'limits'])))
+qa('sub-impact 팀 표본합=전체 표본', lambda: assert_(sum(t['n'] for t in d_s['teams']) == d_s['first_sub_samples']))
+qa('sub-impact 벤치 최소출전 필터', lambda: assert_(all(b['minutes'] >= d_s['bench_min_minutes'] and b['apps'] >= d_s['bench_min_apps'] for b in d_s['bench'])))
+qa('sub-impact 벤치 90분당 정합', lambda: assert_(all(abs(b['ga_per90'] - (b['goals'] + b['assists']) * 90 / b['minutes']) < 0.011 for b in d_s['bench'])))
+qa('sub-impact 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/substitution-impact?league=zz') == 400))
+
 # ── 3. 백테스트 ──
 d_bt2 = get('/api/prediction-backtest?league=k2&year=2026')
 qa('backtest K2 n_total>0',   lambda: assert_(d_bt2['n_total'] > 0))

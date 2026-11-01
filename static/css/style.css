@@ -6383,6 +6383,16 @@ body.pr-expanded-lock {
 .ins-rs-cmp { margin-top: 4px; font-size: 0.74rem; color: #9fb4cc; }
 .ins-rs-cmp b { color: #e8f2ff; }
 @media (max-width: 480px) { .ins-rs-row { grid-template-columns: 78px minmax(0, 1fr) auto; gap: 6px; } }
+/* 교체 효과 — 0 기준 좌우 트랙(점=리그 평균 대비, 선=95% CI) */
+.ins-sb-grid { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+@media (max-width: 900px) { .ins-sb-grid { grid-template-columns: minmax(0, 1fr); } }
+.ins-sb-table td:last-child { text-align: left; }
+.ins-sb-track { position: relative; display: inline-block; vertical-align: middle; width: 120px; height: 14px; background: rgba(255,255,255,0.05); border-radius: 3px; }
+.ins-sb-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.45); }
+.ins-sb-ci { position: absolute; top: 50%; height: 2px; margin-top: -1px; background: #cbd5e1; }
+.ins-sb-dot { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #4ea4f8; border: 1px solid #0b1220; }
+.ins-sb-val { margin-left: 8px; font-weight: 700; color: #e8f2ff; font-variant-numeric: tabular-nums; }
+.ins-sb-star { color: #facc15; }
 .ins-xl-warn { margin: 4px 0 8px; padding: 6px 9px; border-radius: 6px; font-size: 0.74rem; color: #fde68a; background: rgba(250,204,21,0.1); border: 1px solid rgba(250,204,21,0.3); }
 /* 산식/근거 캡션 — 신빙성 표시 */
 .ins-method { margin-top: 9px; padding-top: 7px; border-top: 1px dashed rgba(255,255,255,0.10); font-size: 0.68rem; color: #8090a6; line-height: 1.5; }

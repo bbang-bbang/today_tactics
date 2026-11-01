@@ -6405,6 +6405,129 @@ def insights_substitution():
                     "avg_first": avg_first, "injury_subs": inj})
 
 
+_SUBIMP_WINDOW = 15         # 첫 전술 교체 앞뒤로 비교할 분
+_SUBIMP_MIN_TEAM_N = 8      # 팀당 이 미만이면 판정 제외
+_SUBIMP_MIN_SUB_MINS = 180  # 벤치 선수 90분당 지표: 교체 출전 합계 최소 분
+_SUBIMP_MIN_SUB_APPS = 4
+
+
+@app.route("/api/insights/substitution-impact")
+@cached_response(ttl=3600)
+def insights_substitution_impact():
+    """교체 효과 심화.
+    ① 팀별: 첫 전술 교체(부상 교체 제외) 앞뒤 15분의 순득실 변화(교체 후−전)를 리그 평균과 비교 (95% CI).
+       앞뒤를 같은 팀·같은 경기에서 비교해 팀 전력 차이는 통제하지만 경기 상황(지고 있어서 교체 등)은 통제하지 못한다.
+    ② 벤치 선수: 교체 출전 시간 기준 90분당 득점+도움 (최소 출전 시간 필터)."""
+    league = (request.args.get("league") or "k1").lower()
+    if league not in ("k1", "k2"):
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label = "K1" if league == "k1" else "K2"
+    tid = _LEAGUE_TID_BY_KEY[label]
+    year = (request.args.get("year") or "all").strip()
+    if year != "all" and not year.isdigit():
+        year = "all"
+    ycond, yp = "", ()
+    if year != "all":
+        lo, hi = _year_range(year)
+        ycond, yp = " AND e.date_ts >= ? AND e.date_ts < ?", (lo, hi)
+
+    W = _SUBIMP_WINDOW
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        ev = {r[0]: (r[1], r[2]) for r in conn.execute(f"""
+            SELECT e.id, e.home_team_id, e.away_team_id FROM events e
+            WHERE e.tournament_id = ? AND e.home_score IS NOT NULL{ycond}""", (tid, *yp))}
+        first_sub = conn.execute(f"""
+            SELECT s.event_id, s.team_id, MIN(s.minute + IFNULL(s.added_time, 0))
+            FROM sub_events s JOIN events e ON e.id = s.event_id
+            WHERE e.tournament_id = ? AND e.home_score IS NOT NULL
+              AND (s.injury IS NULL OR s.injury = 0){ycond}
+            GROUP BY s.event_id, s.team_id""", (tid, *yp)).fetchall()
+        goals = {}
+        for eid, gt, gm in conn.execute(f"""
+            SELECT g.event_id, g.team_id, g.minute + IFNULL(g.added_time, 0)
+            FROM goal_events g JOIN events e ON e.id = g.event_id
+            WHERE e.tournament_id = ? AND e.home_score IS NOT NULL{ycond}""", (tid, *yp)):
+            goals.setdefault(eid, []).append((gt, gm))
+        p_rows = conn.execute(f"""
+            SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name), m.team_id,
+                   COUNT(*), SUM(m.minutes_played), SUM(m.goals), SUM(m.assists)
+            FROM sub_events s
+            JOIN match_player_stats m ON m.event_id = s.event_id AND m.player_id = s.player_in_id
+            JOIN events e ON e.id = s.event_id LEFT JOIN players p ON p.id = m.player_id
+            WHERE e.tournament_id = ? AND e.home_score IS NOT NULL AND m.minutes_played > 0{ycond}
+            GROUP BY m.player_id""", (tid, *yp)).fetchall()
+    finally:
+        conn.close()
+
+    # ── ① 팀별 교체 전후 순득실 ──
+    per_team, all_d, firsts = {}, [], {}
+    for eid, team, m in first_sub:
+        if eid not in ev or team not in info or m is None or m < W + 1 or m + W > 90:
+            continue       # 앞뒤 15분이 모두 온전한 경기만
+        h, a = ev[eid]
+        opp = a if team == h else h
+        gl = goals.get(eid, [])
+        def net(lo, hi):
+            return sum(1 for t, g in gl if lo < g <= hi and t == team) - sum(1 for t, g in gl if lo < g <= hi and t == opp)
+        d = net(m, m + W) - net(m - W, m)
+        per_team.setdefault(team, []).append(d)
+        firsts.setdefault(team, []).append(m)
+        all_d.append(d)
+    n_all = len(all_d)
+    lg_mean = sum(all_d) / n_all if n_all else 0.0
+    lg_sd = math.sqrt(sum((x - lg_mean) ** 2 for x in all_d) / (n_all - 1)) if n_all > 1 else 0.0
+    lg_ci = 1.96 * lg_sd / math.sqrt(n_all) if n_all > 1 else None
+
+    teams = []
+    for team, ds in per_team.items():
+        n = len(ds)
+        mean = sum(ds) / n
+        sd = math.sqrt(sum((x - mean) ** 2 for x in ds) / (n - 1)) if n > 1 else 0.0
+        item = {"id": info[team]["id"], "short": info[team].get("short", info[team]["name"]),
+                "n": n, "avg_first_min": round(sum(firsts[team]) / n, 1),
+                "mean": round(mean, 2), "eligible": n >= _SUBIMP_MIN_TEAM_N}
+        if item["eligible"] and sd > 0:
+            rel = mean - lg_mean
+            z = rel / (sd / math.sqrt(n))
+            item.update({"vs_league": round(rel, 2), "ci": round(1.96 * sd / math.sqrt(n), 2),
+                         "z": round(z, 1), "significant": abs(z) >= 1.96})
+        teams.append(item)
+    teams.sort(key=lambda t: (-t.get("vs_league", -99), -t["n"]))
+    elig = [t for t in teams if "z" in t]
+    n_sig = sum(1 for t in elig if t["significant"])
+
+    # ── ② 벤치 선수 90분당 G+A ──
+    tot_g = sum(r[5] or 0 for r in p_rows); tot_a = sum(r[6] or 0 for r in p_rows); tot_m = sum(r[4] or 0 for r in p_rows)
+    bench = []
+    for pid, nm, tm, apps, mins, g, a in p_rows:
+        if apps < _SUBIMP_MIN_SUB_APPS or (mins or 0) < _SUBIMP_MIN_SUB_MINS or tm not in info:
+            continue
+        ga = (g or 0) + (a or 0)
+        bench.append({"player_id": pid, "name": nm or "", "team": info[tm].get("short", ""),
+                      "apps": apps, "minutes": int(mins), "goals": g or 0, "assists": a or 0,
+                      "ga_per90": round(ga * 90 / mins, 2)})
+    bench.sort(key=lambda b: (-b["ga_per90"], -b["minutes"]))
+    league_ga90 = round((tot_g + tot_a) * 90 / tot_m, 2) if tot_m else None
+
+    expected_fp = round(len(elig) * 0.05, 1)
+    if not elig:
+        verdict = {"level": "insufficient", "text": "표본이 부족해 팀별 교체 효과를 판정할 수 없습니다."}
+    elif n_sig == 0:
+        verdict = {"level": "none", "text": "교체 후 득실 변화가 리그 평균과 유의하게 다른 팀은 없습니다 — 팀 간 차이는 표본 오차 범위입니다."}
+    else:
+        verdict = {"level": "some", "text": f"{n_sig}개 팀이 유의 기준을 넘었습니다. 다만 {len(elig)}개 팀을 동시에 검정하면 우연히 약 {expected_fp}팀은 유의하게 나올 수 있어 참고용입니다."}
+    return jsonify({
+        "league": label, "year": year, "window": W, "first_sub_samples": n_all,
+        "league_mean": round(lg_mean, 2), "league_ci": round(lg_ci, 2) if lg_ci is not None else None,
+        "teams": teams, "verdict": verdict,
+        "bench": bench[:8], "bench_min_minutes": _SUBIMP_MIN_SUB_MINS, "bench_min_apps": _SUBIMP_MIN_SUB_APPS,
+        "league_ga_per90": league_ga90, "min_team_n": _SUBIMP_MIN_TEAM_N,
+        "limits": "교체는 지고 있거나 경기가 흐를 때 이뤄지는 경우가 많아 전후 변화에 경기 상황이 섞입니다. 인과가 아닌 참고 지표입니다.",
+    })
+
+
 @app.route("/api/insights/goalkeeper")
 @cached_response(ttl=1800)
 def insights_goalkeeper():
