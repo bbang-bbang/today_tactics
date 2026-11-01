@@ -66,6 +66,16 @@ def _brief_status(q):
 qa('brief 리그 불일치 400', lambda: assert_(_brief_status('/api/pre-match-brief?team=suwon&opp=ulsan') == 400))
 qa('brief 동일팀/인젝션 400', lambda: assert_(_brief_status('/api/pre-match-brief?team=ulsan&opp=ulsan') == 400 and _brief_status("/api/pre-match-brief?team=x'+OR+'1'='1&opp=ulsan") == 400))
 
+# ── 2-c. xG 운 보정 순위 ──
+d_x = get('/api/insights/xg-luck?league=k1&year=2026')
+qa('xg-luck 12팀 + 키', lambda: assert_(len(d_x['teams']) == 12 and all(k in d_x for k in ['matches', 'matches_with_xg', 'warnings'])))
+qa('xg-luck 실제순위 1..N 연속', lambda: assert_(sorted(t['rank_actual'] for t in d_x['teams']) == list(range(1, len(d_x['teams']) + 1))))
+_el = [t for t in d_x['teams'] if t['eligible']]
+qa('xg-luck xG순위 1..N 연속', lambda: assert_(sorted(t['rank_xg'] for t in _el) == list(range(1, len(_el) + 1))))
+qa('xg-luck xPPG 범위 0~3', lambda: assert_(all(0 <= t['xppg'] <= 3 for t in _el)))
+qa('xg-luck 기대승점 평균≈실제(±0.25PPG)', lambda: assert_(abs(sum(t['ppg'] - t['xppg'] for t in _el) / len(_el)) < 0.25))
+qa('xg-luck 데이터 없는 시즌 경고', lambda: assert_(get('/api/insights/xg-luck?league=k2&year=2021')['warnings']))
+
 # ── 3. 백테스트 ──
 d_bt2 = get('/api/prediction-backtest?league=k2&year=2026')
 qa('backtest K2 n_total>0',   lambda: assert_(d_bt2['n_total'] > 0))

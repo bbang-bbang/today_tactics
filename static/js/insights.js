@@ -987,6 +987,28 @@
        <div class="ins-adv-sub-h">🛫 공중 지배 <span class="ins-clutch-hint">공중볼 30+</span></div><ol class="ins-adv-list">${ae || empty}</ol>
        <div class="ins-method">근거 — 돌파=드리블 성공 합 · 공중=공중볼 경합 승 · 성공률/승률 병기 · 최소 표본 필터(드리블 20·공중 30)</div>`;
   }
+  // xG 운 보정 순위 — 리그 필터 'all'이면 K1·K2를 차례로 표시
+  function renderXgLuck(list) {
+    const el = document.getElementById("ins-xgluck-body"); if (!el) return;
+    const LUCK = { lucky: ["🍀 행운", "ins-xl-lucky"], unlucky: ["🌧 불운", "ins-xl-unlucky"], fair: ["= 부합", "ins-xl-fair"] };
+    const gapTxt = g => g > 0 ? `<span class="ins-xl-up">▲${g}</span>` : g < 0 ? `<span class="ins-xl-down">▼${-g}</span>` : `<span class="ins-xl-flat">–</span>`;
+    el.innerHTML = list.map(d => {
+      if (!d || !d.teams) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      const rows = d.teams.map(t => {
+        if (!t.eligible) {
+          return `<tr class="ins-xl-skip"><td>${t.rank_actual}</td><td class="ins-xl-team">${t.short}</td><td>${t.pts}</td><td colspan="4" class="ins-adv-empty">xG 표본 부족 (${t.xg_games}/${d.min_games}경기)</td></tr>`;
+        }
+        const [lbl, cls] = LUCK[t.luck];
+        return `<tr><td>${t.rank_actual}</td><td class="ins-xl-team">${t.short}</td><td>${t.pts}</td>
+          <td>${t.rank_xg}</td><td title="xG 기준 순위가 실제보다 ${t.rank_gap > 0 ? "높음 (실제는 더 낮게 평가됨)" : t.rank_gap < 0 ? "낮음 (실제는 더 높게 평가됨)" : "같음"}">${gapTxt(t.rank_gap)}</td>
+          <td title="xG 보유 ${t.xg_games}경기 기준">${t.ppg.toFixed(2)} / ${t.xppg.toFixed(2)}</td>
+          <td><span class="ins-xl-badge ${cls}">${lbl} ${t.luck_ppg > 0 ? "+" : ""}${t.luck_ppg.toFixed(2)}</span></td></tr>`;
+      }).join("");
+      const warn = (d.warnings || []).map(w => `<div class="ins-xl-warn" role="note">⚠ ${w}</div>`).join("");
+      return `<div class="ins-adv-sub-h">${d.league} ${d.year} <span class="ins-clutch-hint">xG 보유 ${d.matches_with_xg}/${d.matches}경기</span></div>${warn}
+        <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>실제</th><th>팀</th><th>승점</th><th>xG 순위</th><th>차이</th><th title="경기당 승점: 실제 / 기대">PPG 실제/기대</th><th>판정</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join("") + `<div class="ins-method">근거 — 기대 승점=경기별 양 팀 xG를 포아송 분포로 환산한 승·무 확률(3·1점) · <b>xG가 있는 경기만</b> 실제·기대 모두 같은 경기로 비교 · 차이=xG 기준으론 몇 계단 더 위(▲)/아래(▼)인지 · 판정 ±${list[0] && list[0].ppg_band || 0.25} PPG 이상 · 팀당 ${list[0] && list[0].min_games || 5}경기 미만 제외 · 소표본이라 참고용</div>`;
+  }
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     // 무음 실패 → 가시화: 실패한 인사이트명을 모아 1회 토스트 + console.warn (P5 견고성)
@@ -994,7 +1016,10 @@
     const warn = name => e => { failed.push(name); console.warn("[insights] 로드 실패:", name, e); };
     const flushed = { v: false };
     const notify = () => { if (!flushed.v && failed.length && window.showToast) { flushed.v = true; window.showToast(`일부 인사이트를 불러오지 못했습니다: ${failed.join(", ")} (새로고침 해보세요)`); } };
+    const xgLeagues = currentLeague === "all" ? ["k1", "k2"] : [currentLeague];
     Promise.allSettled([
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/xg-luck?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderXgLuck).catch(warn("xG 운 보정")),
       fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(warn("날씨")),
       fetch(`/api/insights/clutch?${qs}`).then(r => r.json()).then(renderClutch).catch(warn("클러치")),
       fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(warn("슈팅")),

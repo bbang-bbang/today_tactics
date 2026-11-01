@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import time
 import uuid
@@ -6618,6 +6619,126 @@ def insights_card_rankings():
         "red_top":    [player_row(r) for r in red_rows],
         "team_top":   [team_row(r)   for r in team_rows],
     })
+
+
+_XGLUCK_MIN_GAMES = 5       # 팀당 xG 보유 경기가 이 미만이면 xG 순위 제외
+_XGLUCK_PPG_BAND = 0.25     # |실제 PPG − xPPG|가 이 이상이면 행운/불운 판정
+
+
+def _xpts_from_xg(xh, xa, n=11):
+    """한 경기의 두 팀 xG를 독립 포아송 λ로 보고 (홈 기대승점, 원정 기대승점) 계산."""
+    def pmf(lam):
+        out = [math.exp(-lam)]
+        for k in range(1, n):
+            out.append(out[-1] * lam / k)
+        return out
+    ph, pa = pmf(xh), pmf(xa)
+    win = draw = loss = 0.0
+    for i in range(n):
+        for j in range(n):
+            p = ph[i] * pa[j]
+            if i > j:
+                win += p
+            elif i == j:
+                draw += p
+            else:
+                loss += p
+    tot = win + draw + loss
+    if tot <= 0:
+        return 1.0, 1.0
+    win, draw, loss = win / tot, draw / tot, loss / tot
+    return 3 * win + draw, 3 * loss + draw
+
+
+@app.route("/api/insights/xg-luck")
+@cached_response(ttl=1800)
+def insights_xg_luck():
+    """xG 기반 운 보정 순위 — 실제 순위 vs 경기별 xG로 환산한 기대 승점(xPts) 순위.
+    xG가 있는 경기만 비교(커버리지 동봉). 실제/기대 모두 같은 경기 집합으로 계산해 표본 편향을 막는다."""
+    league = (request.args.get("league") or "k1").lower()
+    if league not in ("k1", "k2"):
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label = "K1" if league == "k1" else "K2"
+    tid = _LEAGUE_TID_BY_KEY[label]
+
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        year = (request.args.get("year") or "").strip()
+        if not year.isdigit():
+            row = conn.execute(
+                "SELECT MAX(strftime('%Y', datetime(date_ts,'unixepoch','localtime'))) "
+                "FROM events WHERE tournament_id = ? AND home_score IS NOT NULL", (tid,)).fetchone()
+            year = row[0] if row and row[0] else str(datetime.now().year)
+        ys, ye = _year_range(year)
+        rows = conn.execute("""
+            SELECT e.home_team_id, e.away_team_id, e.home_score, e.away_score,
+                   (SELECT SUM(COALESCE(m.expected_goals, 0)) FROM match_player_stats m
+                    WHERE m.event_id = e.id AND m.is_home = 1),
+                   (SELECT SUM(COALESCE(m.expected_goals, 0)) FROM match_player_stats m
+                    WHERE m.event_id = e.id AND m.is_home = 0)
+            FROM events e
+            WHERE e.tournament_id = ? AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL
+              AND e.date_ts >= ? AND e.date_ts < ?
+        """, (tid, ys, ye)).fetchall()
+    finally:
+        conn.close()
+
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
+    agg = {}
+    def slot(ss):
+        return agg.setdefault(ss, {"played": 0, "pts": 0, "gf": 0, "ga": 0, "xg_games": 0, "cov_pts": 0,
+                                   "xpts": 0.0, "gf_cov": 0, "ga_cov": 0, "xgf": 0.0, "xga": 0.0})
+    with_xg = 0
+    for hid, aid, hs, as_, xh, xa in rows:
+        if hid not in info or aid not in info:
+            continue
+        has_xg = bool(xh and xa and xh > 0 and xa > 0)
+        with_xg += has_xg
+        xp_h, xp_a = _xpts_from_xg(xh, xa) if has_xg else (0, 0)
+        for ss, gf, ga, x_for, x_ag, xp in ((hid, hs, as_, xh, xa, xp_h), (aid, as_, hs, xa, xh, xp_a)):
+            s = slot(ss)
+            pts = 3 if gf > ga else 1 if gf == ga else 0
+            s["played"] += 1; s["pts"] += pts; s["gf"] += gf; s["ga"] += ga
+            if has_xg:
+                s["xg_games"] += 1; s["cov_pts"] += pts; s["xpts"] += xp
+                s["gf_cov"] += gf; s["ga_cov"] += ga; s["xgf"] += x_for; s["xga"] += x_ag
+
+    order = sorted(agg, key=lambda k: (agg[k]["pts"], agg[k]["gf"] - agg[k]["ga"], agg[k]["gf"]), reverse=True)
+    rank_actual = {ss: i + 1 for i, ss in enumerate(order)}
+    eligible = [ss for ss in order if agg[ss]["xg_games"] >= _XGLUCK_MIN_GAMES]
+    by_xg = sorted(eligible, key=lambda k: agg[k]["xpts"] / agg[k]["xg_games"], reverse=True)
+    rank_xg = {ss: i + 1 for i, ss in enumerate(by_xg)}
+    rank_act_el = {ss: i + 1 for i, ss in enumerate(eligible)}   # 비교용: xG 순위와 같은 모집단
+
+    teams = []
+    for ss in order:
+        s, t = agg[ss], info[ss]
+        g = s["xg_games"]
+        item = {"id": t["id"], "name": t["name"], "short": t.get("short", t["name"]),
+                "emblem": t.get("emblem"), "primary": t.get("primary"),
+                "played": s["played"], "pts": s["pts"], "gd": s["gf"] - s["ga"],
+                "rank_actual": rank_actual[ss], "xg_games": g, "eligible": ss in rank_xg}
+        if g:
+            item.update({"cov_pts": s["cov_pts"], "xpts": round(s["xpts"], 1),
+                         "ppg": round(s["cov_pts"] / g, 2), "xppg": round(s["xpts"] / g, 2),
+                         "gf_pg": round(s["gf_cov"] / g, 2), "xgf_pg": round(s["xgf"] / g, 2),
+                         "ga_pg": round(s["ga_cov"] / g, 2), "xga_pg": round(s["xga"] / g, 2)})
+        if item["eligible"]:
+            luck = item["ppg"] - item["xppg"]
+            item.update({"rank_xg": rank_xg[ss], "rank_gap": rank_act_el[ss] - rank_xg[ss],
+                         "luck_ppg": round(luck, 2),
+                         "luck": "lucky" if luck >= _XGLUCK_PPG_BAND else "unlucky" if luck <= -_XGLUCK_PPG_BAND else "fair"})
+        teams.append(item)
+
+    total = sum(1 for r in rows if r[0] in info and r[1] in info)
+    warnings = []
+    if not eligible:
+        warnings.append("이 시즌·리그는 xG 데이터가 부족해 운 보정 순위를 계산할 수 없습니다.")
+    elif total and with_xg / total < 0.6:
+        warnings.append(f"xG가 있는 경기가 {with_xg}/{total}경기뿐입니다. 팀마다 비교 경기 집합이 달라 일정 난이도 차이가 섞일 수 있습니다.")
+    return jsonify({"league": label, "year": year, "matches": total, "matches_with_xg": with_xg,
+                    "min_games": _XGLUCK_MIN_GAMES, "ppg_band": _XGLUCK_PPG_BAND,
+                    "teams": teams, "warnings": warnings})
 
 
 @app.route("/api/insights/xg-efficiency")

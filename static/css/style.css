@@ -6347,6 +6347,21 @@ body.pr-expanded-lock {
 .ins-cv-pct { font-size: 0.78rem; font-weight: 800; color: #7ecfff; text-align: right; font-variant-numeric: tabular-nums; }
 .ins-cv-sub { font-size: 0.66rem; color: #8aa0b8; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 @media (max-width: 760px) { .ins-adv-grid { grid-template-columns: 1fr; } }
+/* xG 운 보정 순위 — 판정은 아이콘+텍스트+수치로 전달(색상만 의존 X) */
+.ins-adv-wide { grid-column: 1 / -1; }
+.ins-adv-card { min-width: 0; }            /* nowrap 표가 그리드 칸을 밀어내 가로 스크롤 유발하는 것 방지 */
+@media (max-width: 760px) { .ins-adv-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .ins-xl-table td, .ins-xl-table th { padding: 4px 5px; font-size: 0.72rem; } }
+.ins-xl-table td, .ins-xl-table th { text-align: center; white-space: nowrap; }
+.ins-xl-table td.ins-xl-team { text-align: left; font-weight: 700; color: #e8f2ff; }
+.ins-xl-skip td { color: #8090a6; }
+.ins-xl-up { color: #7ecfff; font-weight: 700; }      /* 화살표는 중립색 — 행운/불운 판단은 배지가 담당 */
+.ins-xl-down { color: #fbbf77; font-weight: 700; }
+.ins-xl-flat { color: #8090a6; }
+.ins-xl-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; background: rgba(255,255,255,0.07); color: #c8d8f0; }
+.ins-xl-lucky { background: rgba(74,222,128,0.14); color: #86efac; }
+.ins-xl-unlucky { background: rgba(248,113,113,0.14); color: #fca5a5; }
+.ins-xl-warn { margin: 4px 0 8px; padding: 6px 9px; border-radius: 6px; font-size: 0.74rem; color: #fde68a; background: rgba(250,204,21,0.1); border: 1px solid rgba(250,204,21,0.3); }
 /* 산식/근거 캡션 — 신빙성 표시 */
 .ins-method { margin-top: 9px; padding-top: 7px; border-top: 1px dashed rgba(255,255,255,0.10); font-size: 0.68rem; color: #8090a6; line-height: 1.5; }
 /* 산식 안내 — 표 위에 크게/박스로 (예전 하단 작은 footnote → 상단 강조) */
