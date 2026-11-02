@@ -14,7 +14,7 @@
   2. ✅ **라인업·히트맵 복구 — 구현 + 운영 반영 완료(2026-11-02)**: `recover_lineups_kleague.py`(STEP 23, 포털 라인업+mps 등번호) · `collect_kleague_heatmap.py`(STEP 24, 공식 `getHeatmapData` + GK 기준 방향 변환). 원장 `kleague_recovery_log`. 운영에서 1회 실행 완료(라인업 52경기·히트맵 67경기), 이후 월 05:00 크론이 STEP 23·24로 자동. 워커 간 캐시 무효화도 같은 날 수정(`.cache_generation` 마커).
      - 이 PC는 Git Bash ssh가 한글 사용자 경로를 못 읽음 → **PowerShell의 Windows OpenSSH**로 접속. DB 받기는 서버에서 `sqlite3 .backup /tmp/x.db` 후 scp(운영 DB 직접 복사 금지).
      - 별건 버그: 득점 중복 1경기(backlog P1 '득점 중복').
-  3. 팬 항목 ②: 팀/선수 스토리형 인사이트(착수 전 `team-trend`·`player-analytics` 중복 확인).
+  3. ⏸ (보류 — 사용자 판단 중요도 낮음) 팬 항목 ②: 팀/선수 스토리형 인사이트(착수 전 `team-trend`·`player-analytics` 중복 확인).
   4. 선택: 스카우팅 요약에 '패스 허브' 연동 · 슈팅 PK/FK로 `is_penalty` 보정 · 선수 상세 스탯 복구 검토.
 - **정적 자산 수정 시 필수**: nginx가 `/static/`을 `expires 7d` + `immutable`로 내보내므로 JS/CSS를 바꾸면 `templates/index.html`의 `?v=`를 반드시 올릴 것(안 올리면 기존 방문자는 최대 7일간 옛 파일 사용).
 
