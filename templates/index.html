@@ -6,7 +6,7 @@
     <title>Today Tactics - 축구 전술판</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=98">
+    <link rel="stylesheet" href="/static/css/style.css?v=100">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -69,6 +69,7 @@
                 <span class="dfb-dot"></span>
                 <span id="dfb-text">데이터 로딩 중…</span>
             </div>
+            <button type="button" id="gd-open" class="gd-open-btn" title="지표 정의와 해석 주의점" aria-haspopup="dialog">📖 분석 읽는 법</button>
             {% if current_user %}
             <div id="user-menu">
                 {% if current_user.picture %}
@@ -1103,6 +1104,75 @@
             <button id="ob-start-btn" class="ob-start-btn">시작하기 →</button>
         </div>
     </div>
+    <!-- 분석 읽는 법 (도움말) — 지표 정의·해석 주의점. 문구는 각 화면의 '근거' 줄과 일치시킬 것 -->
+    <div id="guide-overlay" class="gd-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="gd-title">
+        <div class="gd-card">
+            <div class="gd-head">
+                <h2 id="gd-title" class="gd-title">분석 읽는 법</h2>
+                <button type="button" id="gd-close" class="gd-close" aria-label="닫기">✕</button>
+            </div>
+            <p class="gd-lead">숫자를 보기 전에 3가지만 기억하세요. <b>① 표본</b>(경기 수가 적으면 참고용) · <b>② 상관≠인과</b>(교체·휴식은 경기 상황이 섞임) · <b>③ 같은 기준끼리 비교</b>(리그·시즌 필터 확인).</p>
+            <div class="gd-body">
+                <details class="gd-sec" open>
+                    <summary>🍀 xG 운 보정 순위 — "운이 좋았나?"</summary>
+                    <ul>
+                        <li><b>기대 승점(xPts)</b>: 경기마다 양 팀 xG(기대 득점)를 확률로 바꿔 승 3점·무 1점으로 환산한 값.</li>
+                        <li><b>▲/▼ 차이</b>: xG 기준 순위가 실제보다 몇 계단 위(▲)·아래(▼)인지. ▲가 크면 내용보다 순위가 낮은 팀, ▼는 내용보다 순위가 높은 팀.</li>
+                        <li>xG가 있는 경기만 실제·기대 모두 같은 경기로 비교합니다. 팀당 5경기 미만은 제외, ±0.25 PPG 이상만 판정 — 소표본이라 참고용.</li>
+                    </ul>
+                </details>
+                <details class="gd-sec">
+                    <summary>😴 휴식일·연전 영향 — "피로가 성적에 영향이 있나?"</summary>
+                    <ul>
+                        <li>막대 = 경기당 승점(PPG), 가는 선 = 95% 신뢰구간. <b>선이 길수록 불확실</b>합니다.</li>
+                        <li>'유의' 표시는 통계 기준(z≥1.96)을 넘었을 때만 붙습니다. 표시가 없으면 "차이가 있다고 단정 못 함"이지 "차이 없음"이 아닙니다.</li>
+                        <li>휴식일은 같은 리그 직전 경기 간격입니다. 컵·ACL은 반영되지 않고, 20경기 미만 구간은 판정에서 제외됩니다.</li>
+                    </ul>
+                </details>
+                <details class="gd-sec">
+                    <summary>🔁 교체 효과 — "교체가 흐름을 바꿨나?"</summary>
+                    <ul>
+                        <li><b>변화</b> = (첫 전술 교체 후 15분 순득실) − (교체 전 15분 순득실), 경기별 평균. 부상 교체는 제외합니다.</li>
+                        <li>교체는 <b>지고 있을 때</b> 많이 하므로 경기 상황이 섞입니다. 효과가 아니라 <b>참고 지표</b>로 보세요.</li>
+                        <li>★는 통계상 유의하지만 여러 팀을 동시에 검정해 우연히 나올 수도 있습니다(검정당 약 5%). 선이 0을 가로지르면 차이를 단정할 수 없습니다.</li>
+                    </ul>
+                </details>
+                <details class="gd-sec">
+                    <summary>⛳ 세트피스 공수 — "세트피스로 얻고 잃는 슛"</summary>
+                    <ul>
+                        <li>세트피스 = 코너 + 프리킥 + 스로인 + 기타 (<b>PK 제외</b>). 공격 = 만든 슛, 허용 = 상대에게 내준 슛(경기당).</li>
+                        <li><b>순 = 공격 − 허용</b>. 순위는 8경기 이상 팀만, SP%(득점·실점 중 세트피스 비중)는 골 8개 미만이면 †(소표본)로 표시됩니다.</li>
+                    </ul>
+                </details>
+                <details class="gd-sec">
+                    <summary>🎯 슈팅·승부처·수문장·듀얼</summary>
+                    <ul>
+                        <li><b>유효슛</b> = 득점 + 선방 유발. <b>결정률</b> = 골 ÷ 슛.</li>
+                        <li><b>결승골</b> = 승자가 패자 최종 득점+1에 도달한 골. <b>동점골</b> = 뒤지다 동점을 만든 골.</li>
+                        <li><b>선방률</b> = 선방 ÷ (선방 + 실점), 주전(60분↑) 5경기 이상만. <b>CS</b> = 무실점 경기.</li>
+                        <li><b>듀얼</b>: 돌파 = 드리블 성공, 공중 = 공중볼 경합 승. 최소 표본(드리블 20·공중 30) 미만은 제외.</li>
+                    </ul>
+                </details>
+                <details class="gd-sec">
+                    <summary>🕸 패스 네트워크 — "누가 누구와 연결되나?"</summary>
+                    <ul>
+                        <li>원 크기 = 패스 관여량, 선 굵기 = 두 선수 사이 <b>양방향 패스 합계</b>(방향별 횟수는 툴팁에).</li>
+                        <li>원 위치는 <b>선발 라인업 배치</b>이지 실제 평균 위치가 아닙니다. 겹치는 선수는 보기 좋게 약간 옮겨 그렸습니다.</li>
+                        <li>슬라이더로 표시할 최소 연결 횟수를 조절하고, 시즌 누적과 경기별 보기를 전환할 수 있습니다.</li>
+                    </ul>
+                </details>
+                <details class="gd-sec">
+                    <summary>📡 데이터 출처와 한계</summary>
+                    <ul>
+                        <li>기본 데이터는 SofaScore이며, <b>2026-08-02 이후 수집이 차단</b>되어 득점·카드·교체·라인업·히트맵·패스는 K리그 공식 API로 복구해 채웁니다.</li>
+                        <li>복구 데이터는 출처가 달라 선수 이름 표기·일부 세부 스탯이 이전 경기와 다를 수 있습니다. 상단 <b>"⚠ 일부 미수집"</b> 배지가 보이면 최근 수집에 빠진 항목이 있다는 뜻입니다.</li>
+                        <li>경기 시점 날씨는 Open-Meteo 실측값입니다.</li>
+                    </ul>
+                </details>
+            </div>
+            <button type="button" id="gd-done" class="ob-start-btn">확인</button>
+        </div>
+    </div>
     <script>
     (function () {
         // ── 온보딩 오버레이 ──────────────────────────────────────
@@ -1133,6 +1203,29 @@
             });
             um.appendChild(resetLink);
         }
+
+        // ── 분석 읽는 법 (도움말 모달) ─────────────────────────────
+        var guide = document.getElementById('guide-overlay');
+        var guideOpener = null;
+        function openGuide() {
+            guideOpener = document.activeElement;
+            guide.style.display = '';
+            requestAnimationFrame(function () { guide.classList.add('gd-visible'); });
+            document.getElementById('gd-close').focus();
+        }
+        function closeGuide() {
+            guide.classList.remove('gd-visible');
+            setTimeout(function () { guide.style.display = 'none'; }, 200);
+            if (guideOpener && guideOpener.focus) guideOpener.focus();
+        }
+        var guideOpen = document.getElementById('gd-open');
+        if (guideOpen) guideOpen.addEventListener('click', openGuide);
+        document.getElementById('gd-close').addEventListener('click', closeGuide);
+        document.getElementById('gd-done').addEventListener('click', closeGuide);
+        guide.addEventListener('click', function (e) { if (e.target === guide) closeGuide(); });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && guide.style.display !== 'none') closeGuide();
+        });
 
         // ── 데이터 신선도 배지 ──────────────────────────────────
         var dfbText  = document.getElementById('dfb-text');
