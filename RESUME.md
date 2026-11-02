@@ -13,10 +13,18 @@
   1. ✅ **운영 DB 동기화 완료(2026-11-02)**: 서버에서 `update_data.py --days 14` 실행 → 10/31~11/1 결과·득점/카드/교체 복구(STEP 21)·패스 네트워크 2023~2026(STEP 22, 1,636경기) 반영. 이후는 **월 05:00 크론**이 자동 처리(첫 동기화는 SSH로 직접 실행 — `/api/trigger-update`는 30분 제한이라 부적합). 접속: `ssh -i ~/.ssh/<SSH키> rocky@<운영IP>`(키는 `~/.ssh/`), 앱 `/opt/today_tactics`, 파이썬 `./venv/bin/python`. 주의: 업데이트 직후 gunicorn 워커별 메모리 캐시 때문에 일부 API가 옛 응답을 최대 1시간 서빙(백로그 P1 '미해결' 참조).
   2. ✅ **라인업·히트맵 복구 — 구현 + 운영 반영 완료(2026-11-02)**: `recover_lineups_kleague.py`(STEP 23, 포털 라인업+mps 등번호) · `collect_kleague_heatmap.py`(STEP 24, 공식 `getHeatmapData` + GK 기준 방향 변환). 원장 `kleague_recovery_log`. 운영에서 1회 실행 완료(라인업 52경기·히트맵 67경기), 이후 월 05:00 크론이 STEP 23·24로 자동. 워커 간 캐시 무효화도 같은 날 수정(`.cache_generation` 마커).
      - 이 PC는 Git Bash ssh가 한글 사용자 경로를 못 읽음 → **PowerShell의 Windows OpenSSH**로 접속. DB 받기는 서버에서 `sqlite3 .backup /tmp/x.db` 후 scp(운영 DB 직접 복사 금지).
-     - 별건 버그: 득점 중복 1경기(backlog P1 '득점 중복').
+     - ✅ 별건 버그 '득점 중복'은 해결됨(2026-11-02, `fix_duplicate_incidents.py` + 재수집 시 경기 단위 교체).
   3. ⏸ (보류 — 사용자 판단 중요도 낮음) 팬 항목 ②: 팀/선수 스토리형 인사이트(착수 전 `team-trend`·`player-analytics` 중복 확인).
   4. 선택: 스카우팅 요약에 '패스 허브' 연동 · 슈팅 PK/FK로 `is_penalty` 보정 · 선수 상세 스탯 복구 검토.
 - **2026-11-03 완료**: ①헤더 `📖 분석 읽는 법` 도움말 모달(`templates/index.html` `#guide-overlay`, style.css v100 — 지표 정의·해석 주의점·데이터 한계, 문구는 각 화면 '근거' 줄과 일치 유지) ②공식 선수 상세 API(`getMatchRecordPlayerDetail`) 정합 검증 → **보완재, `match_player_stats`에 혼합 금지**, 구현 보류(트리거: 운영 선수 스탯까지 차단 확산 — 상세·수치는 `checklist/backlog.md` P1) ③이 PC 새 수집 단계(STEP 23~25)를 DB 복사본에서 dry-run→apply 검증(원본 미변경). 상세: `checklist/work-log-2026-11-03.md`. 이 PC의 `players.db`는 11/2 00:19 기준(운영보다 오래됨) — 서버/QA 필요 시 운영 DB를 `sqlite3 .backup` 후 scp.
+- **📋 다음 작업 (2026-11-03 기준, 우선순위순 — 상세·근거는 `checklist/backlog.md`)**:
+  1. **운영 수집 상태 점검** (읽기 전용): 월 05:00 크론(`update_data.py --days 14`) 로그에서 STEP 3·20(SofaScore)과 STEP 21~25(공식 API 복구)가 정상인지, `analysis/audit_collection_gaps.py` 공백 일수가 늘지 않는지 확인. 11/1 히트맵 7경기는 '공개 지연'이라 다음 크론에서 채워져야 함. 운영 접속은 PowerShell OpenSSH(이 PC 기준).
+  2. **운영 서버 백업 파일 정리**: `/home/rocky/players_before_*_20261102.db`(복구·중복 정리 직전 백업) — 정상 동작 확인 후 삭제 가능. 삭제 전 반드시 사용자 확인.
+  3. **선수 상세 스탯 대비 (보류 중 — 트리거 대기)**: SofaScore 차단이 운영의 선수 스탯(mps)까지 번지면 착수. 공식 `getMatchRecordPlayerDetail`은 SofaScore 대체가 아닌 보완재(정의 다른 항목 혼합 금지). 착수 전 선결: 출전분 불일치(공식 74.8분 vs 66.2분) 원인 조사 + 표본 30경기↑ 재검증. 방침은 backlog P1 '선수 상세 정합 검증 2026-11-03'.
+  4. **도움말('📖 분석 읽는 법') 보강**: Firefox·Edge 크로스 브라우저 확인(미실시) · 선수 리포트(레이더·백분위)와 경기 후 요약 카드 설명 추가 · 지표 문구는 각 화면 '근거' 줄(`insights.js`·`pass_network.js`)과 항상 동기화. 기존 헤더 '도움말' 링크는 로그인 상태에서만 보이는 선재 이슈(공개 모드 미노출) — 필요 시 `#user-menu` 밖으로 이동.
+  5. **선택 과제**: 스카우팅 요약에 '패스 허브' 연동 · 팀/선수 스토리형 인사이트(사용자 판단으로 보류 — 재개 시 `team-trend`·`player-analytics` 중복 확인부터).
+  6. **시즌 종료 대비**: K리그 시즌 종료 후 비시즌 동안 크론·워밍업·신선도 배지 문구('일부 미수집' 오탐 여부) 점검.
+  - 로컬 환경 메모: 로컬 `players.db`는 11/2 00:19 기준(운영보다 오래됨) — 서버/QA가 필요하면 운영 DB를 `sqlite3 .backup` 후 scp로 받을 것(운영 DB 직접 복사 금지).
 - **정적 자산 수정 시 필수**: nginx가 `/static/`을 `expires 7d` + `immutable`로 내보내므로 JS/CSS를 바꾸면 `templates/index.html`의 `?v=`를 반드시 올릴 것(안 올리면 기존 방문자는 최대 7일간 옛 파일 사용).
 
 ## 1. 현재 상태 (2026-06-11 종료 시점)
