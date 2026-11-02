@@ -137,6 +137,17 @@ def main():
             [PYTHON, str(CRAWLERS/"collect_kleague_events.py"), "--apply"]),
         (22, "K리그 공식 API → 패스 네트워크(선수 간 패스 행렬) 수집 (경기 다음 날 공개, 미공개는 다음 실행에서 재시도)",
             [PYTHON, str(CRAWLERS/"collect_kleague_passes.py"), "--apply"]),
+        # SofaScore lineups/heatmap 차단(운영 9/20~) 대체. 둘 다 '데이터 없는 경기·선수만' 채우므로
+        # SofaScore가 복구되면 자연히 할 일이 없어진다. STEP 16(포털 라인업)·4~5(mps) 이후, 18(detail_pos) 이전.
+        (23, f"라인업 복원 — 포털 라인업 + mps 등번호 → match_lineups (SofaScore 라인업 없는 경기만, 최근 {max(args.days, 30)}일)",
+            [PYTHON, str(CRAWLERS/"recover_lineups_kleague.py"), "--apply", "--days", str(max(args.days, 30))]),
+    ]
+    if not args.skip_heatmap:
+        steps += [
+            (24, f"K리그 공식 API → 히트맵 (SofaScore 히트맵 없는 선수만, 최근 {max(args.days, 30)}일)",
+                [PYTHON, str(CRAWLERS/"collect_kleague_heatmap.py"), "--apply", "--days", str(max(args.days, 30))]),
+        ]
+    steps += [
         (17, "events.round 백필 (K리그 roundId → 백테스트 per_round)",
             [PYTHON, str(CRAWLERS/"backfill_rounds.py")]),
         (18, "세부 포지션 백필 (formation+slot → detail_pos, 비교 필터용)",
