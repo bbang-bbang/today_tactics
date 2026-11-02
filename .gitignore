@@ -40,6 +40,7 @@ ci_deploy_key.pub
 flask_test.log
 flask_dev.log
 qa_results.txt
+.cache_generation
 *.legacy_*.bak
 
 # Understand-Anything 지식 그래프 (로컬 개발 산출물 — 운영 배포 제외)

@@ -23,6 +23,7 @@ STEP 20 수집 공백 감사 (마지막에 실행; 종료 코드 0 정상 / 1 �
 """
 
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -169,6 +170,16 @@ def main():
     # prediction-backtest, round-predictions, schedule, rounds 캐시 리셋.
     # 부분 실패(STEP 3~)여도 스코어 등은 갱신됐으므로 치명 실패(0~2)가 아니면 무효화한다.
     if not critical_failed:
+        # ① 캐시 세대 마커 갱신 — gunicorn 워커 전원이 다음 API 요청 때 각자 캐시를 비운다
+        #    (아래 HTTP 호출은 워커 1개에만 도달하므로 이것만으론 부족했음). main.py `_CACHE_GEN_FILE`과 같은 경로.
+        try:
+            _gen_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cache_generation")
+            with open(_gen_file, "w", encoding="ascii") as f:
+                f.write(str(time.time_ns()))
+            print("  ✓ 캐시 세대 마커 갱신 (전 워커 무효화)")
+        except OSError as e:
+            print(f"  (캐시 세대 마커 갱신 실패: {e})")
+        # ② 워커 1개 즉시 무효화 + 워밍업
         try:
             import urllib.request, urllib.error
             urllib.request.urlopen("http://127.0.0.1:5000/api/cache-invalidate", timeout=10).read()

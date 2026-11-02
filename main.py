@@ -16,7 +16,7 @@ import time as _time_mod
 
 # ── API 응답 인메모리 캐시 (TTL) ────────────────────────────
 # 사용처: 무거운 read-only 라우트(통계/누적/예측). 세션·CRUD 라우트는 절대 캐싱 금지.
-# Flask test 환경/단일 process gunicorn 가정. multi-worker 시 동기화 안 됨 (worker별 캐시).
+# 캐시는 worker별 메모리. 무효화는 `.cache_generation` 마커 파일로 전 worker에 전파 (아래 _sync_cache_generation).
 _API_CACHE = {}  # key → (expires_at, payload). Python 3.7+ dict는 insertion order 보존 → LRU 흉내
 _API_CACHE_TTL = 3600  # 1시간
 _API_CACHE_MAX_KEYS = 4096  # player_id × 파라미터 조합 폭발 방지 cap
@@ -115,12 +115,69 @@ def cached_response(ttl=_API_CACHE_TTL):
     return deco
 
 
-def invalidate_api_cache():
-    """update_data.py 실행 후 새 데이터 반영 위해 캐시 클리어."""
+def _clear_local_caches():
+    """이 프로세스(워커)의 메모리 캐시 전부 비우기."""
     with _API_CACHE_LOCK:
         _API_CACHE.clear()
     with _GAMES_CACHE_LOCK:
         _GAMES_CACHE.clear()
+    # 아래 둘은 파일 뒤쪽에서 정의됨 — 호출 시점엔 존재
+    for _name in ("_PRED_CACHE", "_BACKTEST_CACHE"):
+        _c = globals().get(_name)
+        if isinstance(_c, dict):
+            _c.clear()
+
+
+# ── 워커 간 캐시 무효화 (gunicorn multi-worker) ─────────────
+# 워커마다 캐시가 따로라 /api/cache-invalidate는 요청을 받은 워커 1개만 비운다.
+# → 공유 마커 파일의 mtime을 '캐시 세대'로 쓰고, 각 워커가 API 요청 때(최대 2초 간격) 확인해
+#   세대가 바뀌었으면 자기 캐시를 비운다. update_data.py도 종료 시 이 파일을 직접 touch한다.
+_CACHE_GEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cache_generation")
+_CACHE_GEN_CHECK_INTERVAL = 2.0
+
+
+def _read_cache_gen():
+    try:
+        return os.stat(_CACHE_GEN_FILE).st_mtime_ns
+    except OSError:
+        return 0
+
+
+_cache_gen_seen = _read_cache_gen()   # 기동 시점 세대 — 기동 직후 캐시는 원래 비어 있음
+_cache_gen_checked_at = 0.0
+
+
+def bump_cache_generation():
+    """마커 파일 갱신 → 다른 워커들이 다음 API 요청 때 캐시를 비운다. 새 세대 값 반환."""
+    try:
+        with open(_CACHE_GEN_FILE, "w", encoding="ascii") as f:
+            f.write(str(_time_mod.time_ns()))
+        os.utime(_CACHE_GEN_FILE, None)
+    except OSError:
+        return 0
+    return _read_cache_gen()
+
+
+def _sync_cache_generation():
+    """마커 세대가 바뀌었으면 이 워커의 캐시를 비운다 (stat 호출은 2초에 1번으로 제한)."""
+    global _cache_gen_seen, _cache_gen_checked_at
+    now = _time_mod.time()
+    if now - _cache_gen_checked_at < _CACHE_GEN_CHECK_INTERVAL:
+        return
+    _cache_gen_checked_at = now
+    gen = _read_cache_gen()
+    if gen != _cache_gen_seen:
+        _cache_gen_seen = gen
+        _clear_local_caches()
+
+
+def invalidate_api_cache():
+    """update_data.py 실행 후 새 데이터 반영 위해 캐시 클리어 (모든 워커에 전파)."""
+    global _cache_gen_seen
+    _clear_local_caches()
+    gen = bump_cache_generation()
+    if gen:
+        _cache_gen_seen = gen   # 자기 자신이 방금 데운 캐시를 다시 비우지 않도록
 
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from authlib.integrations.flask_client import OAuth
@@ -363,6 +420,18 @@ def login_required_api(view):
 # 로그인 강제 토글 — 환경변수 LOGIN_REQUIRED=1 일 때만 게이트 활성
 # (OAuth 앱 등록·secret 발급 전까지 OFF로 두어 사이트 공개 유지)
 LOGIN_REQUIRED = os.environ.get("LOGIN_REQUIRED", "0") == "1"
+
+
+@app.before_request
+def _cache_generation_gate():
+    """다른 워커/update_data.py가 캐시 세대를 올렸으면 이 워커 캐시도 비운다."""
+    if request.path.startswith("/static/"):
+        return None
+    try:
+        _sync_cache_generation()
+    except Exception:
+        pass        # 캐시 동기화 실패가 요청 처리를 막으면 안 됨
+    return None
 
 
 @app.before_request
