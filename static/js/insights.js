@@ -1102,6 +1102,112 @@
         <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th>경기</th><th title="팀이 만든 세트피스 ${unit}/경기">공격 ${unit}</th><th title="상대에게 허용한 세트피스 ${unit}/경기 — 낮을수록 좋음">허용 ${unit}</th><th title="공격−허용">순</th><th title="팀 득점 중 세트피스 비중">득점 SP%</th><th title="팀 실점 중 세트피스 비중 — 높을수록 세트피스 수비 취약">실점 SP%</th><th title="세트피스 슈팅 중 헤더 비율">헤더</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }).join("") + `<div class="ins-method">근거 — 슈팅맵 기반 · 세트피스=코너+프리킥+스로인+기타(PK 제외) · 순=공격−허용(경기당) · 순위는 정렬 가능한 ${list[0] && list[0].min_games || 8}경기↑ 팀만 · SP%는 득점·실점 중 세트피스 골 비중(†=골 ${list[0] && list[0].min_goals || 8}개 미만 소표본) · 행에 마우스를 올리면 공격 유형별 슈팅/경기</div>`;
   }
+  // ── 신규 인사이트 4종 (2026-11-03): 득점 의존도 · 선발 로테이션 · 득점 직후 실점 · 패스 허브 ──────────────
+  // DB 문자열(팀·선수명)은 모두 escI 를 거쳐 삽입한다. 소표본은 숨기지 않고 n 을 함께 보여 준다.
+  const escI = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const insHead = d => `<div class="ins-adv-sub-h">${escI(d.league)} ${d.year === "all" ? "전 시즌" : escI(d.year)}</div>`;
+  const insWarn = d => (d.warnings || []).map(w => `<div class="ins-xl-warn" role="note">⚠ ${escI(w)}</div>`).join("");
+  const INS_VERDICT = { none: ["ins-rs-v-none", "✔"], some: ["ins-rs-v-some", "❗"], insufficient: ["ins-rs-v-low", "…"] };
+  const insVerdict = v => { const [c, i] = INS_VERDICT[v.level] || INS_VERDICT.insufficient; return `<div class="ins-rs-verdict ${c}" role="status"><span aria-hidden="true">${i}</span> ${escI(v.text)}</div>`; };
+  // PPG 막대(±95% 구간) — 휴식일 카드와 같은 시각 문법
+  function insPpgRow(r) {
+    const MAXP = 3;
+    const w = v => Math.max(0, Math.min(100, v / MAXP * 100));
+    if (!r || !r.n || r.n < 20) return `<div class="ins-rs-row ins-rs-low"><span class="ins-rs-lbl">${escI(r && r.label)}</span><span class="ins-rs-note">표본 부족 (${r ? r.n : 0}경기)</span></div>`;
+    const lo = Math.max(0, r.ppg - (r.ci || 0)), hi = r.ppg + (r.ci || 0);
+    return `<div class="ins-rs-row"><span class="ins-rs-lbl">${escI(r.label)}</span>
+      <span class="ins-rs-track" role="img" aria-label="${escI(r.label)} 경기당 승점 ${r.ppg.toFixed(2)}, 95% 구간 ${lo.toFixed(2)}~${hi.toFixed(2)}"><i class="ins-rs-bar" style="width:${w(r.ppg)}%"></i><i class="ins-rs-ci" style="left:${w(lo)}%;width:${w(hi) - w(lo)}%"></i></span>
+      <span class="ins-rs-val"><b>${r.ppg.toFixed(2)}</b><span class="ins-rs-pm"> ±${(r.ci || 0).toFixed(2)}</span><span class="ins-rs-n"> · ${r.n}경기</span></span></div>`;
+  }
+  const insCmp = (c, a, b) => c ? `<div class="ins-rs-cmp">${a} − ${b}: <b>${c.diff > 0 ? "+" : ""}${c.diff.toFixed(2)} PPG</b> (z=${c.z > 0 ? "+" : ""}${c.z.toFixed(1)}) · ${c.significant ? "유의한 차이" : "오차 범위 안 — 차이 단정 불가"}</div>` : "";
+  const insBar = (pct, max) => `<span class="ins-mini-track" aria-hidden="true"><i class="ins-mini-bar" style="width:${Math.min(100, pct / max * 100)}%"></i></span>`;
+
+  // ① 득점 의존도
+  function renderScoringDep(list) {
+    const el = document.getElementById("ins-sdep-body"); if (!el) return;
+    el.innerHTML = list.map(d => {
+      if (!d || !d.teams) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      const ppg = v => v == null ? "-" : v.toFixed(2);
+      const rows = d.teams.map(t => {
+        if (!t.eligible) return `<tr class="ins-xl-skip"><td class="ins-xl-team">${escI(t.short)}</td><td>${t.goals}</td><td colspan="4" class="ins-adv-empty">표본 부족 (${d.min_games}경기·${d.min_goals}득점 미만)</td></tr>`;
+        const top = t.top.map(x => `${escI(x.name)} ${x.goals}골`).join(" · ");
+        const a = t.ace;
+        const ace = a ? `${ppg(a.ppg_with)}<span class="ins-rs-n"> (${a.n_with})</span>` : "-";
+        const without = a ? (a.ppg_without == null ? `<span class="ins-adv-empty" title="비선발 ${a.n_without}경기 — ${d.min_without}경기 미만은 표시하지 않음">표본 부족 (${a.n_without})</span>` : `${ppg(a.ppg_without)}<span class="ins-rs-n"> (${a.n_without})</span>`) : "-";
+        return `<tr><td class="ins-xl-team">${escI(t.short)}</td><td>${t.goals}</td>
+          <td title="${top}"><b>${t.top1_share}%</b> ${insBar(t.top1_share, 50)}<span class="ins-sd-name">${escI(t.top[0].name)}</span></td>
+          <td>${t.top2_share}%</td><td>${ace}</td><td>${without}</td></tr>`;
+      }).join("");
+      return `${insHead(d)}${insWarn(d)}
+        <div class="ins-rs-cmp">리그 평균: 1위 득점자 <b>${d.league_top1_share ?? "-"}%</b> · 1·2위 합 <b>${d.league_top2_share ?? "-"}%</b></div>
+        <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th title="자책골 제외 팀 득점">득점</th>
+          <th title="팀 득점 1위 선수의 득점 비중 (막대 = 50% 기준)">1위 득점자 비중</th><th title="득점 1·2위 선수 합">1·2위 합</th>
+          <th title="에이스(팀 득점 1위)가 선발이던 경기의 팀 경기당 승점 (경기 수)">에이스 선발 PPG</th><th title="에이스가 선발이 아니던 경기의 팀 경기당 승점 (경기 수)">비선발 PPG</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join("") + `<div class="ins-method">근거 — 득점=자책골 제외 · 비중=선수 득점÷팀 득점 · 에이스=팀 득점 1위, 선발 여부는 K리그 포털 선발 명단 기준 · 비선발 PPG는 ${list[0] && list[0].min_without || 3}경기 미만이면 표시 안 함 · 비선발 경기는 부상·징계·로테이션이 섞여 <b>인과가 아닌 참고</b> · 표본이 작으니 (경기 수)를 함께 보세요</div>`;
+  }
+
+  // ② 선발 로테이션
+  function renderRotation(list) {
+    const el = document.getElementById("ins-rot-body"); if (!el) return;
+    el.innerHTML = list.map(d => {
+      if (!d || !d.buckets) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      const rows = d.teams.map(t => {
+        if (!t.eligible) return `<tr class="ins-xl-skip"><td class="ins-xl-team">${escI(t.short)}</td><td>${t.matches}</td><td colspan="3" class="ins-adv-empty">표본 부족 (${d.min_games}경기 미만)</td></tr>`;
+        const hp = t.high_ppg == null ? `<span class="ins-adv-empty">표본 부족</span>` : `${t.high_ppg.toFixed(2)}`;
+        return `<tr><td class="ins-xl-team">${escI(t.short)}</td><td>${t.matches}</td><td><b>${t.avg_changes.toFixed(2)}</b>명 ${insBar(t.avg_changes, 6)}</td><td>${t.core_size}명</td><td>${t.high_n}경기 · PPG ${hp}</td></tr>`;
+      }).join("");
+      return `${insHead(d)}${insVerdict(d.verdict)}${insWarn(d)}
+        <div class="ins-rs-grid ins-rs-grid-2">
+          <div><div class="ins-adv-sub-h">직전 경기 대비 선발 교체 인원 <span class="ins-clutch-hint">팀-경기 ${d.team_matches.toLocaleString()}건</span></div>${d.buckets.map(insPpgRow).join("")}${insCmp(d.high_vs_stable, "대폭", "안정")}</div>
+          <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th title="직전 경기와 비교 가능한 경기 수">경기</th><th title="직전 경기 대비 평균 선발 교체 인원 (막대 = 6명 기준)">평균 교체</th>
+            <th title="팀 경기의 70% 이상 선발로 나선 선수 수">고정 주전</th><th title="선발 4명 이상 바꾼 경기 수와 그때 팀 경기당 승점 (3경기 미만은 표시 안 함)">대폭 로테 경기</th></tr></thead><tbody>${rows}</tbody></table></div>
+        </div>`;
+    }).join("") + `<div class="ins-method">근거 — 교체 인원=11−(직전 경기 선발과 겹치는 선수 수) · 직전 경기=<b>같은 리그</b>(컵·ACL 미반영, 21일 초과 공백 제외) · 선발은 K리그 포털 명단 · 막대=PPG·가는 선=95% 신뢰구간 · z≥1.96일 때만 '유의' · 로테이션은 연전·부상·직전 결과에 따라 달라져 <b>인과가 아님</b></div>`;
+  }
+
+  // ③ 득점 직후 실점 / 실점 후 반격
+  function renderAftermath(list) {
+    const el = document.getElementById("ins-aft-body"); if (!el) return;
+    const zTxt = z => z == null ? `<span class="ins-rs-n">-</span>` : (Math.abs(z) >= 2 ? `<b>${z > 0 ? "▲" : "▼"} z=${z > 0 ? "+" : ""}${z.toFixed(1)}</b>` : `<span class="ins-rs-n">z=${z > 0 ? "+" : ""}${z.toFixed(1)}</span>`);
+    el.innerHTML = list.map(d => {
+      if (!d || !d.teams) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      const L = d.league_total;
+      const rows = d.teams.map(t => t.eligible ? `<tr><td class="ins-xl-team">${escI(t.short)}</td><td>${t.scored}</td>
+          <td>${t.conc_obs}<span class="ins-rs-n"> / 기대 ${t.conc_exp.toFixed(1)}</span></td><td>${zTxt(t.conc_z)}</td>
+          <td>${t.conceded}</td><td>${t.resp_obs}<span class="ins-rs-n"> / 기대 ${t.resp_exp.toFixed(1)}</span></td><td>${zTxt(t.resp_z)}</td></tr>`
+        : `<tr class="ins-xl-skip"><td class="ins-xl-team">${escI(t.short)}</td><td colspan="6" class="ins-adv-empty">표본 부족 (${d.min_games}경기 미만)</td></tr>`).join("");
+      const gen = d.flagged.length ? `기대와 크게 다른 팀(|z|≥2): <b>${d.flagged.map(escI).join(", ")}</b> — 여러 팀을 동시에 보면 우연히도 나올 수 있어 참고용입니다.` : "기대와 크게 다른 팀은 없습니다 (모두 |z|&lt;2).";
+      return `${insHead(d)}${insWarn(d)}
+        <div class="ins-rs-cmp">리그 전체: 득점 ${L.scored}골 중 ${d.window}분 안에 상대가 받아친 경우 <b>${L.conc_obs}</b>건 (평소 득실점률로 기대되는 <b>${L.conc_exp.toFixed(1)}</b>건) ${zTxt(L.conc_z)}</div>
+        <div class="ins-rs-cmp">${gen}</div>
+        <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th title="득점 횟수(자책골로 인정된 득점 포함)">득점</th>
+          <th colspan="2" title="득점 후 ${d.window}분 안에 실점한 횟수 / 팀의 평소 실점률로 기대되는 횟수">득점 직후 실점</th><th title="실점 횟수">실점</th>
+          <th colspan="2" title="실점 후 ${d.window}분 안에 득점한 횟수 / 팀의 평소 득점률로 기대되는 횟수">실점 직후 반격</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join("") + `<div class="ins-method">근거 — 득점 직후=다음 ${list[0] && list[0].window || 10}분 · 기대=Σ(1−exp(−팀 평소 득실점률×남은 시간)) · z=(관측−기대)÷√기대, 기대 1.5건↑일 때만 계산 · ▲=기대보다 많음(실점은 취약, 반격은 강점)·▼=적음 · 경기 종료는 95분(마지막 골이 더 늦으면 그 직후)으로 근사 · 상대·시간대 강도 미보정이라 <b>참고용</b></div>`;
+  }
+
+  // ④ 패스 허브 의존도
+  function renderPassHub(list) {
+    const el = document.getElementById("ins-hub-body"); if (!el) return;
+    el.innerHTML = list.map(d => {
+      if (!d || !d.teams) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      const POS = { GK: "GK", DF: "수비", MF: "미드", FW: "공격" };
+      const rows = d.teams.map(t => {
+        if (!t.eligible) return `<tr class="ins-xl-skip"><td class="ins-xl-team">${escI(t.short)}</td><td>${t.matches}</td><td colspan="3" class="ins-adv-empty">표본 부족 (${d.min_games}경기 미만)</td></tr>`;
+        const m = t.main_hub;
+        return `<tr><td class="ins-xl-team">${escI(t.short)}</td><td>${t.matches}</td><td><b>${t.hub_share}%</b> ${insBar(t.hub_share, 20)}</td><td>${t.top2_share}%</td>
+          <td title="이 선수가 허브였던 경기 ${m.times}/${t.matches}">${escI(m.name)}${m.pos ? `<span class="ins-rs-n"> ${POS[m.pos] || escI(m.pos)}</span>` : ""} · ${m.pct}%</td><td>${t.hubs}명</td></tr>`;
+      }).join("");
+      return `${insHead(d)}${insVerdict(d.verdict)}
+        <div class="ins-rs-cmp">리그 평균 허브 지분 <b>${d.league_hub_share ?? "-"}%</b> (한 선수가 팀 패스 관여의 몇 %를 차지하나 — 11명이 고르게 나누면 약 9%)</div>
+        <div class="ins-rs-grid ins-rs-grid-2">
+          <div><div class="ins-adv-sub-h">팀 평소 대비 허브 집중도별 성적 <span class="ins-clutch-hint">팀-경기 ${d.matches.toLocaleString()}건</span></div>${[d.hub_high, d.hub_low].map(insPpgRow).join("")}${insCmp(d.high_vs_low, "집중한 날", "분산된 날")}</div>
+          <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th title="패스 데이터가 있는 경기 수">경기</th><th title="경기별 1위 관여 선수의 (보낸+받은) 패스 관여 비중 평균 (막대 = 20% 기준)">허브 지분</th>
+            <th title="관여 1·2위 선수 합">1·2위 합</th><th title="가장 자주 허브였던 선수와 그 비율">주 허브</th><th title="시즌 중 허브가 된 적 있는 서로 다른 선수 수 — 많을수록 허브가 자주 바뀜">허브 수</th></tr></thead><tbody>${rows}</tbody></table></div>
+        </div>`;
+    }).join("") + `<div class="ins-method">근거 — K리그 공식 패스 행렬(2023~) · 허브 지분=한 선수의 (보낸+받은) 패스 관여÷팀 총 관여(패스 1회=2관여) · 허브는 보통 센터백·수비형 미드(빌드업 거점) · 집중한 날=팀 평소보다 +2%p↑, 분산된 날=−2%p↓ · 점유율·상대 압박에 따라 달라져 <b>인과가 아님</b></div>`;
+  }
+
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     // 무음 실패 → 가시화: 실패한 인사이트명을 모아 1회 토스트 + console.warn (P5 견고성)
@@ -1119,6 +1225,14 @@
         .then(renderSubImpact).catch(warn("교체 효과")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/setpiece-profile?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderSetpieceProfile).catch(warn("세트피스")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/scoring-dependence?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderScoringDep).catch(warn("득점 의존도")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/rotation?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderRotation).catch(warn("선발 로테이션")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/goal-aftermath?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderAftermath).catch(warn("득점 직후 실점")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/pass-hub?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderPassHub).catch(warn("패스 허브")),
       fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(warn("날씨")),
       fetch(`/api/insights/clutch?${qs}`).then(r => r.json()).then(renderClutch).catch(warn("클러치")),
       fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(warn("슈팅")),

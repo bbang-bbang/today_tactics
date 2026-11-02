@@ -102,6 +102,33 @@ qa('setpiece-profile 비중 0~100', lambda: assert_(all(0 <= (t['for']['goal_sha
 qa('setpiece-profile xG 미보유 시 슈팅 대체', lambda: assert_(get('/api/insights/setpiece-profile?league=k1&year=2026')['metric'] in ('xG', '슈팅')))
 qa('setpiece-profile 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/setpiece-profile?league=zz') == 400))
 
+# ── 신규 인사이트 4종 (2026-11-03) + 제거된 죽은 API ──
+qa('제거된 죽은 API 4종 404', lambda: assert_(all(_brief_status('/api/insights/' + e) == 404 for e in ('xg-efficiency', 'forward-goals', 'midfielder-pass', 'defender-score'))))
+d_sd = get('/api/insights/scoring-dependence?league=k1&year=2026')
+_sde = [t for t in d_sd['teams'] if t['eligible']]
+qa('scoring-dependence 12팀 + 키', lambda: assert_(len(d_sd['teams']) == 12 and all(k in d_sd for k in ['league_top1_share', 'warnings', 'limits'])))
+qa('scoring-dependence 비중 0~100·1·2위 합 ≥ 1위', lambda: assert_(_sde and all(0 < t['top1_share'] <= 100 and t['top2_share'] >= t['top1_share'] - 0.05 for t in _sde)))
+qa('scoring-dependence 1위 득점 ≤ 팀 득점', lambda: assert_(all(t['top'][0]['goals'] <= t['goals'] and abs(t['top'][0]['goals'] / t['goals'] * 100 - t['top1_share']) < 0.11 for t in _sde)))
+qa('scoring-dependence 에이스 선발+비선발 ≤ 경기수', lambda: assert_(all(t['ace']['n_with'] + t['ace']['n_without'] <= t['games'] for t in _sde)))
+qa('scoring-dependence 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/scoring-dependence?league=zz') == 400))
+d_ro = get('/api/insights/rotation?league=k1&year=2026')
+qa('rotation 키·버킷 3개', lambda: assert_(len(d_ro['buckets']) == 3 and all(k in d_ro for k in ['verdict', 'teams', 'limits'])))
+qa('rotation 표본 합계 일치', lambda: assert_(sum(b['n'] for b in d_ro['buckets']) == d_ro['team_matches']))
+qa('rotation 평균 교체 0~11·고정 주전 0~11', lambda: assert_(all(0 <= t['avg_changes'] <= 11 and 0 <= t['core_size'] <= 11 for t in d_ro['teams'] if t['eligible'])))
+qa('rotation 표본부족 시 판정 보류', lambda: assert_(get('/api/insights/rotation?league=k2&year=2021')['verdict']['level'] == 'insufficient'))
+qa('rotation 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/rotation?league=zz') == 400))
+d_ga = get('/api/insights/goal-aftermath?league=k1&year=2026')
+_L = d_ga['league_total']
+qa('goal-aftermath 득점수 = 실점수(폐쇄 리그)', lambda: assert_(_L['scored'] == _L['conceded'] == sum(t['scored'] for t in d_ga['teams'])))
+qa('goal-aftermath 관측 ≤ 득점 · 기대 ≥ 0', lambda: assert_(_L['conc_obs'] <= _L['scored'] and _L['conc_exp'] >= 0 and all(t['conc_obs'] <= t['scored'] and t['resp_obs'] <= t['conceded'] for t in d_ga['teams'])))
+qa('goal-aftermath 리그 관측 일치(득점 후 실점 = 실점 후 반격)', lambda: assert_(_L['conc_obs'] == _L['resp_obs']))
+qa('goal-aftermath 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/goal-aftermath?league=zz') == 400))
+d_ph = get('/api/insights/pass-hub?league=k1&year=2026')
+_phe = [t for t in d_ph['teams'] if t['eligible']]
+qa('pass-hub 키·허브 지분 범위', lambda: assert_(_phe and all(k in d_ph for k in ['verdict', 'high_vs_low', 'limits']) and all(5 < t['hub_share'] < 40 and t['top2_share'] > t['hub_share'] for t in _phe)))
+qa('pass-hub 주 허브 비율 ≤ 100', lambda: assert_(all(0 < t['main_hub']['pct'] <= 100 and t['hubs'] >= 1 for t in _phe)))
+qa('pass-hub 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/pass-hub?league=zz') == 400))
+
 # ── 2-g. 경기 요약 카드 (팬용) ──
 d_rc = get('/api/match-recap?date=2026.10.24&home_slug=incheon&away_slug=jeju')
 qa('recap 키 완전성', lambda: assert_(d_rc.get('ready') and all(k in d_rc for k in ['headline', 'result', 'teams', 'goals', 'badges', 'table', 'notes'])))

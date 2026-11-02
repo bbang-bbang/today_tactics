@@ -17,6 +17,7 @@
   3. ⏸ (보류 — 사용자 판단 중요도 낮음) 팬 항목 ②: 팀/선수 스토리형 인사이트(착수 전 `team-trend`·`player-analytics` 중복 확인).
   4. 선택: 스카우팅 요약에 '패스 허브' 연동 · 슈팅 PK/FK로 `is_penalty` 보정 · 선수 상세 스탯 복구 검토.
 - **2026-11-03 완료**: ①헤더 `📖 분석 읽는 법` 도움말 모달(`templates/index.html` `#guide-overlay`, style.css v100 — 지표 정의·해석 주의점·데이터 한계, 문구는 각 화면 '근거' 줄과 일치 유지) ②공식 선수 상세 API(`getMatchRecordPlayerDetail`) 정합 검증 → **보완재, `match_player_stats`에 혼합 금지**, 구현 보류(트리거: 운영 선수 스탯까지 차단 확산 — 상세·수치는 `checklist/backlog.md` P1) ③이 PC 새 수집 단계(STEP 23~25)를 DB 복사본에서 dry-run→apply 검증(원본 미변경). 상세: `checklist/work-log-2026-11-03.md`. 이 PC의 `players.db`는 11/2 00:19 기준(운영보다 오래됨) — 서버/QA 필요 시 운영 DB를 `sqlite3 .backup` 후 scp.
+- **2026-11-03 추가 완료**: 분석 포인트 정비 — 죽은 API 4종 제거 + 신규 인사이트 4종(득점 의존도·선발 로테이션·득점 직후 실점·패스 허브, 인사이트>심화 탭, `insights.js?v=40`·`style.css?v=101`, qa 99/99). 상세·검증 중 잡은 버그·데이터 주의점(`players.name_ko` 중복)은 `checklist/work-log-2026-11-03.md`. 새 인사이트를 추가할 땐 `_rest_stat`/`_rest_compare` 재사용 + 도움말 모달(`#guide-overlay`) 항목 동기화.
 - **📋 다음 작업 (2026-11-03 기준, 우선순위순 — 상세·근거는 `checklist/backlog.md`)**:
   1. **운영 수집 상태 점검** (읽기 전용): 월 05:00 크론(`update_data.py --days 14`) 로그에서 STEP 3·20(SofaScore)과 STEP 21~25(공식 API 복구)가 정상인지, `analysis/audit_collection_gaps.py` 공백 일수가 늘지 않는지 확인. 11/1 히트맵 7경기는 '공개 지연'이라 다음 크론에서 채워져야 함. 운영 접속은 PowerShell OpenSSH(이 PC 기준).
   2. **운영 서버 백업 파일 정리**: `/home/rocky/players_before_*_20261102.db`(복구·중복 정리 직전 백업) — 정상 동작 확인 후 삭제 가능. 삭제 전 반드시 사용자 확인.

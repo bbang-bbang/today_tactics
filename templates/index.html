@@ -6,7 +6,7 @@
     <title>Today Tactics - 축구 전술판</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=100">
+    <link rel="stylesheet" href="/static/css/style.css?v=101">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -398,6 +398,10 @@
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">😴 휴식일·연전 영향 <span class="ins-clutch-hint">짧은 휴식이 정말 성적을 떨어뜨리나?</span></div><div id="ins-rest-body"><div class="ins-adv-loading">불러오는 중… (휴식일 집계)</div></div></div>
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🔁 교체 효과 심화 <span class="ins-clutch-hint">첫 교체 앞뒤 15분 득실 · 벤치 선수 효율</span></div><div id="ins-subimp-body"><div class="ins-adv-loading">불러오는 중… (교체 전후 집계)</div></div></div>
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">⛳ 세트피스 공수 프로필 <span class="ins-clutch-hint">코너·프리킥·스로인·기타 (PK 제외) — 만든 것 vs 허용한 것</span></div><div id="ins-spp-body"><div class="ins-adv-loading">불러오는 중… (슈팅맵 집계)</div></div></div>
+                <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🎯 득점 의존도 <span class="ins-clutch-hint">득점의 몇 %를 1·2위 득점자가 만드나? 에이스가 빠지면?</span></div><div id="ins-sdep-body"><div class="ins-adv-loading">불러오는 중… (득점 집계)</div></div></div>
+                <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🔀 선발 로테이션 <span class="ins-clutch-hint">직전 경기와 선발이 얼마나 바뀌나, 성적과 관계는?</span></div><div id="ins-rot-body"><div class="ins-adv-loading">불러오는 중… (선발 라인업 집계)</div></div></div>
+                <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">⚡ 득점 직후 실점·반격 <span class="ins-clutch-hint">골 넣고 바로 먹히나? 먹고 바로 따라붙나?</span></div><div id="ins-aft-body"><div class="ins-adv-loading">불러오는 중… (득점 타임라인 집계)</div></div></div>
+                <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🕸️ 패스 허브 의존도 <span class="ins-clutch-hint">팀 패스가 한 선수에게 얼마나 몰리나?</span></div><div id="ins-hub-body"><div class="ins-adv-loading">불러오는 중… (패스 행렬 집계)</div></div></div>
                 <div class="ins-adv-card"><div class="ins-adv-h">🌡️ 날씨 영향</div><div id="ins-weather-body"><div class="ins-adv-loading">불러오는 중…</div></div></div>
                 <div class="ins-adv-card"><div class="ins-adv-h">⏱️ 승부처 해결사</div><div id="ins-clutch-body"><div class="ins-adv-loading">불러오는 중…</div></div></div>
                 <div class="ins-adv-card"><div class="ins-adv-h">🎯 슈팅 인사이트</div><div id="ins-shooting-body"><div class="ins-adv-loading">불러오는 중… (슈팅맵 집계)</div></div></div>
@@ -1057,7 +1061,7 @@
         pass_network: "/static/js/pass_network.js?v=2",
         match_report: "/static/js/match_report.js?v=1",
         player_compare: "/static/js/player_compare.js?v=2",
-        insights: "/static/js/insights.js?v=39"
+        insights: "/static/js/insights.js?v=40"
     };
     </script>
 
@@ -1159,6 +1163,38 @@
                         <li>원 크기 = 패스 관여량, 선 굵기 = 두 선수 사이 <b>양방향 패스 합계</b>(방향별 횟수는 툴팁에).</li>
                         <li>원 위치는 <b>선발 라인업 배치</b>이지 실제 평균 위치가 아닙니다. 겹치는 선수는 보기 좋게 약간 옮겨 그렸습니다.</li>
                         <li>슬라이더로 표시할 최소 연결 횟수를 조절하고, 시즌 누적과 경기별 보기를 전환할 수 있습니다.</li>
+                    </ul>
+                </details>
+                <details class="gd-sec">
+                    <summary>🎯 득점 의존도 — "에이스가 빠지면 어떻게 되나?"</summary>
+                    <ul>
+                        <li><b>1위 득점자 비중</b> = 선수 득점 ÷ 팀 득점(자책골 제외). 리그 평균과 비교해 보세요. <b>1·2위 합</b>이 클수록 득점이 소수에게 몰립니다.</li>
+                        <li><b>에이스 선발 PPG / 비선발 PPG</b>: 에이스(팀 득점 1위)가 선발이던 경기와 아니던 경기의 팀 경기당 승점이며 괄호는 경기 수입니다. 비선발이 3경기 미만이면 표시하지 않습니다.</li>
+                        <li>비선발 경기에는 부상·징계·로테이션이 섞여 <b>에이스 때문이라고 단정할 수 없습니다</b>. 경기 수가 적으면 참고만 하세요.</li>
+                    </ul>
+                </details>
+                <details class="gd-sec">
+                    <summary>🔀 선발 로테이션 — "선발을 많이 바꾸면 성적이 떨어지나?"</summary>
+                    <ul>
+                        <li><b>교체 인원</b> = 11 − (직전 경기 선발과 겹치는 선수 수). 직전 경기는 같은 리그 기준이고 21일 넘게 비면 비교하지 않습니다.</li>
+                        <li><b>고정 주전</b> = 팀 경기의 70% 이상 선발로 나선 선수 수. 평균 교체가 크고 고정 주전이 적으면 선발이 자주 바뀌는 팀입니다.</li>
+                        <li>막대·선·'유의' 판정은 휴식일 카드와 같은 방식입니다. 로테이션은 연전·부상·직전 결과에 따라 달라지므로 <b>원인이 아닌 참고</b>입니다.</li>
+                    </ul>
+                </details>
+                <details class="gd-sec">
+                    <summary>⚡ 득점 직후 실점·반격 — "골 넣고 바로 먹히나?"</summary>
+                    <ul>
+                        <li><b>득점 직후 실점</b> = 득점 후 10분 안에 상대가 넣은 횟수. <b>실점 직후 반격</b> = 실점 후 10분 안에 따라붙은 횟수.</li>
+                        <li>관측값은 <b>"그 팀의 평소 득실점률이라면 기대되는 횟수"</b>와 비교합니다. z = (관측 − 기대) ÷ √기대이고, 기대가 1.5건 이상일 때만 계산합니다.</li>
+                        <li>▲는 기대보다 많음(실점 쪽은 취약, 반격 쪽은 강점), ▼는 적음입니다. |z|≥2만 눈에 띄게 표시하며, 팀이 많아 우연히도 나올 수 있어 참고용입니다.</li>
+                    </ul>
+                </details>
+                <details class="gd-sec">
+                    <summary>🕸️ 패스 허브 의존도 — "한 선수가 빌드업을 쥐고 있나?"</summary>
+                    <ul>
+                        <li><b>허브 지분</b> = 한 선수의 (보낸+받은) 패스 관여 ÷ 팀 총 관여(패스 1회 = 2관여). 11명이 고르게 나누면 약 9%이고, 리그 평균은 15% 안팎입니다.</li>
+                        <li>허브는 보통 센터백·수비형 미드(빌드업 거점)입니다. <b>주 허브</b>는 가장 자주 허브였던 선수와 그 비율, <b>허브 수</b>가 많을수록 허브가 자주 바뀌는 팀입니다.</li>
+                        <li><b>집중한 날 / 분산된 날</b>: 팀 평소보다 허브 지분이 +2%p 이상·−2%p 이하였던 경기의 PPG 비교입니다. 점유율·상대 압박이 섞여 <b>인과가 아닙니다</b>.</li>
                     </ul>
                 </details>
                 <details class="gd-sec">

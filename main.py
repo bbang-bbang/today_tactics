@@ -7381,190 +7381,404 @@ def insights_rest_effect():
     })
 
 
-@app.route("/api/insights/xg-efficiency")
-@cached_response(ttl=1800)
-def insights_xg_efficiency():
-    """xG 효율 — 전 포지션(F/M/D) + minutes>0 + 시즌 ≥3경기 + xG ≥0.5.
-    league(all|k1|k2) 필터, 정렬은 클라가 처리(절대 골/효율 등)."""
-    year = request.args.get("year", "2026")
-    league = request.args.get("league", "all")
-    date_cond, date_params = _year_date_params(year)
-    league_cond, league_params = _league_team_filter(league)
+# ── 신규 인사이트 4종 (2026-11-03): 득점 의존도 · 선발 로테이션 · 득점 직후 실점 · 패스 허브 의존도 ──────────
+# 공통 원칙: 이미 수집된 데이터만 사용 · 소표본은 숨기지 않고 n 을 함께 노출 · 상관≠인과 문구를 limits 에 명시.
+_INS_MIN_GAMES = 8           # 팀 단위 표 노출 최소 경기 수
+_INS_MIN_GOALS = 10          # 득점 의존도 판정 최소 득점(자책골 제외)
+_ACE_MIN_WITHOUT = 3         # 에이스 비선발 경기 PPG 를 보여 줄 최소 표본
+_AFTERMATH_WINDOW = 10       # '득점 직후' = 다음 N분
+_AFTERMATH_END = 95          # 경기 종료 근사(후반 추가시간 포함) — 기대값 계산 시 창이 경기 끝을 넘지 않게 자름
+_ROT_HIGH = 4                # 직전 경기 대비 선발 4명↑ 교체 = 대폭 로테이션
+_ROT_STABLE = 2              # 2명↓ = 안정
+_ROT_CORE_PCT = 0.7          # 팀 경기의 70%↑ 선발 = '고정 주전'
+
+
+def _ins_scope():
+    """공통 쿼리 파라미터 → (label, tid, year, ycond, yp). league 가 잘못되면 None (호출부에서 400)."""
+    league = (request.args.get("league") or "k1").lower()
+    if league not in ("k1", "k2"):
+        return None
+    label = "K1" if league == "k1" else "K2"
+    year = (request.args.get("year") or "all").strip()
+    if year != "all" and not year.isdigit():
+        year = "all"
+    ycond, yp = "", ()
+    if year != "all":
+        lo, hi = _year_range(year)
+        ycond, yp = " AND e.date_ts >= ? AND e.date_ts < ?", (lo, hi)
+    return label, _LEAGUE_TID_BY_KEY[label], year, ycond, yp
+
+
+def _norm_kname(s):
+    """포털 라인업 표기 차이 흡수: 주장 표기 '(c)'·공백 제거."""
+    return re.sub(r"\(c\)|\s", "", s or "")
+
+
+def _ins_events(conn, tid, ycond, yp):
+    return conn.execute(
+        "SELECT e.id, e.home_team_id, e.away_team_id, e.date_ts, e.home_score, e.away_score FROM events e "
+        "WHERE e.tournament_id = ? AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL" + ycond +
+        " ORDER BY e.date_ts, e.id", (tid, *yp)).fetchall()
+
+
+def _ins_pts(gf, ga):
+    return 3 if gf > ga else 1 if gf == ga else 0
+
+
+def _ins_starters(conn, tid, ycond, yp):
+    """포털 라인업(선발 11, 전 경기 100% 수록) → {(event_id, 'home'|'away'): {정규화 이름}}"""
+    out = {}
+    for ev, side, nm in conn.execute(
+            "SELECT l.sofa_event_id, l.side, l.player_name FROM kleague_lineup l JOIN events e ON e.id = l.sofa_event_id "
+            "WHERE e.tournament_id = ? AND l.is_starter = 1" + ycond, (tid, *yp)):
+        out.setdefault((ev, side), set()).add(_norm_kname(nm))
+    return out
+
+
+@app.route("/api/insights/scoring-dependence")
+@cached_response(ttl=3600)
+def insights_scoring_dependence():
+    """득점 의존도 — 팀 득점(자책골 제외) 중 1·2위 득점자 비중 + 에이스(팀 득점 1위) 선발 여부별 팀 PPG.
+    선발 여부는 포털 라인업(이름) 매칭이라 100% 수록이지만 이름이 안 맞는 경기는 제외한다."""
+    sc = _ins_scope()
+    if sc is None:
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label, tid, year, ycond, yp = sc
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(f"""
-        SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) as name_ko, m.team_id,
-               COUNT(*) as games, SUM(m.goals) as goals,
-               SUM(COALESCE(m.expected_goals,0)) as xg, SUM(m.total_shots) as shots,
-               (SELECT m2.position FROM match_player_stats m2
-                WHERE m2.player_id=m.player_id {date_cond}
-                GROUP BY m2.position ORDER BY COUNT(*) DESC LIMIT 1) as main_pos,
-               (SELECT COUNT(*) FROM goal_events g
-                WHERE g.player_id=m.player_id AND g.is_penalty=1 AND g.is_own_goal=0
-                AND g.event_id IN (
-                    SELECT event_id FROM match_player_stats
-                    WHERE player_id=m.player_id {date_cond})) as pk_goals
-        FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
-        WHERE m.position IN ('F','M','D') AND m.minutes_played>0 {date_cond} {league_cond}
-        GROUP BY m.player_id HAVING games>=3 AND xg>0.5
-        ORDER BY (SUM(m.goals) - SUM(COALESCE(m.expected_goals,0))) DESC
-        LIMIT 25
-    """, date_params * 3 + league_params).fetchall()
-    conn.close()
-    return jsonify([{
-        "player_id": r["player_id"],
-        "name": r["name_ko"] or "",
-        "team": _ko_team(r["team_id"], ""),
-        "pos": r["main_pos"] or "",
-        "games": r["games"],
-        "goals": r["goals"] or 0,
-        "pk_goals": r["pk_goals"] or 0,
-        "np_goals": (r["goals"] or 0) - (r["pk_goals"] or 0),
-        "xg": round(r["xg"], 2),
-        "diff": round((r["goals"] or 0) - r["xg"], 2),
-        "shots": r["shots"] or 0,
-    } for r in rows])
-
-
-@app.route("/api/insights/forward-goals")
-@cached_response(ttl=1800)
-def insights_forward_goals():
-    player_id = request.args.get("playerId", "").strip()
-    year = request.args.get("year", "all")
-
-    if not player_id:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        date_cond, date_params = _year_date_params(year)
-        rows = conn.execute(f"""
-            SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) as name_ko, m.team_id,
-                   SUM(m.goals) as total_goals,
-                   (SELECT COUNT(*) FROM goal_events g
-                    WHERE g.player_id=m.player_id AND g.is_penalty=1 AND g.is_own_goal=0
-                    AND g.event_id IN (
-                        SELECT event_id FROM match_player_stats
-                        WHERE player_id=m.player_id {date_cond})) as pk_goals
-            FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
-            WHERE m.position='F' AND m.minutes_played>0 AND m.goals>0 {date_cond}
-            GROUP BY m.player_id ORDER BY total_goals DESC LIMIT 30
-        """, date_params * 2).fetchall()
+    try:
+        evs = _ins_events(conn, tid, ycond, yp)
+        goals = conn.execute(
+            "SELECT g.event_id, g.is_home, g.player_id, g.player_name FROM goal_events g JOIN events e ON e.id = g.event_id "
+            "WHERE e.tournament_id = ? AND e.home_score IS NOT NULL AND g.is_own_goal = 0" + ycond, (tid, *yp)).fetchall()
+        plist = conn.execute("SELECT id, team_id, name, name_ko FROM players").fetchall()
+        starters = _ins_starters(conn, tid, ycond, yp)
+    finally:
         conn.close()
-        return jsonify([{
-            "player_id": r["player_id"],
-            "name": r["name_ko"] or "",
-            "team": _ko_team(r["team_id"], ""),
-            "goals": r["total_goals"],
-            "pk_goals": r["pk_goals"] or 0,
-            "np_goals": (r["total_goals"] or 0) - (r["pk_goals"] or 0),
-        } for r in rows])
 
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    by_name, pinfo = {}, {}      # (팀, 이름) -> [선수 ID...] — name_ko 가 같은 선수가 한 팀에 여럿일 수 있다(실데이터)
+    for pid, ptid, nm, nk in plist:
+        pinfo[pid] = (nm, nk)
+        for n in {x for x in (nm, nk) if x}:
+            by_name.setdefault((ptid, _norm_kname(n)), []).append(pid)
 
-    bands = [("1-15",1,15),("16-30",16,30),("31-45",31,45),
-             ("46-60",46,60),("61-75",61,75),("76-90",76,120)]
-    time_data = []
-    for label, lo, hi in bands:
-        row = conn.execute("""
-            SELECT COUNT(*) as cnt FROM goal_events
-            WHERE player_id=? AND minute>=? AND minute<=? AND is_own_goal=0
-        """, (player_id, lo, hi)).fetchone()
-        time_data.append({"band": label, "goals": row["cnt"]})
+    evmap = {e[0]: e for e in evs}
+    known = {}                   # 팀별로 ID 가 확정된 득점자 — 이름만 있는 득점을 이 ID 들에 우선 연결
+    for ev, is_home, pid, _pn in goals:
+        e = evmap.get(ev)
+        if e and pid:
+            known.setdefault(e[1] if is_home else e[2], set()).add(pid)
+    cnt, disp = {}, {}
+    for ev, is_home, pid, pname in goals:
+        e = evmap.get(ev)
+        if not e:
+            continue
+        team = e[1] if is_home else e[2]
+        key = pid
+        if key is None:
+            cands = by_name.get((team, _norm_kname(pname)), [])
+            key = next((c for c in cands if c in known.get(team, ())), cands[0] if cands else None)
+        if key is None:
+            key = "n:" + _norm_kname(pname)
+        cnt.setdefault(team, {})
+        cnt[team][key] = cnt[team].get(key, 0) + 1
+        if key not in disp:
+            nm, nk = pinfo.get(key, (None, None)) if not isinstance(key, str) else (None, None)
+            disp[key] = nk or pname or nm or "?"
 
-    opp_rows = conn.execute("""
-        SELECT CASE WHEN g.is_home=1 THEN e.away_team_id ELSE e.home_team_id END as opp_id,
-               CASE WHEN g.is_home=1 THEN e.away_team_name ELSE e.home_team_name END as opp_name,
-               COUNT(*) as goals
-        FROM goal_events g JOIN events e ON g.event_id = e.id
-        WHERE g.player_id=? AND g.is_own_goal=0
-        GROUP BY opp_id ORDER BY goals DESC
-    """, (player_id,)).fetchall()
+    games = {}
+    for ev, h, a, _ts, hs, as_ in evs:
+        games.setdefault(h, []).append((ev, "home", _ins_pts(hs, as_)))
+        games.setdefault(a, []).append((ev, "away", _ins_pts(as_, hs)))
 
-    info = conn.execute("""
-        SELECT COALESCE(p.name_ko, m.player_name, p.name) as name_ko, m.team_id
-        FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
-        WHERE m.player_id=? AND m.player_name IS NOT NULL LIMIT 1
-    """, (player_id,)).fetchone()
-    conn.close()
+    teams = []
+    for t, tinfo in info.items():
+        g = games.get(t, [])
+        c = cnt.get(t, {})
+        total = sum(c.values())
+        ranked = sorted(c.items(), key=lambda kv: (-kv[1], str(kv[0])))
+        top = [{"name": disp[k], "goals": v, "share": round(v / total * 100, 1)} for k, v in ranked[:2]] if total else []
+        item = {"id": t, "short": tinfo.get("short", tinfo["name"]), "games": len(g), "goals": total, "scorers": len(c),
+                "top": top, "top1_share": top[0]["share"] if top else None,
+                "top2_share": round(sum(x["goals"] for x in top) / total * 100, 1) if total else None,
+                "eligible": len(g) >= _INS_MIN_GAMES and total >= _INS_MIN_GOALS, "ace": None}
+        if item["eligible"]:
+            ace_key = ranked[0][0]
+            nm, nk = pinfo.get(ace_key, (None, None)) if not isinstance(ace_key, str) else (None, None)
+            aliases = {_norm_kname(x) for x in (nm, nk, disp[ace_key]) if x}
+            w, wo = [], []
+            for ev, side, pts in g:
+                st = starters.get((ev, side))
+                if not st or len(st) < 11:
+                    continue          # 라인업 미확인 경기는 어느 쪽에도 넣지 않는다
+                (w if aliases & st else wo).append(pts)
+            item["ace"] = {"name": disp[ace_key], "goals": ranked[0][1], "n_with": len(w), "n_without": len(wo),
+                           "ppg_with": round(sum(w) / len(w), 2) if w else None,
+                           "ppg_without": round(sum(wo) / len(wo), 2) if len(wo) >= _ACE_MIN_WITHOUT else None}
+        teams.append(item)
 
+    elig = [t for t in teams if t["eligible"]]
+    teams.sort(key=lambda t: (-(t["top1_share"] if t["eligible"] else -1), t["short"]))
+    lg1 = round(sum(t["top1_share"] for t in elig) / len(elig), 1) if elig else None
+    lg2 = round(sum(t["top2_share"] for t in elig) / len(elig), 1) if elig else None
+    warnings = []
+    if not elig:
+        warnings.append(f"{_INS_MIN_GAMES}경기·{_INS_MIN_GOALS}득점 이상인 팀이 없어 판정할 수 없습니다.")
     return jsonify({
-        "player_id": int(player_id),
-        "name": info["name_ko"] if info else "",
-        "team": _ko_team(info["team_id"], "") if info else "",
-        "time_bands": time_data,
-        "by_opponent": [
-            {"opponent": _ko_team(r["opp_id"], r["opp_name"]), "goals": r["goals"]}
-            for r in opp_rows
-        ],
+        "league": label, "year": year, "teams": teams, "league_top1_share": lg1, "league_top2_share": lg2,
+        "min_games": _INS_MIN_GAMES, "min_goals": _INS_MIN_GOALS, "min_without": _ACE_MIN_WITHOUT, "warnings": warnings,
+        "limits": "득점자 식별은 선수 ID 우선·없으면 이름 매칭이라 드물게 같은 선수가 둘로 갈릴 수 있음 · 에이스 비선발 경기는 부상·징계·로테이션이 섞여 인과가 아님 · 소표본",
     })
 
 
-@app.route("/api/insights/midfielder-pass")
-@cached_response(ttl=1800)
-def insights_midfielder_pass():
-    year = request.args.get("year", "2026")
-    date_cond, date_params = _year_date_params(year)
+@app.route("/api/insights/rotation")
+@cached_response(ttl=3600)
+def insights_rotation():
+    """선발 로테이션 — 직전 경기 대비 선발 교체 인원(포털 라인업, 같은 리그 직전 경기 기준)과 성적의 관계.
+    팀별 평균 변경 인원·고정 주전 수, 리그 전체에서 대폭 로테이션(4명↑) vs 안정(2명↓) PPG 비교."""
+    sc = _ins_scope()
+    if sc is None:
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label, tid, year, ycond, yp = sc
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(f"""
-        SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) as name_ko, m.team_id,
-               COUNT(*) as games, SUM(m.minutes_played) as mins,
-               SUM(m.total_passes) as tp, SUM(m.accurate_passes) as ap,
-               AVG(m.rating) as avg_rating
-        FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
-        WHERE m.position='M' AND m.minutes_played>0 {date_cond}
-        GROUP BY m.player_id HAVING games>=3 AND tp>=50
-        ORDER BY (CAST(ap AS REAL)/tp) DESC LIMIT 25
-    """, date_params).fetchall()
-    conn.close()
-    return jsonify([{
-        "player_id": r["player_id"],
-        "name": r["name_ko"] or "",
-        "team": _ko_team(r["team_id"], ""),
-        "games": r["games"], "mins": r["mins"],
-        "total_passes": r["tp"] or 0, "accurate_passes": r["ap"] or 0,
-        "pass_acc": round((r["ap"] or 0) / r["tp"] * 100, 1) if r["tp"] else 0,
-        "passes_p90": round((r["tp"] or 0) / r["mins"] * 90, 1) if r["mins"] else 0,
-        "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
-    } for r in rows])
+    try:
+        # 연도 필터와 무관하게 직전 경기를 찾아야 하므로 전 시즌 로드 후 집계 구간만 거른다
+        all_evs = _ins_events(conn, tid, "", ())
+        starters = _ins_starters(conn, tid, "", ())
+    finally:
+        conn.close()
+    y_lo, y_hi = _year_range(year) if year != "all" else (None, None)
+
+    prev, per_team, recs = {}, {}, []
+    for ev, h, a, ts, hs, as_ in all_evs:
+        for t, side, gf, ga in ((h, "home", hs, as_), (a, "away", as_, hs)):
+            cur = starters.get((ev, side))
+            if not cur or len(cur) != 11:
+                prev[t] = None            # 라인업 공백을 건너뛰어 비교하지 않는다
+                continue
+            p, p_ts = prev.get(t) or (None, None)
+            if p is not None and (ts - p_ts) / 86400 > _REST_MAX_GAP_DAYS:
+                p = None                  # 시즌 시작·긴 휴식기 뒤 첫 경기는 직전 경기와 비교하지 않는다
+            in_range = y_lo is None or y_lo <= ts < y_hi
+            if in_range:
+                per_team.setdefault(t, {"lineups": [], "chg": []})["lineups"].append(cur)
+            if p is not None and in_range:
+                chg = 11 - len(cur & p)
+                per_team[t]["chg"].append((chg, _ins_pts(gf, ga)))
+                recs.append({"chg": chg, "pts": _ins_pts(gf, ga), "gf": gf, "ga": ga})
+            prev[t] = (cur, ts)
+
+    teams = []
+    for t, tinfo in info.items():
+        d = per_team.get(t)
+        if not d or not d["chg"]:
+            teams.append({"id": t, "short": tinfo.get("short", tinfo["name"]), "matches": 0, "eligible": False})
+            continue
+        chg = d["chg"]
+        n_l = len(d["lineups"])
+        starts = {}
+        for s in d["lineups"]:
+            for nm in s:
+                starts[nm] = starts.get(nm, 0) + 1
+        hi = [p for c, p in chg if c >= _ROT_HIGH]
+        teams.append({"id": t, "short": tinfo.get("short", tinfo["name"]), "matches": len(chg),
+                      "eligible": len(chg) >= _INS_MIN_GAMES,
+                      "avg_changes": round(sum(c for c, _ in chg) / len(chg), 2),
+                      "core_size": sum(1 for v in starts.values() if v / n_l >= _ROT_CORE_PCT),
+                      "high_n": len(hi), "high_ppg": round(sum(hi) / len(hi), 2) if len(hi) >= 3 else None})
+    teams.sort(key=lambda t: (-(t.get("avg_changes") or -1) if t["eligible"] else 99, t["short"]))
+
+    stable = _rest_stat([r for r in recs if r["chg"] <= _ROT_STABLE])
+    mid = _rest_stat([r for r in recs if _ROT_STABLE < r["chg"] < _ROT_HIGH])
+    high = _rest_stat([r for r in recs if r["chg"] >= _ROT_HIGH])
+    cmp_ = _rest_compare(high, stable)
+    clean = lambda s: {k: v for k, v in s.items() if k != "_sd"}   # noqa: E731
+    if cmp_ is None:
+        verdict = {"level": "insufficient", "text": "표본이 부족해 판정할 수 없습니다."}
+    elif cmp_["significant"]:
+        verdict = {"level": "some", "text": f"대폭 로테이션 경기의 PPG가 안정 경기보다 {cmp_['diff']:+.2f} (z={cmp_['z']:+.1f})로 통계적으로 유의합니다."}
+    else:
+        verdict = {"level": "none", "text": "대폭 로테이션이 성적에 영향을 준다는 통계적 근거는 확인되지 않았습니다 (차이가 표본 오차 범위)."}
+    warnings = []
+    if high["n"] < 30:
+        warnings.append(f"대폭 로테이션 표본이 {high['n']}건뿐이라 오차가 큽니다.")
+    return jsonify({
+        "league": label, "year": year, "team_matches": len(recs), "teams": teams,
+        "buckets": [{"key": "stable", "label": f"안정 (선발 {_ROT_STABLE}명↓ 교체)", **clean(stable)},
+                    {"key": "mid", "label": (f"보통 ({_ROT_STABLE + 1}명 교체)" if _ROT_STABLE + 1 == _ROT_HIGH - 1 else f"보통 ({_ROT_STABLE + 1}~{_ROT_HIGH - 1}명 교체)"), **clean(mid)},
+                    {"key": "high", "label": f"대폭 ({_ROT_HIGH}명↑ 교체)", **clean(high)}],
+        "high_vs_stable": cmp_, "verdict": verdict, "warnings": warnings, "min_games": _INS_MIN_GAMES,
+        "limits": "직전 경기는 같은 리그 기준(컵·ACL 미반영) · 로테이션은 연전·부상·징계·직전 결과에 따라 달라져 인과가 아님 · 선발 비교는 포털 라인업 이름 기준",
+    })
 
 
-@app.route("/api/insights/defender-score")
-@cached_response(ttl=1800)
-def insights_defender_score():
-    year = request.args.get("year", "2026")
-    date_cond, date_params = _year_date_params(year)
+@app.route("/api/insights/goal-aftermath")
+@cached_response(ttl=3600)
+def insights_goal_aftermath():
+    """득점 직후 실점/반격 — 골 직후 10분 안에 상대가 득점한 횟수를 '그 팀의 평소 실점률로 기대되는 횟수'와 비교.
+    (A) 득점 후 실점: 넣고 나서 바로 먹는가  (B) 실점 후 반격: 먹고 나서 바로 따라붙는가.
+    기대값 = Σ(1−exp(−팀 평소 득실점률 × 남은 창 길이)). 자책골 포함(득점 인정 팀 기준)."""
+    sc = _ins_scope()
+    if sc is None:
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label, tid, year, ycond, yp = sc
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(f"""
-        SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) as name_ko, m.team_id,
-               COUNT(*) as games, SUM(m.minutes_played) as mins,
-               SUM(m.tackles) as tkl, SUM(COALESCE(m.interceptions,0)) as intc,
-               SUM(m.clearances) as clr, SUM(COALESCE(m.blocked_shots,0)) as blk,
-               SUM(COALESCE(m.ball_recovery,0)) as brc, SUM(COALESCE(m.challenge_lost,0)) as chl,
-               SUM(m.aerial_won) as aer,
-               SUM(m.duel_won) as duel, AVG(m.rating) as avg_rating
-        FROM match_player_stats m LEFT JOIN players p ON m.player_id=p.id
-        WHERE m.position='D' AND m.minutes_played>0 {date_cond}
-        GROUP BY m.player_id HAVING games>=5 AND mins>=450
-        ORDER BY (tkl + intc*1.5 + clr + blk + brc*0.5 - chl) / mins DESC LIMIT 25
-    """, date_params).fetchall()
-    conn.close()
-    return jsonify([{
-        "player_id": r["player_id"],
-        "name": r["name_ko"] or "",
-        "team": _ko_team(r["team_id"], ""),
-        "games": r["games"], "mins": r["mins"],
-        "tackles": r["tkl"] or 0, "interceptions": r["intc"] or 0,
-        "clearances": r["clr"] or 0, "blocked_shots": r["blk"] or 0,
-        "ball_recovery": r["brc"] or 0, "challenge_lost": r["chl"] or 0,
-        "aerial_won": r["aer"] or 0, "duel_won": r["duel"] or 0,
-        # 수비P: 순수 수비행동(태클+인터셉트×1.5+클리어+슈팅차단+볼회수×0.5−피드리블). 공중볼/듀얼 제외.
-        "def_score": round(
-            ((r["tkl"] or 0) + (r["intc"] or 0)*1.5 + (r["clr"] or 0)
-             + (r["blk"] or 0) + (r["brc"] or 0)*0.5 - (r["chl"] or 0)) / r["mins"] * 90, 2),
-        "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
-    } for r in rows])
+    try:
+        evs = _ins_events(conn, tid, ycond, yp)
+        rows = conn.execute(
+            "SELECT g.event_id, g.id, g.minute, g.added_time, g.is_home FROM goal_events g JOIN events e ON e.id = g.event_id "
+            "WHERE e.tournament_id = ? AND e.home_score IS NOT NULL" + ycond, (tid, *yp)).fetchall()
+    finally:
+        conn.close()
+    evmap = {e[0]: e for e in evs}
+    by_ev = {}
+    for ev, gid, mn, ad, is_home in rows:
+        if ev in evmap and mn is not None:
+            by_ev.setdefault(ev, []).append((mn + (ad or 0), gid, 1 if is_home else 0))
+
+    n_games, gf, ga = {}, {}, {}
+    for ev, h, a, _ts, hs, as_ in evs:
+        for t, f, g in ((h, hs, as_), (a, as_, hs)):
+            n_games[t] = n_games.get(t, 0) + 1
+            gf[t], ga[t] = gf.get(t, 0) + f, ga.get(t, 0) + g
+    # 분당 득점·실점률(경기 90분 기준)
+    rate_f = {t: gf[t] / (n_games[t] * 90.0) for t in n_games}
+    rate_a = {t: ga[t] / (n_games[t] * 90.0) for t in n_games}
+
+    st = {t: {"scored": 0, "conc_obs": 0, "conc_exp": 0.0, "conceded": 0, "resp_obs": 0, "resp_exp": 0.0} for t in n_games}
+    for ev, glist in by_ev.items():
+        _id, h, a, _ts, _hs, _as = evmap[ev]
+        glist.sort()
+        end_t = max(_AFTERMATH_END, glist[-1][0] + 1)     # 긴 추가시간 경기도 마지막 골이 창을 갖도록 종료 시점을 늘린다
+        for i, (t0, _gid, side) in enumerate(glist):
+            win = min(_AFTERMATH_WINDOW, end_t - t0)
+            scorer, other = (h, a) if side else (a, h)
+            opp_scored = any(t1 - t0 <= win and s1 != side for t1, _g, s1 in glist[i + 1:])
+            st[scorer]["scored"] += 1
+            st[scorer]["conc_obs"] += 1 if opp_scored else 0
+            st[scorer]["conc_exp"] += 1 - math.exp(-rate_a[scorer] * win)
+            # 같은 장면을 상대(other) 시점에서 보면 '실점 후 반격'(other 가 창 안에 득점) — 관측은 같고 기대값(팀별 평소 득점률)만 다름
+            reply = opp_scored
+            st[other]["conceded"] += 1
+            st[other]["resp_obs"] += 1 if reply else 0
+            st[other]["resp_exp"] += 1 - math.exp(-rate_f[other] * win)
+
+    def z_of(obs, exp):
+        return round((obs - exp) / math.sqrt(exp), 1) if exp >= 1.5 else None
+
+    teams = []
+    for t, tinfo in info.items():
+        s = st.get(t)
+        if not s or n_games.get(t, 0) == 0:
+            continue
+        el = n_games[t] >= _INS_MIN_GAMES
+        teams.append({"id": t, "short": tinfo.get("short", tinfo["name"]), "games": n_games[t], "eligible": el,
+                      "scored": s["scored"], "conc_obs": s["conc_obs"], "conc_exp": round(s["conc_exp"], 1),
+                      "conc_z": z_of(s["conc_obs"], s["conc_exp"]) if el else None,
+                      "conceded": s["conceded"], "resp_obs": s["resp_obs"], "resp_exp": round(s["resp_exp"], 1),
+                      "resp_z": z_of(s["resp_obs"], s["resp_exp"]) if el else None})
+    teams.sort(key=lambda t: (-(t["conc_z"] or -99) if t["eligible"] else 99, t["short"]))
+
+    tot = lambda k: sum(v[k] for v in st.values())   # noqa: E731
+    lg = {"scored": tot("scored"), "conc_obs": tot("conc_obs"), "conc_exp": round(tot("conc_exp"), 1),
+          "conceded": tot("conceded"), "resp_obs": tot("resp_obs"), "resp_exp": round(tot("resp_exp"), 1)}
+    lg["conc_z"], lg["resp_z"] = z_of(lg["conc_obs"], tot("conc_exp")), z_of(lg["resp_obs"], tot("resp_exp"))
+    flagged = [t for t in teams if t["eligible"] and ((t["conc_z"] or 0) >= 2 or (t["resp_z"] or 0) <= -2)]
+    warnings = []
+    if lg["scored"] < 100:
+        warnings.append(f"리그 전체 득점이 {lg['scored']}골뿐이라 오차가 큽니다.")
+    return jsonify({"league": label, "year": year, "window": _AFTERMATH_WINDOW, "league_total": lg, "teams": teams,
+                    "flagged": [t["short"] for t in flagged], "min_games": _INS_MIN_GAMES, "warnings": warnings,
+                    "limits": "기대값은 팀의 시즌 평균 득실점률 기준(상대·시간대 강도 미보정) · 팀당 표본이 작아 z는 참고용이며 여러 팀을 동시에 보면 우연히 큰 값이 나올 수 있음 · 경기 종료는 95분(마지막 골이 더 늦으면 그 직후)으로 근사"})
+
+
+@app.route("/api/insights/pass-hub")
+@cached_response(ttl=3600)
+def insights_pass_hub():
+    """패스 허브 의존도 — 경기별로 팀 패스(보낸+받은) 관여의 몇 %가 가장 많이 관여한 한 선수에게 몰리는가.
+    K리그 공식 패스 행렬(2023~) 기준. 팀 평소보다 허브 지분이 높았던 경기 vs 낮았던 경기 PPG 도 비교."""
+    sc = _ins_scope()
+    if sc is None:
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label, tid, year, ycond, yp = sc
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        evs = _ins_events(conn, tid, ycond, yp)
+        ids = {e[0] for e in evs}
+        edges = conn.execute(
+            "SELECT p.event_id, p.team_id, p.passer_kid, p.receiver_kid, p.passes FROM kleague_pass_edge p "
+            "JOIN events e ON e.id = p.event_id WHERE e.tournament_id = ?" + ycond, (tid, *yp)).fetchall()
+        pl = conn.execute(
+            "SELECT p.event_id, p.team_id, p.player_kid, p.player_name, p.position FROM kleague_pass_player p "
+            "JOIN events e ON e.id = p.event_id WHERE e.tournament_id = ?" + ycond, (tid, *yp)).fetchall()
+    finally:
+        conn.close()
+    pname = {}
+    for ev, t, kid, nm, pos in pl:
+        pname[(ev, t, kid)] = (nm, pos)
+    inv, tot = {}, {}
+    for ev, t, a, b, n in edges:
+        if ev not in ids:
+            continue
+        d = inv.setdefault((ev, t), {})
+        d[a] = d.get(a, 0) + n
+        d[b] = d.get(b, 0) + n
+        tot[(ev, t)] = tot.get((ev, t), 0) + n
+    pts = {}
+    for ev, h, a, _ts, hs, as_ in evs:
+        pts[(ev, h)] = (_ins_pts(hs, as_), hs, as_)
+        pts[(ev, a)] = (_ins_pts(as_, hs), as_, hs)
+
+    per_team = {}
+    for (ev, t), d in inv.items():
+        total = tot[(ev, t)]
+        if total < 50:
+            continue
+        top = sorted(d.items(), key=lambda kv: (-kv[1], kv[0]))
+        s1, s2 = top[0][1] / (2 * total), (top[0][1] + (top[1][1] if len(top) > 1 else 0)) / (2 * total)
+        nm, pos = pname.get((ev, t, top[0][0]), (f"선수{top[0][0]}", None))
+        per_team.setdefault(t, []).append({"ev": ev, "s1": s1, "s2": s2, "hub": top[0][0], "name": nm, "pos": pos})
+
+    teams, recs = [], []
+    for t, tinfo in info.items():
+        L = per_team.get(t, [])
+        if not L:
+            continue
+        mean1 = sum(x["s1"] for x in L) / len(L)
+        cnt = {}
+        for x in L:
+            cnt[x["hub"]] = cnt.get(x["hub"], 0) + 1
+        main_kid = max(cnt, key=lambda k: (cnt[k], -k))
+        main = next(x for x in L if x["hub"] == main_kid)
+        for x in L:
+            p = pts.get((x["ev"], t))
+            if p:
+                recs.append({"rel": x["s1"] - mean1, "pts": p[0], "gf": p[1], "ga": p[2]})
+        teams.append({"id": t, "short": tinfo.get("short", tinfo["name"]), "matches": len(L), "eligible": len(L) >= _INS_MIN_GAMES,
+                      "hub_share": round(mean1 * 100, 1), "top2_share": round(sum(x["s2"] for x in L) / len(L) * 100, 1),
+                      "main_hub": {"name": main["name"], "pos": main["pos"], "times": cnt[main_kid], "pct": round(cnt[main_kid] / len(L) * 100)},
+                      "hubs": len(cnt)})
+    elig = [t for t in teams if t["eligible"]]
+    teams.sort(key=lambda t: (-(t["hub_share"] if t["eligible"] else -1), t["short"]))
+    lg = round(sum(t["hub_share"] for t in elig) / len(elig), 1) if elig else None
+
+    hi = _rest_stat([r for r in recs if r["rel"] >= 0.02])
+    lo = _rest_stat([r for r in recs if r["rel"] <= -0.02])
+    cmp_ = _rest_compare(hi, lo)
+    clean = lambda s: {k: v for k, v in s.items() if k != "_sd"}   # noqa: E731
+    if cmp_ is None:
+        verdict = {"level": "insufficient", "text": "표본이 부족해 판정할 수 없습니다."}
+    elif cmp_["significant"]:
+        verdict = {"level": "some", "text": f"팀 평소보다 허브 지분이 높았던 경기의 PPG가 낮았던 경기보다 {cmp_['diff']:+.2f} (z={cmp_['z']:+.1f}) 차이입니다."}
+    else:
+        verdict = {"level": "none", "text": "허브 지분이 평소보다 높거나 낮았던 경기 사이에 성적 차이가 있다는 통계적 근거는 확인되지 않았습니다."}
+    return jsonify({"league": label, "year": year, "teams": teams, "league_hub_share": lg, "min_games": _INS_MIN_GAMES,
+                    "hub_high": {"label": "평소보다 허브 집중 (+2%p↑)", **clean(hi)}, "hub_low": {"label": "평소보다 분산 (−2%p↓)", **clean(lo)},
+                    "high_vs_low": cmp_, "verdict": verdict, "matches": len(recs),
+                    "limits": "허브 지분 = 한 선수의 (보낸+받은) 패스 관여 ÷ 팀 총 패스 관여(패스 1회=2관여) · 공식 패스 행렬 2023~ · 점유율·상대 압박·경기 상황에 따라 달라져 인과가 아님"})
 
 
 @app.route("/api/insights/player-detail")

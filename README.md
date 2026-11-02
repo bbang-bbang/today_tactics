@@ -204,11 +204,11 @@ K리그 (players.db)
 | `/api/kleague{1,2}/position-heatmap` | 포지션 평균 동선 — 비교 오버레이용. `detail=`(세부 8그룹 GK/CB/FB/DM/CM/AM/W/ST) 우선, 없으면 `position=`(G/D/M/F). `year` 필터 |
 | `/api/heatmap-player-search` | 히트맵 통합 선수 검색 (K1·2 전 구단, 선수당 1줄, 최근 소속) |
 | `/api/insights/top-performers` | 포지션별 TOP 퍼포머 — 행에 `detail`(세부 포지션 최빈) 부착, 프론트 칩이 CB/FB/DM/CM/AM/W/ST로 행 필터 |
-| `/api/insights/xg-efficiency` | xG 효율 분석 |
-| `/api/insights/forward-goals` | 공격수 득점 패턴 |
-| `/api/insights/midfielder-pass` | 미드필더 패스 분석 |
-| `/api/insights/defender-score` | 수비수 평점 분석 |
 | `/api/insights/player-detail` | 선수 인사이트 상세 |
+| `/api/insights/scoring-dependence` | 득점 의존도 — 1·2위 득점자 비중 + 에이스 선발 여부별 팀 PPG (`league`, `year`) |
+| `/api/insights/rotation` | 선발 로테이션 — 직전 경기 대비 선발 교체 인원과 성적 (같은 리그·21일 초과 공백 제외) |
+| `/api/insights/goal-aftermath` | 득점 직후 10분 실점·실점 직후 반격 — 팀 평소 득실점률 기대값 대비 |
+| `/api/insights/pass-hub` | 패스 허브 의존도 — 한 선수의 패스 관여 비중, 팀 평소 대비 집중도별 성적 (공식 패스 2023~) |
 | **해외리그 (`/leagues` 페이지)** | |
 | `/leagues` | 해외리그 독립 페이지 (leagues.html) — 순위표·팀지표·TOP퍼포머·리그분석 4탭 |
 | `/api/leagues` | 지원 리그 목록 (kleague 제외 해외 5개 리그) |

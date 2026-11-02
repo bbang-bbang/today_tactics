@@ -9703,3 +9703,10 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .gd-open-btn:active { transform: scale(0.97); }
 .gd-open-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .gd-open-btn + #user-menu { margin-left: 10px; }
+
+/* ── 신규 인사이트 4종: 미니 막대 · 2열 그리드 ───────────────── */
+.ins-rs-grid-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+@media (max-width: 900px) { .ins-rs-grid-2 { grid-template-columns: minmax(0, 1fr); } }
+.ins-mini-track { display: inline-block; width: 44px; height: 6px; margin: 0 6px 1px 4px; background: rgba(255,255,255,0.08); border-radius: 3px; vertical-align: middle; overflow: hidden; }
+.ins-mini-bar { display: block; height: 100%; background: #7ecfff; border-radius: 3px; }
+.ins-sd-name { color: #9fb3cf; font-size: 0.74rem; }
