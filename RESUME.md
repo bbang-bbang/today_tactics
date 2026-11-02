@@ -16,6 +16,7 @@
      - 별건 버그: 득점 중복 1경기(backlog P1 '득점 중복').
   3. ⏸ (보류 — 사용자 판단 중요도 낮음) 팬 항목 ②: 팀/선수 스토리형 인사이트(착수 전 `team-trend`·`player-analytics` 중복 확인).
   4. 선택: 스카우팅 요약에 '패스 허브' 연동 · 슈팅 PK/FK로 `is_penalty` 보정 · 선수 상세 스탯 복구 검토.
+- **2026-11-03 완료**: ①헤더 `📖 분석 읽는 법` 도움말 모달(`templates/index.html` `#guide-overlay`, style.css v100 — 지표 정의·해석 주의점·데이터 한계, 문구는 각 화면 '근거' 줄과 일치 유지) ②공식 선수 상세 API(`getMatchRecordPlayerDetail`) 정합 검증 → **보완재, `match_player_stats`에 혼합 금지**, 구현 보류(트리거: 운영 선수 스탯까지 차단 확산 — 상세·수치는 `checklist/backlog.md` P1) ③이 PC 새 수집 단계(STEP 23~25)를 DB 복사본에서 dry-run→apply 검증(원본 미변경). 상세: `checklist/work-log-2026-11-03.md`. 이 PC의 `players.db`는 11/2 00:19 기준(운영보다 오래됨) — 서버/QA 필요 시 운영 DB를 `sqlite3 .backup` 후 scp.
 - **정적 자산 수정 시 필수**: nginx가 `/static/`을 `expires 7d` + `immutable`로 내보내므로 JS/CSS를 바꾸면 `templates/index.html`의 `?v=`를 반드시 올릴 것(안 올리면 기존 방문자는 최대 7일간 옛 파일 사용).
 
 ## 1. 현재 상태 (2026-06-11 종료 시점)
