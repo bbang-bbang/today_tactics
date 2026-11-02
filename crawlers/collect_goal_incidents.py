@@ -133,7 +133,7 @@ async def main():
         days_params = (args.days,)
 
     cur.execute(f"""
-        SELECT id, home_team_id, away_team_id
+        SELECT id, home_team_id, away_team_id, home_score, away_score
         FROM events WHERE tournament_id IN ({placeholders}){days_cond}
         ORDER BY date_ts
     """, tuple(tids) + days_params)
@@ -191,11 +191,25 @@ async def main():
                 continue
             consecutive_fails = 0
 
-            # 재수집 모드: 기존 해당 경기 데이터 삭제 후 재삽입
-            if args.refetch:
-                cur.execute("DELETE FROM goal_events WHERE event_id=?", (eid,))
-                cur.execute("DELETE FROM card_events WHERE event_id=?", (eid,))
-                cur.execute("DELETE FROM sub_events  WHERE event_id=?", (eid,))
+            # 기존 해당 경기 데이터 삭제 후 재삽입 — 재수집 모드뿐 아니라 일반 모드에서도.
+            # 일반 모드도 '카드 0장 경기'처럼 이미 득점/교체가 저장된 경기를 매번 다시 대상으로 잡는데,
+            # SofaScore가 경기 후 시각을 1분씩 정정하면(82'→81') UNIQUE 키가 달라져 INSERT OR IGNORE를
+            # 통과해 득점·교체·카드가 중복 누적됐다(2026-11-02 발견: 15404030 득점 9건/스코어 6 등).
+            # 응답이 유효할 때만 여기 도달하므로(위 continue), 삭제 후 최신 응답으로 통째 교체한다.
+            # 안전장치: 응답 득점 수가 스코어와 다른데 기존 기록은 스코어와 맞으면 교체하지 않는다
+            # (불완전 응답이 공식 API 복구분 등 정상 기록을 덮어쓰는 것 방지).
+            if ev["home_score"] is not None and ev["away_score"] is not None:
+                final = ev["home_score"] + ev["away_score"]
+                resp_goals = sum(1 for inc in data["incidents"] if inc.get("incidentType") == "goal")
+                cur.execute("SELECT COUNT(*) FROM goal_events WHERE event_id=?", (eid,))
+                stored_goals = cur.fetchone()[0]
+                if resp_goals != final and stored_goals == final and stored_goals > 0:
+                    log(f"  [{eid}] 응답 득점 {resp_goals} ≠ 스코어 {final} — 기존 기록 유지")
+                    skip += 1
+                    continue
+            cur.execute("DELETE FROM goal_events WHERE event_id=?", (eid,))
+            cur.execute("DELETE FROM card_events WHERE event_id=?", (eid,))
+            cur.execute("DELETE FROM sub_events  WHERE event_id=?", (eid,))
 
             rows_inserted = 0
             for inc in data["incidents"]:
