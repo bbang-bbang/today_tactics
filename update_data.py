@@ -141,6 +141,9 @@ def main():
         # SofaScore가 복구되면 자연히 할 일이 없어진다. STEP 16(포털 라인업)·4~5(mps) 이후, 18(detail_pos) 이전.
         (23, f"라인업 복원 — 포털 라인업 + mps 등번호 → match_lineups (SofaScore 라인업 없는 경기만, 최근 {max(args.days, 30)}일)",
             [PYTHON, str(CRAWLERS/"recover_lineups_kleague.py"), "--apply", "--days", str(max(args.days, 30))]),
+        # STEP 21 복구 득점은 PK 구분이 없음 → 공식 슈팅 데이터(PK 코드)로 is_penalty 보정. 슈팅은 다음 날 공개.
+        (25, f"K리그 공식 슈팅 → 득점 PK 보정 (최근 {max(args.days, 30)}일)",
+            [PYTHON, str(CRAWLERS/"fix_penalty_from_kleague.py"), "--apply", "--days", str(max(args.days, 30))]),
     ]
     if not args.skip_heatmap:
         steps += [
