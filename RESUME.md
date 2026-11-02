@@ -11,7 +11,7 @@
 - **2026-11-02 완료**: **패스 네트워크**(`collect_kleague_passes.py` + `/api/pass-network` + 팀 분석 '🕸 패스 네트워크' 탭, 2023~2026 백필 완료, update_data STEP 22). 공식 API는 엔드포인트마다 필드명이 달라(`getPassData`=year/meetSeq/gameId+homeTeam/awayTeam, `getShootData`=MEET_YEAR/MEET_SEQ/GAME_ID+homeTeam/awayTeam, 모두 multipart) 잘못 호출하면 '성공+빈 데이터'가 나오므로 페이지 JS의 formData를 먼저 확인할 것.
 - **남은 결정/작업**:
   1. ✅ **운영 DB 동기화 완료(2026-11-02)**: 서버에서 `update_data.py --days 14` 실행 → 10/31~11/1 결과·득점/카드/교체 복구(STEP 21)·패스 네트워크 2023~2026(STEP 22, 1,636경기) 반영. 이후는 **월 05:00 크론**이 자동 처리(첫 동기화는 SSH로 직접 실행 — `/api/trigger-update`는 30분 제한이라 부적합). 접속: `ssh -i ~/.ssh/<SSH키> rocky@<운영IP>`(키는 `~/.ssh/`), 앱 `/opt/today_tactics`, 파이썬 `./venv/bin/python`. 주의: 업데이트 직후 gunicorn 워커별 메모리 캐시 때문에 일부 API가 옛 응답을 최대 1시간 서빙(백로그 P1 '미해결' 참조).
-  2. ✅ **라인업·히트맵 복구 구현(2026-11-02, 로컬 커밋 · 운영 미반영)**: `recover_lineups_kleague.py`(STEP 23, 포털 라인업+mps 등번호) · `collect_kleague_heatmap.py`(STEP 24, 공식 `getHeatmapData` + GK 기준 방향 변환). 원장 `kleague_recovery_log`. **남은 일: push 후 운영에서 두 스크립트 `--apply` + `backfill_detail_positions.py` 1회 실행**(절차는 backlog P1). 워커 간 캐시 무효화도 같은 날 수정(`.cache_generation` 마커).
+  2. ✅ **라인업·히트맵 복구 — 구현 + 운영 반영 완료(2026-11-02)**: `recover_lineups_kleague.py`(STEP 23, 포털 라인업+mps 등번호) · `collect_kleague_heatmap.py`(STEP 24, 공식 `getHeatmapData` + GK 기준 방향 변환). 원장 `kleague_recovery_log`. 운영에서 1회 실행 완료(라인업 52경기·히트맵 67경기), 이후 월 05:00 크론이 STEP 23·24로 자동. 워커 간 캐시 무효화도 같은 날 수정(`.cache_generation` 마커).
      - 이 PC는 Git Bash ssh가 한글 사용자 경로를 못 읽음 → **PowerShell의 Windows OpenSSH**로 접속. DB 받기는 서버에서 `sqlite3 .backup /tmp/x.db` 후 scp(운영 DB 직접 복사 금지).
      - 별건 버그: 득점 중복 1경기(backlog P1 '득점 중복').
   3. 팬 항목 ②: 팀/선수 스토리형 인사이트(착수 전 `team-trend`·`player-analytics` 중복 확인).
