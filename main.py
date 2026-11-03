@@ -5259,6 +5259,241 @@ def get_player_stat_report():
     })
 
 
+# ── 공식(K리그) 선수 리포트 ───────────────────────────────────────────────
+# kleague_player_match(공식 값 그대로)만으로 계산한다. match_player_stats(SofaScore)와는 섞지 않는다 —
+# 태클·드리블·경합 등 정의가 다른 항목이 많고, 출전분도 추가시간 포함(풀타임≈98분)이라 90분 환산 기준이 다르다.
+# 기존 /api/player-stat-report 는 변경하지 않는다(롤백 = 이 블록 제거).
+_KPM_POS_TO_BROAD = {"GK": "G", "DF": "D", "MF": "M", "FW": "F"}
+_KPM_SUM_COLS = ("goals", "assists", "shots", "shots_on_target", "passes", "passes_acc", "key_passes",
+                 "dribbles", "dribbles_won", "tackles", "interceptions", "clearances", "shots_blocked",
+                 "aerials", "aerials_won", "duels", "duels_won", "fouls", "fouled", "yellow", "red",
+                 "saves", "goals_conceded")
+_KPM_POS_GROUPS = {
+    "G": [("saves", "선방(90분)", "🧤"), ("aer_pct", "공중볼 장악률(%)", "✈"),
+          ("pass_pct", "패스 성공률(%)", "🎯"), ("passes", "패스 시도(90분)", "👟")],
+    "D": [("tackles", "태클(90분)", "🛡"), ("ints", "인터셉트(90분)", "✂"), ("clears", "클리어링(90분)", "🥊"),
+          ("aer_w", "공중볼 성공(90분)", "✈"), ("aer_pct", "공중볼 장악률(%)", "📊"),
+          ("blocked", "슈팅 차단(90분)", "🚫"), ("duel_pct", "듀얼 승률(%)", "⚔"), ("pass_pct", "패스 성공률(%)", "🎯")],
+    "M": [("key_passes", "키패스(90분)", "🔑"), ("pass_pct", "패스 성공률(%)", "🎯"), ("assists", "도움(90분)", "🎨"),
+          ("drib_s", "드리블 성공(90분)", "💨"), ("tackles", "태클(90분)", "🛡"), ("ints", "인터셉트(90분)", "✂"),
+          ("goals", "득점(90분)", "⚽"), ("passes", "패스 시도(90분)", "👟")],
+    "F": [("goals", "득점(90분)", "⚽"), ("assists", "도움(90분)", "🎨"), ("shots", "슈팅(90분)", "🎯"),
+          ("sot", "유효슈팅(90분)", "🎯"), ("drib_s", "드리블 성공(90분)", "💨"),
+          ("drib_pct", "드리블 성공률(%)", "📊"), ("aer_w", "공중볼 성공(90분)", "✈"), ("fouled", "파울 유도(90분)", "🤸")],
+}
+_KPM_RADAR_KEYS = {
+    "G": ["saves", "aer_pct", "pass_pct", "passes", "duel_pct"],
+    "D": ["tackles", "ints", "aer_pct", "blocked", "pass_pct"],
+    "M": ["key_passes", "pass_pct", "drib_s", "tackles", "goals"],
+    "F": ["goals", "shots", "drib_s", "aer_w", "assists"],
+}
+_KPM_RADAR_LABELS = {
+    "goals": "득점", "assists": "도움", "shots": "슈팅", "sot": "유효슈팅", "pass_pct": "패스%", "passes": "패스",
+    "key_passes": "키패스", "drib_s": "드리블", "tackles": "태클", "ints": "인터셉트", "aer_pct": "공중볼%",
+    "blocked": "슈팅차단", "saves": "선방", "duel_pct": "듀얼승률%",
+}
+
+
+def _kpm_resolve_kid(conn, pid):
+    """SofaScore player id → (공식 선수 ID, 방식) 또는 (None, 사유).
+    1) kleague_player_map 확정 매핑  2) 같은 이름 후보 중 '같은 경기·같은 홈/원정'에 함께 출전한 비율이 80% 이상
+    (SofaScore 쪽 중복 레코드·동명이인 구제)인 후보가 정확히 1명일 때만 채택. 모호하면 포기(오매칭 방지)."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague_player_match'").fetchone():
+        return None, "no_official_table"
+    try:
+        r = conn.execute("SELECT player_kid FROM kleague_player_map WHERE sofa_player_id = ? LIMIT 1", (pid,)).fetchone()
+    except sqlite3.OperationalError:
+        r = None
+    if r:
+        return r[0], "map"
+    prow = conn.execute("SELECT name_ko FROM players WHERE id = ?", (pid,)).fetchone()
+    nm = re.sub(r"\(c\)|[\s·.\-]", "", (prow[0] if prow else "") or "")
+    if not nm:
+        return None, "no_match"
+    cands = [x[0] for x in conn.execute(
+        "SELECT DISTINCT player_kid FROM kleague_player_match "
+        "WHERE REPLACE(REPLACE(REPLACE(player_name, ' ', ''), '·', ''), '.', '') = ?", (nm,))]
+    if not cands:
+        return None, "no_match"
+    # 공식 수집 원장에 있는 경기만 대조(수집 범위 밖 옛 시즌 경기는 분모에서 제외)
+    total = conn.execute(
+        "SELECT COUNT(DISTINCT m.event_id) FROM match_player_stats m JOIN kleague_player_match_log l ON l.event_id = m.event_id "
+        "WHERE m.player_id = ?", (pid,)).fetchone()[0]
+    if total < 3:
+        return None, "unverifiable"
+    ok = []
+    for kid in cands:
+        # 같은 경기·같은 홈/원정 + 출전분 정합(공식=추가시간 포함이라 SofaScore보다 -3~+25분). 출전이 드문 동명 선수가
+        # 주전 선수의 경기와 우연히 겹쳐도 출전분까지 맞지 않으면 탈락한다.
+        both, mins_ok = conn.execute(
+            "SELECT COUNT(DISTINCT m.event_id), "
+            "COUNT(DISTINCT CASE WHEN m.minutes_played IS NOT NULL AND k.minutes - m.minutes_played BETWEEN -3 AND 25 "
+            "THEN m.event_id END) "
+            "FROM match_player_stats m JOIN kleague_player_match_log l ON l.event_id = m.event_id "
+            "JOIN kleague_player_match k ON k.event_id = m.event_id AND k.is_home = m.is_home AND k.player_kid = ? "
+            "WHERE m.player_id = ?", (kid, pid)).fetchone()
+        if both / total >= 0.8 and mins_ok / total >= 0.8:
+            ok.append(kid)
+    if len(ok) == 1:
+        return ok[0], "name+overlap"
+    return None, ("ambiguous" if ok else "no_match")
+
+
+@app.route("/api/player-stat-report-official")
+@cached_response(ttl=3600)
+def get_player_stat_report_official():
+    """선수 상세 스탯 보고서(공식 K리그 기록 기준) — 비교군·백분위·90분 환산 모두 공식 데이터끼리만 계산."""
+    import datetime as _dt
+    name = request.args.get("name", "").strip()
+    player_id = request.args.get("playerId", type=int)
+    year_arg = request.args.get("year", type=int)
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    try:
+        if player_id:
+            row = cur.execute("SELECT id, name_ko, name FROM players WHERE id = ?", (player_id,)).fetchone()
+            pid, matched = (row["id"], row["name_ko"] or row["name"]) if row else (None, None)
+        else:
+            pid, _t, matched = _find_player(cur, name)
+        if not pid:
+            return jsonify({"found": False}), 404
+
+        kid, how = _kpm_resolve_kid(conn, pid)
+        base = {"found": True, "source": "official", "player": {"id": pid, "name": matched}}
+        if kid is None:
+            return jsonify({**base, "official": False, "reason": how})
+
+        year_expr = "strftime('%Y', datetime(e.date_ts,'unixepoch','localtime'))"
+        years = [r[0] for r in cur.execute(
+            f"SELECT DISTINCT {year_expr} FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
+            "WHERE k.player_kid = ? AND e.tournament_id IN (410, 777) ORDER BY 1", (kid,))]
+        if not years:
+            return jsonify({**base, "official": False, "reason": "no_games"})
+        year = str(year_arg) if year_arg else years[-1]
+        if year not in years:
+            return jsonify({**base, "official": False, "reason": "no_year", "available_years": years})
+
+        t = cur.execute(
+            f"SELECT e.tournament_id FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
+            f"WHERE k.player_kid = ? AND e.tournament_id IN (410, 777) AND {year_expr} = ? "
+            "ORDER BY e.date_ts DESC LIMIT 1", (kid, year)).fetchone()
+        tid = t[0]
+        sums = ", ".join(f"SUM(k.{c}) {c}" for c in _KPM_SUM_COLS)     # 컬럼명은 위 고정 목록 — 외부 입력 없음
+
+        me = cur.execute(
+            f"SELECT COUNT(*) games, SUM(k.minutes) mins, SUM(k.xg) xg, AVG(k.point) point, {sums} "
+            f"FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
+            f"WHERE k.player_kid = ? AND e.tournament_id = ? AND {year_expr} = ?", (kid, tid, year)).fetchone()
+        pos_row = cur.execute(
+            f"SELECT k.position, COUNT(*) c FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
+            f"WHERE k.player_kid = ? AND e.tournament_id = ? AND {year_expr} = ? AND k.position IS NOT NULL "
+            "GROUP BY k.position ORDER BY c DESC LIMIT 1", (kid, tid, year)).fetchone()
+        pos_raw = pos_row[0] if pos_row else None
+        eff_pos = _KPM_POS_TO_BROAD.get(pos_raw, "M")
+        pos_label = pos_raw or "?"
+
+        def metrics(r):
+            m = r["mins"] or 0
+            def v90(c): return (r[c] or 0) / m * 90 if m else 0.0
+            def ratio(a, b): return round((r[a] or 0) / r[b] * 100, 1) if r[b] else None   # 분모 0 = 공식 미기록(GK 공중볼 등)
+            return {
+                "goals": v90("goals"), "assists": v90("assists"), "shots": v90("shots"), "sot": v90("shots_on_target"),
+                "pass_pct": ratio("passes_acc", "passes"), "passes": v90("passes"), "key_passes": v90("key_passes"),
+                "drib_s": v90("dribbles_won"), "drib_pct": ratio("dribbles_won", "dribbles"),
+                "tackles": v90("tackles"), "ints": v90("interceptions"), "clears": v90("clearances"),
+                "blocked": v90("shots_blocked"), "aer_w": v90("aerials_won"), "aer_pct": ratio("aerials_won", "aerials"),
+                "duel_w": v90("duels_won"), "duel_pct": ratio("duels_won", "duels"),
+                "saves": v90("saves"), "fouls": v90("fouls"), "fouled": v90("fouled"),
+            }
+
+        my = metrics(me)
+
+        # 비교군: 같은 리그·같은 해·같은 출전 포지션, 공식 출전 270분·5경기 이상 (기존 리포트와 동일 기준)
+        peers = {}
+        if pos_raw:
+            for r in cur.execute(
+                f"SELECT k.player_kid, COUNT(*) games, SUM(k.minutes) mins, {sums} "
+                f"FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
+                f"WHERE e.tournament_id = ? AND {year_expr} = ? AND k.position = ? "
+                "GROUP BY k.player_kid HAVING mins >= 270 AND games >= 5", (tid, year, pos_raw)):
+                peers[r["player_kid"]] = metrics(r)
+
+        def percentile(key, val, higher_is_better=True):
+            if val is None:
+                return None                      # 공식 미기록 지표는 백분위도 없음(0%로 오해 방지)
+            vals = [v[key] for v in peers.values() if v[key] is not None]
+            if not vals:
+                return 50
+            below = sum(1 for v in vals if (v < val if higher_is_better else v > val))
+            return round(below / len(vals) * 100)
+
+        pctile = {k: percentile(k, my[k]) for k in my}
+        pctile["fouls"] = percentile("fouls", my["fouls"], higher_is_better=False)
+
+        stat_items = [{"key": k, "label": lb, "icon": ic, "val": None if my[k] is None else round(my[k], 2),
+                       "pctile": pctile.get(k), "peer_cnt": len(peers)} for k, lb, ic in _KPM_POS_GROUPS[eff_pos]]
+        radar = [{"label": _KPM_RADAR_LABELS.get(k, k), "pctile": pctile[k]}
+                 for k in _KPM_RADAR_KEYS[eff_pos] if pctile.get(k) is not None]
+
+        recent = []
+        for r in cur.execute(
+            "SELECT e.date_ts, CASE WHEN k.is_home = 1 THEN e.away_team_id ELSE e.home_team_id END opp_id, "
+            "k.goals, k.assists, k.point, k.is_home, e.home_score, e.away_score, k.tackles, k.interceptions, "
+            "k.clearances, k.aerials_won, k.saves, k.shots_on_target, k.key_passes "
+            "FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
+            "WHERE k.player_kid = ? AND e.tournament_id = ? AND e.date_ts IS NOT NULL "
+            "ORDER BY e.date_ts DESC LIMIT 5", (kid, tid)):
+            d = _dt.datetime.utcfromtimestamp(r[0])
+            hs, aws, is_home = r[6], r[7], r[5]
+            if hs is not None and aws is not None:
+                a, b = (hs, aws) if is_home else (aws, hs)
+                res = "W" if a > b else ("D" if a == b else "L")
+            else:
+                res = "?"
+            recent.append({
+                "date": f"{d.year}/{d.month}/{d.day}", "opponent": _ko_name_by_ss_id(str(r[1])) or str(r[1]),
+                "is_home": bool(is_home), "goals": r[2] or 0, "assists": r[3] or 0,
+                "rating": round(r[4], 1) if r[4] else None,        # 공식 playerPoint — SofaScore 평점 아님
+                "result": res, "score": f"{r[6]}-{r[7]}", "tackles": r[8] or 0, "ints": r[9] or 0,
+                "clears": r[10] or 0, "aer_w": r[11] or 0, "saves": r[12] or 0, "sot": r[13] or 0, "key_passes": r[14] or 0,
+            })
+
+        last_team = cur.execute(
+            f"SELECT k.team_id FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
+            f"WHERE k.player_kid = ? AND e.tournament_id = ? AND {year_expr} = ? ORDER BY e.date_ts DESC LIMIT 1",
+            (kid, tid, year)).fetchone()
+        sofa_games = cur.execute(
+            f"SELECT COUNT(DISTINCT m.event_id) FROM match_player_stats m JOIN events e ON e.id = m.event_id "
+            f"WHERE m.player_id = ? AND e.tournament_id = ? AND {year_expr} = ?", (pid, tid, year)).fetchone()[0]
+        has_xg = me["xg"] is not None
+
+        return jsonify({
+            **base,
+            "official": True,
+            "mapping": {"kid": kid, "method": how},
+            "player": {
+                "id": pid, "kid": kid, "name": matched,
+                "team": (_ko_name_by_ss_id(str(last_team[0])) if last_team else None) or "",
+                "league": "K1" if tid == 410 else "K2", "pos": eff_pos, "pos_label": pos_label,
+                "peer_label": BROAD_POS_LABELS.get(eff_pos, pos_label),
+                "games": me["games"], "mins": int(me["mins"] or 0),
+                "goals": me["goals"] or 0, "assists": me["assists"] or 0,
+                "rating": round(me["point"], 2) if me["point"] else None,   # 공식 평점(playerPoint)
+                "yellows": me["yellow"] or 0, "reds": me["red"] or 0,
+                "xg": round(me["xg"], 2) if has_xg else None,               # 2026은 공식 xG 빈 값 → None
+            },
+            "year": year, "available_years": years,
+            "coverage": {"official_games": me["games"], "sofa_games": sofa_games},
+            "minutes_basis": "official_incl_stoppage",
+            "stat_items": stat_items, "radar": radar, "recent_form": recent, "peer_count": len(peers),
+            "all_stats": {k: (None if v is None else round(v, 2)) for k, v in my.items()}, "all_pctiles": pctile,
+        })
+    finally:
+        conn.close()
+
+
 @app.route("/api/player-analytics")
 @cached_response(ttl=1800)
 def get_player_analytics():

@@ -303,6 +303,33 @@ qa('선수 한글명 존재', lambda: assert_(players_ko > 0, f'{players_ko}명'
 
 conn.close()
 
+# ── 공식(K리그) 선수 리포트 ──
+# 공식 테이블이 없는 환경(로컬 구DB)에서는 official=False + reason 이면 통과(기능 미적용 상태의 정상 응답).
+def _official_ok():
+    d = get('/api/player-stat-report-official?playerId=171785')   # 제르소(인천) — 공식 매핑 확정 선수
+    assert_(d.get('found') is True and d.get('source') == 'official', '기본 키')
+    if not d.get('official'):
+        assert_(d.get('reason'), 'official=False 인데 reason 없음')
+        return
+    assert_(d['mapping']['kid'] and d['player']['games'] > 0 and d['player']['mins'] > 0, '매핑/출전')
+    assert_(d['minutes_basis'] == 'official_incl_stoppage', '출전분 기준 표기')
+    assert_(all(s['pctile'] is None or 0 <= s['pctile'] <= 100 for s in d['stat_items']), '백분위 범위')
+    assert_(all(0 <= r['pctile'] <= 100 for r in d['radar']) and len(d['radar']) >= 3, '레이더')
+    assert_(d['coverage']['official_games'] == d['player']['games'], '커버리지 정합')
+qa('공식 리포트 구조·범위', _official_ok)
+def _official_404():
+    try:
+        urllib.request.urlopen(base + '/api/player-stat-report-official?name=%EC%97%86%EB%8A%94%EC%84%A0%EC%88%98xyz', timeout=10)
+    except urllib.error.HTTPError as e:
+        assert_(e.code == 404, f'HTTP {e.code}')
+        return
+    raise AssertionError('404 아님')
+qa('공식 리포트 미존재 선수 404', _official_404)
+def _official_no_year():
+    d = get('/api/player-stat-report-official?playerId=171785&year=1999')
+    assert_(d.get('official') is False and d.get('reason') in ('no_year', 'no_official_table', 'no_match', 'no_games'), str(d.get('reason')))
+qa('공식 리포트 없는 연도 안전 응답', _official_no_year)
+
 # ── 결과 출력 ──
 passed = sum(1 for r in results if r[0] == 'PASS')
 failed = [r for r in results if r[0] == 'FAIL']
