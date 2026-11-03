@@ -71,8 +71,9 @@ today_tactics/
     fetch_venues.py                  #   경기장 좌표 수집
     fetch_weather.py                 #   경기 당시 날씨 수집
     fetch_events.py / fetch_*.py     #   누락 이벤트 메타 보완 (referees/injuries/round 등)
-    backfill_*.py / fill_*.py        #   과거 데이터 보강 (1회성 마이그레이션 다수)
+    backfill_*.py / fill_*.py        #   과거 데이터 보강 (대부분 update_data.py STEP에서 실행)
     sync_results_to_events.py        #   results JSON → events 테이블 동기화
+    ARCHIVED.md                      #   정리된 1회성 스크립트 14개 목록 + git 복원 방법
   analysis/                          # 분석/검증 스크립트 (읽기 전용)
     auto_check_all.py                #   전체 자동 검증 러너
     audit_api_responses.py           #   API 응답 감사
