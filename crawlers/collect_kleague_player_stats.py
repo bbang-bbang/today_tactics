@@ -256,9 +256,17 @@ def main() -> None:
     ap.add_argument("--days", type=int, help="최근 N일 (지정 시 --since 무시)")
     ap.add_argument("--limit", type=int, default=3000, help="한 번에 처리할 최대 경기 수")
     ap.add_argument("--delay", type=float, default=DELAY, help=f"호출 간격(초, 기본 {DELAY}) — 대량 백필은 1.0 권장")
+    ap.add_argument("--pause-hours", metavar="H1-H2",
+                    help="이 시간대(현지 시각, 예 13-22)에는 수집을 쉬고 끝날 때까지 대기 — 대량 백필용(경기·접속 많은 시간 회피)")
     ap.add_argument("--db", default=DB_PATH)
     args = ap.parse_args()
     delay = max(0.3, args.delay)
+    pause = None
+    if args.pause_hours:
+        h1, h2 = (int(x) for x in args.pause_hours.split("-"))
+        if not (0 <= h1 < h2 <= 24):
+            ap.error("--pause-hours 는 0 <= H1 < H2 <= 24 (예 13-22)")
+        pause = (h1, h2)
 
     conn = sqlite3.connect(args.db, timeout=30)
     conn.row_factory = sqlite3.Row
@@ -275,6 +283,12 @@ def main() -> None:
     cnt = {"saved": 0, "pending": 0, "fail": 0, "players": 0, "calls": 0}
     t0 = time.time()
     for i, ev in enumerate(targets):
+        if pause:
+            now = time.localtime()
+            if pause[0] <= now.tm_hour < pause[1]:
+                wait = (pause[1] - now.tm_hour) * 3600 - now.tm_min * 60 - now.tm_sec
+                log(f"  [쉬는 시간 {pause[0]}~{pause[1]}시] {wait // 60}분 대기 후 재개 (진행 {i}/{len(targets)})")
+                time.sleep(max(60, wait))
         r = process_event(conn, ev, args.apply, delay)
         cnt[r["status"]] += 1
         cnt["players"] += r["players"]
