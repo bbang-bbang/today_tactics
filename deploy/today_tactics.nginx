@@ -3,6 +3,15 @@
 limit_req_zone $binary_remote_addr zone=tt_general:10m rate=10r/s;
 # trigger-update는 엄격 — IP당 분당 1회 (burst 2)
 limit_req_zone $binary_remote_addr zone=tt_trigger:1m rate=1r/m;
+# 쓰기(POST/PUT/DELETE: 전술·스쿼드 저장, 선수 상태) — IP당 분당 30회 (burst 20). GET은 키가 빈 값이라 제한 없음.
+#   공개 모드라 누구나 쓸 수 있어 스팸 저장 방지 (2026-11-04). 서버에도 파일 개수 상한 있음.
+map $request_method $tt_write_key {
+    default "";
+    POST    $binary_remote_addr;
+    PUT     $binary_remote_addr;
+    DELETE  $binary_remote_addr;
+}
+limit_req_zone $tt_write_key zone=tt_write:1m rate=30r/m;
 
 # Canonical 도메인 = suwon.today-tactics.co.kr
 #   - HTTP 및 IP 직접 접근은 모두 301로 canonical에 통합.
@@ -48,9 +57,10 @@ server {
     add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     # CSP: 외부 리소스 = jsdelivr(Pretendard 폰트 + Chart.js)만 허용.
-    # script unsafe-inline: index.html 인라인 fetch 래퍼(글로벌 에러핸들링) 허용.
+    # script: 인라인 스크립트·핸들러 전면 금지(2026-11-04, 템플릿 인라인 <script>는 static/js로 분리).
+    #   jsdelivr는 누구의 npm 패키지든 내려주므로 Chart.js 고정 경로만 허용. style은 인라인 style 속성 다수라 유지.
     # img data:: Canvas toDataURL PNG 내보내기 + 팀 엠블럼.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/chart.js@4.4.0/; object-src 'none'; base-uri 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';" always;
 
     # 서버 정보 노출 최소화
     server_tokens off;
@@ -80,6 +90,8 @@ server {
     # 나머지는 Gunicorn(Flask)으로 프록시
     location / {
         limit_req zone=tt_general burst=100 nodelay;
+        limit_req zone=tt_write burst=20 nodelay;
+        limit_req_status 429;
         proxy_pass         http://127.0.0.1:5000;
         proxy_set_header   Host $host;
         proxy_set_header   X-Real-IP $remote_addr;

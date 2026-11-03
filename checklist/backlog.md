@@ -16,7 +16,8 @@
 - **선택지**: ① 2025 5건을 `EXCLUDED_EVENT_IDS`에 추가하고 2026 PO는 발생 후 수동 추가(빠름, 반복 작업) ② 수집 단계(`sync_results_to_events`/공식 API meet 코드)에서 PO를 별도 tournament로 분리(근본 해결, 크롤 로직 = Red) ③ 정규 라운드 종료일 이후 경기를 리그 집계에서 제외. H2H에는 PO를 포함할지도 함께 결정.
 - 리스크 등급: 통계 정의·마스터 데이터 = **Red**(사용자 확인 필수).
 
-### [ ] 🔒 CSP `'unsafe-inline'` 제거 + 공개 쓰기 API 남용 제한 (2026-11-03 보안 점검 후속)
+### [~] 🔒 CSP `'unsafe-inline'` 제거 + 공개 쓰기 API 남용 제한 (2026-11-03 보안 점검 후속)
+- ✅ 코드 완료(2026-11-04 커밋): 인라인 스크립트·핸들러 제거, CSP `script-src` 축소, 파일 개수 상한·기본 스쿼드 삭제 금지, nginx 쓰기 빈도 제한. **남은 것: 운영 nginx 설정 반영(sudo 필요 — 사용자가 직접)**: `sudo cp /opt/today_tactics/deploy/today_tactics.nginx /etc/nginx/conf.d/today_tactics.conf && sudo nginx -t && sudo systemctl reload nginx`. 반영 후 `curl -sI https://suwon.today-tactics.co.kr/ | grep -i content-security`로 확인. 앞으로 템플릿에 인라인 `<script>`·`on*=` 속성을 넣으면 운영에서 동작하지 않음(qa가 잡음).
 - 11/3에 저장형 XSS 경로(saves·squads·player-status 서버 검증 + 화면 125곳 이스케이프)는 막았지만, nginx CSP가 `script-src 'unsafe-inline'`이라 이스케이프 누락이 한 곳이라도 생기면 다시 실행된다. 인라인 이벤트 핸들러(`onerror=` 등)와 인라인 `<script>`를 걷어내고 CSP를 `'self'`로 좁히는 것이 근본 대책.
 - 공개 모드라 누구나 스쿼드·저장을 무제한 생성 가능(요청당 512KB 제한만) — 필요하면 IP당 빈도 제한 또는 파일 개수 상한.
 

@@ -1521,6 +1521,17 @@
     // ── Toast ─────────────────────────────────────────────
     let toastEl = document.createElement("div"); toastEl.className = "toast"; document.body.appendChild(toastEl);
     let toastTimer = null;
+    // 쓰기 API 실패(400 입력 거부·403·429 상한 등) 시 서버 사유를 토스트로 — true면 실패 처리 완료
+    async function writeFailed(res, action) {
+        if (res.ok) return false;
+        if (res.status === 401) { showToast(`${action}하려면 로그인이 필요합니다.`); return true; }
+        let why = "";
+        try { why = (await res.json()).error || ""; } catch (e) { /* 본문 없음 */ }
+        if (why.includes("'<'")) why = "이름에 < > 기호는 쓸 수 없습니다.";
+        else if (why.startsWith("string longer")) why = "이름이 너무 깁니다(100자 이하).";
+        showToast(`${action} 실패${why ? ": " + why : ""}`);
+        return true;
+    }
     function showToast(msg) { toastEl.textContent = msg; toastEl.classList.remove("toast-has-action"); toastEl.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2000); }
     if (typeof window !== "undefined") window.showToast = showToast;  // 다른 모듈(analytics/insights)에서 토스트 재사용
 
@@ -1959,11 +1970,11 @@
         const snap = getStateSnapshot(); snap.name = name;
         if (saveOverwriteId) {
             const r = await fetch(`/api/saves/${saveOverwriteId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(snap) });
-            if (r.status === 401) { showToast("저장하려면 로그인이 필요합니다."); closeSaveModal(); return; }
+            if (await writeFailed(r, "저장")) { closeSaveModal(); return; }
             showToast("전술이 덮어쓰기 되었습니다.");
         } else {
             const _saveRes = await fetch("/api/saves", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(snap) });
-            if (_saveRes.status === 401) { showToast("저장하려면 로그인이 필요합니다."); closeSaveModal(); return; }
+            if (await writeFailed(_saveRes, "저장")) { closeSaveModal(); return; }
             const _saved = await _saveRes.json();
             showLinkToast(_saved.id);
         }
@@ -2015,7 +2026,7 @@
             if (btn.classList.contains("btn-load-item")) { const r = await fetch(`/api/saves/${id}`); applySnapshot(await r.json()); closeLoadModal(); showToast("전술을 불러왔습니다."); }
             else if (btn.classList.contains("btn-overwrite-item")) { closeLoadModal(); openSaveModal(id, btn.dataset.name); }
             else if (btn.classList.contains("btn-link-item")) { copyShareLink(id); }
-            else if (btn.classList.contains("btn-delete-item")) { if (!confirm("정말 삭제하시겠습니까?")) return; const _dr = await fetch(`/api/saves/${id}`, { method: "DELETE" }); if (_dr.status === 401) { showToast("삭제하려면 로그인이 필요합니다."); return; } showToast("삭제되었습니다."); openLoadModal(); }
+            else if (btn.classList.contains("btn-delete-item")) { if (!confirm("정말 삭제하시겠습니까?")) return; const _dr = await fetch(`/api/saves/${id}`, { method: "DELETE" }); if (await writeFailed(_dr, "삭제")) return; showToast("삭제되었습니다."); openLoadModal(); }
         };
     }
     document.getElementById("btn-load").addEventListener("click", openLoadModal);
@@ -2070,7 +2081,7 @@
                 item.dataset.eventId = m.event_id;
                 item.dataset.hasLineup = m.has_lineup ? "1" : "0";
 
-                const emblem = (slug, emblem) => emblem ? `<img src="/static/img/emblems/${emblem}" alt="${escapeHtml(slug||'')}" onerror="this.style.display='none'">` : "";
+                const emblem = (slug, emblem) => emblem ? `<img src="/static/img/emblems/${emblem}" alt="${escapeHtml(slug||'')}" data-hide-err>` : "";
                 const homeScore = (m.home_score != null) ? m.home_score : "-";
                 const awayScore = (m.away_score != null) ? m.away_score : "-";
                 const scoreCls = (m.home_score == null) ? "no-score" : "";
@@ -2464,7 +2475,7 @@
                     })),
                 }),
             });
-            if (_sqRes.status === 401) { showToast("저장하려면 로그인이 필요합니다."); return; }
+            if (await writeFailed(_sqRes, "저장")) return;
             showToast("스쿼드가 저장되었습니다.");
         });
     });
@@ -2488,7 +2499,7 @@
                 const teamObj = state.teams.find((t) => t.id === s.teamId);
                 const teamLabel = teamObj ? teamObj.short : "";
                 item.innerHTML = `<div class="save-item-info"><div class="save-item-name">${escapeHtml(s.name)}</div><div class="save-item-meta">${teamLabel} &middot; ${s.playerCount}명</div></div>
-                <div class="save-item-actions"><button class="btn-load-item" data-id="${s.id}">적용</button><button class="btn-delete-item" data-id="${s.id}">삭제</button></div>`;
+                <div class="save-item-actions"><button class="btn-load-item" data-id="${s.id}">적용</button>${s.builtin ? "" : `<button class="btn-delete-item" data-id="${s.id}">삭제</button>`}</div>`;
                 squadList.appendChild(item);
             }
             squadList.onclick = async (e) => {
@@ -2503,8 +2514,7 @@
                 } else if (btn2.classList.contains("btn-delete-item")) {
                     if (!confirm("정말 삭제하시겠습니까?")) return;
                     const delRes = await fetch(`/api/squads/${id}`, { method: "DELETE" });
-                    if (delRes.status === 401) { showToast("삭제하려면 로그인이 필요합니다."); return; }
-                    if (!delRes.ok) { showToast("삭제 실패"); return; }
+                    if (await writeFailed(delRes, "삭제")) return;
                     showToast("삭제되었습니다.");
                     // 목록 새로고침
                     const url2 = (squadLoadSide === "A" ? state.teamA : state.teamB)
@@ -2518,7 +2528,7 @@
                         const item2 = document.createElement("div"); item2.className = "save-item";
                         const teamObj2 = state.teams.find((t) => t.id === s2.teamId);
                         item2.innerHTML = `<div class="save-item-info"><div class="save-item-name">${escapeHtml(s2.name)}</div><div class="save-item-meta">${teamObj2 ? teamObj2.short : ""} &middot; ${s2.playerCount}명</div></div>
-                        <div class="save-item-actions"><button class="btn-load-item" data-id="${s2.id}">적용</button><button class="btn-delete-item" data-id="${s2.id}">삭제</button></div>`;
+                        <div class="save-item-actions"><button class="btn-load-item" data-id="${s2.id}">적용</button>${s2.builtin ? "" : `<button class="btn-delete-item" data-id="${s2.id}">삭제</button>`}</div>`;
                         squadList.appendChild(item2);
                     }
                 }

@@ -840,6 +840,16 @@ def _payload_problem(body):
     return None
 
 
+# 공개 모드 쓰기 남용(디스크 채우기·기본 데이터 삭제) 방지 — 2026-11-04
+#   사용자가 API로 만든 파일은 uuid 앞 8자리 이름, 그 외(default_*·{팀}_2026)는 배포에 포함된 기본 스쿼드.
+_USER_FILE_RE = re.compile(r'^[0-9a-f]{8}\.json$')
+_MAX_SAVES, _MAX_USER_SQUADS = 500, 300
+
+
+def _user_file_count(base_dir):
+    return sum(1 for f in os.listdir(base_dir) if _USER_FILE_RE.match(f))
+
+
 @app.route("/api/saves", methods=["POST"])
 @login_required_api
 def create_save():
@@ -847,6 +857,8 @@ def create_save():
     bad = _payload_problem(body)
     if bad:
         return jsonify({"error": bad}), 400
+    if _user_file_count(SAVES_DIR) >= _MAX_SAVES:
+        return jsonify({"error": "저장 개수 상한에 도달했습니다. 기존 전술을 삭제한 뒤 다시 저장하세요."}), 429
     save_id = str(uuid.uuid4())[:8]
     now = datetime.now().isoformat()
     data = {
@@ -931,6 +943,7 @@ def list_squads():
             "name": data["name"],
             "playerCount": len(data.get("players", [])),
             "updatedAt": data.get("updatedAt", ""),
+            "builtin": not _USER_FILE_RE.match(fname),
         })
     squads.sort(key=lambda s: s["updatedAt"], reverse=True)
     return jsonify(squads)
@@ -943,6 +956,8 @@ def create_squad():
     bad = _payload_problem(body)
     if bad:
         return jsonify({"error": bad}), 400
+    if _user_file_count(SQUADS_DIR) >= _MAX_USER_SQUADS:
+        return jsonify({"error": "스쿼드 개수 상한에 도달했습니다. 기존 스쿼드를 삭제한 뒤 다시 저장하세요."}), 429
     squad_id = str(uuid.uuid4())[:8]
     now = datetime.now().isoformat()
     data = {
@@ -1007,6 +1022,8 @@ def delete_squad(squad_id):
                 break
     if not fpath:
         return jsonify({"error": "Not found"}), 404
+    if not _USER_FILE_RE.match(os.path.basename(fpath)):
+        return jsonify({"error": "기본 스쿼드는 삭제할 수 없습니다."}), 403
     os.remove(fpath)
     return jsonify({"ok": True})
 

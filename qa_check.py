@@ -1,4 +1,4 @@
-import urllib.request, urllib.error, json, sqlite3, sys
+import urllib.request, urllib.error, json, re, sqlite3, sys
 sys.stdout.reconfigure(encoding='utf-8')
 
 base = 'http://127.0.0.1:5000'
@@ -82,6 +82,16 @@ qa('보안: 전술 저장 마크업·과대 문자열 거부 400', lambda: asser
     _post_status('/api/saves', {"name": "x", "formation": "4-3-3\"><script>"}) == 400 and _post_status('/api/saves', {"name": "a" * 101}) == 400))
 qa('보안: 선수 상태 잘못된 값·ID 거부 400', lambda: assert_(
     _post_status('/api/player-status', {"playerId": "1", "status": "hacked"}) == 400 and _post_status('/api/player-status', {"playerId": "../x", "status": "injured"}) == 400))
+qa('보안: 기본 스쿼드 삭제 거부 403 + builtin 표시', lambda: assert_(
+    _post_status('/api/squads/suwon_2026', {}, method="DELETE") == 403
+    and any(s['builtin'] for s in get('/api/squads?teamId=suwon'))))
+def _no_inline_script(path):
+    # CSP script-src에 'unsafe-inline'이 없으므로 템플릿에 인라인 <script>·on* 속성이 있으면 운영에서 깨진다
+    html = urllib.request.urlopen(base + path, timeout=10).read().decode('utf-8')
+    tags = re.findall(r'<script\b([^>]*)>', re.sub(r'<!--.*?-->', '', html, flags=re.S))
+    inline = [t for t in tags if 'src=' not in t and 'application/json' not in t]
+    return not inline and not re.search(r'<[a-z][^>]*\son[a-z]+\s*=', html)
+qa('보안: CSP — 템플릿 인라인 스크립트·핸들러 없음', lambda: assert_(_no_inline_script('/') and _no_inline_script('/leagues')))
 qa('brief 리그 불일치 400',lambda: assert_(_brief_status('/api/pre-match-brief?team=suwon&opp=ulsan') == 400))
 qa('brief 동일팀/인젝션 400', lambda: assert_(_brief_status('/api/pre-match-brief?team=ulsan&opp=ulsan') == 400 and _brief_status("/api/pre-match-brief?team=x'+OR+'1'='1&opp=ulsan") == 400))
 

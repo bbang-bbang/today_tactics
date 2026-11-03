@@ -8,58 +8,7 @@
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
     <link rel="stylesheet" href="/static/css/style.css?v=104">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script>
-    // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
-    window.addEventListener("unhandledrejection", (e) => { console.warn("Unhandled:", e.reason); e.preventDefault(); });
-    window._fetch = window.fetch;
-
-    const _apiCache = new Map();
-    const _API_CACHE_TTL = 30000; // 30초
-    // 캐시 제외: 폴링 엔드포인트, 사용자 저장 데이터
-    const _CACHE_EXCLUDE = ['/api/update-status', '/api/trigger-update', '/api/saves', '/api/squads'];
-    // 뮤테이션 발생 시 관련 GET 캐시 무효화: prefix → 무효화할 캐시 prefix 목록
-    const _CACHE_INVALIDATE = { '/api/saves': ['/api/saves'], '/api/squads': ['/api/squads'] };
-
-    function _shouldCache(urlStr, method) {
-        return method === 'GET' && urlStr.startsWith('/api/') &&
-               !_CACHE_EXCLUDE.some(p => urlStr.startsWith(p));
-    }
-
-    window.fetch = function(url, opts) {
-        const method = ((opts && opts.method) || 'GET').toUpperCase();
-        const urlStr = typeof url === 'string' ? url : (url && url.url) || String(url);
-
-        // 뮤테이션 시 관련 캐시 무효화
-        if (method !== 'GET') {
-            for (const [prefix, targets] of Object.entries(_CACHE_INVALIDATE)) {
-                if (urlStr.startsWith(prefix)) {
-                    for (const [k] of _apiCache) {
-                        if (targets.some(t => k.startsWith(t))) _apiCache.delete(k);
-                    }
-                }
-            }
-        }
-
-        if (_shouldCache(urlStr, method)) {
-            const hit = _apiCache.get(urlStr);
-            if (hit && Date.now() - hit.ts < _API_CACHE_TTL) {
-                return Promise.resolve(new Response(JSON.stringify(hit.data),
-                    { status: 200, headers: { 'Content-Type': 'application/json' } }));
-            }
-        }
-
-        return window._fetch(url, opts).then(r => {
-            if (!r.ok) { console.warn(`API ${r.status}: ${urlStr}`); return r; }
-            if (_shouldCache(urlStr, method)) {
-                r.clone().json().then(data => _apiCache.set(urlStr, { ts: Date.now(), data })).catch(() => {});
-            }
-            return r;
-        }).catch(err => {
-            console.warn(`Network error: ${urlStr}`, err.message);
-            throw err;
-        });
-    };
-    </script>
+    <script src="/static/js/boot.js?v=1"></script>
 </head>
 <body>
     <div id="app">
@@ -981,13 +930,13 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=18"></script>
+    <script src="/static/js/app.js?v=19"></script>
 
     <script src="/static/js/info.js?v=8"></script>
     <!-- 해외리그 일단 비활성화 (아직 이른 단계) — 복구 시 아래 스크립트 복원
     <script src="/static/js/global_league.js?v=2"></script> -->
     <script src="/static/js/banner_stats.js?v=3"></script>
-    <script src="/static/js/prediction.js?v=63"></script>
+    <script src="/static/js/prediction.js?v=64"></script>
 
     <!-- 선수 분석 모달 -->
     <div id="player-analytics-modal" class="pa-modal hidden">
@@ -1067,20 +1016,18 @@
     <script src="/static/js/player_report.js?v=8"></script>
 
     <!-- 지연 로딩 모듈 (탭/버튼 최초 사용 시 workspace.js 의 ttLazy 가 로드). 버전은 캐시 무효화용 -->
-    <script>
-    window.TT_LAZY = {
-        k2heatmap: "/static/js/k2heatmap.js?v=17",
-        team_compare: "/static/js/team_compare.js?v=13",
-        analytics: "/static/js/analytics.js?v=18",
-        pass_network: "/static/js/pass_network.js?v=2",
-        match_report: "/static/js/match_report.js?v=2",
-        player_compare: "/static/js/player_compare.js?v=3",
-        insights: "/static/js/insights.js?v=44"
-    };
-    </script>
+    <script type="application/json" id="tt-lazy">{
+        "k2heatmap": "/static/js/k2heatmap.js?v=18",
+        "team_compare": "/static/js/team_compare.js?v=13",
+        "analytics": "/static/js/analytics.js?v=18",
+        "pass_network": "/static/js/pass_network.js?v=2",
+        "match_report": "/static/js/match_report.js?v=2",
+        "player_compare": "/static/js/player_compare.js?v=3",
+        "insights": "/static/js/insights.js?v=44"
+    }</script>
 
     <!-- 작업공간 탭 컨트롤러 — 반드시 모든 모듈 스크립트 뒤에 로드 -->
-    <script src="/static/js/workspace.js?v=9"></script>
+    <script src="/static/js/workspace.js?v=10"></script>
 
     <!-- 온보딩 오버레이 -->
     <div id="onboarding-overlay" class="ob-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Today Tactics 소개">
@@ -1252,90 +1199,6 @@
             <button type="button" id="gd-done" class="ob-start-btn">확인</button>
         </div>
     </div>
-    <script>
-    (function () {
-        // ── 온보딩 오버레이 ──────────────────────────────────────
-        var overlay  = document.getElementById('onboarding-overlay');
-        var startBtn = document.getElementById('ob-start-btn');
-        function showOnboarding() {
-            overlay.style.display = '';
-            requestAnimationFrame(function () { overlay.classList.add('ob-visible'); });
-        }
-        function hideOnboarding() {
-            overlay.classList.remove('ob-visible');
-            overlay.classList.add('ob-hiding');
-            setTimeout(function () { overlay.style.display = 'none'; overlay.classList.remove('ob-hiding'); }, 300);
-            localStorage.setItem('tt_onboarded', '1');
-        }
-        if (!localStorage.getItem('tt_onboarded')) { showOnboarding(); }
-        startBtn.addEventListener('click', hideOnboarding);
-        // "다시 보기" 링크를 헤더 사용자 영역에 동적 추가
-        var um = document.getElementById('user-menu');
-        if (um) {
-            var resetLink = document.createElement('button');
-            resetLink.className = 'ob-reset-link';
-            resetLink.textContent = '도움말';
-            resetLink.title = '사용법 다시 보기';
-            resetLink.addEventListener('click', function () {
-                localStorage.removeItem('tt_onboarded');
-                showOnboarding();
-            });
-            um.appendChild(resetLink);
-        }
-
-        // ── 분석 읽는 법 (도움말 모달) ─────────────────────────────
-        var guide = document.getElementById('guide-overlay');
-        var guideOpener = null;
-        function openGuide() {
-            guideOpener = document.activeElement;
-            guide.style.display = '';
-            requestAnimationFrame(function () { guide.classList.add('gd-visible'); });
-            document.getElementById('gd-close').focus();
-        }
-        function closeGuide() {
-            guide.classList.remove('gd-visible');
-            setTimeout(function () { guide.style.display = 'none'; }, 200);
-            if (guideOpener && guideOpener.focus) guideOpener.focus();
-        }
-        var guideOpen = document.getElementById('gd-open');
-        if (guideOpen) guideOpen.addEventListener('click', openGuide);
-        document.getElementById('gd-close').addEventListener('click', closeGuide);
-        document.getElementById('gd-done').addEventListener('click', closeGuide);
-        guide.addEventListener('click', function (e) { if (e.target === guide) closeGuide(); });
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && guide.style.display !== 'none') closeGuide();
-        });
-
-        // ── 데이터 신선도 배지 ──────────────────────────────────
-        var dfbText  = document.getElementById('dfb-text');
-        var dfbBadge = document.getElementById('data-freshness-badge');
-        fetch('/api/update-status').then(function (r) { return r.json(); }).then(function (d) {
-            if (!dfbText) return;
-            if (d.last_run) {
-                dfbText.textContent = '데이터 ' + d.last_run.replace(' KST','');
-                if (d.last_result === 'error') {
-                    dfbBadge.classList.add('dfb-error');
-                    dfbBadge.title = '마지막 업데이트 실패: ' + (d.last_msg || '') + (d.next_run ? ' / 다음: ' + d.next_run : '');
-                } else if (d.last_result === 'partial') {
-                    // 스코어는 갱신됐지만 일부 수집(득점·라인업·슈팅맵 등) 실패 — 'last_run'만 보면 정상처럼 보이므로 경고 표시
-                    dfbBadge.classList.add('dfb-old');
-                    dfbText.textContent = '데이터 ' + d.last_run.replace(' KST','') + ' ⚠ 일부 미수집';
-                    dfbBadge.title = '일부 수집 실패: ' + (d.last_msg || '') + (d.next_run ? ' / 다음: ' + d.next_run : '');
-                } else {
-                    dfbBadge.title = '마지막 업데이트: ' + d.last_run + (d.next_run ? ' / 다음: ' + d.next_run : '');
-                }
-            } else if (d.next_run) {
-                dfbText.textContent = '다음 업데이트 ' + d.next_run.replace(' KST','');
-                dfbBadge.classList.add('dfb-old');
-                dfbBadge.title = '아직 업데이트 실행 전입니다. 다음 예정: ' + d.next_run;
-            } else {
-                dfbText.textContent = '데이터 기준 미확인';
-                dfbBadge.classList.add('dfb-old');
-            }
-        }).catch(function () {
-            if (dfbText) { dfbText.textContent = '업데이트 상태 확인 불가'; dfbBadge.classList.add('dfb-error'); }
-        });
-    })();
-    </script>
+    <script src="/static/js/onboarding.js?v=1"></script>
 </body>
 </html>

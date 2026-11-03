@@ -24,7 +24,11 @@
     // 초기 로드에서 제외한 모듈(히트맵·팀 분석/비교·인사이트·경기 리포트·선수 비교)을
     // 탭 최초 노출 또는 진입 버튼 첫 클릭 시 1회만 로드. 로드 완료 전 클릭은 가로채서
     // 로드 후 재클릭하므로 기존 모듈 로직은 그대로 재사용된다.
-    const _lazyMap = window.TT_LAZY || {};
+    // 버전표는 템플릿의 <script type="application/json" id="tt-lazy"> (실행되지 않는 데이터라 CSP 인라인 금지와 무관)
+    const _lazyMap = (() => {
+        try { return JSON.parse(document.getElementById("tt-lazy").textContent); }
+        catch (e) { console.warn("tt-lazy 버전표 읽기 실패", e); return {}; }
+    })();
     const _lazyState = {};   // name → { promise, done }
     function lazyLoad(name) {
         if (!_lazyMap[name]) return Promise.resolve();            // 정적 로드된 모듈

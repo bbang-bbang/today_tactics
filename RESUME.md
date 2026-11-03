@@ -28,6 +28,7 @@
   5. **선택 과제**: ✅ 스카우팅 요약 '빌드업 허브' 연동 완료(2026-11-03, `prediction.js?v=62`) · 팀/선수 스토리형 인사이트(사용자 판단으로 보류 — 재개 시 `team-trend`·`player-analytics` 중복 확인부터).
   6. **시즌 종료 대비**: ✅ 점검 완료(2026-11-03) — 비시즌 배지 오탐 없음. ① K2 PO·승강 PO가 K1(410)로 저장되던 문제 ✅ 해결(`reclassify_playoffs.py`, update_data STEP 26 → tournament_id 9410, 운영은 다음 크론에서 자동 적용) ② 2027 연도 전환 하드코딩 목록은 backlog P1(2027 개막 전 작업).
   - 로컬 환경 메모: 로컬 `players.db`는 11/2 00:19 기준(운영보다 오래됨) — 서버/QA가 필요하면 운영 DB를 `sqlite3 .backup` 후 scp로 받을 것(운영 DB 직접 복사 금지).
+- **2026-11-04 보안 후속**: CSP 인라인 스크립트 금지 대응(템플릿 인라인 `<script>` → `static/js/boot.js`·`onboarding.js`·`leagues.js`, `TT_LAZY` → `#tt-lazy` JSON, `onerror=` → `data-hide-err`) + 쓰기 남용 제한(파일 상한·기본 스쿼드 삭제 금지·nginx 쓰기 빈도 제한). **운영 nginx는 수동 반영 필요**(backlog 참조). 이제 템플릿에 인라인 스크립트·`on*=` 속성 금지.
 - **정적 자산 수정 시 필수**: nginx가 `/static/`을 `expires 7d` + `immutable`로 내보내므로 JS/CSS를 바꾸면 `templates/index.html`의 `?v=`를 반드시 올릴 것(안 올리면 기존 방문자는 최대 7일간 옛 파일 사용).
 
 ## 1. 현재 상태 (2026-06-11 종료 시점)

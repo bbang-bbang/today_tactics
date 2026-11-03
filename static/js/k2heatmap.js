@@ -124,7 +124,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             const el = document.createElement("div");
             el.className = "k2-team-card";
             el.innerHTML = `
-                <img src="/static/img/emblems/${t.emblem}" onerror="this.style.display='none'">
+                <img src="/static/img/emblems/${t.emblem}" data-hide-err>
                 <span>${ttEsc(t.short)}</span>`;
             el.style.borderColor = t.primary;
             el.addEventListener("click", () => selectTeam(t));

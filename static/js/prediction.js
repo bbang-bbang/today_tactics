@@ -310,8 +310,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                     : `<div class="kmc-time">-</div>
                        <div class="kmc-meta">${dateShort}</div>`;
 
-            const homeEmb  = hc.e ? `<img class="kmc-emb" src="/static/img/emblems/${hc.e}" alt="" onerror="this.style.display='none'">` : "";
-            const awayEmb  = ac.e ? `<img class="kmc-emb" src="/static/img/emblems/${ac.e}" alt="" onerror="this.style.display='none'">` : "";
+            const homeEmb  = hc.e ? `<img class="kmc-emb" src="/static/img/emblems/${hc.e}" alt="" data-hide-err>` : "";
+            const awayEmb  = ac.e ? `<img class="kmc-emb" src="/static/img/emblems/${ac.e}" alt="" data-hide-err>` : "";
 
             return `
             <div class="kmc${finished ? " kmc-done" : canPredict ? " kmc-upcoming" : ""}${isFav ? " kmc-fav" : ""}"
