@@ -4607,13 +4607,21 @@ def _year_range(year_str):
     return start, end
 
 def _find_player(cur, name):
-    """(player_id, team_id, matched_name) 반환, 없으면 (None, None, None)"""
-    cur.execute("SELECT id, team_id, name_ko, name FROM players WHERE name_ko = ?", (name,))
+    """(player_id, team_id, matched_name) 반환, 없으면 (None, None, None)
+
+    같은 이름 레코드가 여럿이면(players.name_ko 중복 421건) 경기 기록(match_player_stats)이 가장 많은 레코드를
+    우선한다 — 이전엔 첫 행이라 경기 1~2개짜리 중복 레코드(예: 제르소·디자우마)가 잡히던 문제 보정.
+    동점이면 id 오름차순(결정적). 동명이인(서로 다른 사람)은 여전히 경기 수 많은 쪽 하나로 귀결된다."""
+    cur.execute(
+        "SELECT id, team_id, name_ko, name FROM players WHERE name_ko = ? "
+        "ORDER BY (SELECT COUNT(*) FROM match_player_stats m WHERE m.player_id = players.id) DESC, id", (name,))
     row = cur.fetchone()
     if not row:
         # 공백 제거 후 재시도 (예: '브루노 실바' vs '브루노실바')
         name_no_space = name.replace(" ", "")
-        cur.execute("SELECT id, team_id, name_ko, name FROM players WHERE REPLACE(name_ko, ' ', '') = ?", (name_no_space,))
+        cur.execute(
+            "SELECT id, team_id, name_ko, name FROM players WHERE REPLACE(name_ko, ' ', '') = ? "
+            "ORDER BY (SELECT COUNT(*) FROM match_player_stats m WHERE m.player_id = players.id) DESC, id", (name_no_space,))
         row = cur.fetchone()
     if not row:
         # 동명이인 구분용 끝 숫자 접미사 제거 후 정확 재매칭 (예: '이정문1' -> '이정문').
@@ -4622,12 +4630,15 @@ def _find_player(cur, name):
         if name_base and name_base != name:
             cur.execute(
                 "SELECT id, team_id, name_ko, name FROM players "
-                "WHERE name_ko = ? OR REPLACE(name_ko, ' ', '') = ?",
+                "WHERE name_ko = ? OR REPLACE(name_ko, ' ', '') = ? "
+                "ORDER BY (SELECT COUNT(*) FROM match_player_stats m WHERE m.player_id = players.id) DESC, id",
                 (name_base, name_base.replace(" ", "")),
             )
             row = cur.fetchone()
     if not row:
-        cur.execute("SELECT id, team_id, name_ko, name FROM players WHERE name LIKE ?", (f"%{name}%",))
+        cur.execute(
+            "SELECT id, team_id, name_ko, name FROM players WHERE name LIKE ? "
+            "ORDER BY (SELECT COUNT(*) FROM match_player_stats m WHERE m.player_id = players.id) DESC, id", (f"%{name}%",))
         row = cur.fetchone()
     if not row:
         return (None, None, None)

@@ -301,6 +301,25 @@ cur.execute('SELECT COUNT(*) FROM players WHERE name_ko IS NOT NULL')
 players_ko = cur.fetchone()[0]
 qa('선수 한글명 존재', lambda: assert_(players_ko > 0, f'{players_ko}명'))
 
+# 이름이 겹치면(name_ko 중복) 경기 기록이 가장 많은 레코드가 선택돼야 한다 (_find_player)
+def _dup_name_prefers_most_games():
+    import urllib.parse
+    cur.execute("""SELECT p.name_ko FROM players p JOIN match_player_stats m ON m.player_id = p.id
+                   WHERE p.name_ko IS NOT NULL AND p.name_ko <> ''
+                     AND p.name_ko IN (SELECT name_ko FROM players WHERE name_ko <> '' GROUP BY name_ko HAVING COUNT(*) > 1)
+                   GROUP BY p.name_ko ORDER BY COUNT(*) DESC LIMIT 5""")
+    names = [r[0] for r in cur.fetchall()]
+    assert_(names, '중복 이름 표본 없음')
+    for nm in names:
+        d = get('/api/player-stat-report?name=' + urllib.parse.quote(nm))
+        assert_(d.get('found') is True, f'{nm} 미발견')
+        cur.execute("SELECT COUNT(*) FROM match_player_stats WHERE player_id = ?", (d['player']['id'],))
+        got = cur.fetchone()[0]
+        cur.execute("""SELECT MAX(c) FROM (SELECT COUNT(*) c FROM match_player_stats m JOIN players p ON p.id = m.player_id
+                       WHERE p.name_ko = ? GROUP BY m.player_id)""", (nm,))
+        assert_(got >= cur.fetchone()[0], f'{nm}: 경기 많은 레코드가 아님({got}경기)')
+qa('이름 중복 시 경기 많은 레코드 우선', _dup_name_prefers_most_games)
+
 conn.close()
 
 # ── 공식(K리그) 선수 리포트 ──
