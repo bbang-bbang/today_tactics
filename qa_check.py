@@ -184,7 +184,20 @@ import reclassify_playoffs as _rp  # noqa: E402
 import io, contextlib  # noqa: E402
 with contextlib.redirect_stdout(io.StringIO()):
     _po_left = _rp.find_playoffs(conn)
-qa('K1(410)에 PO 경기 잔류 0', lambda: assert_(not _po_left, f'{len(_po_left)}건 — reclassify_playoffs.py --apply 필요'))
+
+# ── 공식 선수 경기 기록(kleague_player_match, update_data STEP 27) — 테이블이 있을 때만 ──
+if cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague_player_match'").fetchone():
+    _kpm_bad = cur.execute("""
+        SELECT COUNT(*) FROM events e WHERE e.id IN (SELECT event_id FROM kleague_player_match_log)
+          AND ((SELECT COALESCE(SUM(goals),0) FROM kleague_player_match k WHERE k.event_id=e.id AND k.is_home=1)
+               + (SELECT COUNT(*) FROM goal_events g WHERE g.event_id=e.id AND g.is_home=1 AND g.is_own_goal=1) != e.home_score
+            OR (SELECT COALESCE(SUM(goals),0) FROM kleague_player_match k WHERE k.event_id=e.id AND k.is_home=0)
+               + (SELECT COUNT(*) FROM goal_events g WHERE g.event_id=e.id AND g.is_home=0 AND g.is_own_goal=1) != e.away_score)
+    """).fetchone()[0]
+    qa('공식 선수 기록 득점 합 = 스코어', lambda: assert_(_kpm_bad == 0, f'{_kpm_bad}경기 불일치'))
+    _kpm_teams = cur.execute("""SELECT MIN(c) FROM (SELECT COUNT(*) c FROM kleague_player_match GROUP BY event_id, is_home)""").fetchone()[0]
+    qa('공식 선수 기록 팀당 11명↑', lambda: assert_(_kpm_teams is None or _kpm_teams >= 11, f'최소 {_kpm_teams}명'))
+qa('K1(410)에 PO 경기 잔류 0',lambda: assert_(not _po_left, f'{len(_po_left)}건 — reclassify_playoffs.py --apply 필요'))
 
 # ── K리그 공식 API 복구 데이터(2026-08-03 이후) 정합성 ──
 cur.execute("""SELECT COUNT(*) FROM events e WHERE e.tournament_id IN (410,777) AND e.home_score IS NOT NULL

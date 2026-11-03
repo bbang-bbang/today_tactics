@@ -17,6 +17,8 @@ STEP 7  K1 골/카드 incidents
 STEP 8  K2 골/카드 incidents
 STEP 21 K리그 공식 API로 득점·카드·교체 복구 (SofaScore incidents 차단 대체 — STEP 16 매핑 직후 실행)
 STEP 22 K리그 공식 API로 패스 네트워크 수집 (공개는 경기 다음 날 — 미공개는 재시도)
+STEP 27 K리그 공식 선수 경기 기록 → kleague_player_match (공식 정의 그대로, mps와 분리)
+STEP 28 공식 선수 ID ↔ SofaScore 선수 ID 매핑 → kleague_player_map
 STEP 26 K2 PO·승강 PO를 K1(410)에서 분리 (tournament_id 9410, 멱등)
 STEP 20 수집 공백 감사 (마지막에 실행; 종료 코드 0 정상 / 1 치명 / 2 부분 실패)
 
@@ -146,9 +148,17 @@ def main():
         (25, f"K리그 공식 슈팅 → 득점 PK 보정 (최근 {max(args.days, 30)}일)",
             [PYTHON, str(CRAWLERS/"fix_penalty_from_kleague.py"), "--apply", "--days", str(max(args.days, 30))]),
     ]
+    steps += [
+        # 공식 데이터 전환 2단계: 공식 선수 경기 기록을 별도 테이블에 저장(SofaScore mps와 정의가 달라 섞지 않음).
+        # 패스(STEP 22)·라인업(16)·교체(21) 이후 — 출전 선수 판별에 사용. 공개는 경기 다음 날, 미공개는 재시도.
+        (27, f"K리그 공식 선수 경기 기록 → kleague_player_match (최근 {max(args.days, 30)}일)",
+            [PYTHON, str(CRAWLERS/"collect_kleague_player_stats.py"), "--apply", "--days", str(max(args.days, 30))]),
+        (28, "공식 선수 ID ↔ SofaScore 선수 ID 매핑 재계산 → kleague_player_map",
+            [PYTHON, str(CRAWLERS/"build_kleague_player_map.py"), "--apply"]),
+    ]
     if not args.skip_heatmap:
         steps += [
-            (24, f"K리그 공식 API → 히트맵 (SofaScore 히트맵 없는 선수만, 최근 {max(args.days, 30)}일)",
+            (24,f"K리그 공식 API → 히트맵 (SofaScore 히트맵 없는 선수만, 최근 {max(args.days, 30)}일)",
                 [PYTHON, str(CRAWLERS/"collect_kleague_heatmap.py"), "--apply", "--days", str(max(args.days, 30))]),
         ]
     steps += [
