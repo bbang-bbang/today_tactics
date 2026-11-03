@@ -4053,6 +4053,7 @@ def get_pre_match_brief():
     rk = _brief_call(get_league_rankings, f"/api/league-rankings?league={league}&year={year}") or {}
     shape = _brief_call(get_team_shape, f"/api/team-shape?teamId={opp_id}&year={year}") or {}
     forms = _brief_formations(ss_op, tid, year)
+    hub_all = _brief_call(insights_pass_hub, f"/api/insights/pass-hub?league={league.lower()}&year={year}") or {}
 
     # ── ① 폼·순위 ──
     def side(t):
@@ -4085,6 +4086,18 @@ def get_pre_match_brief():
             elif lo_txt and r["rank"] > r["total"] - max(2, r["total"] // 4):
                 identity["traits"].append({"text": lo_txt, "detail": f"{nm} 리그 {r['rank']}/{r['total']}위"})
     identity["traits"] = identity["traits"][:4]
+
+    # ── ②-b 빌드업 허브 (공식 패스 행렬 — /api/insights/pass-hub 재사용) ──
+    hub_row = next((t for t in (hub_all.get("teams") or []) if t.get("id") == ss_op), None)
+    build_hub = None
+    if hub_row and hub_row.get("eligible") and hub_row.get("main_hub"):
+        mh = hub_row["main_hub"]
+        recent = hub_row.get("recent_hubs") or []
+        build_hub = {"name": mh.get("name"), "pos": mh.get("pos"), "pct": mh.get("pct"), "times": mh.get("times"),
+                     "matches": hub_row.get("matches"), "hubs": hub_row.get("hubs"),
+                     "share": hub_row.get("hub_share"), "league_share": hub_all.get("league_hub_share"),
+                     "recent_main": sum(1 for r in recent if r.get("is_main")), "recent_n": len(recent)}
+    identity["build_hub"] = build_hub
 
     # ── ③ 강점3·약점3 (리그 내 순위 기반) ──
     strengths, weaknesses = [], []
@@ -4175,6 +4188,14 @@ def get_pre_match_brief():
     if isinstance(spp, (int, float)) and spp >= 25:
         cands.append((68, "상대는 세트피스 득점 비중이 높음 — 코너·프리킥 수비 조직 점검",
                       f"득점의 {spp:.0f}%가 세트피스"))
+    # 빌드업이 한 선수에게 고정된 팀 — 시즌 45%↑ 허브 + 최근 5경기 중 3경기↑ 허브(지금도 거점) + 팀 지분 리그 평균 이상
+    bh = build_hub
+    if (bh and (bh["pct"] or 0) >= 45 and bh["recent_n"] >= 3 and bh["recent_main"] >= 3
+            and isinstance(bh["share"], (int, float)) and isinstance(bh["league_share"], (int, float))
+            and bh["share"] >= bh["league_share"]):
+        cands.append((66, f"빌드업이 {bh['name']}({bh['pos'] or '-'})에게 집중 — 이 선수를 압박해 전개를 끊어라",
+                      f"{bh['matches']}경기 중 {bh['times']}경기({bh['pct']}%) 팀 패스 관여 1위, 최근 {bh['recent_n']}경기 중 {bh['recent_main']}경기 · "
+                      f"허브 지분 {bh['share']:.1f}% (리그 평균 {bh['league_share']:.1f}%)"))
     cands.sort(key=lambda c: -c[0])
     conclusions = [{"title": t, "evidence": e} for _p, t, e in cands[:3]]
 
@@ -7729,8 +7750,9 @@ def insights_pass_hub():
         d[a] = d.get(a, 0) + n
         d[b] = d.get(b, 0) + n
         tot[(ev, t)] = tot.get((ev, t), 0) + n
-    pts = {}
+    pts, ev_ts = {}, {}
     for ev, h, a, _ts, hs, as_ in evs:
+        ev_ts[ev] = _ts
         pts[(ev, h)] = (_ins_pts(hs, as_), hs, as_)
         pts[(ev, a)] = (_ins_pts(as_, hs), as_, hs)
 
@@ -7762,7 +7784,10 @@ def insights_pass_hub():
         teams.append({"id": t, "short": tinfo.get("short", tinfo["name"]), "matches": len(L), "eligible": len(L) >= _INS_MIN_GAMES,
                       "hub_share": round(mean1 * 100, 1), "top2_share": round(sum(x["s2"] for x in L) / len(L) * 100, 1),
                       "main_hub": {"name": main["name"], "pos": main["pos"], "times": cnt[main_kid], "pct": round(cnt[main_kid] / len(L) * 100)},
-                      "hubs": len(cnt)})
+                      "hubs": len(cnt),
+                      # 최근 5경기 허브(최신순) — 스카우팅 요약이 '지금도' 같은 선수가 거점인지 확인하는 데 사용
+                      "recent_hubs": [{"name": x["name"], "pos": x["pos"], "is_main": x["hub"] == main_kid}
+                                      for x in sorted(L, key=lambda x: -ev_ts.get(x["ev"], 0))[:5]]})
     elig = [t for t in teams if t["eligible"]]
     teams.sort(key=lambda t: (-(t["hub_share"] if t["eligible"] else -1), t["short"]))
     lg = round(sum(t["hub_share"] for t in elig) / len(elig), 1) if elig else None

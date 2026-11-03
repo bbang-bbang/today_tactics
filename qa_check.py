@@ -56,6 +56,12 @@ qa('brief 강점·약점 <=3', lambda: assert_(len(d_b['strengths']) <= 3 and le
 qa('brief 상성 확률합=100%', lambda: assert_(abs(d_b['matchup']['win_pct'] + d_b['matchup']['draw_pct'] + d_b['matchup']['loss_pct'] - 100) <= 1))
 d_b_away = get('/api/pre-match-brief?team=jeonbuk&opp=ulsan&home=0')
 qa('brief 홈/원정 상성 방향 반영', lambda: assert_(d_b_away['matchup']['venue'] == 'away' and d_b_away['matchup']['h2h']['win'] == d_b['matchup']['h2h']['win']))
+def _bh_ok(bh):
+    # 빌드업 허브: 없으면 None(표본 부족 허용), 있으면 수치 범위·최근 집계 정합
+    return bh is None or (bh['name'] and 0 < bh['pct'] <= 100 and 0 < bh['times'] <= bh['matches']
+                          and 0 <= bh['recent_main'] <= bh['recent_n'] <= 5 and 5 < bh['share'] < 40)
+qa('brief 빌드업 허브 정합', lambda: assert_('build_hub' in d_b['identity'] and _bh_ok(d_b['identity']['build_hub'])
+                                         and d_b['identity']['build_hub'] is not None))
 d_b_new = get('/api/pre-match-brief?team=gimhae&opp=cheongju')
 qa('brief 신규팀 표본부족 경고', lambda: assert_(len(d_b_new['conclusions']) >= 1))
 def _brief_status(q):
@@ -127,6 +133,7 @@ d_ph = get('/api/insights/pass-hub?league=k1&year=2026')
 _phe = [t for t in d_ph['teams'] if t['eligible']]
 qa('pass-hub 키·허브 지분 범위', lambda: assert_(_phe and all(k in d_ph for k in ['verdict', 'high_vs_low', 'limits']) and all(5 < t['hub_share'] < 40 and t['top2_share'] > t['hub_share'] for t in _phe)))
 qa('pass-hub 주 허브 비율 ≤ 100', lambda: assert_(all(0 < t['main_hub']['pct'] <= 100 and t['hubs'] >= 1 for t in _phe)))
+qa('pass-hub 최근 허브 ≤5 + 주 허브 표시', lambda: assert_(all(1 <= len(t['recent_hubs']) <= 5 and all('is_main' in r for r in t['recent_hubs']) for t in _phe)))
 qa('pass-hub 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/pass-hub?league=zz') == 400))
 
 # ── 2-g. 경기 요약 카드 (팬용) ──

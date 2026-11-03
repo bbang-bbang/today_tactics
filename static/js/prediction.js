@@ -1410,10 +1410,16 @@
 
         const idn = b.identity || {};
         const fm = idn.formation;
+        // 빌드업 허브 = 팀 패스(보낸+받은) 관여 1위를 가장 자주 차지한 선수 (공식 패스 행렬, /api/insights/pass-hub)
+        const bh = idn.build_hub;
+        const hubLine = bh ? `<div class="sb-line" title="경기마다 팀 패스(보낸+받은) 관여 1위인 선수를 '허브'로 집계 · 공식 패스 데이터">
+                🕸️ 빌드업 허브 <b>${e(bh.name || "-")}</b>${bh.pos ? `<span class="sb-muted"> (${e(bh.pos)})</span>` : ""}
+                <span class="sb-muted"> · ${bh.matches}경기 중 ${bh.times}경기(${bh.pct}%)${bh.recent_n ? ` · 최근 ${bh.recent_n}경기 중 ${bh.recent_main}경기` : ""} · 지분 ${bh.share}%${bh.league_share != null ? ` (리그 ${bh.league_share}%)` : ""}</span></div>` : "";
         const identity = `<div class="sb-block">
             <div class="sb-h">② 전술 정체성</div>
             <div class="sb-big">${fm ? e(fm.formation) : "-"}<span class="sb-sub">${fm ? `시즌 ${fm.games}/${fm.of}경기` : "라인업 없음"}</span></div>
             ${(idn.recent_formations || []).length ? `<div class="sb-line">최근 ${idn.recent_formations.length}경기: ${idn.recent_formations.map(f => `<span class="sb-chip">${e(f)}</span>`).join("")}</div>` : ""}
+            ${hubLine}
             <ul class="sb-list">${(idn.traits || []).map(t => `<li>${e(t.text)}<span class="sb-muted"> · ${e(t.detail)}</span></li>`).join("") || `<li class="sb-muted">뚜렷한 특징 없음 (리그 평균 수준)</li>`}</ul>
         </div>`;
 
