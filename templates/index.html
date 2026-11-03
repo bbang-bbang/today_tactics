@@ -6,7 +6,7 @@
     <title>Today Tactics - 축구 전술판</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=103">
+    <link rel="stylesheet" href="/static/css/style.css?v=104">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -388,25 +388,38 @@
             <div id="ins-top-body"></div>
         </div>
 
-        <!-- 심화 인사이트 (날씨·승부처·폼·활동량·슈팅) -->
+        <!-- 심화 인사이트 (경기 흐름·교체·슈팅·수문장·듀얼 등) -->
         <div class="ins-block hidden" id="ins-panel-adv" data-itab-panel="adv">
             <div class="ins-block-title">🔬 심화 인사이트
-                <span class="ins-block-hint">날씨·승부처·슈팅·교체·수문장·듀얼 — 상단 리그/시즌 필터 적용</span>
+                <span class="ins-block-hint">경기 흐름·교체·승부처·슈팅·수문장·듀얼 — 상단 리그/시즌 필터 적용</span>
             </div>
             <div class="ins-adv-grid">
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🍀 xG 운 보정 순위 <span class="ins-clutch-hint">실제 순위 vs 기대 승점(xPts) 순위</span></div><div id="ins-xgluck-body"><div class="ins-adv-loading">불러오는 중… (xG 집계)</div></div></div>
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">😴 휴식일·연전 영향 <span class="ins-clutch-hint">짧은 휴식이 정말 성적을 떨어뜨리나?</span></div><div id="ins-rest-body"><div class="ins-adv-loading">불러오는 중… (휴식일 집계)</div></div></div>
-                <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🔁 교체 효과 심화 <span class="ins-clutch-hint">첫 교체 앞뒤 15분 득실 · 벤치 선수 효율</span></div><div id="ins-subimp-body"><div class="ins-adv-loading">불러오는 중… (교체 전후 집계)</div></div></div>
+                <!-- 교체 분석: 팀별 교체 효과(교체 효과 심화) + 슈퍼서브·교체 시점(교체 영향) 통합 탭 카드 -->
+                <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🔁 교체 분석 <span class="ins-clutch-hint">교체가 흐름을 바꾸나? 누가 벤치에서 터지나?</span></div>
+                    <div class="ins-ctabs" role="tablist" aria-label="교체 분석 보기">
+                        <button type="button" class="ins-ctab active" role="tab" id="ins-ctab-subimp" aria-selected="true" aria-controls="ins-subimp-body">팀별 교체 효과</button>
+                        <button type="button" class="ins-ctab" role="tab" id="ins-ctab-sub" aria-selected="false" aria-controls="ins-sub-body" tabindex="-1">슈퍼서브·교체 시점</button>
+                    </div>
+                    <div id="ins-subimp-body" role="tabpanel" aria-labelledby="ins-ctab-subimp"><div class="ins-adv-loading">불러오는 중… (교체 전후 집계)</div></div>
+                    <div id="ins-sub-body" role="tabpanel" aria-labelledby="ins-ctab-sub" hidden><div class="ins-adv-loading">불러오는 중… (교체 집계)</div></div>
+                </div>
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">⛳ 세트피스 공수 프로필 <span class="ins-clutch-hint">코너·프리킥·스로인·기타 (PK 제외) — 만든 것 vs 허용한 것</span></div><div id="ins-spp-body"><div class="ins-adv-loading">불러오는 중… (슈팅맵 집계)</div></div></div>
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🎯 득점 의존도 <span class="ins-clutch-hint">득점의 몇 %를 1·2위 득점자가 만드나? 에이스가 빠지면?</span></div><div id="ins-sdep-body"><div class="ins-adv-loading">불러오는 중… (득점 집계)</div></div></div>
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🔀 선발 로테이션 <span class="ins-clutch-hint">직전 경기와 선발이 얼마나 바뀌나, 성적과 관계는?</span></div><div id="ins-rot-body"><div class="ins-adv-loading">불러오는 중… (선발 라인업 집계)</div></div></div>
-                <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🎢 경기 상황별 성적 <span class="ins-clutch-hint">앞서면 지켜내나? 뒤지면 따라붙나?</span></div><div id="ins-gs-body"><div class="ins-adv-loading">불러오는 중… (득점 타임라인 집계)</div></div></div>
-                <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">⚡ 득점 직후 실점·반격 <span class="ins-clutch-hint">골 넣고 바로 먹히나? 먹고 바로 따라붙나?</span></div><div id="ins-aft-body"><div class="ins-adv-loading">불러오는 중… (득점 타임라인 집계)</div></div></div>
+                <!-- 경기 흐름: 경기 상황별 성적 + 득점 직후 실점·반격 통합 탭 카드 -->
+                <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🎢 경기 흐름 <span class="ins-clutch-hint">앞서면 지켜내나? 골 직후 10분은?</span></div>
+                    <div class="ins-ctabs" role="tablist" aria-label="경기 흐름 보기">
+                        <button type="button" class="ins-ctab active" role="tab" id="ins-ctab-gs" aria-selected="true" aria-controls="ins-gs-body">경기 상황별 성적</button>
+                        <button type="button" class="ins-ctab" role="tab" id="ins-ctab-aft" aria-selected="false" aria-controls="ins-aft-body" tabindex="-1">득점 직후 실점·반격</button>
+                    </div>
+                    <div id="ins-gs-body" role="tabpanel" aria-labelledby="ins-ctab-gs"><div class="ins-adv-loading">불러오는 중… (득점 타임라인 집계)</div></div>
+                    <div id="ins-aft-body" role="tabpanel" aria-labelledby="ins-ctab-aft" hidden><div class="ins-adv-loading">불러오는 중… (득점 타임라인 집계)</div></div>
+                </div>
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🕸️ 패스 허브 의존도 <span class="ins-clutch-hint">팀 패스가 한 선수에게 얼마나 몰리나?</span></div><div id="ins-hub-body"><div class="ins-adv-loading">불러오는 중… (패스 행렬 집계)</div></div></div>
-                <div class="ins-adv-card"><div class="ins-adv-h">🌡️ 날씨 영향</div><div id="ins-weather-body"><div class="ins-adv-loading">불러오는 중…</div></div></div>
                 <div class="ins-adv-card"><div class="ins-adv-h">⏱️ 승부처 해결사</div><div id="ins-clutch-body"><div class="ins-adv-loading">불러오는 중…</div></div></div>
                 <div class="ins-adv-card"><div class="ins-adv-h">🎯 슈팅 인사이트</div><div id="ins-shooting-body"><div class="ins-adv-loading">불러오는 중… (슈팅맵 집계)</div></div></div>
-                <div class="ins-adv-card"><div class="ins-adv-h">🔄 교체 영향</div><div id="ins-sub-body"><div class="ins-adv-loading">불러오는 중… (교체 집계)</div></div></div>
                 <div class="ins-adv-card"><div class="ins-adv-h">🧤 수문장 (골키퍼)</div><div id="ins-gk-body"><div class="ins-adv-loading">불러오는 중… (골키퍼 집계)</div></div></div>
                 <div class="ins-adv-card"><div class="ins-adv-h">⚔️ 듀얼 지배</div><div id="ins-duel-body"><div class="ins-adv-loading">불러오는 중… (듀얼 집계)</div></div></div>
             </div>
@@ -1062,7 +1075,7 @@
         pass_network: "/static/js/pass_network.js?v=2",
         match_report: "/static/js/match_report.js?v=1",
         player_compare: "/static/js/player_compare.js?v=2",
-        insights: "/static/js/insights.js?v=42"
+        insights: "/static/js/insights.js?v=43"
     };
     </script>
 

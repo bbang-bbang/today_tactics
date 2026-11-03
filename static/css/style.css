@@ -6479,6 +6479,18 @@ body.pr-expanded-lock {
     cursor: help; transition: background var(--trans-fast);
 }
 .ins-fresh:hover { background: var(--warn-bg-hi); }
+/* 카드 내부 탭 (insights.js initCardTabs) — 교체 분석 · 경기 흐름 */
+.ins-ctabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 10px; border-bottom: 1px solid var(--border-subtle); }
+.ins-ctab {
+    padding: 6px 12px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 2px solid transparent;
+    border-radius: 6px 6px 0 0; background: transparent; color: var(--text-muted);
+    font: inherit; font-size: 0.8rem; font-weight: 600; line-height: 1.5; cursor: pointer;
+    transition: color var(--trans-fast), background var(--trans-fast), border-color var(--trans-fast);
+}
+.ins-ctab:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.04); }
+.ins-ctab:active { background: rgba(255, 255, 255, 0.08); }
+.ins-ctab.active { color: var(--text-primary); border-bottom-color: var(--accent); }
+.ins-ctab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* 경기 상황별 성적 — 앞섬/동점/뒤짐 시간 비율 막대 (색 + 숫자 병기, 색만 의존 X) */
 .ins-gs-share-td { min-width: 150px; }
 .ins-gs-share { display: flex; width: 110px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--border-subtle); vertical-align: middle; }

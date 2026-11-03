@@ -6409,53 +6409,6 @@ def _league_tid(league):
     return 410 if league == "k1" else 777 if league == "k2" else None
 
 
-@app.route("/api/insights/weather")
-@cached_response(ttl=1800)
-def insights_weather():
-    """날씨 영향 — 온도대별 리그 평균(경기당 득점·평균 평점) + 혹서기(>25°C) 강자."""
-    year = request.args.get("year", "2026")
-    league = request.args.get("league", "all")
-    date_cond, date_params = _year_date_params(year)
-    league_cond, league_params = _league_team_filter(league)
-    base_params = tuple(date_params) + tuple(league_params)
-    conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
-
-    # 온도 버킷 — 단일 GROUP BY 1회 스캔 (버킷별 4회 스캔 → 1회로 최적화)
-    brows = conn.execute(f"""
-        SELECT CASE WHEN m.temperature < 10 THEN 0
-                    WHEN m.temperature < 20 THEN 1
-                    WHEN m.temperature < 25 THEN 2
-                    ELSE 3 END bidx,
-               COUNT(DISTINCT m.event_id) games,
-               ROUND(AVG(m.rating), 2) rating,
-               ROUND(CAST(SUM(m.goals) AS REAL) / NULLIF(COUNT(DISTINCT m.event_id), 0), 2) gpm
-        FROM match_player_stats m
-        WHERE m.temperature IS NOT NULL AND m.minutes_played > 0
-          {date_cond} {league_cond}
-        GROUP BY bidx
-    """, base_params).fetchall()
-    labels = ["저온 <10°C", "선선 10~20°C", "온화 20~25°C", "더위 ≥25°C"]
-    bmap = {r["bidx"]: r for r in brows}
-    temp_buckets = [{"label": labels[i],
-                     "games": (bmap[i]["games"] if i in bmap else 0),
-                     "rating": (bmap[i]["rating"] if i in bmap else None),
-                     "gpm": (bmap[i]["gpm"] if i in bmap else None)} for i in range(4)]
-
-    hot = conn.execute(f"""
-        SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name) name, m.team_id,
-               COUNT(*) games, ROUND(AVG(m.rating), 2) rating, SUM(m.goals) goals
-        FROM match_player_stats m LEFT JOIN players p ON m.player_id = p.id
-        WHERE m.temperature >= 25 AND m.minutes_played > 0 AND m.rating IS NOT NULL
-          {date_cond} {league_cond}
-        GROUP BY m.player_id HAVING games >= 3
-        ORDER BY AVG(m.rating) DESC LIMIT 6
-    """, base_params).fetchall()
-    hot_top = [{"name": r["name"] or "", "team": _ko_team(r["team_id"], ""),
-                "games": r["games"], "rating": r["rating"], "goals": r["goals"] or 0} for r in hot]
-    conn.close()
-    return jsonify({"temp_buckets": temp_buckets, "hot_top": hot_top})
-
-
 @app.route("/api/insights/clutch")
 @cached_response(ttl=1800)
 def insights_clutch():
@@ -6679,8 +6632,12 @@ def insights_substitution():
         SELECT COALESCE(p.name_ko, s.player_in_name) name, s.team_id, COUNT(*) cnt
         FROM sub_events s JOIN events e ON e.id = s.event_id
         LEFT JOIN players p ON p.id = s.player_in_id
-        WHERE 1=1 {where} GROUP BY s.player_in_id ORDER BY cnt DESC, name LIMIT 6
+        WHERE 1=1 {where} AND (s.player_in_id IS NOT NULL OR COALESCE(s.player_in_name, '') != '')
+        GROUP BY COALESCE(CAST(s.player_in_id AS TEXT), s.team_id || ':' || s.player_in_name)
+        ORDER BY cnt DESC, name LIMIT 6
     """, P).fetchall()
+    # ↑ 공식 API로 복구한 교체는 선수 ID를 못 찾으면 NULL — ID로만 묶으면 미해석분이 '이름 없는 한 명'으로 합쳐졌다(2026-11-03 수정).
+    #   ID가 없으면 (팀, 이름)으로 묶는다. 같은 선수가 ID 있는 기록과 없는 기록으로 나뉘면 따로 집계될 수 있음(과소집계 쪽).
     frequent = [{"name": r["name"] or "", "team": _ko_team(r["team_id"], ""), "count": r["cnt"]} for r in fq]
 
     # 평균 첫 교체 시점 (경기·팀별 첫 교체 분의 평균) + 부상 교체 수
@@ -10805,7 +10762,6 @@ def _warm_cache():
         "http://127.0.0.1:5000/api/league-dashboard?league=K1",
         "http://127.0.0.1:5000/api/league-dashboard?league=K2",
         "http://127.0.0.1:5000/api/insights/top-performers?year=2026&league=all",
-        "http://127.0.0.1:5000/api/insights/weather?year=2026&league=all",
         "http://127.0.0.1:5000/api/insights/clutch?year=2026&league=all",
         "http://127.0.0.1:5000/api/insights/card-rankings?year=2026&league=all",
     ]

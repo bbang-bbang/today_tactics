@@ -134,6 +134,9 @@ _phe = [t for t in d_ph['teams'] if t['eligible']]
 qa('pass-hub 키·허브 지분 범위', lambda: assert_(_phe and all(k in d_ph for k in ['verdict', 'high_vs_low', 'limits']) and all(5 < t['hub_share'] < 40 and t['top2_share'] > t['hub_share'] for t in _phe)))
 qa('pass-hub 주 허브 비율 ≤ 100', lambda: assert_(all(0 < t['main_hub']['pct'] <= 100 and t['hubs'] >= 1 for t in _phe)))
 qa('pass-hub 최근 허브 ≤5 + 주 허브 표시', lambda: assert_(all(1 <= len(t['recent_hubs']) <= 5 and all('is_main' in r for r in t['recent_hubs']) for t in _phe)))
+d_sub = get('/api/insights/substitution?year=2026&league=all')
+qa('교체 영향 최다 투입 이름 비어 있지 않음', lambda: assert_(all(f['name'] for f in d_sub['frequent'])))
+qa('날씨 인사이트 API 제거됨(404)', lambda: assert_(_brief_status('/api/insights/weather?year=2026&league=all') == 404))
 d_gs = get('/api/insights/game-state?league=k1&year=2026')
 qa('game-state 대칭(리드 경기 = 뒤진 경기)·팀 경기 합 = 2×경기', lambda: assert_(
     d_gs['league_avg']['led_games'] == d_gs['league_avg']['trailed_games']

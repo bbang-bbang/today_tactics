@@ -855,24 +855,12 @@
   }
 
   /* ══════════════════════════════════════════════════
-     심화 인사이트 — 날씨 · 승부처 · 폼 · 활동량
+     심화 인사이트 — 승부처 · 슈팅 · 교체 · 수문장 · 듀얼
   ══════════════════════════════════════════════════ */
-  function renderWeather(d) {
-    const el = document.getElementById("ins-weather-body"); if (!el) return;
-    const tb = d.temp_buckets || [];
-    const rows = tb.map(b =>
-      `<tr><td>${b.label}</td><td>${b.games}</td><td>${b.rating ?? "-"}</td><td><strong>${b.gpm ?? "-"}</strong></td></tr>`).join("");
-    const hot = (d.hot_top || []).slice(0, 4).map((p, i) =>
-      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.rating}</b></li>`).join("");
-    el.innerHTML =
-      `<table class="ins-adv-tbl"><thead><tr><th>기온</th><th>경기</th><th>평점</th><th>경기당 골</th></tr></thead><tbody>${rows}</tbody></table>
-       <div class="ins-adv-sub-h">🔥 더위(≥25°C) 강자</div><ol class="ins-adv-list">${hot || '<li class="ins-adv-empty">표본 부족</li>'}</ol>
-       <div class="ins-method">근거 — 경기 당시 실측 기상(Open-Meteo) · 경기당 골=양 팀 합/경기 · 강자=더위 3경기↑ 평균 평점순</div>`;
-  }
   function renderClutch(d) {
     const el = document.getElementById("ins-clutch-body"); if (!el) return;
     const dec = (d.decisive_top || []).slice(0, 5).map((p, i) =>
-      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team} · 결승 ${p.gwg}·동점 ${p.eq}</span><b>${p.total}</b></li>`).join("");
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${escI(p.name)}</span><span class="ins-adv-sub">${escI(p.team)} · 결승 ${p.gwg}·동점 ${p.eq}</span><b>${p.total}</b></li>`).join("");
     const tl = d.timeline || [];
     const total = tl.reduce((s, t) => s + t.goals, 0) || 1;
     const max = Math.max(...tl.map(t => t.goals), 1);
@@ -938,9 +926,9 @@
   function renderSubstitution(d) {
     const el = document.getElementById("ins-sub-body"); if (!el) return;
     const ss = (d.supersub || []).slice(0, 5).map((p, i) =>
-      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.goals}골</b></li>`).join("");
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${escI(p.name)}</span><span class="ins-adv-sub">${escI(p.team)}</span><b>${p.goals}골</b></li>`).join("");
     const fq = (d.frequent || []).slice(0, 5).map((p, i) =>
-      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}</span><b>${p.count}회</b></li>`).join("");
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${escI(p.name)}</span><span class="ins-adv-sub">${escI(p.team)}</span><b>${p.count}회</b></li>`).join("");
     const tl = d.timeline || [];
     const max = Math.max(...tl.map(t => t.count), 1);
     const total = tl.reduce((s, t) => s + t.count, 0) || 1;
@@ -1244,8 +1232,9 @@
   /* ── 데이터 기준일 배지 — SofaScore 의존 카드에 '마지막 수집일 · 미반영 경기 수' 표시 (P4 신뢰) ──
      빠진 경기가 없으면(과거 시즌·K2 등) 배지를 붙이지 않는다. 기준은 /api/data-freshness (리그 최신 종료 경기 대비). */
   const FRESH_CARDS = {
-    "ins-top-body": "mps", "ins-weather-body": "mps", "ins-gk-body": "mps", "ins-duel-body": "mps",
-    "ins-xgluck-body": "mps", "ins-subimp-body": "mps", "ins-shooting-body": "shotmap", "ins-spp-body": "shotmap",
+    // 값: 소스 키 또는 [소스 키, 탭 카드에서 해당하는 탭 이름]
+    "ins-top-body": "mps", "ins-gk-body": "mps", "ins-duel-body": "mps", "ins-xgluck-body": "mps",
+    "ins-subimp-body": ["mps", "팀별 교체 효과"], "ins-shooting-body": "shotmap", "ins-spp-body": "shotmap",
   };
   const _freshCache = {};
   function md(d) { const p = (d || "").split("-"); return p.length === 3 ? `${+p[1]}/${+p[2]}` : (d || "?"); }
@@ -1259,7 +1248,8 @@
       document.querySelectorAll(".ins-fresh").forEach(e => e.remove());
       if (!d || !d.leagues) return;
       const lgs = league === "all" ? ["k1", "k2"] : [league];
-      Object.entries(FRESH_CARDS).forEach(([bodyId, src]) => {
+      Object.entries(FRESH_CARDS).forEach(([bodyId, spec]) => {
+        const [src, tabName] = Array.isArray(spec) ? spec : [spec, null];
         const parts = [], latest = [];
         lgs.forEach(lg => {
           const L = d.leagues[lg], s = L && L.sources && L.sources[src];
@@ -1271,7 +1261,7 @@
         if (!parts.length) return;
         const head = bodyId === "ins-top-body"
           ? document.querySelector("#ins-panel-top .ins-block-title")
-          : document.getElementById(bodyId)?.previousElementSibling;
+          : document.getElementById(bodyId)?.closest(".ins-adv-card")?.querySelector(".ins-adv-h");
         if (!head) return;
         const tip = `SofaScore 수집이 일부 차단되어 이후 경기가 이 카드 집계에 빠져 있습니다. 리그 최신 경기: ${latest.join(", ")}. K리그 공식 데이터로 전환 중입니다.`;
         const b = document.createElement("span");
@@ -1280,7 +1270,7 @@
         b.setAttribute("tabindex", "0");
         b.setAttribute("aria-label", `데이터 기준: ${parts.join(", ")}. ${tip}`);
         b.title = tip;
-        b.textContent = "⚠ " + parts.join(" / ");
+        b.textContent = "⚠ " + (tabName ? `${tabName} 탭: ` : "") + parts.join(" / ");
         head.appendChild(b);
       });
     });
@@ -1313,7 +1303,6 @@
         .then(renderAftermath).catch(warn("득점 직후 실점")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/pass-hub?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderPassHub).catch(warn("패스 허브")),
-      fetch(`/api/insights/weather?${qs}`).then(r => r.json()).then(renderWeather).catch(warn("날씨")),
       fetch(`/api/insights/clutch?${qs}`).then(r => r.json()).then(renderClutch).catch(warn("클러치")),
       fetch(`/api/insights/shooting?${qs}`).then(r => r.json()).then(renderShooting).catch(warn("슈팅")),
       fetch(`/api/insights/substitution?${qs}`).then(r => r.json()).then(renderSubstitution).catch(warn("교체")),
@@ -1344,6 +1333,30 @@
     });
   }
 
+  /* ── 카드 내부 탭 (교체 분석·경기 흐름) — 정적 HTML, 두 패널 모두 미리 로드되고 표시만 전환 ── */
+  function initCardTabs() {
+    document.querySelectorAll(".ins-ctabs").forEach(list => {
+      const tabs = [...list.querySelectorAll(".ins-ctab")];
+      const select = tab => tabs.forEach(t => {
+        const on = t === tab;
+        t.classList.toggle("active", on);
+        t.setAttribute("aria-selected", String(on));
+        t.tabIndex = on ? 0 : -1;
+        const panel = document.getElementById(t.getAttribute("aria-controls"));
+        if (panel) panel.hidden = !on;
+      });
+      tabs.forEach((t, i) => {
+        t.addEventListener("click", () => select(t));
+        t.addEventListener("keydown", e => {         // 좌우 화살표로 탭 이동 (WAI-ARIA 탭 패턴)
+          if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+          e.preventDefault();
+          const n = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+          select(n); n.focus();
+        });
+      });
+    });
+  }
+
   /* ── 전체 로드 ── (필터 변경/최초) — 활성 탭만 로드, 나머지는 재방문 시 재로드 */
   function loadAll() {
     _itabLoaded = { rank: false, adv: false, discipline: false };
@@ -1366,6 +1379,7 @@
           initInsTabs();
           initPosTab();
           initCardModeTab();
+          initCardTabs();
           loadAll();
           loaded = true;
         }
@@ -1376,6 +1390,7 @@
       initInsTabs();
       initPosTab();
       initCardModeTab();
+      initCardTabs();
       loadAll();
     }
     document.getElementById("drawer-close")?.addEventListener("click", closeDrawer);
