@@ -6268,6 +6268,12 @@ body.pr-expanded-lock {
 .pr-radar-canvas-wrap { flex-shrink: 0; }
 #pr-radar-canvas { width: 100%; max-width: 220px; max-height: 220px; }
 .pr-stats-card { min-width: 0; }
+/* 모바일: 레이더와 지표 목록을 세로로 쌓는다(2열 고정이면 지표 열이 74px로 좁아져 글자가 세로로 깨짐). 터치 영역 확대. */
+@media (max-width: 600px) {
+    .pr-radar-card { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+    #pr-radar-canvas { display: block; margin: 0 auto; }
+    .pr-src-btn { min-height: 36px; padding: 8px 14px; }
+}
 
 /* 스탯 리스트 */
 .pr-stat-list { display:flex; flex-direction:column; gap:10px; }
