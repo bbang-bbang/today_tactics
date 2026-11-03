@@ -134,7 +134,12 @@ _phe = [t for t in d_ph['teams'] if t['eligible']]
 qa('pass-hub 키·허브 지분 범위', lambda: assert_(_phe and all(k in d_ph for k in ['verdict', 'high_vs_low', 'limits']) and all(5 < t['hub_share'] < 40 and t['top2_share'] > t['hub_share'] for t in _phe)))
 qa('pass-hub 주 허브 비율 ≤ 100', lambda: assert_(all(0 < t['main_hub']['pct'] <= 100 and t['hubs'] >= 1 for t in _phe)))
 qa('pass-hub 최근 허브 ≤5 + 주 허브 표시', lambda: assert_(all(1 <= len(t['recent_hubs']) <= 5 and all('is_main' in r for r in t['recent_hubs']) for t in _phe)))
-qa('pass-hub 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/pass-hub?league=zz') == 400))
+d_fr = get('/api/data-freshness?year=2026')
+qa('data-freshness 구조·미반영 수 ≥ 0', lambda: assert_(all(
+    L['latest'] and all(s['missing'] >= 0 and (s['last'] is None or s['last'] <= L['latest']) for s in L['sources'].values())
+    for L in d_fr['leagues'].values()) and set(d_fr['leagues']) <= {'k1', 'k2'}))
+qa('data-freshness 잘못된 year 400', lambda: assert_(_brief_status('/api/data-freshness?year=x') == 400))
+qa('pass-hub 잘못된 league 400',lambda: assert_(_brief_status('/api/insights/pass-hub?league=zz') == 400))
 
 # ── 2-g. 경기 요약 카드 (팬용) ──
 d_rc = get('/api/match-recap?date=2026.10.24&home_slug=incheon&away_slug=jeju')

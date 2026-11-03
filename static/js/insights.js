@@ -1208,6 +1208,51 @@
     }).join("") + `<div class="ins-method">근거 — K리그 공식 패스 행렬(2023~) · 허브 지분=한 선수의 (보낸+받은) 패스 관여÷팀 총 관여(패스 1회=2관여) · 허브는 보통 센터백·수비형 미드(빌드업 거점) · 집중한 날=팀 평소보다 +2%p↑, 분산된 날=−2%p↓ · 점유율·상대 압박에 따라 달라져 <b>인과가 아님</b></div>`;
   }
 
+  /* ── 데이터 기준일 배지 — SofaScore 의존 카드에 '마지막 수집일 · 미반영 경기 수' 표시 (P4 신뢰) ──
+     빠진 경기가 없으면(과거 시즌·K2 등) 배지를 붙이지 않는다. 기준은 /api/data-freshness (리그 최신 종료 경기 대비). */
+  const FRESH_CARDS = {
+    "ins-top-body": "mps", "ins-weather-body": "mps", "ins-gk-body": "mps", "ins-duel-body": "mps",
+    "ins-xgluck-body": "mps", "ins-subimp-body": "mps", "ins-shooting-body": "shotmap", "ins-spp-body": "shotmap",
+  };
+  const _freshCache = {};
+  function md(d) { const p = (d || "").split("-"); return p.length === 3 ? `${+p[1]}/${+p[2]}` : (d || "?"); }
+  function applyFreshBadges() {
+    const year = currentYear, league = currentLeague;
+    document.querySelectorAll(".ins-fresh").forEach(e => e.remove());   // 필터 변경 즉시 이전 기준 배지 제거(응답 전 잘못된 표시 방지)
+    const get = _freshCache[year] || (_freshCache[year] = fetch(`/api/data-freshness?year=${year}`)
+      .then(r => (r.ok ? r.json() : null)).catch(() => null));
+    get.then(d => {
+      if (year !== currentYear || league !== currentLeague) return;      // 필터가 바뀐 뒤 늦게 온 응답은 버림
+      document.querySelectorAll(".ins-fresh").forEach(e => e.remove());
+      if (!d || !d.leagues) return;
+      const lgs = league === "all" ? ["k1", "k2"] : [league];
+      Object.entries(FRESH_CARDS).forEach(([bodyId, src]) => {
+        const parts = [], latest = [];
+        lgs.forEach(lg => {
+          const L = d.leagues[lg], s = L && L.sources && L.sources[src];
+          if (s && s.missing > 0) {
+            parts.push(`${lg.toUpperCase()} ${s.last ? md(s.last) + "까지" : "데이터 없음"} · 최근 ${s.missing}경기 미반영`);
+            latest.push(`${lg.toUpperCase()} ${md(L.latest)}`);
+          }
+        });
+        if (!parts.length) return;
+        const head = bodyId === "ins-top-body"
+          ? document.querySelector("#ins-panel-top .ins-block-title")
+          : document.getElementById(bodyId)?.previousElementSibling;
+        if (!head) return;
+        const tip = `SofaScore 수집이 일부 차단되어 이후 경기가 이 카드 집계에 빠져 있습니다. 리그 최신 경기: ${latest.join(", ")}. K리그 공식 데이터로 전환 중입니다.`;
+        const b = document.createElement("span");
+        b.className = "ins-fresh";
+        b.setAttribute("role", "note");
+        b.setAttribute("tabindex", "0");
+        b.setAttribute("aria-label", `데이터 기준: ${parts.join(", ")}. ${tip}`);
+        b.title = tip;
+        b.textContent = "⚠ " + parts.join(" / ");
+        head.appendChild(b);
+      });
+    });
+  }
+
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     // 무음 실패 → 가시화: 실패한 인사이트명을 모아 1회 토스트 + console.warn (P5 견고성)
@@ -1268,6 +1313,7 @@
   function loadAll() {
     _itabLoaded = { rank: false, adv: false, discipline: false };
     loadInsTab(_activeItab);
+    applyFreshBadges();   // 카드 머리말은 정적 HTML이라 탭 로드와 무관하게 바로 붙일 수 있다
   }
 
   function init() {

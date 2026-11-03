@@ -7808,6 +7808,42 @@ def insights_pass_hub():
                     "limits": "허브 지분 = 한 선수의 (보낸+받은) 패스 관여 ÷ 팀 총 패스 관여(패스 1회=2관여) · 공식 패스 행렬 2023~ · 점유율·상대 압박·경기 상황에 따라 달라져 인과가 아님"})
 
 
+@app.route("/api/data-freshness")
+@cached_response(ttl=1800)
+def data_freshness():
+    """SofaScore 의존 데이터의 리그별 '마지막 수집 경기일'과 그 뒤 미반영 경기 수 — 인사이트 카드 기준일 배지용.
+    공백은 오늘이 아니라 '리그 최신 종료 경기' 기준(비시즌 오탐 없음, analysis/audit_collection_gaps.py와 같은 기준)."""
+    year = (request.args.get("year") or "all").strip()
+    if year != "all" and not year.isdigit():
+        return jsonify({"error": "year must be YYYY or all"}), 400
+    ycond, yp = "", ()
+    if year != "all":
+        lo, hi = _year_range(year)
+        ycond, yp = " AND e.date_ts >= ? AND e.date_ts < ?", (lo, hi)
+    day = lambda ts: datetime.fromtimestamp(ts).strftime("%Y-%m-%d") if ts else None   # noqa: E731
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        out = {}
+        for key, tid in (("k1", 410), ("k2", 777)):
+            rows = [r for r in conn.execute(
+                "SELECT e.id, e.date_ts,"
+                " EXISTS(SELECT 1 FROM match_player_stats m WHERE m.event_id = e.id AND m.rating IS NOT NULL),"
+                " EXISTS(SELECT 1 FROM match_shotmap s WHERE s.event_id = e.id)"
+                " FROM events e WHERE e.tournament_id = ? AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL" + ycond,
+                (tid, *yp)).fetchall() if r[0] not in EXCLUDED_EVENT_IDS]
+            if not rows:
+                continue
+            latest = max(r[1] for r in rows)
+            srcs = {}
+            for name, idx in (("mps", 2), ("shotmap", 3)):
+                last = max((r[1] for r in rows if r[idx]), default=None)
+                srcs[name] = {"last": day(last), "missing": sum(1 for r in rows if last is None or r[1] > last)}
+            out[key] = {"latest": day(latest), "matches": len(rows), "sources": srcs}
+    finally:
+        conn.close()
+    return jsonify({"year": year, "leagues": out})
+
+
 @app.route("/api/insights/player-detail")
 @cached_response(ttl=1800)
 def insights_player_detail():

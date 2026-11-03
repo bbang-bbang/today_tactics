@@ -33,6 +33,12 @@
     --color-draw: #a16207;
     --color-loss: #b91c1c;
 
+    /* 경고(데이터 기준일 등) — 어두운 카드 배경 위 대비 8:1 이상 */
+    --warn-fg:     #fbbf24;
+    --warn-bg:     rgba(245, 158, 11, 0.12);
+    --warn-bg-hi:  rgba(245, 158, 11, 0.22);
+    --warn-border: rgba(245, 158, 11, 0.40);
+
     /* 폰트 */
     --font-base: 'Pretendard', 'Noto Sans KR', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 
@@ -6464,6 +6470,16 @@ body.pr-expanded-lock {
 .ins-tl-sg b { color: #e8f0fb; font-weight: 800; }
 .ins-tl-sg-peak b { color: #ffc870; }
 .ins-clutch-hint { font-size: 0.66rem; font-weight: 600; color: #8aa0b8; margin-left: 6px; }
+/* 데이터 기준일 배지 (insights.js applyFreshBadges) — 제목 아래 한 줄, 색 + ⚠ 기호 + 문구로 전달(색만 의존 X) */
+.ins-fresh {
+    display: flex; width: fit-content; max-width: 100%; align-items: center; gap: 4px;
+    margin-top: 4px; padding: 2px 8px; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 600; line-height: 1.5; letter-spacing: -0.01em;
+    color: var(--warn-fg); background: var(--warn-bg); border: 1px solid var(--warn-border);
+    cursor: help; transition: background var(--trans-fast);
+}
+.ins-fresh:hover { background: var(--warn-bg-hi); }
+.ins-fresh:focus-visible { outline: 2px solid var(--warn-fg); outline-offset: 2px; }
 /* 슈팅 인사이트 — 깔때기(가로 막대 3단) + 결정률(그리드 정렬 막대, 공통 스케일) */
 .ins-fn { display: flex; flex-direction: column; gap: 5px; margin: 4px 0 10px; }
 .ins-fn-row { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 8px; }

@@ -6,7 +6,7 @@
     <title>Today Tactics - 축구 전술판</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=101">
+    <link rel="stylesheet" href="/static/css/style.css?v=102">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -1061,7 +1061,7 @@
         pass_network: "/static/js/pass_network.js?v=2",
         match_report: "/static/js/match_report.js?v=1",
         player_compare: "/static/js/player_compare.js?v=2",
-        insights: "/static/js/insights.js?v=40"
+        insights: "/static/js/insights.js?v=41"
     };
     </script>
 
@@ -1222,6 +1222,7 @@
                     <ul>
                         <li>기본 데이터는 SofaScore이며, 8월 이후 <b>수집이 부분적으로 차단</b>되었습니다(항목별로 시점이 다름). 라인업·히트맵·득점·카드·교체는 K리그 공식 API로 보완하고, 패스 네트워크는 처음부터 공식 데이터입니다.</li>
                         <li>공식 데이터로 채운 경기는 출처가 달라 선수 이름 표기가 다를 수 있고, 선수 세부 스탯(태클·드리블 등)은 차단 이후 경기에서 갱신되지 않을 수 있습니다. 상단 <b>"⚠ 일부 미수집"</b> 배지가 보이면 최근 수집에 빠진 항목이 있다는 뜻입니다.</li>
+                        <li>인사이트 카드 제목 아래 <b>"⚠ K1 10/24까지 · 최근 N경기 미반영"</b> 같은 배지는 그 카드가 쓰는 데이터(선수 스탯·슈팅맵)가 그날까지만 들어 있다는 뜻입니다. 빠진 경기가 없으면(과거 시즌 등) 배지가 붙지 않습니다.</li>
                         <li>경기 시점 날씨는 Open-Meteo 실측값입니다.</li>
                     </ul>
                 </details>
