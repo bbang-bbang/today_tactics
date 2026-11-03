@@ -4922,6 +4922,7 @@ def get_player_stat_report():
             "saves":    v90("saves"),
             "touches":  v90("touches"),
             "fouls":    v90("fouls"),
+            "fouled":   v90("fouled"),
         }
 
     # 세부 포지션 비교군 적용 — 같은 그룹 피어가 5명 이상일 때만(표본 안정).
@@ -4966,6 +4967,7 @@ def get_player_stat_report():
         "saves":    p90(p["saves"]),
         "touches":  p90(p["touches"]),
         "fouls":    p90(p["fouls"]),
+        "fouled":   p90(p["fouled"]),   # 파울 유도(당한 파울) — 높을수록 좋음
     }
 
     # 퍼센타일 계산
@@ -5008,7 +5010,7 @@ def get_player_stat_report():
             {"key":"drib_s",   "label":"드리블 성공(90분)",    "icon":"💨"},
             {"key":"drib_pct", "label":"드리블 성공률(%)",     "icon":"📊"},
             {"key":"aer_w",    "label":"공중볼 성공(90분)",    "icon":"✈"},
-            {"key":"fouls",    "label":"파울 유도(90분)",      "icon":"🤸"},
+            {"key":"fouled",   "label":"파울 유도(90분)",      "icon":"🤸"},
         ],
     }
 
