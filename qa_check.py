@@ -310,15 +310,48 @@ def _dup_name_prefers_most_games():
                    GROUP BY p.name_ko ORDER BY COUNT(*) DESC LIMIT 5""")
     names = [r[0] for r in cur.fetchall()]
     assert_(names, '중복 이름 표본 없음')
+    # 공식 매핑상 이름이 틀린 것으로 확정된 레코드는 '경기 많은 순' 경쟁에서 제외(아래 별도 점검이 담당)
+    mis = set()
+    cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague_player_map'")
+    if cur.fetchone():
+        norm = lambda s: re.sub(r"\(c\)|[\s·.\-]", "", s or "")
+        cur.execute("SELECT m.sofa_player_id, p.name_ko, m.player_name FROM kleague_player_map m JOIN players p ON p.id = m.sofa_player_id")
+        mis = {r[0] for r in cur.fetchall() if norm(r[1]) != norm(r[2])}
     for nm in names:
         d = get('/api/player-stat-report?name=' + urllib.parse.quote(nm))
         assert_(d.get('found') is True, f'{nm} 미발견')
         cur.execute("SELECT COUNT(*) FROM match_player_stats WHERE player_id = ?", (d['player']['id'],))
         got = cur.fetchone()[0]
-        cur.execute("""SELECT MAX(c) FROM (SELECT COUNT(*) c FROM match_player_stats m JOIN players p ON p.id = m.player_id
-                       WHERE p.name_ko = ? GROUP BY m.player_id)""", (nm,))
-        assert_(got >= cur.fetchone()[0], f'{nm}: 경기 많은 레코드가 아님({got}경기)')
+        cur.execute("""SELECT m.player_id, COUNT(*) FROM match_player_stats m JOIN players p ON p.id = m.player_id
+                       WHERE p.name_ko = ? GROUP BY m.player_id""", (nm,))
+        cnts = {r[0]: r[1] for r in cur.fetchall()}
+        pool = {k: v for k, v in cnts.items() if k not in mis} or cnts
+        assert_(got >= max(pool.values()), f'{nm}: 경기 많은 레코드가 아님({got}경기)')
 qa('이름 중복 시 경기 많은 레코드 우선', _dup_name_prefers_most_games)
+
+# name_ko 가 다른 사람 이름으로 잘못 라벨된 레코드(공식 매핑상 이름 불일치)는, 정상 후보가 있으면 선택되지 않아야 한다
+def _mislabeled_not_picked():
+    import urllib.parse
+    cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague_player_map'")
+    if not cur.fetchone():
+        return   # 공식 매핑이 없는 구 DB — 해당 없음
+    norm = lambda s: re.sub(r"\(c\)|[\s·.\-]", "", s or "")
+    cur.execute("""SELECT m.sofa_player_id, p.name_ko, m.player_name FROM kleague_player_map m
+                   JOIN players p ON p.id = m.sofa_player_id WHERE p.name_ko IS NOT NULL AND p.name_ko <> ''""")
+    mis = {r[0]: r[1] for r in cur.fetchall() if norm(r[2]) != norm(r[1])}
+    checked = 0
+    for pid_bad, nm in sorted(mis.items(), key=lambda kv: kv[1])[:60]:
+        cur.execute("SELECT id FROM players WHERE name_ko = ?", (nm,))
+        cands = [r[0] for r in cur.fetchall()]
+        if len(cands) < 2 or all(i in mis for i in cands):
+            continue   # 정상 후보가 없으면 구제 불가 — 대상 아님
+        d = get('/api/player-stat-report?name=' + urllib.parse.quote(nm))
+        assert_(d['player']['id'] not in mis, f"{nm}: 이름 오기 레코드({d['player']['id']})가 선택됨")
+        checked += 1
+        if checked >= 8:
+            break
+    assert_(checked > 0 or not mis, '검증 표본 없음')
+qa('이름 오기 확정 레코드는 정상 후보가 있으면 후순위', _mislabeled_not_picked)
 
 conn.close()
 

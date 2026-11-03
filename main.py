@@ -4606,22 +4606,37 @@ def _year_range(year_str):
     end   = int(datetime(y+1, 1, 1).timestamp())
     return start, end
 
+_PLAYER_ORDER_BY_GAMES = (
+    " ORDER BY (SELECT COUNT(*) FROM match_player_stats m WHERE m.player_id = players.id) DESC, id")
+# 공식 K리그 매핑이 있고 공식 이름 ≠ name_ko 인 레코드 = name_ko 가 다른 사람 이름으로 잘못 라벨된 것으로 확정 가능
+# (예: Seung-wook Park 의 name_ko 가 '이창우' — 공식=박승욱). 이런 레코드는 경기 수가 많아도 뒤로 미룬다.
+_PLAYER_ORDER_MISLABEL_LAST = (
+    " ORDER BY EXISTS(SELECT 1 FROM kleague_player_map k WHERE k.sofa_player_id = players.id "
+    "AND REPLACE(REPLACE(k.player_name, ' ', ''), '·', '') <> REPLACE(REPLACE(COALESCE(players.name_ko, ''), ' ', ''), '·', '')) ASC, "
+    "(SELECT COUNT(*) FROM match_player_stats m WHERE m.player_id = players.id) DESC, id")
+
+
+def _player_order_sql(cur):
+    """kleague_player_map 이 있는 DB 에서만 '이름 오기 확정 레코드 후순위' 규칙을 쓴다(구 DB 호환). 고정 문자열만 반환."""
+    has_map = cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague_player_map'").fetchone()
+    return _PLAYER_ORDER_MISLABEL_LAST if has_map else _PLAYER_ORDER_BY_GAMES
+
+
 def _find_player(cur, name):
     """(player_id, team_id, matched_name) 반환, 없으면 (None, None, None)
 
-    같은 이름 레코드가 여럿이면(players.name_ko 중복 421건) 경기 기록(match_player_stats)이 가장 많은 레코드를
-    우선한다 — 이전엔 첫 행이라 경기 1~2개짜리 중복 레코드(예: 제르소·디자우마)가 잡히던 문제 보정.
-    동점이면 id 오름차순(결정적). 동명이인(서로 다른 사람)은 여전히 경기 수 많은 쪽 하나로 귀결된다."""
-    cur.execute(
-        "SELECT id, team_id, name_ko, name FROM players WHERE name_ko = ? "
-        "ORDER BY (SELECT COUNT(*) FROM match_player_stats m WHERE m.player_id = players.id) DESC, id", (name,))
+    같은 이름 레코드가 여럿이면(players.name_ko 중복 421건) ① 이름이 틀린 것으로 확정된 레코드는 뒤로,
+    ② 경기 기록(match_player_stats)이 가장 많은 레코드를 우선한다 — 이전엔 첫 행이라 경기 1~2개짜리 중복
+    레코드(예: 제르소·디자우마)가 잡히던 문제 보정. 동점이면 id 오름차순(결정적).
+    동명이인(서로 다른 사람)은 여전히 경기 수 많은 쪽 하나로 귀결된다."""
+    order = _player_order_sql(cur)
+    cur.execute("SELECT id, team_id, name_ko, name FROM players WHERE name_ko = ?" + order, (name,))
     row = cur.fetchone()
     if not row:
         # 공백 제거 후 재시도 (예: '브루노 실바' vs '브루노실바')
         name_no_space = name.replace(" ", "")
-        cur.execute(
-            "SELECT id, team_id, name_ko, name FROM players WHERE REPLACE(name_ko, ' ', '') = ? "
-            "ORDER BY (SELECT COUNT(*) FROM match_player_stats m WHERE m.player_id = players.id) DESC, id", (name_no_space,))
+        cur.execute("SELECT id, team_id, name_ko, name FROM players WHERE REPLACE(name_ko, ' ', '') = ?" + order,
+                    (name_no_space,))
         row = cur.fetchone()
     if not row:
         # 동명이인 구분용 끝 숫자 접미사 제거 후 정확 재매칭 (예: '이정문1' -> '이정문').
@@ -4630,15 +4645,12 @@ def _find_player(cur, name):
         if name_base and name_base != name:
             cur.execute(
                 "SELECT id, team_id, name_ko, name FROM players "
-                "WHERE name_ko = ? OR REPLACE(name_ko, ' ', '') = ? "
-                "ORDER BY (SELECT COUNT(*) FROM match_player_stats m WHERE m.player_id = players.id) DESC, id",
+                "WHERE name_ko = ? OR REPLACE(name_ko, ' ', '') = ?" + order,
                 (name_base, name_base.replace(" ", "")),
             )
             row = cur.fetchone()
     if not row:
-        cur.execute(
-            "SELECT id, team_id, name_ko, name FROM players WHERE name LIKE ? "
-            "ORDER BY (SELECT COUNT(*) FROM match_player_stats m WHERE m.player_id = players.id) DESC, id", (f"%{name}%",))
+        cur.execute("SELECT id, team_id, name_ko, name FROM players WHERE name LIKE ?" + order, (f"%{name}%",))
         row = cur.fetchone()
     if not row:
         return (None, None, None)
