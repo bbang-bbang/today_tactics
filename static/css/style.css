@@ -6184,6 +6184,26 @@ body.pr-expanded-lock {
 }
 .pr-yr-btn:hover { color:#aac; }
 .pr-yr-btn.active { background:rgba(74,222,128,0.12); border-color:rgba(74,222,128,0.4); color:#4ade80; }
+.pr-yr-btn:focus-visible { outline:2px solid #4ea4f8; outline-offset:2px; }
+
+/* 데이터 출처 전환(SofaScore / 공식 K리그) — 선수 리포트 상단 */
+.pr-source-toggle { display:flex; align-items:center; gap:6px; margin:0 0 12px; flex-wrap:wrap; }
+.pr-src-label { font-size:0.72rem; color:#8aa0b8; margin-right:2px; }
+.pr-src-btn {
+    background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.14);
+    color:#9ab0c8; border-radius:6px; font-size:0.78rem; padding:5px 12px; cursor:pointer;
+    transition:background .15s ease-in-out, border-color .15s ease-in-out, color .15s ease-in-out;
+}
+.pr-src-btn small { font-size:0.62rem; color:#f0a25c; margin-left:3px; }
+.pr-src-btn:hover { color:#d4e2f4; border-color:rgba(255,255,255,0.3); }
+.pr-src-btn:active { transform:translateY(1px); }
+.pr-src-btn:focus-visible { outline:2px solid #4ea4f8; outline-offset:2px; }
+.pr-src-btn.active { background:rgba(78,164,248,0.16); border-color:rgba(78,164,248,0.6); color:#cfe4ff; font-weight:700; }
+.pr-peer-note.pr-peer-note-official { color:#8aa0b8; }   /* 공식 탭 안내문 — 기본 색(#3a5060)은 어두운 배경에서 대비 부족 */
+.pr-stat-nodata { opacity:0.85; }
+.pr-stat-nodata .pr-pct-info span { color:#8aa0b8; font-size:0.72rem; }
+.pr-official-note ul { margin:6px 0 0; padding-left:18px; color:#9ab0c8; font-size:0.78rem; line-height:1.6; }
+.pr-official-note b { color:#cfe4ff; }
 
 .pr-loading, .pr-empty {
     text-align:center; color:#4a6080; padding:32px; font-size:0.9rem;

@@ -11,6 +11,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     let currentYear = null;
     let currentDob  = "";
     let currentShirt = null;
+    let currentSource = "sofa";   // "sofa" | "official"(K리그 공식 기록, 베타) — 선수를 새로 열 때마다 sofa 로 초기화
+    let currentPid    = null;     // SofaScore 리포트에서 확정된 선수 id (공식 탭 조회 키)
     let radarChart    = null;
     let activityChart = null;
     let vsTeamsChart  = null;
@@ -21,12 +23,36 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         currentDob   = e.detail.dob || "";
         currentShirt = e.detail.shirt || null;
         currentYear  = null;
+        currentSource = "sofa";
+        currentPid    = null;
         load();
     });
+
+    /* ── 데이터 출처 전환 (SofaScore ↔ 공식 K리그) ──────────── */
+    function srcToggle(active) {
+        const b = (src, label, tip) =>
+            `<button type="button" class="pr-src-btn${active === src ? " active" : ""}" data-src="${src}" aria-pressed="${active === src}" title="${tip}">${label}</button>`;
+        return `<div class="pr-source-toggle" role="group" aria-label="데이터 출처">
+            <span class="pr-src-label">데이터 출처</span>
+            ${b("sofa", "SofaScore", "기존 리포트 — 90분=풀타임 90분 기준")}
+            ${b("official", "공식 K리그 <small>베타</small>", "K리그 공식 경기 기록 — 출전분이 추가시간 포함, 일부 지표 정의가 다름")}
+        </div>`;
+    }
+    function bindSource() {
+        body.querySelectorAll(".pr-src-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                if (btn.dataset.src === currentSource) return;
+                currentSource = btn.dataset.src;
+                currentYear = null;
+                load();
+            });
+        });
+    }
 
     /* ── 데이터 로드 ─────────────────────────────────────── */
     function load() {
         if (!currentName) return;
+        if (currentSource === "official" && currentPid) { loadOfficial(); return; }
         body.innerHTML = `<div class="pr-loading">분석 중...</div>`;
         let url = `/api/player-stat-report?name=${encodeURIComponent(currentName)}`;
         if (currentDob)   url += `&dob=${encodeURIComponent(currentDob)}`;
@@ -53,6 +79,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     /* ── 렌더링 ──────────────────────────────────────────── */
     function render(d) {
         const p = d.player;
+        currentPid = p.id;
         const activity = d.activity || {};
         if (radarChart)    { radarChart.destroy();    radarChart    = null; }
         if (activityChart) { activityChart.destroy(); activityChart = null; }
@@ -100,7 +127,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             </tr>`;
         }).join("");
 
-        body.innerHTML = `
+        body.innerHTML = srcToggle("sofa") + `
         <div class="pr-card pr-info-card">
             <div class="pr-player-header">
                 <div class="pr-pos-badge" style="background:${posColor}22;border-color:${posColor}55;color:${posColor}">${roleLabel}</div>
@@ -164,10 +191,141 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         </div>
         `;
 
+        bindSource();
         // 레이더 차트
         renderRadar(d.radar, posLabel);
         renderActivity(activity);
         loadVsTeams(p.id);
+    }
+
+    /* ── 공식 K리그 기록 리포트 (베타) ────────────────────────
+       값·백분위·비교군 모두 공식 데이터끼리만 계산된 /api/player-stat-report-official 응답.
+       SofaScore 리포트와 수치를 섞어 보여주지 않는다(정의가 다른 지표가 많음). */
+    const OFFICIAL_REASON = {
+        no_official_table: "공식 기록 테이블이 아직 준비되지 않았습니다.",
+        no_match:          "이 선수의 공식 K리그 기록과 안전하게 연결되지 않았습니다(동명이인·표기 차이). SofaScore 탭을 이용해 주세요.",
+        ambiguous:         "공식 기록 후보가 여러 명이라 연결하지 않았습니다. SofaScore 탭을 이용해 주세요.",
+        unverifiable:      "출전 경기가 적어 공식 기록과의 연결을 검증하지 못했습니다. SofaScore 탭을 이용해 주세요.",
+        no_games:          "공식 기록이 수집된 경기가 없습니다.",
+        no_year:           "선택한 연도의 공식 기록이 없습니다.",
+    };
+
+    function loadOfficial() {
+        body.innerHTML = `<div class="pr-loading">공식 기록 분석 중...</div>`;
+        let url = `/api/player-stat-report-official?playerId=${encodeURIComponent(currentPid)}`;
+        if (currentYear) url += `&year=${encodeURIComponent(currentYear)}`;
+        fetch(url)
+            .then(r => r.json())
+            .then(renderOfficial)
+            .catch(() => {
+                body.innerHTML = srcToggle("official") + `<div class="pr-empty">⚠️ 공식 기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>`;
+                bindSource();
+            });
+    }
+
+    function bindYears(years, active) {
+        yrFilter.innerHTML = (years || []).map(y =>
+            `<button class="pr-yr-btn${y === active ? " active" : ""}" data-y="${ttEsc(y)}">${ttEsc(y)}</button>`).join("");
+        yrFilter.querySelectorAll(".pr-yr-btn").forEach(btn => {
+            btn.addEventListener("click", () => { currentYear = btn.dataset.y; load(); });
+        });
+    }
+
+    function renderOfficial(d) {
+        if (radarChart)    { radarChart.destroy();    radarChart    = null; }
+        if (activityChart) { activityChart.destroy(); activityChart = null; }
+        if (vsTeamsChart)  { vsTeamsChart.destroy();  vsTeamsChart  = null; }
+
+        if (!d || !d.official) {
+            bindYears(d && d.available_years, null);
+            const who = d && d.player && d.player.name ? `<b>${ttEsc(d.player.name)}</b> 선수의 ` : "";
+            const msg = OFFICIAL_REASON[d && d.reason] || "공식 기록을 불러오지 못했습니다.";
+            body.innerHTML = srcToggle("official") +
+                `<div class="pr-empty">📭 ${who}공식 K리그 기록을 표시할 수 없습니다.<br><span class="pr-empty-sub">${ttEsc(msg)}</span></div>`;
+            bindSource();
+            return;
+        }
+
+        const p = d.player;
+        bindYears(d.available_years, d.year);
+        const posLabel = p.pos_label || p.pos || "?";
+        const posColor = {GK:"#fbbf24",DF:"#4ade80",MF:"#4ea4f8",FW:"#f87171"}[posLabel] || "#9ab";
+        const statCards = d.stat_items.map(item => statCard(item, posLabel)).join("");
+
+        const formCols = getFormCols(p.pos);
+        const formHead = formCols.map(c => `<th>${c.label}</th>`).join("");
+        const formRows = d.recent_form.map(g => {
+            const resCls = g.result === "W" ? "pr-res-w" : g.result === "D" ? "pr-res-d" : "pr-res-l";
+            const cells = formCols.map(c => `<td>${g[c.key] ?? "-"}</td>`).join("");
+            return `<tr>
+                <td>${ttEsc(g.date)}</td>
+                <td>${ttEsc(g.opponent)} <span class="pr-ha">${g.is_home ? "홈" : "원정"}</span></td>
+                <td>${ttEsc(g.score)}</td>
+                <td class="${resCls}">${ttEsc(g.result)}</td>
+                ${cells}
+                <td>${g.rating ?? "-"}</td>
+            </tr>`;
+        }).join("");
+
+        const cov = d.coverage || {};
+        const covNote = cov.sofa_games && cov.sofa_games !== cov.official_games
+            ? `<li>공식 기록 <b>${cov.official_games}경기</b> · SofaScore 기록 ${cov.sofa_games}경기 — 수집 범위·선수 연결 차이로 경기 수가 다를 수 있습니다.</li>` : "";
+
+        body.innerHTML = srcToggle("official") + `
+        <div class="pr-card pr-info-card">
+            <div class="pr-player-header">
+                <div class="pr-pos-badge" style="background:${posColor}22;border-color:${posColor}55;color:${posColor}">${ttEsc(posLabel)}</div>
+                <div class="pr-player-name">${ttEsc(p.name)}</div>
+                <div class="pr-player-team">${ttEsc(p.team)} · ${ttEsc(p.league)} ${ttEsc(d.year)}</div>
+                <div class="pr-info-badges">
+                    <span class="pr-badge">${p.games}경기</span>
+                    <span class="pr-badge">${p.mins}분</span>
+                    <span class="pr-badge pr-badge-goal">${p.goals}골</span>
+                    <span class="pr-badge pr-badge-assist">${p.assists}도움</span>
+                    ${p.rating ? `<span class="pr-badge pr-badge-rating" title="공식 playerPoint — SofaScore 평점과 산식이 다릅니다">공식 평점 ${p.rating}</span>` : ""}
+                    ${p.xg != null ? `<span class="pr-badge" title="공식 xG (2023~2025 시즌만 제공)">xG ${p.xg}</span>` : ""}
+                    ${p.yellows ? `<span class="pr-badge">🟨${p.yellows}</span>` : ""}
+                    ${p.reds    ? `<span class="pr-badge">🟥${p.reds}</span>` : ""}
+                </div>
+                <div class="pr-peer-note pr-peer-note-official">같은 리그·같은 포지션 <b>${ttEsc(p.peer_label)}</b> ${d.peer_count}명 대비 퍼센타일 (공식 기록 기준)</div>
+            </div>
+        </div>
+
+        <div class="pr-main-grid">
+            <div class="pr-card pr-radar-card">
+                <div class="pr-radar-canvas-wrap">
+                    <div class="pr-section-title">종합 능력치 레이더</div>
+                    <canvas id="pr-radar-canvas"></canvas>
+                </div>
+                <div class="pr-stats-card">
+                    <div class="pr-section-title">주요 지표 퍼센타일 <span class="pr-pos-tag">${ttEsc(posLabel)} · 공식 기준</span></div>
+                    <div class="pr-stat-list">${statCards}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="pr-card">
+            <div class="pr-section-title">최근 5경기 <span class="pr-pos-tag">공식 기록</span></div>
+            <div class="pr-table-wrap">
+                <table class="pr-table">
+                    <thead><tr><th>날짜</th><th>상대</th><th>스코어</th><th>결과</th>${formHead}<th>공식평점</th></tr></thead>
+                    <tbody>${formRows || `<tr><td colspan="10" style="text-align:center;color:#8aa0b8;padding:16px">데이터 없음</td></tr>`}</tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="pr-card pr-official-note">
+            <div class="pr-section-title">공식 기록 읽는 법</div>
+            <ul>
+                <li>출전 시간은 <b>추가시간 포함 실제 시간</b>(풀타임 ≈ 98분)이라, 90분 환산값이 SofaScore 탭보다 약 8% 낮게 나옵니다.</li>
+                <li>태클·인터셉트·드리블·경합·볼 회수 등은 <b>공식 정의</b>라 SofaScore 탭 수치와 직접 비교하지 마세요. 백분위도 공식 기록을 가진 선수끼리만 계산합니다.</li>
+                <li>'기록 없음'은 공식이 해당 지표를 집계하지 않는 경우(예: 골키퍼 공중볼)입니다. 0으로 보지 마세요.</li>
+                ${covNote}
+            </ul>
+        </div>`;
+
+        bindSource();
+        renderRadar(d.radar, posLabel);
     }
 
     /* ── 신체 뱃지 ───────────────────────────────────────── */
@@ -181,6 +339,12 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
     /* ── 스탯 카드 ───────────────────────────────────────── */
     function statCard(item, posLabel) {
+        if (item.pctile == null) {   // 공식 미기록 지표(예: 골키퍼 공중볼) — 0%로 오해하지 않게 별도 표기
+            return `<div class="pr-stat-item pr-stat-nodata">
+                <div class="pr-stat-label"><span class="pr-stat-icon">${item.icon}</span><span>${item.label}</span><span class="pr-stat-val">-</span></div>
+                <div class="pr-pct-info"><span>기록 없음</span></div>
+            </div>`;
+        }
         const pct = item.pctile;
         const color = pct >= 75 ? "#4ade80" : pct >= 50 ? "#4ea4f8" : pct >= 25 ? "#fbbf24" : "#f87171";
         const grade = pct >= 90 ? "탁월" : pct >= 75 ? "우수" : pct >= 50 ? "평균이상" : pct >= 25 ? "평균이하" : "하위";
