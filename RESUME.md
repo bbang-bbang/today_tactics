@@ -5,6 +5,13 @@
 
 ---
 
+## 0-A. 🌙 2026-11-04 새벽 중단 지점 (가장 먼저 읽을 것)
+**상세·명령·함정은 `checklist/work-log-2026-11-04.md`.** 요약:
+- **운영 서버에서 `collect_kleague_player_stats.py --fill-missing`이 백그라운드로 돌고 있음**(01:10 시작, 15~20분). 로그 `/var/log/today_tactics/kpm_fill.log`, 끝 줄 `[완료] 추가 N명…`. 끝나면 서버에서 `touch /opt/today_tactics/.cache_generation`(캐시 무효화, 재시작 불필요) → 득점 불일치 재측정.
+- 오늘 배포 완료: 공식 선수 리포트 API+화면(SofaScore/공식 전환), 이름 중복 해소, **players.name_ko 교정 145건(운영 DB 변경, 롤백 JSON·백업 있음)**, 공식 리포트 득점 보정, 수집기 출전 ID 보강. 마지막 코드 커밋 `003a38f`.
+- 다음: ① fill-missing 결과 확인 ② QA 식 보정(공식합==스코어 또는 +자책골, 9경기는 출처 간 자책골/굴절 정의 차이라 오류 아님) ③ name_ko REVIEW 8건 ④ 결정 대기(공식 탭 기본값 전환·비교 모달 지원). QA 120/121 — 실패 1건은 11/9 크론 PO 재분류 대기.
+- ⚠ 공식 사이트 부하에 민감: `--dry-run`도 실제 호출함 → 시험은 `--limit`·`--delay 2~3`.
+
 ## 0. ⏭ 재개 지점 (NEXT)
 **열린 작업: SofaScore 수집 중단 대응 (2026-11-01 발견, `checklist/backlog.md` P1).** 운영 = https://suwon.today-tactics.co.kr (루트 도메인 `today-tactics.co.kr`에는 A 레코드 없음 — canonical은 `suwon.` 서브도메인).
 - **2026-11-01 완료**: 감독 `프리매치 스카우팅 요약`(`/api/pre-match-brief`) · 분석가 4종(xG 운 보정 순위·휴식일/연전·교체 효과·세트피스 공수 — `인사이트 > 심화` 탭) · 팬 `경기 후 요약 카드`(`/api/match-recap`) · **수집 가시화**(`crawlers/fetch_health.py` probe, `update_data.py` 종료 코드 0/1/2, 헤더 배지 `⚠ 일부 미수집`, `analysis/audit_collection_gaps.py`) · **K리그 공식 API 복구 크롤러**(`crawlers/collect_kleague_events.py` → 득점·카드·교체, `update_data.py` STEP 21) · 10/31~11/1 결과 갱신.
