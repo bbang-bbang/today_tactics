@@ -178,6 +178,14 @@ cur.execute('SELECT COUNT(*) FROM heatmap_points')
 hp = cur.fetchone()[0]
 qa('heatmap_points 100K+', lambda: assert_(hp > 100000, f'{hp}개'))
 
+# ── K1(410) 안에 K2 PO·승강 PO가 남아 있지 않은지 (crawlers/reclassify_playoffs.py, update_data STEP 26) ──
+sys.path.insert(0, 'crawlers')
+import reclassify_playoffs as _rp  # noqa: E402
+import io, contextlib  # noqa: E402
+with contextlib.redirect_stdout(io.StringIO()):
+    _po_left = _rp.find_playoffs(conn)
+qa('K1(410)에 PO 경기 잔류 0', lambda: assert_(not _po_left, f'{len(_po_left)}건 — reclassify_playoffs.py --apply 필요'))
+
 # ── K리그 공식 API 복구 데이터(2026-08-03 이후) 정합성 ──
 cur.execute("""SELECT COUNT(*) FROM events e WHERE e.tournament_id IN (410,777) AND e.home_score IS NOT NULL
     AND e.date_ts >= strftime('%s','2026-08-03')

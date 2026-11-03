@@ -17,6 +17,7 @@ STEP 7  K1 골/카드 incidents
 STEP 8  K2 골/카드 incidents
 STEP 21 K리그 공식 API로 득점·카드·교체 복구 (SofaScore incidents 차단 대체 — STEP 16 매핑 직후 실행)
 STEP 22 K리그 공식 API로 패스 네트워크 수집 (공개는 경기 다음 날 — 미공개는 재시도)
+STEP 26 K2 PO·승강 PO를 K1(410)에서 분리 (tournament_id 9410, 멱등)
 STEP 20 수집 공백 감사 (마지막에 실행; 종료 코드 0 정상 / 1 치명 / 2 부분 실패)
 
 레거시는 update_data.py.legacy_*.bak에 백업.
@@ -151,6 +152,10 @@ def main():
                 [PYTHON, str(CRAWLERS/"collect_kleague_heatmap.py"), "--apply", "--days", str(max(args.days, 30))]),
         ]
     steps += [
+        # SofaScore는 K2 PO·승강 PO를 K1(410) 대회로 내려줌 → K2 팀이 K1 집계에 섞임. 크롤러들이 events를
+        # INSERT OR REPLACE 하므로 매번 다시 분리한다(멱등). 시즌 초(최다 20경기 미만)는 판정 보류.
+        (26, "K2 PO·승강 PO 경기를 K1(410)에서 분리 → tournament_id 9410",
+            [PYTHON, str(CRAWLERS/"reclassify_playoffs.py"), "--apply"]),
         (17, "events.round 백필 (K리그 roundId → 백테스트 per_round)",
             [PYTHON, str(CRAWLERS/"backfill_rounds.py")]),
         (18, "세부 포지션 백필 (formation+slot → detail_pos, 비교 필터용)",
