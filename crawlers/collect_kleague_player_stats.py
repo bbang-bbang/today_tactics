@@ -96,6 +96,14 @@ WHERE e.tournament_id IN (410, 777, 9410) AND e.home_score IS NOT NULL AND e.awa
 ORDER BY e.date_ts DESC
 """
 
+EVENT_BY_ID_SQL = """
+SELECT e.id, e.home_team_id, e.away_team_id, m.year, m.league_id, m.game_id, m.meet_seq, s.home_kid, s.away_kid
+FROM events e
+JOIN kleague_event_map m ON m.sofa_event_id = e.id
+JOIN kleague_schedule s ON s.year = m.year AND s.league_id = m.league_id AND s.game_id = m.game_id AND s.meet_seq = m.meet_seq
+WHERE e.id = ?
+"""
+
 # (컬럼, playerDetail 키) — 정수 카운트
 INT_FIELDS = [
     ("goals", "goal"), ("assists", "assist"), ("shots", "shot"), ("shots_on_target", "shotOnTarget"),
@@ -187,6 +195,81 @@ def played_names(conn, ev) -> set[str] | None:
     return names
 
 
+def played_kids(conn, ev) -> set[int]:
+    """이름이 아니라 '공식 선수 ID'로 출전을 알 수 있는 선수 — SofaScore 출전(minutes>0) ∪ 득점자(자책골 제외).
+    패스 0개·교체 기록 누락인 짧은 교체 선수(예: 90분 교체 투입 후 득점)가 이름 기반 추정에서 빠지던 문제 보정.
+    kleague_player_map 이 아직 없으면(첫 수집) 빈 집합."""
+    try:
+        rows = conn.execute(
+            "SELECT mp.player_kid FROM match_player_stats m JOIN kleague_player_map mp ON mp.sofa_player_id = m.player_id "
+            "WHERE m.event_id = ? AND m.minutes_played > 0 "
+            "UNION SELECT mp.player_kid FROM goal_events g JOIN kleague_player_map mp ON mp.sofa_player_id = g.player_id "
+            "WHERE g.event_id = ? AND g.is_own_goal = 0", (ev["id"], ev["id"])).fetchall()
+    except sqlite3.OperationalError:
+        return set()
+    return {r[0] for r in rows}
+
+
+def build_row(ev, side: str, kid, pos, name, back, vals: dict, data: dict, now: str) -> dict:
+    raw = json.dumps({"playerDetail": data.get("playerDetail"), "playerGKDetail": data.get("playerGKDetail")},
+                     ensure_ascii=False, separators=(",", ":"))
+    vals = dict(vals)
+    vals.update({"event_id": ev["id"], "team_id": ev["home_team_id"] if side == "home" else ev["away_team_id"],
+                 "is_home": 1 if side == "home" else 0, "player_kid": kid, "player_name": name,
+                 "back_no": back, "position": pos or None, "raw_json": raw, "fetched_at": now})
+    return vals
+
+
+def find_missing(conn, since: int, until: int) -> dict[int, set[int]]:
+    """이미 수집된 경기에서 'SofaScore 출전 + 공식 선수 매핑됨'인데 공식 행이 없는 선수 → {event_id: {kid}}."""
+    out: dict[int, set[int]] = {}
+    for eid, kid in conn.execute(
+            "SELECT m.event_id, mp.player_kid FROM match_player_stats m "
+            "JOIN kleague_player_map mp ON mp.sofa_player_id = m.player_id JOIN events e ON e.id = m.event_id "
+            "WHERE m.minutes_played > 0 AND e.date_ts >= ? AND e.date_ts < ? "
+            "AND m.event_id IN (SELECT event_id FROM kleague_player_match_log) "
+            "AND NOT EXISTS (SELECT 1 FROM kleague_player_match k WHERE k.event_id = m.event_id AND k.player_kid = mp.player_kid)",
+            (since, until)):
+        out.setdefault(eid, set()).add(kid)
+    return out
+
+
+def fill_event(conn, ev, kids: set[int], apply: bool, delay: float) -> dict:
+    """한 경기에서 빠진 선수(kids)만 호출해 추가한다(기존 행은 건드리지 않음). 반환: {added, calls, problems}"""
+    res = {"added": 0, "calls": 0, "problems": []}
+    entry, err = fetch_entry(ev["year"], ev["league_id"], ev["game_id"], ev["meet_seq"])
+    time.sleep(delay)
+    if not entry:
+        res["problems"].append(f"엔트리 실패/미공개: {err}")
+        return res
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
+    rows = []
+    for side, kid, pos, name, back in entry:
+        if kid not in kids:
+            continue
+        team_kid = ev["home_kid"] if side == "home" else ev["away_kid"]
+        data, err = post_multipart("getMatchRecordPlayerDetail.do", {
+            "MEET_YEAR": ev["year"], "MEET_SEQ": ev["meet_seq"], "GAME_ID": ev["game_id"], "TEAM_ID": team_kid, "PLAYER_ID": kid})
+        time.sleep(delay)
+        res["calls"] += 1
+        if data is None:
+            res["problems"].append(f"{name}: {err}")
+            continue
+        vals, probs = parse_detail(data)
+        if vals is None or probs or not vals["minutes"]:
+            if probs:
+                res["problems"].append(f"{name}: " + ", ".join(probs))
+            continue                       # 공식 응답이 비었거나(공식 쪽 누락) 미출전 — 억지로 채우지 않는다
+        rows.append(build_row(ev, side, kid, pos, name, back, vals, data, now))
+    if apply and rows:
+        with conn:
+            conn.executemany(INSERT_SQL, [tuple(r[c] for c in COLUMNS) for r in rows])
+            conn.execute("UPDATE kleague_player_match_log SET players = (SELECT COUNT(*) FROM kleague_player_match WHERE event_id = ?), "
+                         "fetched_at = ? WHERE event_id = ?", (ev["id"], now, ev["id"]))
+    res["added"] = len(rows)
+    return res
+
+
 def process_event(conn, ev, apply: bool, delay: float = DELAY) -> dict:
     """한 경기 수집. 반환: {status: saved|pending|fail, players, problems, calls}"""
     res = {"status": "fail", "players": 0, "problems": [], "calls": 0}
@@ -199,10 +282,11 @@ def process_event(conn, ev, apply: bool, delay: float = DELAY) -> dict:
         res["status"] = "pending"          # 엔트리 미공개
         return res
     want = played_names(conn, ev)
+    want_kids = played_kids(conn, ev) if want is not None else set()
     rows, empty = [], 0
     now = time.strftime("%Y-%m-%d %H:%M:%S")
     for side, kid, pos, name, back in entry:
-        if want is not None and norm(name) not in want:
+        if want is not None and norm(name) not in want and kid not in want_kids:
             continue
         team_kid = ev["home_kid"] if side == "home" else ev["away_kid"]
         data, err = post_multipart("getMatchRecordPlayerDetail.do", {
@@ -222,12 +306,7 @@ def process_event(conn, ev, apply: bool, delay: float = DELAY) -> dict:
             continue
         if not vals["minutes"]:
             continue                        # 미출전
-        raw = json.dumps({"playerDetail": data.get("playerDetail"), "playerGKDetail": data.get("playerGKDetail")},
-                         ensure_ascii=False, separators=(",", ":"))
-        vals.update({"event_id": ev["id"], "team_id": ev["home_team_id"] if side == "home" else ev["away_team_id"],
-                     "is_home": 1 if side == "home" else 0, "player_kid": kid, "player_name": name,
-                     "back_no": back, "position": pos or None, "raw_json": raw, "fetched_at": now})
-        rows.append(vals)
+        rows.append(build_row(ev, side, kid, pos, name, back, vals, data, now))
     if res["calls"] and empty == res["calls"]:
         res["status"] = "pending"           # 전원 빈 응답 = 미공개 → 다음 실행에서 재시도
         return res
@@ -258,6 +337,8 @@ def main() -> None:
     ap.add_argument("--delay", type=float, default=DELAY, help=f"호출 간격(초, 기본 {DELAY}) — 대량 백필은 1.0 권장")
     ap.add_argument("--pause-hours", metavar="H1-H2",
                     help="이 시간대(현지 시각, 예 13-22)에는 수집을 쉬고 끝날 때까지 대기 — 대량 백필용(경기·접속 많은 시간 회피)")
+    ap.add_argument("--fill-missing", action="store_true",
+                    help="이미 수집된 경기에서 빠진 선수(SofaScore 출전 + 공식 매핑됨, 공식 행 없음)만 추가 수집 — 기존 행 불변")
     ap.add_argument("--db", default=DB_PATH)
     args = ap.parse_args()
     delay = max(0.3, args.delay)
@@ -276,6 +357,25 @@ def main() -> None:
         conn.execute("CREATE TEMP TABLE kleague_player_match_log(event_id INTEGER PRIMARY KEY, players, fetched_at)")
     since = (time.time() - args.days * 86400) if args.days else time.mktime(time.strptime(args.since, "%Y-%m-%d"))
     until = time.mktime(time.strptime(args.until, "%Y-%m-%d"))
+    if args.fill_missing:
+        missing = find_missing(conn, int(since), int(until))
+        log(f"[{'APPLY(저장)' if args.apply else 'DRY-RUN(저장 안 함)'}] 빠진 선수 {sum(len(v) for v in missing.values())}명 · "
+            f"{len(missing)}경기 (엔트리 {len(missing)}콜 + 선수 호출, 간격 {delay}s)")
+        added = calls = failed = 0
+        for i, (eid, kids) in enumerate(sorted(missing.items(), key=lambda kv: -kv[0])[: args.limit]):
+            ev = conn.execute(EVENT_BY_ID_SQL, (eid,)).fetchone()
+            if ev is None:
+                continue
+            r = fill_event(conn, ev, kids, args.apply, delay)
+            added += r["added"]; calls += r["calls"]
+            if r["problems"]:
+                failed += 1
+                log(f"  [{eid}] " + " / ".join(r["problems"][:2]))
+            if (i + 1) % 25 == 0:
+                log(f"  진행 {i + 1}/{len(missing)}경기 — 추가 {added}명, 호출 {calls}")
+        conn.close()
+        log(f"[완료] 추가 {added}명 · 호출 {calls} · 문제 경기 {failed}")
+        return
     targets = conn.execute(TARGET_SQL, (int(since), int(until))).fetchall()[: args.limit]
     log(f"[{'APPLY(저장)' if args.apply else 'DRY-RUN(저장 안 함)'}] 대상 {len(targets)}경기 "
         f"({time.strftime('%Y-%m-%d', time.localtime(since))} ~ {args.until}, limit {args.limit})")
