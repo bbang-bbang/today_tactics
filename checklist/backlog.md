@@ -100,7 +100,7 @@
 **데이터 한계**: 패스 이벤트·GPS·계약/몸값 없음 → PPDA·패스 네트워크·영입 가치 분석은 불가.
 
 
-### [ ] (보류) Google OAuth 발급 + LOGIN_REQUIRED=1 활성화 — 2026-06-11 보류 결정
+### [x] ~~(보류) Google OAuth 발급 + LOGIN_REQUIRED=1 활성화~~ — 2026-11-03 사용자 결정: **로그인 기능 사용 안 함** (OAuth 콘솔 redirect URI 등록도 불필요, 공개 모드 유지)
 
 **상태**: ⏸ **보류** — 트래픽/개인화 필요 시 재개. PM 판단(6/11):
 - 핵심 보안(SECRET_KEY 고정·CSP·cache-invalidate 차단·MAX_CONTENT_LENGTH 등)은 6/1에 이미 완료. 공격면은 막혀 있음.

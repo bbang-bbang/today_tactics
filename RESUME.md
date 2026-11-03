@@ -81,7 +81,7 @@ ssh -i $KEY $R "sudo systemctl restart today_tactics"   # 템플릿 변경 시 �
 
 ## 4. 다음 작업 (백로그)
 2026-06-05 종료 시점 후속 후보:
-1. **(우선) 새 도메인 OAuth 콘솔 등록** — Google/Kakao/Naver 각 콘솔에 `https://suwon.today-tactics.co.kr/auth/callback/{provider}` redirect URI 추가. 미등록 시 로그인 불가. 등록 후 로그인 플로우 검증. (코드 변경 불필요 — `url_for(_external=True)`로 Host 동적.)
+1. ~~**(우선) 새 도메인 OAuth 콘솔 등록**~~ — 2026-11-03 사용자 결정: 로그인 기능 사용 안 함 → 불필요. — Google/Kakao/Naver 각 콘솔에 `https://suwon.today-tactics.co.kr/auth/callback/{provider}` redirect URI 추가. 미등록 시 로그인 불가. 등록 후 로그인 플로우 검증. (코드 변경 불필요 — `url_for(_external=True)`로 Host 동적.)
 2. **mps team_id 오태깅 영향 점검** — `match_player_stats.team_id`에 팀 비참가 경기 오태깅 행 존재(ulsan 382건, §10). team-insights는 참가 필터로 처리했으나 **league-rankings의 xG/태클 등 mps 집계도 같은 패턴이라 잠재 오염**(미점검). 점검 후 필요 시 동일 필터 적용. → Claude 메모리 `reference_mps_team_id_contamination`.
 3. **R16 재개(07-04) 후 데이터 검증** — 월드컵 휴식 후 첫 수집. 06/08·06/15 등 월요일 cron이 빈 수집으로 무해한지, 07-04 이후 정상 증분되는지 확인.
 4. **부팅 워밍업 동시성 완화** — 재시작 직후 ~60~90s 워밍업이 2vCPU 포화 → 일시 지연/502. 워밍업 순차화/사전집계 검토. (team-insights는 워밍업 URL 미포함 — 팀 선택 후 호출이라 무관.)
