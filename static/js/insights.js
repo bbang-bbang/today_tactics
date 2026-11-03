@@ -1165,6 +1165,39 @@
     }).join("") + `<div class="ins-method">근거 — 교체 인원=11−(직전 경기 선발과 겹치는 선수 수) · 직전 경기=<b>같은 리그</b>(컵·ACL 미반영, 21일 초과 공백 제외) · 선발은 K리그 포털 명단 · 막대=PPG·가는 선=95% 신뢰구간 · z≥1.96일 때만 '유의' · 로테이션은 연전·부상·직전 결과에 따라 달라져 <b>인과가 아님</b></div>`;
   }
 
+  // ⓪ 경기 상황별 성적 (앞섬·동점·뒤짐)
+  function renderGameState(list) {
+    const el = document.getElementById("ins-gs-body"); if (!el) return;
+    const zTxt = z => z == null ? "" : (Math.abs(z) >= 2 ? ` <b class="ins-gs-z">${z > 0 ? "▲" : "▼"} z=${z > 0 ? "+" : ""}${z.toFixed(1)}</b>` : ` <span class="ins-rs-n">z=${z > 0 ? "+" : ""}${z.toFixed(1)}</span>`);
+    const wdl = o => `${o.w}승 ${o.d}무 ${o.l}패`;
+    const share = s => `<span class="ins-gs-share" role="img" aria-label="경기 시간 중 앞섬 ${s[0]}%, 동점 ${s[1]}%, 뒤짐 ${s[2]}%">
+        <i class="ins-gs-lead" style="width:${s[0]}%"></i><i class="ins-gs-level" style="width:${s[1]}%"></i><i class="ins-gs-trail" style="width:${s[2]}%"></i></span>
+        <span class="ins-gs-pct">${s[0]} · ${s[1]} · ${s[2]}</span>`;
+    el.innerHTML = list.map(d => {
+      if (!d || !d.teams) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      const A = d.league_avg || {};
+      const rows = d.teams.map(t => {
+        if (!t.eligible) return `<tr class="ins-xl-skip"><td class="ins-xl-team">${escI(t.short)}</td><td>${t.games}</td><td colspan="5" class="ins-adv-empty">표본 부족 (${d.min_games}경기 미만)</td></tr>`;
+        const L = t.led, T = t.trailed;
+        const hold = L.n ? `<b>${L.hold_pct}%</b>${zTxt(L.z)}<span class="ins-rs-n"> (${L.n}경기 · ${wdl(L)})</span>` : `<span class="ins-rs-n">리드 경기 없음</span>`;
+        const back = T.n ? `<b>${T.ppg.toFixed(2)}</b><span class="ins-rs-n"> (${T.n}경기 · ${wdl(T)})</span>` : `<span class="ins-rs-n">-</span>`;
+        return `<tr><td class="ins-xl-team">${escI(t.short)}</td><td>${t.games}</td><td class="ins-gs-share-td">${share(t.share)}</td>
+          <td>${hold}</td><td>${L.dropped_pts}</td><td>${back}</td></tr>`;
+      }).join("");
+      const gen = d.flagged.length
+        ? `리드 지킨 비율이 리그 평균과 크게 다른 팀(|z|≥2): <b>${d.flagged.map(escI).join(", ")}</b> — 여러 팀을 동시에 보면 우연히도 나올 수 있어 참고용입니다.`
+        : "리드 지킨 비율이 리그 평균과 크게 다른 팀은 없습니다 (모두 |z|&lt;2).";
+      return `${insHead(d)}${insWarn(d)}
+        <div class="ins-rs-cmp">리그 평균: 리드를 잡은 경기의 <b>${A.hold_pct ?? "-"}%</b>를 승리로 마무리 · 뒤진 적 있는 경기에서 경기당 <b>${A.trailed_ppg != null ? A.trailed_ppg.toFixed(2) : "-"}</b>점 회복 <span class="ins-rs-n">(${d.matches}경기${d.skipped ? ` · 득점 기록 불일치 ${d.skipped}경기 제외` : ""})</span></div>
+        <div class="ins-rs-cmp">${gen}</div>
+        <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th>경기</th>
+          <th title="경기 시간 중 앞선·동점·뒤진 시간 비율(%) — 초록=앞섬, 회색=동점, 빨강=뒤짐">앞섬 · 동점 · 뒤짐 (%)</th>
+          <th title="한 번이라도 앞선 경기 중 승리로 끝낸 비율 (z = 리그 평균 대비, |z|≥2만 강조)">리드 지킨 비율</th>
+          <th title="앞선 적 있는 경기에서 놓친 승점 = Σ(3 − 얻은 승점)">놓친 승점</th>
+          <th title="한 번이라도 뒤진 경기에서 얻은 경기당 승점">뒤진 경기 회복</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join("") + `<div class="ins-method">근거 — K리그 공식 득점 기록(분+추가시간) · 리드·뒤짐 = 경기 중 한 번이라도 앞선/뒤진 경기(한 경기가 양쪽 다 해당 가능) · 리드 지킨 비율 = 그중 승리 비율, z = 리그 평균과의 이항 비교 · 놓친 승점 = Σ(3−얻은 승점) · 경기 종료는 95분(마지막 골이 더 늦으면 그 직후)으로 근사 · 득점 기록이 스코어와 맞는 경기만 · 상대 강도·퇴장 미보정이라 <b>참고용</b></div>`;
+  }
+
   // ③ 득점 직후 실점 / 실점 후 반격
   function renderAftermath(list) {
     const el = document.getElementById("ins-aft-body"); if (!el) return;
@@ -1274,6 +1307,8 @@
         .then(renderScoringDep).catch(warn("득점 의존도")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/rotation?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderRotation).catch(warn("선발 로테이션")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/game-state?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderGameState).catch(warn("경기 상황별 성적")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/goal-aftermath?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderAftermath).catch(warn("득점 직후 실점")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/pass-hub?year=${currentYear}&league=${lg}`).then(r => r.json())))

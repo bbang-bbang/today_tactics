@@ -6,7 +6,7 @@
     <title>Today Tactics - 축구 전술판</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=102">
+    <link rel="stylesheet" href="/static/css/style.css?v=103">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
     // 전역 에러 핸들링 + fetch 래퍼 + GET API 캐시
@@ -400,6 +400,7 @@
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">⛳ 세트피스 공수 프로필 <span class="ins-clutch-hint">코너·프리킥·스로인·기타 (PK 제외) — 만든 것 vs 허용한 것</span></div><div id="ins-spp-body"><div class="ins-adv-loading">불러오는 중… (슈팅맵 집계)</div></div></div>
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🎯 득점 의존도 <span class="ins-clutch-hint">득점의 몇 %를 1·2위 득점자가 만드나? 에이스가 빠지면?</span></div><div id="ins-sdep-body"><div class="ins-adv-loading">불러오는 중… (득점 집계)</div></div></div>
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🔀 선발 로테이션 <span class="ins-clutch-hint">직전 경기와 선발이 얼마나 바뀌나, 성적과 관계는?</span></div><div id="ins-rot-body"><div class="ins-adv-loading">불러오는 중… (선발 라인업 집계)</div></div></div>
+                <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🎢 경기 상황별 성적 <span class="ins-clutch-hint">앞서면 지켜내나? 뒤지면 따라붙나?</span></div><div id="ins-gs-body"><div class="ins-adv-loading">불러오는 중… (득점 타임라인 집계)</div></div></div>
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">⚡ 득점 직후 실점·반격 <span class="ins-clutch-hint">골 넣고 바로 먹히나? 먹고 바로 따라붙나?</span></div><div id="ins-aft-body"><div class="ins-adv-loading">불러오는 중… (득점 타임라인 집계)</div></div></div>
                 <div class="ins-adv-card ins-adv-wide"><div class="ins-adv-h">🕸️ 패스 허브 의존도 <span class="ins-clutch-hint">팀 패스가 한 선수에게 얼마나 몰리나?</span></div><div id="ins-hub-body"><div class="ins-adv-loading">불러오는 중… (패스 행렬 집계)</div></div></div>
                 <div class="ins-adv-card"><div class="ins-adv-h">🌡️ 날씨 영향</div><div id="ins-weather-body"><div class="ins-adv-loading">불러오는 중…</div></div></div>
@@ -1061,7 +1062,7 @@
         pass_network: "/static/js/pass_network.js?v=2",
         match_report: "/static/js/match_report.js?v=1",
         player_compare: "/static/js/player_compare.js?v=2",
-        insights: "/static/js/insights.js?v=41"
+        insights: "/static/js/insights.js?v=42"
     };
     </script>
 
@@ -1179,6 +1180,14 @@
                         <li><b>교체 인원</b> = 11 − (직전 경기 선발과 겹치는 선수 수). 직전 경기는 같은 리그 기준이고 21일 넘게 비면 비교하지 않습니다.</li>
                         <li><b>고정 주전</b> = 팀 경기의 70% 이상 선발로 나선 선수 수. 평균 교체가 크고 고정 주전이 적으면 선발이 자주 바뀌는 팀입니다.</li>
                         <li>막대·선·'유의' 판정은 휴식일 카드와 같은 방식입니다. 로테이션은 연전·부상·직전 결과에 따라 달라지므로 <b>원인이 아닌 참고</b>입니다.</li>
+                    </ul>
+                </details>
+                <details class="gd-sec">
+                    <summary>🎢 경기 상황별 성적 — "앞서면 지켜내나?"</summary>
+                    <ul>
+                        <li><b>리드 지킨 비율</b> = 경기 중 한 번이라도 앞선 경기 중 승리로 끝낸 비율. <b>놓친 승점</b> = 그 경기들에서 잃은 승점(앞섰는데 비기면 2점, 지면 3점).</li>
+                        <li><b>뒤진 경기 회복</b> = 한 번이라도 뒤진 경기에서 얻은 경기당 승점. 한 경기가 '앞섬'과 '뒤짐'에 모두 들어갈 수 있습니다(역전·재역전).</li>
+                        <li><b>앞섬·동점·뒤짐 %</b> = 경기 시간 중 각 상황이었던 비율(경기 종료는 95분으로 근사). z는 리드 지킨 비율을 리그 평균과 비교한 값이며 |z|≥2만 강조합니다. 상대 강도·퇴장은 반영하지 않아 <b>참고용</b>입니다.</li>
                     </ul>
                 </details>
                 <details class="gd-sec">

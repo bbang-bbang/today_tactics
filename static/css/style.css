@@ -6479,6 +6479,15 @@ body.pr-expanded-lock {
     cursor: help; transition: background var(--trans-fast);
 }
 .ins-fresh:hover { background: var(--warn-bg-hi); }
+/* 경기 상황별 성적 — 앞섬/동점/뒤짐 시간 비율 막대 (색 + 숫자 병기, 색만 의존 X) */
+.ins-gs-share-td { min-width: 150px; }
+.ins-gs-share { display: flex; width: 110px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--border-subtle); vertical-align: middle; }
+.ins-gs-share i { display: block; height: 100%; }
+.ins-gs-lead  { background: var(--color-win); }
+.ins-gs-level { background: #64748b; }
+.ins-gs-trail { background: var(--color-loss); }
+.ins-gs-pct { display: block; margin-top: 2px; font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.ins-gs-z { color: var(--warn-fg); }
 .ins-fresh:focus-visible { outline: 2px solid var(--warn-fg); outline-offset: 2px; }
 /* 슈팅 인사이트 — 깔때기(가로 막대 3단) + 결정률(그리드 정렬 막대, 공통 스케일) */
 .ins-fn { display: flex; flex-direction: column; gap: 5px; margin: 4px 0 10px; }

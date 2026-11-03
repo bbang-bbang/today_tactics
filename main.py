@@ -7717,6 +7717,110 @@ def insights_goal_aftermath():
                     "limits": "기대값은 팀의 시즌 평균 득실점률 기준(상대·시간대 강도 미보정) · 팀당 표본이 작아 z는 참고용이며 여러 팀을 동시에 보면 우연히 큰 값이 나올 수 있음 · 경기 종료는 95분(마지막 골이 더 늦으면 그 직후)으로 근사"})
 
 
+@app.route("/api/insights/game-state")
+@cached_response(ttl=3600)
+def insights_game_state():
+    """경기 상황별 성적 — 앞설 때·동점·뒤질 때. 리드를 잡은 경기에서 이긴 비율(리드 지킨 비율), 놓친 승점,
+    뒤진 경기에서 되찾은 승점, 경기 시간 중 앞섬/동점/뒤짐 비율. 득점 기록이 최종 스코어와 맞는 경기만 사용.
+    리드 지킨 비율은 리그 평균과 이항 z로 비교(|z|≥2만 강조, 다중 비교라 참고용)."""
+    sc = _ins_scope()
+    if sc is None:
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label, tid, year, ycond, yp = sc
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        evs = _ins_events(conn, tid, ycond, yp)
+        rows = conn.execute(
+            "SELECT g.event_id, g.minute, g.added_time, g.is_home FROM goal_events g JOIN events e ON e.id = g.event_id "
+            "WHERE e.tournament_id = ? AND e.home_score IS NOT NULL" + ycond, (tid, *yp)).fetchall()
+    finally:
+        conn.close()
+    goals = {}
+    bad_minute = set()
+    for ev, mn, ad, is_home in rows:
+        if mn is None:
+            bad_minute.add(ev)
+            continue
+        goals.setdefault(ev, []).append((mn + (ad or 0), 1 if is_home else 0))
+
+    def blank():
+        return {"n": 0, "min": [0.0, 0.0, 0.0], "led": [0, 0, 0], "led_drop": 0, "trl": [0, 0, 0], "trl_pts": 0}
+    st = {}
+    used = skipped = 0
+    for ev, h, a, _ts, hs, as_ in evs:
+        gl = sorted(goals.get(ev, []))
+        if ev in bad_minute or sum(s for _, s in gl) != hs or sum(1 - s for _, s in gl) != as_:
+            skipped += 1
+            continue
+        used += 1
+        end = max(_AFTERMATH_END, (gl[-1][0] + 1) if gl else 0)
+        for team, is_home_side in ((h, 1), (a, 0)):
+            s = st.setdefault(team, blank())
+            s["n"] += 1
+            gf_final, ga_final = (hs, as_) if is_home_side else (as_, hs)
+            pts = _ins_pts(gf_final, ga_final)
+            res = 0 if pts == 3 else 1 if pts == 1 else 2          # W/D/L 인덱스
+            f = g = 0
+            t_prev = 0.0
+            ever_led = ever_trailed = False
+            for t, side in gl + [(end, None)]:
+                diff = f - g
+                s["min"][0 if diff > 0 else 1 if diff == 0 else 2] += max(0.0, t - t_prev)
+                t_prev = t
+                if side is None:
+                    break
+                if side == is_home_side:
+                    f += 1
+                else:
+                    g += 1
+                ever_led |= f > g
+                ever_trailed |= f < g
+            if ever_led:
+                s["led"][res] += 1
+                s["led_drop"] += 3 - pts
+            if ever_trailed:
+                s["trl"][res] += 1
+                s["trl_pts"] += pts
+
+    lg_led = [sum(s["led"][i] for s in st.values()) for i in range(3)]
+    lg_trl = [sum(s["trl"][i] for s in st.values()) for i in range(3)]
+    p_hold = lg_led[0] / sum(lg_led) if sum(lg_led) else None
+    teams = []
+    for t, tinfo in info.items():
+        s = st.get(t)
+        if not s or not s["n"]:
+            continue
+        el = s["n"] >= _INS_MIN_GAMES
+        tot_min = sum(s["min"]) or 1
+        led_n, trl_n = sum(s["led"]), sum(s["trl"])
+        hold = s["led"][0] / led_n if led_n else None
+        z = None
+        if el and p_hold and 0 < p_hold < 1 and led_n * p_hold * (1 - p_hold) >= 2:
+            z = round((s["led"][0] - led_n * p_hold) / math.sqrt(led_n * p_hold * (1 - p_hold)), 1)
+        teams.append({"id": t, "short": tinfo.get("short", tinfo["name"]), "games": s["n"], "eligible": el,
+                      "share": [round(m / tot_min * 100) for m in s["min"]],
+                      "led": {"n": led_n, "w": s["led"][0], "d": s["led"][1], "l": s["led"][2],
+                              "hold_pct": round(hold * 100) if hold is not None else None, "dropped_pts": s["led_drop"], "z": z},
+                      "trailed": {"n": trl_n, "w": s["trl"][0], "d": s["trl"][1], "l": s["trl"][2],
+                                  "pts": s["trl_pts"], "ppg": round(s["trl_pts"] / trl_n, 2) if trl_n else None}})
+    teams.sort(key=lambda x: (not x["eligible"], -(x["led"]["hold_pct"] if x["led"]["hold_pct"] is not None else -1), x["short"]))
+    flagged = [x["short"] for x in teams if x["eligible"] and x["led"]["z"] is not None and abs(x["led"]["z"]) >= 2]
+    warnings = []
+    if skipped and skipped / max(1, used + skipped) > 0.05:
+        warnings.append(f"득점 기록이 스코어와 맞지 않거나 시각이 없는 {skipped}경기는 제외했습니다.")
+    return jsonify({
+        "league": label, "year": year, "matches": used, "skipped": skipped, "teams": teams, "flagged": flagged,
+        "min_games": _INS_MIN_GAMES, "warnings": warnings,
+        "league_avg": {"hold_pct": round(p_hold * 100) if p_hold is not None else None,
+                       "led_games": sum(lg_led),
+                       "trailed_ppg": round((lg_trl[0] * 3 + lg_trl[1]) / sum(lg_trl), 2) if sum(lg_trl) else None,
+                       "trailed_games": sum(lg_trl)},
+        "limits": "리드·뒤짐 = 경기 중 한 번이라도 앞선/뒤진 경기(양쪽 다 해당 가능) · 리드 지킨 비율 = 그중 승리 비율 · "
+                  "시각은 분+추가시간, 경기 종료는 95분(마지막 골이 더 늦으면 그 직후)으로 근사 · 득점 기록이 스코어와 맞는 경기만 · "
+                  "상대 강도·퇴장 미보정이라 참고용"})
+
+
 @app.route("/api/insights/pass-hub")
 @cached_response(ttl=3600)
 def insights_pass_hub():
