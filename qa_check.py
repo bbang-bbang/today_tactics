@@ -231,7 +231,11 @@ if cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague
             OR (SELECT COALESCE(SUM(goals),0) FROM kleague_player_match k WHERE k.event_id=e.id AND k.is_home=0)
                + (SELECT COUNT(*) FROM goal_events g WHERE g.event_id=e.id AND g.is_home=0 AND g.is_own_goal=1) != e.away_score)
     """).fetchone()[0]
-    qa('공식 선수 기록 득점 합 = 스코어', lambda: assert_(_kpm_bad == 0, f'{_kpm_bad}경기 불일치'))
+    # 공식 playerDetail.goal 은 추가시간 득점 등을 일부 빠뜨린다(2026-11-04 확인: 재호출에도 동일, 원본 한계 — 약 4%).
+    # 리포트는 _kpm_goal_adjust 로 보정하므로 여기서는 '원본 불일치율이 평소(≤6%)를 넘는지'만 본다(수집 회귀 감시).
+    _kpm_logged = cur.execute("SELECT COUNT(*) FROM kleague_player_match_log").fetchone()[0]
+    qa('공식 선수 기록 득점 합 ≈ 스코어 (원본 불일치율 ≤6%)',
+       lambda: assert_(_kpm_bad <= max(3, _kpm_logged * 0.06), f'{_kpm_bad}/{_kpm_logged}경기 불일치'))
     _kpm_teams = cur.execute("""SELECT MIN(c) FROM (SELECT COUNT(*) c FROM kleague_player_match GROUP BY event_id, is_home)""").fetchone()[0]
     qa('공식 선수 기록 팀당 11명↑', lambda: assert_(_kpm_teams is None or _kpm_teams >= 11, f'최소 {_kpm_teams}명'))
 qa('K1(410)에 PO 경기 잔류 0',lambda: assert_(not _po_left, f'{len(_po_left)}건 — reclassify_playoffs.py --apply 필요'))
@@ -369,6 +373,23 @@ def _official_ok():
     assert_(all(0 <= r['pctile'] <= 100 for r in d['radar']) and len(d['radar']) >= 3, '레이더')
     assert_(d['coverage']['official_games'] == d['player']['games'], '커버리지 정합')
 qa('공식 리포트 구조·범위', _official_ok)
+def _official_goals_not_below_raw():
+    # 득점 보정은 공식 값을 줄이지 않는다: 리포트 골 수 >= 공식 원본 합, goals_adjusted.added = 차이
+    c2 = sqlite3.connect('players.db'); c2.row_factory = sqlite3.Row
+    if not c2.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague_player_map'").fetchone():
+        return
+    r = c2.execute("""SELECT k.player_kid, SUM(k.goals) s, m.sofa_player_id sid FROM kleague_player_match k
+        JOIN events e ON e.id = k.event_id JOIN kleague_player_map m ON m.player_kid = k.player_kid
+        WHERE e.tournament_id = 410 AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = '2026'
+        GROUP BY k.player_kid ORDER BY s DESC LIMIT 1""").fetchone()
+    c2.close()
+    if not r:
+        return
+    d = get(f'/api/player-stat-report-official?playerId={r["sid"]}&year=2026')
+    assert_(d.get('official') is True, '득점 1위 선수 공식 리포트 없음')
+    g = d['player']['goals']; add = d['goals_adjusted']['added']
+    assert_(g >= r['s'] and g - r['s'] == add, f'골 {g} / 원본 {r["s"]} / 보정 {add}')
+qa('공식 리포트 득점 보정은 원본을 줄이지 않음', _official_goals_not_below_raw)
 def _official_404():
     try:
         urllib.request.urlopen(base + '/api/player-stat-report-official?name=%EC%97%86%EB%8A%94%EC%84%A0%EC%88%98xyz', timeout=10)

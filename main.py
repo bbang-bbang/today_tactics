@@ -5287,6 +5287,50 @@ def get_player_stat_report():
 # 태클·드리블·경합 등 정의가 다른 항목이 많고, 출전분도 추가시간 포함(풀타임≈98분)이라 90분 환산 기준이 다르다.
 # 기존 /api/player-stat-report 는 변경하지 않는다(롤백 = 이 블록 제거).
 _KPM_POS_TO_BROAD = {"GK": "G", "DF": "D", "MF": "M", "FW": "F"}
+def _kpm_goal_adjust(cur, where_sql, params):
+    """공식 선수 기록의 득점 누락 보정량 {(event_id, 공식 선수ID): 추가할 골 수}.
+
+    공식 playerDetail.goal 은 추가시간 득점 등을 일부 빠뜨린다(공식 API 재호출에도 동일 — 공식 쪽 한계).
+    경기 기록(goal_events, 최종 스코어와 일치 검증됨)으로 메우되, 이중 집계를 막기 위해 '경기·팀 단위 부족분' 안에서만:
+      부족분 = 팀 스코어 - 그 팀에 인정된 자책골 - 공식 선수 득점 합
+      · 부족분이 없으면 보정 없음(공식·경기 기록이 득점자를 다르게 적은 경기에서 이중 집계 방지)
+      · 경기 기록이 공식보다 많이 적은 선수들의 차이 합이 부족분 이하일 때만 그 차이를 보정
+        (부족분보다 크면 누가 넣었는지 모호 → 건드리지 않는다)
+    where_sql 은 호출부의 고정 문자열(events 별칭 e 사용), 값은 params 로 바인딩."""
+    base = " FROM kleague_player_match k JOIN events e ON e.id = k.event_id WHERE " + where_sql
+    rows = cur.execute("SELECT k.event_id, k.is_home, k.player_kid, COALESCE(k.goals, 0)" + base, params).fetchall()
+    if not rows:
+        return {}
+    ge = {}
+    for eid, kid, n in cur.execute(
+            "SELECT g.event_id, mp.player_kid, COUNT(*) FROM goal_events g "
+            "JOIN kleague_player_map mp ON mp.sofa_player_id = g.player_id JOIN events e ON e.id = g.event_id "
+            "WHERE g.is_own_goal = 0 AND " + where_sql + " GROUP BY g.event_id, mp.player_kid", params):
+        ge[(eid, kid)] = n
+    og = {(eid, ih): n for eid, ih, n in cur.execute(
+        "SELECT g.event_id, g.is_home, COUNT(*) FROM goal_events g JOIN events e ON e.id = g.event_id "
+        "WHERE g.is_own_goal = 1 AND " + where_sql + " GROUP BY g.event_id, g.is_home", params)}
+    score = {r[0]: (r[1], r[2]) for r in cur.execute(
+        "SELECT e.id, e.home_score, e.away_score FROM events e WHERE " + where_sql, params)}
+    teams = {}
+    for eid, ih, kid, g in rows:
+        t = teams.setdefault((eid, ih), {"sum": 0, "gaps": {}})
+        t["sum"] += g
+        gap = ge.get((eid, kid), 0) - g
+        if gap > 0:
+            t["gaps"][kid] = gap
+    out = {}
+    for (eid, ih), t in teams.items():
+        sc = score.get(eid)
+        if not sc or sc[0] is None or sc[1] is None or not t["gaps"]:
+            continue
+        deficit = (sc[0] if ih else sc[1]) - og.get((eid, ih), 0) - t["sum"]
+        if 0 < sum(t["gaps"].values()) <= deficit:
+            for kid, gap in t["gaps"].items():
+                out[(eid, kid)] = gap
+    return out
+
+
 _KPM_SUM_COLS = ("goals", "assists", "shots", "shots_on_target", "passes", "passes_acc", "key_passes",
                  "dribbles", "dribbles_won", "tackles", "interceptions", "clearances", "shots_blocked",
                  "aerials", "aerials_won", "duels", "duels_won", "fouls", "fouled", "yellow", "red",
@@ -5403,12 +5447,22 @@ def get_player_stat_report_official():
             f"WHERE k.player_kid = ? AND e.tournament_id IN (410, 777) AND {year_expr} = ? "
             "ORDER BY e.date_ts DESC LIMIT 1", (kid, year)).fetchone()
         tid = t[0]
+        # 득점 보정(공식 goal 누락분) — 본인·비교군 모두 같은 규칙이라 백분위가 공정하다. 규칙·근거는 _kpm_goal_adjust.
+        # 매핑 테이블이 없는 DB 에서는 공식 값 그대로.
+        has_map = bool(cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague_player_map'").fetchone())
+        adj = _kpm_goal_adjust(cur, f"e.tournament_id = ? AND {year_expr} = ?", (tid, year)) if has_map else {}
+        adj_add, adj_games = {}, {}
+        for (_eid, _kid), _n in adj.items():
+            adj_add[_kid] = adj_add.get(_kid, 0) + _n
+            adj_games[_kid] = adj_games.get(_kid, 0) + 1
         sums = ", ".join(f"SUM(k.{c}) {c}" for c in _KPM_SUM_COLS)     # 컬럼명은 위 고정 목록 — 외부 입력 없음
 
         me = cur.execute(
             f"SELECT COUNT(*) games, SUM(k.minutes) mins, SUM(k.xg) xg, AVG(k.point) point, {sums} "
             f"FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
             f"WHERE k.player_kid = ? AND e.tournament_id = ? AND {year_expr} = ?", (kid, tid, year)).fetchone()
+        me = dict(me)
+        me["goals"] = (me["goals"] or 0) + adj_add.get(kid, 0)
         pos_row = cur.execute(
             f"SELECT k.position, COUNT(*) c FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
             f"WHERE k.player_kid = ? AND e.tournament_id = ? AND {year_expr} = ? AND k.position IS NOT NULL "
@@ -5441,7 +5495,9 @@ def get_player_stat_report_official():
                 f"FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
                 f"WHERE e.tournament_id = ? AND {year_expr} = ? AND k.position = ? "
                 "GROUP BY k.player_kid HAVING mins >= 270 AND games >= 5", (tid, year, pos_raw)):
-                peers[r["player_kid"]] = metrics(r)
+                rr = dict(r)
+                rr["goals"] = (rr["goals"] or 0) + adj_add.get(rr["player_kid"], 0)
+                peers[rr["player_kid"]] = metrics(rr)
 
         def percentile(key, val, higher_is_better=True):
             if val is None:
@@ -5461,13 +5517,18 @@ def get_player_stat_report_official():
                  for k in _KPM_RADAR_KEYS[eff_pos] if pctile.get(k) is not None]
 
         recent = []
-        for r in cur.execute(
+        recent_rows = cur.execute(
             "SELECT e.date_ts, CASE WHEN k.is_home = 1 THEN e.away_team_id ELSE e.home_team_id END opp_id, "
             "k.goals, k.assists, k.point, k.is_home, e.home_score, e.away_score, k.tackles, k.interceptions, "
-            "k.clearances, k.aerials_won, k.saves, k.shots_on_target, k.key_passes "
+            "k.clearances, k.aerials_won, k.saves, k.shots_on_target, k.key_passes, k.event_id "
             "FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
             "WHERE k.player_kid = ? AND e.tournament_id = ? AND e.date_ts IS NOT NULL "
-            "ORDER BY e.date_ts DESC LIMIT 5", (kid, tid)):
+            "ORDER BY e.date_ts DESC LIMIT 5", (kid, tid)).fetchall()
+        recent_adj = {}
+        if has_map and recent_rows:   # 최근 5경기는 연도가 섞일 수 있어 이벤트 id 로 따로 보정
+            ids = tuple(r[15] for r in recent_rows)
+            recent_adj = _kpm_goal_adjust(cur, "e.id IN (" + ",".join("?" * len(ids)) + ")", ids)
+        for r in recent_rows:
             d = _dt.datetime.utcfromtimestamp(r[0])
             hs, aws, is_home = r[6], r[7], r[5]
             if hs is not None and aws is not None:
@@ -5477,7 +5538,7 @@ def get_player_stat_report_official():
                 res = "?"
             recent.append({
                 "date": f"{d.year}/{d.month}/{d.day}", "opponent": _ko_name_by_ss_id(str(r[1])) or str(r[1]),
-                "is_home": bool(is_home), "goals": r[2] or 0, "assists": r[3] or 0,
+                "is_home": bool(is_home), "goals": (r[2] or 0) + recent_adj.get((r[15], kid), 0), "assists": r[3] or 0,
                 "rating": round(r[4], 1) if r[4] else None,        # 공식 playerPoint — SofaScore 평점 아님
                 "result": res, "score": f"{r[6]}-{r[7]}", "tackles": r[8] or 0, "ints": r[9] or 0,
                 "clears": r[10] or 0, "aer_w": r[11] or 0, "saves": r[12] or 0, "sot": r[13] or 0, "key_passes": r[14] or 0,
@@ -5509,6 +5570,8 @@ def get_player_stat_report_official():
             },
             "year": year, "available_years": years,
             "coverage": {"official_games": me["games"], "sofa_games": sofa_games},
+            # 득점 보정 내역 — 공식 goals 가 경기 기록보다 적었던 경기 수·추가된 골 수(0이면 보정 없음)
+            "goals_adjusted": {"added": adj_add.get(kid, 0), "games": adj_games.get(kid, 0)},
             "minutes_basis": "official_incl_stoppage",
             "stat_items": stat_items, "radar": radar, "recent_form": recent, "peer_count": len(peers),
             "all_stats": {k: (None if v is None else round(v, 2)) for k, v in my.items()}, "all_pctiles": pctile,

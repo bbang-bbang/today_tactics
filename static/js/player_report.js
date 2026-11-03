@@ -271,6 +271,11 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const covNote = cov.sofa_games && cov.sofa_games !== cov.official_games
             ? `<li>공식 기록 <b>${cov.official_games}경기</b> · SofaScore 기록 ${cov.sofa_games}경기 — 수집 범위·선수 연결 차이로 경기 수가 다를 수 있습니다.</li>` : "";
 
+        const ga = d.goals_adjusted || {};
+        const adjNote = ga.added > 0
+            ? `<li><b>이 선수는 득점 ${ga.added}골(${ga.games}경기)이 보정되어 있습니다.</b> 공식 기록에서 빠진 골을 경기 기록으로 채운 값입니다.</li>` : "";
+        const goalBadgeTitle = ga.added > 0 ? ` title="공식 기록 ${p.goals - ga.added}골 + 경기 기록으로 보정 ${ga.added}골"` : "";
+
         body.innerHTML = srcToggle("official") + `
         <div class="pr-card pr-info-card">
             <div class="pr-player-header">
@@ -280,7 +285,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                 <div class="pr-info-badges">
                     <span class="pr-badge">${p.games}경기</span>
                     <span class="pr-badge">${p.mins}분</span>
-                    <span class="pr-badge pr-badge-goal">${p.goals}골</span>
+                    <span class="pr-badge pr-badge-goal"${goalBadgeTitle}>${p.goals}골${ga.added > 0 ? "*" : ""}</span>
                     <span class="pr-badge pr-badge-assist">${p.assists}도움</span>
                     ${p.rating ? `<span class="pr-badge pr-badge-rating" title="공식 playerPoint — SofaScore 평점과 산식이 다릅니다">공식 평점 ${p.rating}</span>` : ""}
                     ${p.xg != null ? `<span class="pr-badge" title="공식 xG (2023~2025 시즌만 제공)">xG ${p.xg}</span>` : ""}
@@ -320,6 +325,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                 <li>출전 시간은 <b>추가시간 포함 실제 시간</b>(풀타임 ≈ 98분)이라, 90분 환산값이 SofaScore 탭보다 약 8% 낮게 나옵니다.</li>
                 <li>태클·인터셉트·드리블·경합·볼 회수 등은 <b>공식 정의</b>라 SofaScore 탭 수치와 직접 비교하지 마세요. 백분위도 공식 기록을 가진 선수끼리만 계산합니다.</li>
                 <li>'기록 없음'은 공식이 해당 지표를 집계하지 않는 경우(예: 골키퍼 공중볼)입니다. 0으로 보지 마세요.</li>
+                <li><b>득점은 보정된 값</b>입니다. 공식 기록은 추가시간 득점 등을 일부 빠뜨리는데(다시 받아도 동일), 최종 스코어와 맞는 경기 기록으로 부족분만 채웠습니다. 누가 넣었는지 모호한 경기는 건드리지 않습니다.</li>
+                ${adjNote}
                 ${covNote}
             </ul>
         </div>`;
