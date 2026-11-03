@@ -69,7 +69,20 @@ def _brief_status(q):
         urllib.request.urlopen(base + q, timeout=10); return 200
     except urllib.error.HTTPError as e:
         return e.code
-qa('brief 리그 불일치 400', lambda: assert_(_brief_status('/api/pre-match-brief?team=suwon&opp=ulsan') == 400))
+def _post_status(path, payload, method="POST"):
+    """쓰기 API 검증용 — 거부(4xx)돼야 하는 요청만 보낸다(데이터를 쓰지 않음)."""
+    req = urllib.request.Request(base + path, data=json.dumps(payload).encode(), method=method,
+                                 headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=10); return 200
+    except urllib.error.HTTPError as e:
+        return e.code
+qa('보안: 스쿼드 저장 마크업 거부 400', lambda: assert_(_post_status('/api/squads', {"teamId": "suwon", "name": "x", "players": [{"name": "<img src=x onerror=alert(1)>"}]}) == 400))
+qa('보안: 전술 저장 마크업·과대 문자열 거부 400', lambda: assert_(
+    _post_status('/api/saves', {"name": "x", "formation": "4-3-3\"><script>"}) == 400 and _post_status('/api/saves', {"name": "a" * 101}) == 400))
+qa('보안: 선수 상태 잘못된 값·ID 거부 400', lambda: assert_(
+    _post_status('/api/player-status', {"playerId": "1", "status": "hacked"}) == 400 and _post_status('/api/player-status', {"playerId": "../x", "status": "injured"}) == 400))
+qa('brief 리그 불일치 400',lambda: assert_(_brief_status('/api/pre-match-brief?team=suwon&opp=ulsan') == 400))
 qa('brief 동일팀/인젝션 400', lambda: assert_(_brief_status('/api/pre-match-brief?team=ulsan&opp=ulsan') == 400 and _brief_status("/api/pre-match-brief?team=x'+OR+'1'='1&opp=ulsan") == 400))
 
 # ── 2-c. xG 운 보정 순위 ──

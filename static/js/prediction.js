@@ -1,3 +1,5 @@
+// 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
+function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 // prediction.js — 경기 예측 보고서 + 다음 경기 일정
 
 (function () {
@@ -503,7 +505,7 @@
             const predPct = w.predicted_pct[w.predicted_outcome];
             return `<div class="pbt-worst-row">
                 <span class="pbt-worst-date">${w.date.slice(5)}</span>
-                <span class="pbt-worst-match">${w.home} ${w.actual_score} ${w.away}</span>
+                <span class="pbt-worst-match">${ttEsc(w.home)} ${ttEsc(w.actual_score)} ${ttEsc(w.away)}</span>
                 <span class="pbt-worst-pred">예측 ${outcomeLabel[w.predicted_outcome]} ${predPct}%</span>
                 <span class="pbt-worst-arrow">→</span>
                 <span class="pbt-worst-actual">${outcomeLabel[w.actual_outcome]}</span>
@@ -862,12 +864,12 @@
         const insights = [];
         if (h.setpiece_pct !== null && a.setpiece_conceded_pct !== null) {
             if (h.setpiece_pct >= 20 && a.setpiece_conceded_pct >= 25) {
-                insights.push(`⚡ ${home.name} 세트피스 강세 (${h.setpiece_pct}%) × ${away.name} 세트피스 수비 약점 (${a.setpiece_conceded_pct}%)`);
+                insights.push(`⚡ ${ttEsc(home.name)} 세트피스 강세 (${h.setpiece_pct}%) × ${ttEsc(away.name)} 세트피스 수비 약점 (${a.setpiece_conceded_pct}%)`);
             }
         }
         if (a.setpiece_pct !== null && h.setpiece_conceded_pct !== null) {
             if (a.setpiece_pct >= 20 && h.setpiece_conceded_pct >= 25) {
-                insights.push(`⚡ ${away.name} 세트피스 강세 (${a.setpiece_pct}%) × ${home.name} 세트피스 수비 약점 (${h.setpiece_conceded_pct}%)`);
+                insights.push(`⚡ ${ttEsc(away.name)} 세트피스 강세 (${a.setpiece_pct}%) × ${ttEsc(home.name)} 세트피스 수비 약점 (${h.setpiece_conceded_pct}%)`);
             }
         }
         const teamCol = (name, sp, cls) => `
@@ -911,13 +913,13 @@
         // 인사이트: 거친 팀 / 신사적 팀 매치업
         const insights = [];
         if (h.y_per_game !== null && h.y_per_game >= 3.0)
-            insights.push(`🟨 ${home.name} 거친 경기 운영 (경기당 옐로 ${h.y_per_game}장)`);
+            insights.push(`🟨 ${ttEsc(home.name)} 거친 경기 운영 (경기당 옐로 ${h.y_per_game}장)`);
         if (a.y_per_game !== null && a.y_per_game >= 3.0)
-            insights.push(`🟨 ${away.name} 거친 경기 운영 (경기당 옐로 ${a.y_per_game}장)`);
+            insights.push(`🟨 ${ttEsc(away.name)} 거친 경기 운영 (경기당 옐로 ${a.y_per_game}장)`);
         if (h.r_per_game !== null && h.r_per_game >= 0.2)
-            insights.push(`🟥 ${home.name} 퇴장 잦음 (${h.red}회/${h.games}경기)`);
+            insights.push(`🟥 ${ttEsc(home.name)} 퇴장 잦음 (${h.red}회/${h.games}경기)`);
         if (a.r_per_game !== null && a.r_per_game >= 0.2)
-            insights.push(`🟥 ${away.name} 퇴장 잦음 (${a.red}회/${a.games}경기)`);
+            insights.push(`🟥 ${ttEsc(away.name)} 퇴장 잦음 (${a.red}회/${a.games}경기)`);
 
         // 두 팀 비교: y_per_game 더 큰 쪽 강조
         const maxYpg = Math.max(h.y_per_game || 0, a.y_per_game || 0, 1);
@@ -956,9 +958,9 @@
         const insights = [];
         // 롱볼 빌드업 vs 빌드업 약점 (한 쪽만 강하면 의미)
         if (h.long_ball_pct !== null && h.long_ball_pct >= 60 && h.long_ball_pg >= 35)
-            insights.push(`📡 ${home.name} 롱볼 빌드업 강세 (정확도 ${h.long_ball_pct}%, 경기당 ${h.long_ball_pg}회)`);
+            insights.push(`📡 ${ttEsc(home.name)} 롱볼 빌드업 강세 (정확도 ${h.long_ball_pct}%, 경기당 ${h.long_ball_pg}회)`);
         if (a.long_ball_pct !== null && a.long_ball_pct >= 60 && a.long_ball_pg >= 35)
-            insights.push(`📡 ${away.name} 롱볼 빌드업 강세 (정확도 ${a.long_ball_pct}%, 경기당 ${a.long_ball_pg}회)`);
+            insights.push(`📡 ${ttEsc(away.name)} 롱볼 빌드업 강세 (정확도 ${a.long_ball_pct}%, 경기당 ${a.long_ball_pg}회)`);
         // 경합 우위
         if (h.duel_pct !== null && a.duel_pct !== null && Math.abs(h.duel_pct - a.duel_pct) >= 5) {
             const winner = h.duel_pct > a.duel_pct ? home.name : away.name;
@@ -967,14 +969,14 @@
         }
         // 공중볼 강세
         if (h.aerial_pct !== null && h.aerial_pct >= 55)
-            insights.push(`🦅 ${home.name} 공중볼 강세 (승률 ${h.aerial_pct}%)`);
+            insights.push(`🦅 ${ttEsc(home.name)} 공중볼 강세 (승률 ${h.aerial_pct}%)`);
         if (a.aerial_pct !== null && a.aerial_pct >= 55)
-            insights.push(`🦅 ${away.name} 공중볼 강세 (승률 ${a.aerial_pct}%)`);
+            insights.push(`🦅 ${ttEsc(away.name)} 공중볼 강세 (승률 ${a.aerial_pct}%)`);
         // 돌파 강세
         if (h.dribble_pct !== null && h.dribble_pct >= 55 && h.dribble_pg >= 8)
-            insights.push(`💨 ${home.name} 돌파 강세 (성공률 ${h.dribble_pct}%, 경기당 ${h.dribble_pg}회)`);
+            insights.push(`💨 ${ttEsc(home.name)} 돌파 강세 (성공률 ${h.dribble_pct}%, 경기당 ${h.dribble_pg}회)`);
         if (a.dribble_pct !== null && a.dribble_pct >= 55 && a.dribble_pg >= 8)
-            insights.push(`💨 ${away.name} 돌파 강세 (성공률 ${a.dribble_pct}%, 경기당 ${a.dribble_pg}회)`);
+            insights.push(`💨 ${ttEsc(away.name)} 돌파 강세 (성공률 ${a.dribble_pct}%, 경기당 ${a.dribble_pg}회)`);
 
         // 각 팀의 "리그 대비 상위 능력" 표시 (동일지표 맞대결 X)
         const META = {
@@ -1082,7 +1084,7 @@
         <div class="pred-match-header">
             <span class="pmh-round">R${nextInfo.round || "-"}</span>
             <span class="pmh-date">${nextInfo.date.replace(/\./g,"/")} ${nextInfo.time}</span>
-            <span class="pmh-venue">${nextInfo.venue}</span>
+            <span class="pmh-venue">${ttEsc(nextInfo.venue)}</span>
         </div>` : ""}
         ${backtestBannerHtml(backtest)}
 
@@ -1090,7 +1092,7 @@
 
             <!-- 홈팀 -->
             <div class="pred-team-panel pred-home">
-                <div class="pred-team-name">${home.name}</div>
+                <div class="pred-team-name">${ttEsc(home.name)}</div>
                 ${standingBadge(home.standing)}
                 <div class="pred-badges">${formBadges(home.form)}</div>
                 ${trendBlockHtml(home.form_points, "최근 10경기 승점", "#4ea4f8")}
@@ -1107,7 +1109,7 @@
                 ${home.top_scorers.length ? `
                 <div class="pred-scorers">
                     <div class="pred-scorers-title">이번 시즌 득점</div>
-                    ${home.top_scorers.map(s => `<div class="pred-scorer-row"><span class="scorer-name scorer-link" data-player-id="${s.id}">${s.name}</span><span class="scorer-g">${s.goals}골</span></div>`).join("")}
+                    ${home.top_scorers.map(s => `<div class="pred-scorer-row"><span class="scorer-name scorer-link" data-player-id="${s.id}">${ttEsc(s.name)}</span><span class="scorer-g">${s.goals}골</span></div>`).join("")}
                 </div>` : ""}
             </div>
 
@@ -1152,7 +1154,7 @@
 
             <!-- 원정팀 -->
             <div class="pred-team-panel pred-away">
-                <div class="pred-team-name">${away.name}</div>
+                <div class="pred-team-name">${ttEsc(away.name)}</div>
                 ${standingBadge(away.standing)}
                 <div class="pred-badges">${formBadges(away.form)}</div>
                 ${trendBlockHtml(away.form_points, "최근 10경기 승점", "#b87ef8")}
@@ -1169,7 +1171,7 @@
                 ${away.top_scorers.length ? `
                 <div class="pred-scorers">
                     <div class="pred-scorers-title">이번 시즌 득점</div>
-                    ${away.top_scorers.map(s => `<div class="pred-scorer-row"><span class="scorer-name scorer-link" data-player-id="${s.id}">${s.name}</span><span class="scorer-g">${s.goals}골</span></div>`).join("")}
+                    ${away.top_scorers.map(s => `<div class="pred-scorer-row"><span class="scorer-name scorer-link" data-player-id="${s.id}">${ttEsc(s.name)}</span><span class="scorer-g">${s.goals}골</span></div>`).join("")}
                 </div>` : ""}
             </div>
 
@@ -1524,27 +1526,27 @@
         const pins = [];
         // xG-실득 괴리
         if (xg.home > 0 && result.home - xg.home >= 0.8)
-            pins.push(`⚡ ${home.name} 결정력 폭발 — xG ${xg.home.toFixed(1)} 대비 ${result.home}득점`);
+            pins.push(`⚡ ${ttEsc(home.name)} 결정력 폭발 — xG ${xg.home.toFixed(1)} 대비 ${result.home}득점`);
         else if (xg.home > 0 && xg.home - result.home >= 0.8 && result.home === 0)
-            pins.push(`💧 ${home.name} 마무리 부진 — xG ${xg.home.toFixed(1)} 만들고도 무득점`);
+            pins.push(`💧 ${ttEsc(home.name)} 마무리 부진 — xG ${xg.home.toFixed(1)} 만들고도 무득점`);
         if (xg.away > 0 && result.away - xg.away >= 0.8)
-            pins.push(`⚡ ${away.name} 결정력 폭발 — xG ${xg.away.toFixed(1)} 대비 ${result.away}득점`);
+            pins.push(`⚡ ${ttEsc(away.name)} 결정력 폭발 — xG ${xg.away.toFixed(1)} 대비 ${result.away}득점`);
         else if (xg.away > 0 && xg.away - result.away >= 0.8 && result.away === 0)
-            pins.push(`💧 ${away.name} 마무리 부진 — xG ${xg.away.toFixed(1)} 만들고도 무득점`);
+            pins.push(`💧 ${ttEsc(away.name)} 마무리 부진 — xG ${xg.away.toFixed(1)} 만들고도 무득점`);
         // 세트피스
         if (retro.setpiece.home > 0)
-            pins.push(`🎯 ${home.name} 세트피스 ${retro.setpiece.home}골`);
+            pins.push(`🎯 ${ttEsc(home.name)} 세트피스 ${retro.setpiece.home}골`);
         if (retro.setpiece.away > 0)
-            pins.push(`🎯 ${away.name} 세트피스 ${retro.setpiece.away}골`);
+            pins.push(`🎯 ${ttEsc(away.name)} 세트피스 ${retro.setpiece.away}골`);
         // PK / 자책골
         if (retro.penalty.home > 0)
-            pins.push(`⚽ ${home.name} PK ${retro.penalty.home}골`);
+            pins.push(`⚽ ${ttEsc(home.name)} PK ${retro.penalty.home}골`);
         if (retro.penalty.away > 0)
-            pins.push(`⚽ ${away.name} PK ${retro.penalty.away}골`);
+            pins.push(`⚽ ${ttEsc(away.name)} PK ${retro.penalty.away}골`);
         if (retro.owngoal.home > 0)
-            pins.push(`💔 ${away.name} 자책골로 ${home.name} 득점`);
+            pins.push(`💔 ${ttEsc(away.name)} 자책골로 ${ttEsc(home.name)} 득점`);
         if (retro.owngoal.away > 0)
-            pins.push(`💔 ${home.name} 자책골로 ${away.name} 득점`);
+            pins.push(`💔 ${ttEsc(home.name)} 자책골로 ${ttEsc(away.name)} 득점`);
         // 조기 퇴장
         if (retro.redcard.earliest_min != null && retro.redcard.earliest_min < 70) {
             const side = retro.redcard.home > 0 ? home.name : away.name;
@@ -1567,7 +1569,7 @@
                 if (actOut !== strongerOut && actOut !== "draw") {
                     const stronger = homePts > awayPts ? home : away;
                     const weaker   = homePts > awayPts ? away : home;
-                    pins.push(`📉 폼 격차 무시: 최근 10경기 ${stronger.name} ${Math.max(homePts, awayPts)}점 vs ${weaker.name} ${Math.min(homePts, awayPts)}점 — 약팀 upset`);
+                    pins.push(`📉 폼 격차 무시: 최근 10경기 ${ttEsc(stronger.name)} ${Math.max(homePts, awayPts)}점 vs ${ttEsc(weaker.name)} ${Math.min(homePts, awayPts)}점 — 약팀 upset`);
                 }
             }
 
@@ -1688,8 +1690,8 @@
 
         const subs = Array.isArray(extras.subs) ? extras.subs : [];
         const subRow = (s) => {
-            const out = s.out ? `<span class="pt-sub-out">${s.out.shirt ? '#' + s.out.shirt + ' ' : ''}${s.out.name || '-'}</span>` : '<span class="pt-sub-out pt-sub-empty">-</span>';
-            const inn = s.in  ? `<span class="pt-sub-in">${s.in.shirt ? '#' + s.in.shirt + ' ' : ''}${s.in.name || '-'}</span>`     : '<span class="pt-sub-in pt-sub-empty">-</span>';
+            const out = s.out ? `<span class="pt-sub-out">${s.out.shirt ? '#' + s.out.shirt + ' ' : ''}${ttEsc(s.out.name || '-')}</span>` : '<span class="pt-sub-out pt-sub-empty">-</span>';
+            const inn = s.in  ? `<span class="pt-sub-in">${s.in.shirt ? '#' + s.in.shirt + ' ' : ''}${ttEsc(s.in.name || '-')}</span>`     : '<span class="pt-sub-in pt-sub-empty">-</span>';
             return `<div class="pt-sub-item"><span class="pt-sub-min">${s.minute}'</span>${out}<span class="pt-sub-arrow">→</span>${inn}</div>`;
         };
         const homeSubs = subs.filter(s => s.is_home === 1).map(subRow).join("");
@@ -1847,8 +1849,8 @@
                 .join("");
             const xgTip = p.total_xg > 0 ? ` · xG ${p.total_xg}` : "";
             return `<div class="spe-contrib-row scorer-link" data-player-id="${p.player_id}"
-                         title="${p.name} — ${p.total_shots}시도 ${p.total_goals}골${xgTip}">
-                <span class="spe-contrib-name" style="color:${color}">${p.name}</span>
+                         title="${ttEsc(p.name)} — ${p.total_shots}시도 ${p.total_goals}골${xgTip}">
+                <span class="spe-contrib-name" style="color:${color}">${ttEsc(p.name)}</span>
                 <span class="spe-contrib-sits">${sits}</span>
                 <span class="spe-contrib-goals">${p.total_goals}골</span>
             </div>`;
@@ -1911,20 +1913,20 @@
             const h = home.by_type[t.key], a = away.by_type[t.key];
             const la = avg.by_type[t.key];
             if (h.xg_diff !== null && h.shots >= 5 && h.xg_diff >= 1.0)
-                insights.push(`⚡ ${home.short} ${t.label} 효율 우수 (xG +${h.xg_diff})`);
+                insights.push(`⚡ ${ttEsc(home.short)} ${t.label} 효율 우수 (xG +${h.xg_diff})`);
             if (a.xg_diff !== null && a.shots >= 5 && a.xg_diff >= 1.0)
-                insights.push(`⚡ ${away.short} ${t.label} 효율 우수 (xG +${a.xg_diff})`);
+                insights.push(`⚡ ${ttEsc(away.short)} ${t.label} 효율 우수 (xG +${a.xg_diff})`);
             if (h.xg_diff !== null && h.shots >= 5 && h.xg_diff <= -1.0)
-                insights.push(`⚠ ${home.short} ${t.label} 효율 미달 (xG ${h.xg_diff})`);
+                insights.push(`⚠ ${ttEsc(home.short)} ${t.label} 효율 미달 (xG ${h.xg_diff})`);
             if (a.xg_diff !== null && a.shots >= 5 && a.xg_diff <= -1.0)
-                insights.push(`⚠ ${away.short} ${t.label} 효율 미달 (xG ${a.xg_diff})`);
+                insights.push(`⚠ ${ttEsc(away.short)} ${t.label} 효율 미달 (xG ${a.xg_diff})`);
             // xG 없는 리그(K1)도 변환률 비교
             if (la.avg_conversion_pct !== null && h.conversion_pct !== null
                 && h.shots >= 5 && h.conversion_pct >= la.avg_conversion_pct * 1.5)
-                insights.push(`🎯 ${home.short} ${t.label} 변환률 ${h.conversion_pct}% (리그 ${la.avg_conversion_pct}%)`);
+                insights.push(`🎯 ${ttEsc(home.short)} ${t.label} 변환률 ${h.conversion_pct}% (리그 ${la.avg_conversion_pct}%)`);
             if (la.avg_conversion_pct !== null && a.conversion_pct !== null
                 && a.shots >= 5 && a.conversion_pct >= la.avg_conversion_pct * 1.5)
-                insights.push(`🎯 ${away.short} ${t.label} 변환률 ${a.conversion_pct}% (리그 ${la.avg_conversion_pct}%)`);
+                insights.push(`🎯 ${ttEsc(away.short)} ${t.label} 변환률 ${a.conversion_pct}% (리그 ${la.avg_conversion_pct}%)`);
         }
 
         const html = `
@@ -1934,9 +1936,9 @@
                 <span class="spe-sub">시도 / 골 / 변환률 / xG차(실득점-기댓값)</span>
             </div>
             <div class="spe-teams">
-                <span class="spe-team spe-team-home" style="color:${homeColor}">${home.short}</span>
+                <span class="spe-team spe-team-home" style="color:${homeColor}">${ttEsc(home.short)}</span>
                 <span class="spe-team-divider">vs 리그 평균 vs</span>
-                <span class="spe-team spe-team-away" style="color:${awayColor}">${away.short}</span>
+                <span class="spe-team spe-team-away" style="color:${awayColor}">${ttEsc(away.short)}</span>
             </div>
             ${TYPES.map(rowHtml).join("")}
             ${insights.length ? `
@@ -2053,7 +2055,7 @@
                 const p = hit.data;
                 const side = p.is_home === 1 ? "홈" : "원정";
                 const shirt = p.shirt_number ? `#${p.shirt_number} ` : "";
-                tooltip.innerHTML = `<b>${shirt}${p.name || "선수"}</b><br>` +
+                tooltip.innerHTML = `<b>${shirt}${ttEsc(p.name || "선수")}</b><br>` +
                     `<span style="opacity:0.75">${side} · 평균 (${p.x.toFixed(1)}, ${p.y.toFixed(1)})</span>`;
                 tooltip.style.left = (e.clientX - rect.left + 12) + "px";
                 tooltip.style.top  = (e.clientY - rect.top  + 12) + "px";
@@ -2109,7 +2111,7 @@
             if (hit) {
                 const s = hit.data;
                 const xgStr = s.xg != null ? ` · xG ${s.xg.toFixed(2)}` : "";
-                tooltip.innerHTML = `<b>${s.name || "선수"}</b> · ${s.time_min}'<br>` +
+                tooltip.innerHTML = `<b>${ttEsc(s.name || "선수")}</b> · ${s.time_min}'<br>` +
                     `${s.shot_type}${xgStr}<br>` +
                     `<span style="opacity:0.75">${s.body_part || ""} / ${s.situation || ""}</span>`;
                 tooltip.style.left = (e.clientX - rect.left + 12) + "px";
@@ -2152,14 +2154,14 @@
                 <div class="ssb-league">
                     <span class="ssb-name">${d.league}</span>
                     <span class="ssb-sub" title="${d.n_teams}팀 · ${d.pending_games}경기 · ${d.n_simulations}회 시뮬">R${curR}/${totalR} · ${remainR}R 남음</span>
-                    <span class="ssb-champ" title="우승 확률 ${champ.win_pct}%">🏆 ${champ.name} ${champ.win_pct}%</span>
+                    <span class="ssb-champ" title="우승 확률 ${champ.win_pct}%">🏆 ${ttEsc(champ.name)} ${champ.win_pct}%</span>
                     <span class="ssb-divider">·</span>
                     <span class="ssb-afc" title="AFC/승격권 TOP ${afcCount}">
-                        ${top.map(t => `${t.name} ${t.afc_pct}%`).join(" · ")}
+                        ${top.map(t => `${ttEsc(t.name)} ${t.afc_pct}%`).join(" · ")}
                     </span>
                     <span class="ssb-divider">·</span>
                     <span class="ssb-rel" title="강등 위험">
-                        ⚠ ${bot.map(t => `${t.name} ${t.rel_pct}%`).join(" · ")}
+                        ⚠ ${bot.map(t => `${ttEsc(t.name)} ${t.rel_pct}%`).join(" · ")}
                     </span>
                 </div>`;
         };

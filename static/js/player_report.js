@@ -1,3 +1,5 @@
+// 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
+function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 // player_report.js — 선수 개별 분석 보고서 (전술판 아래 섹션)
 
 (function () {
@@ -90,7 +92,7 @@
             const cells = formCols.map(c => `<td>${g[c.key] ?? "-"}</td>`).join("");
             return `<tr>
                 <td>${g.date}</td>
-                <td>${g.opponent} <span class="pr-ha">${ha}</span></td>
+                <td>${ttEsc(g.opponent)} <span class="pr-ha">${ha}</span></td>
                 <td>${g.score}</td>
                 <td class="${resCls}">${g.result}</td>
                 ${cells}
@@ -102,8 +104,8 @@
         <div class="pr-card pr-info-card">
             <div class="pr-player-header">
                 <div class="pr-pos-badge" style="background:${posColor}22;border-color:${posColor}55;color:${posColor}">${roleLabel}</div>
-                <div class="pr-player-name">${p.name}</div>
-                <div class="pr-player-team">${p.team}</div>
+                <div class="pr-player-name">${ttEsc(p.name)}</div>
+                <div class="pr-player-team">${ttEsc(p.team)}</div>
                 <div class="pr-info-badges">
                     <span class="pr-badge">${p.games}경기</span>
                     <span class="pr-badge pr-badge-goal">${p.goals}골</span>

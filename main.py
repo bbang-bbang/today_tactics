@@ -804,10 +804,49 @@ def _safe_path(base_dir, file_id):
     return fpath
 
 
+_PAYLOAD_MAX_STR, _PAYLOAD_MAX_LIST, _PAYLOAD_MAX_DEPTH, _PAYLOAD_MAX_NODES = 100, 1000, 8, 20000
+
+
+def _payload_problem(body):
+    """saves/squads 쓰기 본문 검증 — 공개 모드에서 누구나 쓸 수 있어 저장형 XSS·과대 입력을 막는다.
+    형식(키·구조)은 바꾸지 않고 '거부'만 한다(기존 저장 파일 호환). 문제 없으면 None, 있으면 사유 문자열.
+    규칙: 본문은 객체 · 모든 문자열 ≤ 100자이고 '<' '>' 금지 · 목록 ≤ 1000개 · 깊이 ≤ 8 · 전체 노드 ≤ 20000.
+    (기존 파일 최대: 문자열 26자, 목록 52개 — 2026-11-03 확인)"""
+    if not isinstance(body, dict):
+        return "body must be a JSON object"
+    count = 0
+    stack = [(body, 0)]
+    while stack:
+        o, depth = stack.pop()
+        count += 1
+        if count > _PAYLOAD_MAX_NODES or depth > _PAYLOAD_MAX_DEPTH:
+            return "payload too large or too deep"
+        if isinstance(o, str):
+            if len(o) > _PAYLOAD_MAX_STR:
+                return f"string longer than {_PAYLOAD_MAX_STR}"
+            if "<" in o or ">" in o:
+                return "'<' and '>' are not allowed"
+        elif isinstance(o, list):
+            if len(o) > _PAYLOAD_MAX_LIST:
+                return f"list longer than {_PAYLOAD_MAX_LIST}"
+            stack.extend((x, depth + 1) for x in o)
+        elif isinstance(o, dict):
+            for k, v in o.items():
+                if len(k) > _PAYLOAD_MAX_STR or "<" in k or ">" in k:
+                    return "invalid key"
+                stack.append((v, depth + 1))
+        elif not (o is None or isinstance(o, (bool, int, float))):
+            return "unsupported value type"
+    return None
+
+
 @app.route("/api/saves", methods=["POST"])
 @login_required_api
 def create_save():
-    body = request.get_json()
+    body = request.get_json(silent=True)
+    bad = _payload_problem(body)
+    if bad:
+        return jsonify({"error": bad}), 400
     save_id = str(uuid.uuid4())[:8]
     now = datetime.now().isoformat()
     data = {
@@ -845,9 +884,12 @@ def update_save(save_id):
     fpath = _safe_path(SAVES_DIR, save_id)
     if not fpath or not os.path.exists(fpath):
         return jsonify({"error": "Not found"}), 404
+    body = request.get_json(silent=True)
+    bad = _payload_problem(body)
+    if bad:
+        return jsonify({"error": bad}), 400
     with open(fpath, "r", encoding="utf-8") as f:
         existing = json.load(f)
-    body = request.get_json()
     existing["name"] = body.get("name", existing["name"])
     existing["formation"] = body.get("formation", existing["formation"])
     existing["players"] = body.get("players", existing["players"])
@@ -897,7 +939,10 @@ def list_squads():
 @app.route("/api/squads", methods=["POST"])
 @login_required_api
 def create_squad():
-    body = request.get_json()
+    body = request.get_json(silent=True)
+    bad = _payload_problem(body)
+    if bad:
+        return jsonify({"error": bad}), 400
     squad_id = str(uuid.uuid4())[:8]
     now = datetime.now().isoformat()
     data = {
@@ -8546,17 +8591,30 @@ def get_player_status():
         data = {k: v for k, v in data.items() if v.get("teamId") == team_id}
     return jsonify(data)
 
+_STATUS_VALUES = {"available", "injured", "suspended", "doubtful"}
+_STATUS_MAX_ENTRIES = 5000
+
+
 @app.route("/api/player-status", methods=["POST"])
+@login_required_api
 def update_player_status():
     """선수 상태 업데이트. body: {playerId, teamId, name, status, note, returnDate}
     status: "available" | "injured" | "suspended" | "doubtful"
+    공개 쓰기 API라 saves/squads와 같은 본문 검증(_payload_problem) + 상태값 화이트리스트 + 항목 수 상한.
     """
-    body = request.get_json()
+    body = request.get_json(silent=True)
+    bad = _payload_problem(body)
+    if bad:
+        return jsonify({"error": bad}), 400
     pid = str(body.get("playerId", ""))
-    if not pid:
-        return jsonify({"error": "playerId required"}), 400
-    data = _load_status()
+    if not pid or not _SAFE_ID_RE.match(pid) or len(pid) > 20:
+        return jsonify({"error": "valid playerId required"}), 400
     status = body.get("status", "available")
+    if status not in _STATUS_VALUES:
+        return jsonify({"error": "invalid status"}), 400
+    data = _load_status()
+    if pid not in data and status != "available" and len(data) >= _STATUS_MAX_ENTRIES:
+        return jsonify({"error": "too many entries"}), 400
     if status == "available" and pid in data:
         del data[pid]
     else:
@@ -8573,6 +8631,7 @@ def update_player_status():
     return jsonify({"ok": True, "total": len(data)})
 
 @app.route("/api/player-status/<player_id>", methods=["DELETE"])
+@login_required_api
 def delete_player_status(player_id):
     """선수 상태 삭제 (정상 복귀)"""
     data = _load_status()

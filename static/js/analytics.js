@@ -1,3 +1,5 @@
+// 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
+function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 // analytics.js — 단일 팀 종합 분석 대시보드
 // 백엔드 3종을 오케스트레이션:
 //   /api/team-analytics  : 상대팀별 전적 · 월별 승률 · 홈/원정 · 날씨별 승률 (결과 기반)
@@ -276,7 +278,7 @@
         // 최근 5경기 폼 (최신이 오른쪽)
         const last5 = ms.slice(-5);
         document.getElementById("ta-form").innerHTML = last5.length
-            ? last5.map(m => `<span class="ta-form-pill ta-form-${m.result}" title="${m.date} vs ${m.opponent} ${m.gf}:${m.ga}">${m.result}</span>`).join("")
+            ? last5.map(m => `<span class="ta-form-pill ta-form-${m.result}" title="${m.date} vs ${ttEsc(m.opponent)} ${m.gf}:${m.ga}">${m.result}</span>`).join("")
             : `<span class="ta-form-empty">기록 없음</span>`;
     }
 
@@ -464,7 +466,7 @@
                     ? `<span class="ta-wr-badge ta-wr-low" title="표본 ${r.games}경기 — 참고용">${p}%</span>`
                     : `<span class="ta-wr-badge" style="background:${winColor(p,0.22)};color:${winColor(p,1)};border:1px solid ${winColor(p,0.5)}">${p}%</span>`;
                 return `<tr>
-                    <td class="ta-vs-name">${r.name}</td><td>${r.games}</td>
+                    <td class="ta-vs-name">${ttEsc(r.name)}</td><td>${r.games}</td>
                     <td style="color:#7bed9f">${r.w}</td><td style="color:#aab">${r.d}</td><td style="color:#e05c5c">${r.l}</td>
                     <td>${r.gf}:${r.ga}</td>
                     <td>${badge}</td>
@@ -953,7 +955,7 @@
         const topF = (Frep.topShooters || [])[0];
         if (topF && topF.shots) threats.push({
             lvl: topF.goals >= 5 ? "high" : topF.goals >= 2 ? "med" : "low",
-            text: `핵심 슈터 <b>${topF.name}</b> — ${topF.shots}슛 ${topF.goals}골 (xG ${topF.xg})`,
+            text: `핵심 슈터 <b>${ttEsc(topF.name)}</b> — ${topF.shots}슛 ${topF.goals}골 (xG ${topF.xg})`,
             tag: topF.goals >= 5 ? "집중 마크" : topF.goals >= 2 ? "주시" : "",
         });
         const routeF = (Frep.bySituation || []).filter(s => s.goals > 0).sort((a, b) => b.goals - a.goals)[0];

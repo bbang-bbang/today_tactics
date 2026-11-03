@@ -1,3 +1,5 @@
+// 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
+function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 // player_analytics.js — 선수 개인 분석 보고서 모달
 
 (function () {
@@ -81,7 +83,7 @@
             const rat = g.rating ? g.rating.toFixed(1) : "-";
             return `<tr>
                 <td>${g.date}</td>
-                <td>${g.opponent} <span class="pa-ha">${ha}</span></td>
+                <td>${ttEsc(g.opponent)} <span class="pa-ha">${ha}</span></td>
                 <td>${g.score}</td>
                 <td class="${resCls}">${g.result}</td>
                 <td>${ga}</td>
@@ -93,8 +95,8 @@
         <div class="pa-header">
             <div class="pa-name-area">
                 <span class="pa-pos-badge">${posLabel}</span>
-                <span class="pa-player-name">${info.name}</span>
-                <span class="pa-team-name">${info.team}</span>
+                <span class="pa-player-name">${ttEsc(info.name)}</span>
+                <span class="pa-team-name">${ttEsc(info.team)}</span>
             </div>
             <div class="pa-pills">
                 ${heightHtml}${footHtml}

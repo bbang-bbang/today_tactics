@@ -1,3 +1,5 @@
+// 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
+function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 (function () {
     "use strict";
 
@@ -284,7 +286,7 @@
                 const oppName = opp ? opp.short : (m.opponent || "?");
                 const venue = m.home ? "H" : "A";
                 scoreEl.innerHTML =
-                    `<span class="mr-venue-sm ${m.home ? 'home' : 'away'}">${venue}</span>` +
+                    `<span class="mr-venue-sm ${ttEsc(m.home ? 'home' : 'away')}">${venue}</span>` +
                     `<span class="mr-team opp">${oppName}</span>` +
                     `<span class="mr-num">${m.score || ""}</span>`;
             }

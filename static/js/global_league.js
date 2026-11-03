@@ -1,3 +1,5 @@
+// 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
+function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 /**
  * global_league.js — 해외리그 탭 (🌍)
  * /api/league/<code>/... 엔드포인트 사용
@@ -162,7 +164,7 @@
             ${data.map(r => `
               <tr>
                 <td class="gl-rank">${r.rank}</td>
-                <td class="gl-team-name">${r.team}</td>
+                <td class="gl-team-name">${ttEsc(r.team)}</td>
                 <td>${r.played}</td>
                 <td class="w-col">${r.wins}</td>
                 <td>${r.draws}</td>
@@ -204,7 +206,7 @@
           <tbody>
             ${data.map(r => `
               <tr>
-                <td class="gl-team-name">${r.team}</td>
+                <td class="gl-team-name">${ttEsc(r.team)}</td>
                 <td>${r.matches}</td>
                 <td class="num-col gl-perf-primary"><strong>${r.xg}</strong></td>
                 <td class="num-col">${r.goals}</td>
@@ -320,8 +322,8 @@
               return `
                 <tr>
                   <td class="gl-rank">${i + 1}</td>
-                  <td class="gl-player-name">${p.name}</td>
-                  <td class="gl-team-sub">${p.team}</td>
+                  <td class="gl-player-name">${ttEsc(p.name)}</td>
+                  <td class="gl-team-sub">${ttEsc(p.team)}</td>
                   <td class="gl-pos">${posLabel(p.position)}</td>
                   <td>${p.games}</td>
                   ${cells}

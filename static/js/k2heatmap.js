@@ -1,3 +1,5 @@
+// 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
+function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 // K리그 선수 히트맵 모달 (K1/K2 토글)
 (function () {
     const modal       = document.getElementById("k2-heatmap-modal");
@@ -123,7 +125,7 @@
             el.className = "k2-team-card";
             el.innerHTML = `
                 <img src="/static/img/emblems/${t.emblem}" onerror="this.style.display='none'">
-                <span>${t.short}</span>`;
+                <span>${ttEsc(t.short)}</span>`;
             el.style.borderColor = t.primary;
             el.addEventListener("click", () => selectTeam(t));
             teamGrid.appendChild(el);
@@ -187,7 +189,7 @@
                 const el = document.createElement("div");
                 el.className = "k2-player-row " + pc;
                 el.innerHTML = `
-                    <span class="k2-player-name">${p.name}</span>
+                    <span class="k2-player-name">${ttEsc(p.name)}</span>
                     <span class="k2-player-meta">${p.avgRating ? `<b class="k2-rt">⭐ ${p.avgRating}</b>` : ""}<span class="k2-gm">${p.games}경기</span></span>`;
                 el.addEventListener("click", () => selectPlayer(p));
                 playerList.appendChild(el);
@@ -211,7 +213,7 @@
             const posClass = { G:"pos-g", D:"pos-d", M:"pos-m", F:"pos-f" }[player.position] || "";
             ctxArea.innerHTML = `<div class="k2-player-context">
                 <span class="k2-ctx-pill ${posClass}">${posLabel}</span>
-                <span>${currentTeam.name}</span>
+                <span>${ttEsc(currentTeam.name)}</span>
                 ${player.games ? `<span class="k2-ctx-pill">${player.games}경기</span>` : ""}
                 ${player.avgRating ? `<span class="k2-ctx-pill">⭐ ${player.avgRating}</span>` : ""}
             </div>`;
@@ -274,7 +276,7 @@
             const score = (m.homeScore != null && m.awayScore != null) ? `${m.homeScore}:${m.awayScore}` : "-:-";
             const li = document.createElement("li");
             li.className = "k2-match-item" + (activeId === m.id ? " active" : "");
-            li.innerHTML = `<span class="k2-match-date">${date}</span> ${m.home} ${score} ${m.away}`;
+            li.innerHTML = `<span class="k2-match-date">${date}</span> ${ttEsc(m.home)} ${score} ${ttEsc(m.away)}`;
             li.addEventListener("click", () => {
                 renderMatchList(allMatches, m.id);
                 loadMatchHeatmap(m.id);
@@ -719,7 +721,7 @@
             btn.type = "button";
             btn.dataset.year = s.year;
             btn.className = "k2-year-btn" + (s.year === currentYear ? " active" : "");
-            btn.innerHTML = `${s.year}${s.team ? `<span class="k2-year-team">${s.team}</span>` : ""}`;
+            btn.innerHTML = `${s.year}${s.team ? `<span class="k2-year-team">${ttEsc(s.team)}</span>` : ""}`;
             btn.addEventListener("click", () => changeYear(s.year));
             yearFilter.appendChild(btn);
         });
@@ -794,8 +796,8 @@
             li.setAttribute("role", "option");
             li.tabIndex = 0;
             li.innerHTML =
-                `<span class="k2-quick-name">${r.name}</span>` +
-                `<span class="k2-quick-meta">${r.teamShort || r.teamName} · ${r.detailLabel || POS_LABEL[r.position] || r.position || ""} · ${r.games}경기 · ${r.league.toUpperCase()}</span>`;
+                `<span class="k2-quick-name">${ttEsc(r.name)}</span>` +
+                `<span class="k2-quick-meta">${ttEsc(r.teamShort || r.teamName)} · ${ttEsc(r.detailLabel || POS_LABEL[r.position] || r.position || "")} · ${r.games}경기 · ${r.league.toUpperCase()}</span>`;
             const go = () => jumpToPlayer(r);
             li.addEventListener("click", go);
             li.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });

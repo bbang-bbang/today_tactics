@@ -1,3 +1,5 @@
+// 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
+function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 /* match_report.js — 경기 단일 심층 리포트 모달
  * window.openMatchReport(eventId) 로 호출. /api/match-report 데이터를
  * 헤더·지표비교·xG흐름차트·양팀 슛맵·평균위치·골 타임라인으로 렌더.
@@ -50,15 +52,15 @@
         const headerHTML = `
             <div class="mr-header">
                 <div class="mr-team mr-team-home">
-                    <div class="mr-team-name" style="color:${HOME}">${ev.home}</div>
+                    <div class="mr-team-name" style="color:${HOME}">${ttEsc(ev.home)}</div>
                     ${fmt(ev.homeFormation)}
                 </div>
                 <div class="mr-score">
                     <div class="mr-score-num">${ev.homeScore} <span>:</span> ${ev.awayScore}</div>
-                    <div class="mr-score-meta">${ev.tournament}${ev.round ? " R" + ev.round : ""} · ${ev.date}${ev.venue ? " · " + ev.venue : ""}</div>
+                    <div class="mr-score-meta">${ttEsc(ev.tournament)}${ev.round ? " R" + ev.round : ""} · ${ev.date}${ttEsc(ev.venue ? " · " + ev.venue : "")}</div>
                 </div>
                 <div class="mr-team mr-team-away">
-                    <div class="mr-team-name" style="color:${AWAY}">${ev.away}</div>
+                    <div class="mr-team-name" style="color:${AWAY}">${ttEsc(ev.away)}</div>
                     ${fmt(ev.awayFormation)}
                 </div>
             </div>`;
@@ -124,9 +126,9 @@
                 <div class="mr-sec-title">🎯 슛맵 <span class="mr-sec-sub">점 크기 = xG · 오른쪽이 공격 골문</span></div>
                 <div class="mr-leg-row">${legend}</div>
                 <div class="mr-duo">
-                    <div class="mr-duo-cell"><div class="mr-duo-cap" style="color:${HOME}">${ev.home}</div>
+                    <div class="mr-duo-cell"><div class="mr-duo-cap" style="color:${HOME}">${ttEsc(ev.home)}</div>
                         <canvas id="mr-sm-home" width="360" height="232"></canvas></div>
-                    <div class="mr-duo-cell"><div class="mr-duo-cap" style="color:${AWAY}">${ev.away}</div>
+                    <div class="mr-duo-cell"><div class="mr-duo-cap" style="color:${AWAY}">${ttEsc(ev.away)}</div>
                         <canvas id="mr-sm-away" width="360" height="232"></canvas></div>
                 </div>
             </div>`;
@@ -136,9 +138,9 @@
             <div class="mr-section">
                 <div class="mr-sec-title">🧭 평균 위치 <span class="mr-sec-sub">선발 평균 포지션 · 오른쪽이 공격 방향</span></div>
                 <div class="mr-duo">
-                    <div class="mr-duo-cell"><div class="mr-duo-cap" style="color:${HOME}">${ev.home}${ev.homeFormation ? " · " + ev.homeFormation : ""}</div>
+                    <div class="mr-duo-cell"><div class="mr-duo-cap" style="color:${HOME}">${ttEsc(ev.home)}${ttEsc(ev.homeFormation ? " · " + ev.homeFormation : "")}</div>
                         <canvas id="mr-ap-home" width="360" height="232"></canvas></div>
-                    <div class="mr-duo-cell"><div class="mr-duo-cap" style="color:${AWAY}">${ev.away}${ev.awayFormation ? " · " + ev.awayFormation : ""}</div>
+                    <div class="mr-duo-cell"><div class="mr-duo-cap" style="color:${AWAY}">${ttEsc(ev.away)}${ttEsc(ev.awayFormation ? " · " + ev.awayFormation : "")}</div>
                         <canvas id="mr-ap-away" width="360" height="232"></canvas></div>
                 </div>
             </div>`;
@@ -150,9 +152,9 @@
             const pct = Math.min(100, t / maxMin * 100);
             const tag = (g.pen ? " (PK)" : "") + (g.own ? " (OG)" : "");
             return `<div class="mr-tl-goal ${g.isHome ? "home" : "away"}" style="left:${pct}%"
-                        title="${t}' ${g.name}${tag}">
+                        title="${t}' ${ttEsc(g.name)}${tag}">
                         <span class="mr-tl-dot" style="background:${g.isHome ? HOME : AWAY}"></span>
-                        <span class="mr-tl-label">${g.name.split(" ").pop()} ${t}'${tag}</span>
+                        <span class="mr-tl-label">${ttEsc(g.name.split(" ").pop())} ${t}'${tag}</span>
                     </div>`;
         };
         const timelineHTML = goals.length ? `
@@ -163,7 +165,7 @@
                     <div class="mr-tl-half" style="left:${50 / maxMin * 100}%" title="하프타임"></div>
                     ${goals.map(goalMark).join("")}
                 </div>
-                <div class="mr-tl-legend"><span style="color:${HOME}">▲ ${ev.home}</span><span style="color:${AWAY}">▼ ${ev.away}</span></div>
+                <div class="mr-tl-legend"><span style="color:${HOME}">▲ ${ttEsc(ev.home)}</span><span style="color:${AWAY}">▼ ${ttEsc(ev.away)}</span></div>
             </div>` : "";
 
         body.innerHTML = headerHTML + statsHTML + flowHTML + shotmapHTML + avgHTML + timelineHTML;

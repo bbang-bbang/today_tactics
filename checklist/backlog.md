@@ -16,6 +16,10 @@
 - **선택지**: ① 2025 5건을 `EXCLUDED_EVENT_IDS`에 추가하고 2026 PO는 발생 후 수동 추가(빠름, 반복 작업) ② 수집 단계(`sync_results_to_events`/공식 API meet 코드)에서 PO를 별도 tournament로 분리(근본 해결, 크롤 로직 = Red) ③ 정규 라운드 종료일 이후 경기를 리그 집계에서 제외. H2H에는 PO를 포함할지도 함께 결정.
 - 리스크 등급: 통계 정의·마스터 데이터 = **Red**(사용자 확인 필수).
 
+### [ ] 🔒 CSP `'unsafe-inline'` 제거 + 공개 쓰기 API 남용 제한 (2026-11-03 보안 점검 후속)
+- 11/3에 저장형 XSS 경로(saves·squads·player-status 서버 검증 + 화면 125곳 이스케이프)는 막았지만, nginx CSP가 `script-src 'unsafe-inline'`이라 이스케이프 누락이 한 곳이라도 생기면 다시 실행된다. 인라인 이벤트 핸들러(`onerror=` 등)와 인라인 `<script>`를 걷어내고 CSP를 `'self'`로 좁히는 것이 근본 대책.
+- 공개 모드라 누구나 스쿼드·저장을 무제한 생성 가능(요청당 512KB 제한만) — 필요하면 IP당 빈도 제한 또는 파일 개수 상한.
+
 ### [ ] 2027 시즌 연도 전환 준비 (2027 개막 전, 2026-11-03 점검)
 - 하드코딩 '2026': `main.py` 41곳(엔드포인트 기본 `year="2026"` 다수, `_warm_cache` URL, 다년도 IN 목록 `('2024','2025','2026')`), JS 18곳(`app.js` 8·`insights.js` 5·`prediction.js` 4·`k2heatmap.js` 1), 파이프라인 `update_results_2026.py`(→ `kleague_results_2026.json`)·STEP 16 `--years 2026`·`fetch_next_round.py`의 `2026-01-01`.
 - 승강 결과로 `TEAMS`의 league 필드·스쿼드 파일 변경 필요(마스터 데이터 = Red).

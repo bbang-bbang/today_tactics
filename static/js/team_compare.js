@@ -1,3 +1,5 @@
+// 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
+function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 // team_compare.js — 두 팀 주요 스탯 비교 모달 (Chart.js 레이더 오버레이)
 
 (function () {
@@ -440,14 +442,14 @@
         tbl.innerHTML = `
             <tr><th>팀</th><th>홈 승률</th><th>홈 전적</th><th>원정 승률</th><th>원정 전적</th></tr>
             <tr>
-                <td style="color:${readableInk(a.primary||'#4ea4f8')};font-weight:700">${a.short||a.name}</td>
+                <td style="color:${readableInk(a.primary||'#4ea4f8')};font-weight:700">${ttEsc(a.short||a.name)}</td>
                 <td>${pctBadge(aHome.pct)}</td>
                 <td>${aHome.w}-${aHome.d}-${aHome.l}</td>
                 <td>${pctBadge(aAway.pct)}</td>
                 <td>${aAway.w}-${aAway.d}-${aAway.l}</td>
             </tr>
             <tr>
-                <td style="color:${readableInk(b.primary||'#b87ef8')};font-weight:700">${b.short||b.name}</td>
+                <td style="color:${readableInk(b.primary||'#b87ef8')};font-weight:700">${ttEsc(b.short||b.name)}</td>
                 <td>${pctBadge(bHome.pct)}</td>
                 <td>${bHome.w}-${bHome.d}-${bHome.l}</td>
                 <td>${pctBadge(bAway.pct)}</td>

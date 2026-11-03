@@ -1,3 +1,5 @@
+// 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
+function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 /* insights.js — 포지션별 인사이트 섹션 */
 (function () {
   "use strict";
@@ -89,8 +91,8 @@
   // 셀 1개 렌더 (컬럼 메타 기반)
   function renderCell(col, r, rank) {
     if (col.key === null)   return `<td class="ins-rank">${rank}</td>`;
-    if (col.key === "name") return `<td class="ins-name">${r.name}</td>`;
-    if (col.key === "team") return `<td class="ins-team">${r.team || "-"}</td>`;
+    if (col.key === "name") return `<td class="ins-name">${ttEsc(r.name)}</td>`;
+    if (col.key === "team") return `<td class="ins-team">${ttEsc(r.team || "-")}</td>`;
     if (col.key === "pos") {
       // 색상은 detail 기준 대분류로 정합(윙어=공격색 등), 라벨은 세부 우선
       const broad = (r.detail && DETAIL_BROAD[r.detail]) || r.pos;
@@ -253,7 +255,7 @@
       return `<button class="ins-cat-card" data-key="${c.key}" data-pid="${r.player_id}" title="${c.label} 1위 · 클릭하면 이 지표로 정렬">
         <div class="ins-cat-head"><span class="ins-cat-icon">${c.icon}</span><span class="ins-cat-label">${c.label}</span></div>
         <div class="ins-cat-val">${c.fmt(best.v)}</div>
-        <div class="ins-cat-leader"><span class="ins-pos-badge ins-pos-${r.pos}">${POS_BADGE[r.pos] || "-"}</span> ${r.name}</div>
+        <div class="ins-cat-leader"><span class="ins-pos-badge ins-pos-${r.pos}">${POS_BADGE[r.pos] || "-"}</span> ${ttEsc(r.name)}</div>
       </button>`;
     }).join("");
     host.querySelectorAll(".ins-cat-card").forEach(btn => {
@@ -709,7 +711,7 @@
         const rCls = m.rating >= 7.5 ? "ins-pos" : m.rating && m.rating < 6.5 ? "ins-neg" : "";
         html += `<tr>
           <td style="white-space:nowrap">${m.date ? m.date.slice(0, 10) : "-"}</td>
-          <td class="ins-team">${m.opponent}</td>
+          <td class="ins-team">${ttEsc(m.opponent)}</td>
           <td>${m.score}</td>
           <td>${m.mins}'</td>
           <td class="${rCls}">${m.rating ?? "-"}</td>`;
@@ -793,7 +795,7 @@
       const tbody = sorted.map((r, i) => `
         <tr>
           <td class="ins-rank">${i+1}</td>
-          <td class="ins-name">${r.team}</td>
+          <td class="ins-name">${ttEsc(r.team)}</td>
           <td>${r.games}</td>
           <td><strong>${r.yellow}</strong></td>
           <td class="${r.red > 0 ? 'ins-neg' : ''}">${r.red}</td>
@@ -825,8 +827,8 @@
           <tbody>${yelSorted.map((r, i) => `
             <tr>
               <td class="ins-rank">${i+1}</td>
-              <td class="ins-name">${r.name}</td>
-              <td class="ins-team">${r.team || "-"}</td>
+              <td class="ins-name">${ttEsc(r.name)}</td>
+              <td class="ins-team">${ttEsc(r.team || "-")}</td>
               <td>${r.games}</td>
               <td><strong>${r.yellow}</strong></td>
               <td class="${r.red > 0 ? 'ins-neg' : ''}">${r.red}</td>
@@ -841,8 +843,8 @@
           <tbody>${redSorted.map((r, i) => `
             <tr>
               <td class="ins-rank">${i+1}</td>
-              <td class="ins-name">${r.name}</td>
-              <td class="ins-team">${r.team || "-"}</td>
+              <td class="ins-name">${ttEsc(r.name)}</td>
+              <td class="ins-team">${ttEsc(r.team || "-")}</td>
               <td>${r.yellow}</td>
               <td class="ins-neg"><strong>${r.red}</strong></td>
             </tr>`).join("")}</tbody>
@@ -952,7 +954,7 @@
   function renderGoalkeeper(d) {
     const el = document.getElementById("ins-gk-body"); if (!el) return;
     const row = (p, i, metric, sub) =>
-      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}${sub ? " · " + sub : ""}</span><b>${metric}</b></li>`;
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${ttEsc(p.name)}</span><span class="ins-adv-sub">${ttEsc(p.team)}${sub ? " · " + sub : ""}</span><b>${metric}</b></li>`;
     const sv = (d.saves_top || []).slice(0, 5).map((p, i) => row(p, i, `${p.saves}선방`, `${p.games}경기·CS${p.clean_sheets}`)).join("");
     const cs = (d.clean_sheets_top || []).slice(0, 5).map((p, i) => row(p, i, `CS ${p.clean_sheets}`, `${p.games}경기`)).join("");
     const pct = (d.save_pct_top || []).slice(0, 5).map((p, i) => row(p, i, `${p.save_pct}%`, `선방${p.saves}/실점${p.conceded}`)).join("");
@@ -966,7 +968,7 @@
   function renderDuels(d) {
     const el = document.getElementById("ins-duel-body"); if (!el) return;
     const row = (p, i, metric, sub) =>
-      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${p.name}</span><span class="ins-adv-sub">${p.team}${sub ? " · " + sub : ""}</span><b>${metric}</b></li>`;
+      `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${ttEsc(p.name)}</span><span class="ins-adv-sub">${ttEsc(p.team)}${sub ? " · " + sub : ""}</span><b>${metric}</b></li>`;
     const empty = '<li class="ins-adv-empty">데이터 없음</li>';
     const dr = (d.dribble_top || []).slice(0, 5).map((p, i) => row(p, i, `${p.success}회`, `성공률 ${p.rate}%`)).join("");
     const ae = (d.aerial_top || []).slice(0, 5).map((p, i) => row(p, i, `${p.won}승`, `승률 ${p.rate}%`)).join("");
@@ -984,15 +986,15 @@
       if (!d || !d.teams) return `<div class="ins-adv-empty">데이터 없음</div>`;
       const rows = d.teams.map(t => {
         if (!t.eligible) {
-          return `<tr class="ins-xl-skip"><td>${t.rank_actual}</td><td class="ins-xl-team">${t.short}</td><td>${t.pts}</td><td colspan="4" class="ins-adv-empty">xG 표본 부족 (${t.xg_games}/${d.min_games}경기)</td></tr>`;
+          return `<tr class="ins-xl-skip"><td>${t.rank_actual}</td><td class="ins-xl-team">${ttEsc(t.short)}</td><td>${t.pts}</td><td colspan="4" class="ins-adv-empty">xG 표본 부족 (${t.xg_games}/${d.min_games}경기)</td></tr>`;
         }
         const [lbl, cls] = LUCK[t.luck];
-        return `<tr><td>${t.rank_actual}</td><td class="ins-xl-team">${t.short}</td><td>${t.pts}</td>
+        return `<tr><td>${t.rank_actual}</td><td class="ins-xl-team">${ttEsc(t.short)}</td><td>${t.pts}</td>
           <td>${t.rank_xg}</td><td title="xG 기준 순위가 실제보다 ${t.rank_gap > 0 ? "높음 (실제는 더 낮게 평가됨)" : t.rank_gap < 0 ? "낮음 (실제는 더 높게 평가됨)" : "같음"}">${gapTxt(t.rank_gap)}</td>
           <td title="xG 보유 ${t.xg_games}경기 기준">${t.ppg.toFixed(2)} / ${t.xppg.toFixed(2)}</td>
           <td><span class="ins-xl-badge ${cls}">${lbl} ${t.luck_ppg > 0 ? "+" : ""}${t.luck_ppg.toFixed(2)}</span></td></tr>`;
       }).join("");
-      const warn = (d.warnings || []).map(w => `<div class="ins-xl-warn" role="note">⚠ ${w}</div>`).join("");
+      const warn = (d.warnings || []).map(w => `<div class="ins-xl-warn" role="note">⚠ ${escI(w)}</div>`).join("");
       return `<div class="ins-adv-sub-h">${d.league} ${d.year} <span class="ins-clutch-hint">xG 보유 ${d.matches_with_xg}/${d.matches}경기</span></div>${warn}
         <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>실제</th><th>팀</th><th>승점</th><th>xG 순위</th><th>차이</th><th title="경기당 승점: 실제 / 기대">PPG 실제/기대</th><th>판정</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }).join("") + `<div class="ins-method">근거 — 기대 승점=경기별 양 팀 xG를 포아송 분포로 환산한 승·무 확률(3·1점) · <b>xG가 있는 경기만</b> 실제·기대 모두 같은 경기로 비교 · 차이=xG 기준으론 몇 계단 더 위(▲)/아래(▼)인지 · 판정 ±${list[0] && list[0].ppg_band || 0.25} PPG 이상 · 팀당 ${list[0] && list[0].min_games || 5}경기 미만 제외 · 소표본이라 참고용</div>`;
@@ -1018,9 +1020,9 @@
     el.innerHTML = list.map(d => {
       if (!d || !d.buckets) return `<div class="ins-adv-empty">데이터 없음</div>`;
       const [vc, vi] = VERDICT[d.verdict.level] || VERDICT.insufficient;
-      const warn = (d.warnings || []).map(w => `<div class="ins-xl-warn" role="note">⚠ ${w}</div>`).join("");
+      const warn = (d.warnings || []).map(w => `<div class="ins-xl-warn" role="note">⚠ ${escI(w)}</div>`).join("");
       return `<div class="ins-adv-sub-h">${d.league} ${d.year === "all" ? "전 시즌" : d.year} <span class="ins-clutch-hint">팀-경기 ${d.team_matches.toLocaleString()}건</span></div>
-        <div class="ins-rs-verdict ${vc}" role="status"><span aria-hidden="true">${vi}</span> ${d.verdict.text}${d.year !== "all" ? ` <span class="ins-rs-hint">단일 시즌은 표본이 작아, 상단 시즌 필터를 '전체'로 두면 더 정확합니다.</span>` : ""}</div>${warn}
+        <div class="ins-rs-verdict ${vc}" role="status"><span aria-hidden="true">${vi}</span> ${escI(d.verdict.text)}${d.year !== "all" ? ` <span class="ins-rs-hint">단일 시즌은 표본이 작아, 상단 시즌 필터를 '전체'로 두면 더 정확합니다.</span>` : ""}</div>${warn}
         <div class="ins-rs-grid">
           <div><div class="ins-adv-sub-h">직전 경기와의 간격</div>${d.buckets.map(row).join("")}${cmpTxt(d.short_vs_normal, "3일 이하", "4일 이상")}</div>
           <div><div class="ins-adv-sub-h">홈·원정 휴식 격차 <span class="ins-clutch-hint">홈팀 PPG</span></div>${d.gap.map(row).join("")}${cmpTxt(d.gap_compare, "홈이 더 쉼", "원정이 더 쉼")}</div>
@@ -1040,19 +1042,19 @@
       const [vc, vi] = VERDICT[d.verdict.level] || VERDICT.insufficient;
       const rows = d.teams.map(t => {
         if (!t.z && t.z !== 0) {
-          return `<tr class="ins-xl-skip"><td class="ins-xl-team">${t.short}</td><td>${t.n}</td><td colspan="2" class="ins-adv-empty">표본 부족 (${d.min_team_n}경기 미만)</td></tr>`;
+          return `<tr class="ins-xl-skip"><td class="ins-xl-team">${ttEsc(t.short)}</td><td>${t.n}</td><td colspan="2" class="ins-adv-empty">표본 부족 (${d.min_team_n}경기 미만)</td></tr>`;
         }
         const lo = t.vs_league - t.ci, hi = t.vs_league + t.ci;
-        return `<tr><td class="ins-xl-team">${t.short}${t.significant ? ` <span class="ins-sb-star" title="유의 기준 초과 (z≥1.96)">★</span>` : ""}</td>
+        return `<tr><td class="ins-xl-team">${ttEsc(t.short)}${t.significant ? ` <span class="ins-sb-star" title="유의 기준 초과 (z≥1.96)">★</span>` : ""}</td>
           <td>${t.n}</td><td>${t.avg_first_min.toFixed(0)}분</td>
-          <td><span class="ins-sb-track" role="img" aria-label="${t.short} 리그 평균 대비 ${sg(t.vs_league)}골, 95% 구간 ${sg(lo)}~${sg(hi)}">
+          <td><span class="ins-sb-track" role="img" aria-label="${ttEsc(t.short)} 리그 평균 대비 ${sg(t.vs_league)}골, 95% 구간 ${sg(lo)}~${sg(hi)}">
               <i class="ins-sb-zero"></i><i class="ins-sb-ci" style="left:${pos(lo)}%;width:${pos(hi) - pos(lo)}%"></i><i class="ins-sb-dot" style="left:${pos(t.vs_league)}%"></i></span>
               <span class="ins-sb-val">${sg(t.vs_league)}<span class="ins-rs-pm"> ±${t.ci.toFixed(2)}</span></span></td></tr>`;
       }).join("");
       const bench = d.bench.map((b, i) =>
-        `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${b.name}</span><span class="ins-adv-sub">${b.team} · ${b.minutes}분 ${b.goals}골 ${b.assists}도움</span><b>${b.ga_per90.toFixed(2)}</b></li>`).join("");
+        `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${ttEsc(b.name)}</span><span class="ins-adv-sub">${ttEsc(b.team)} · ${b.minutes}분 ${b.goals}골 ${b.assists}도움</span><b>${b.ga_per90.toFixed(2)}</b></li>`).join("");
       return `<div class="ins-adv-sub-h">${d.league} ${d.year === "all" ? "전 시즌" : d.year} <span class="ins-clutch-hint">첫 전술 교체 ${d.first_sub_samples.toLocaleString()}건</span></div>
-        <div class="ins-rs-verdict ${vc}" role="status"><span aria-hidden="true">${vi}</span> ${d.verdict.text}
+        <div class="ins-rs-verdict ${vc}" role="status"><span aria-hidden="true">${vi}</span> ${escI(d.verdict.text)}
           <span class="ins-rs-hint">리그 전체 평균: 교체 후 순득실 ${sg(d.league_mean)}골${d.league_ci != null ? ` ±${d.league_ci.toFixed(2)}` : ""} (교체 전 15분 대비)${d.year !== "all" ? " · 단일 시즌은 표본이 작아 시즌 필터 '전체' 권장" : ""}</span></div>
         <div class="ins-rs-grid ins-sb-grid">
           <div><div class="ins-adv-sub-h">팀별 교체 후 득실 변화 <span class="ins-clutch-hint">리그 평균 대비</span></div>
@@ -1068,19 +1070,19 @@
     el.innerHTML = list.map(d => {
       if (!d || !d.teams) return `<div class="ins-adv-empty">데이터 없음</div>`;
       const k = d.xg_ok ? "xg_pg" : "shots_pg", unit = d.metric;
-      const warn = (d.warnings || []).map(w => `<div class="ins-xl-warn" role="note">⚠ ${w}</div>`).join("");
+      const warn = (d.warnings || []).map(w => `<div class="ins-xl-warn" role="note">⚠ ${escI(w)}</div>`).join("");
       const hl = (d.highlights || []).map(h =>
-        `<li class="ins-spp-hl ins-spp-${h.kind}"><span class="ins-spp-tag">${h.kind === "attack" ? "▲ 강점" : "▼ 취약"}</span>${h.text}</li>`).join("");
+        `<li class="ins-spp-hl ins-spp-${h.kind}"><span class="ins-spp-tag">${h.kind === "attack" ? "▲ 강점" : "▼ 취약"}</span>${escI(h.text)}</li>`).join("");
       const types = d.league_types.map(t =>
         `<span class="ins-spp-chip"><b>${t.label}</b> ${t.shots.toLocaleString()}슛 · 득점률 ${t.goal_pct ?? "-"}%${t.xg_per_shot != null ? ` · 슈팅당 xG ${t.xg_per_shot}` : ""}</span>`).join("");
       const cell = (o, rank, total) => `${o[k].toFixed(2)}<span class="ins-rs-pm"> ${rank ? rank + "위" : ""}</span>`;
       const share = o => o.goal_share == null ? "-" : `${o.goal_share}%${o.small_goals ? `<span class="ins-spp-small" title="골 ${d.min_goals}개 미만 — 소표본">†</span>` : ""}`;
       const rows = d.teams.map(t => {
         if (!t.eligible) {
-          return `<tr class="ins-xl-skip"><td class="ins-xl-team">${t.short}</td><td>${t.games}</td><td colspan="6" class="ins-adv-empty">표본 부족 (${d.min_games}경기 미만)</td></tr>`;
+          return `<tr class="ins-xl-skip"><td class="ins-xl-team">${ttEsc(t.short)}</td><td>${t.games}</td><td colspan="6" class="ins-adv-empty">표본 부족 (${d.min_games}경기 미만)</td></tr>`;
         }
         const ty = Object.entries(t.for.by_type_pg).map(([a, v]) => `${a} ${v}`).join(" · ");
-        return `<tr title="공격 유형별 슈팅/경기 — ${ty}"><td class="ins-xl-team">${t.short}</td><td>${t.games}</td>
+        return `<tr title="공격 유형별 슈팅/경기 — ${ty}"><td class="ins-xl-team">${ttEsc(t.short)}</td><td>${t.games}</td>
           <td>${cell(t.for, t.rank_for)}</td><td>${cell(t.against, t.rank_against)}</td>
           <td><b class="${t.net > 0 ? "ins-xl-up" : t.net < 0 ? "ins-xl-down" : ""}">${t.net > 0 ? "+" : ""}${t.net.toFixed(2)}</b></td>
           <td>${share(t.for)}</td><td>${share(t.against)}</td><td>${t.for.head_share ?? "-"}%</td></tr>`;

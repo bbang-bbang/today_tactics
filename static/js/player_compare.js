@@ -1,3 +1,5 @@
+// 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
+function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 /* player_compare.js — 선수 vs 선수 직접 비교 모달 (K리그2)
  * window.openPlayerCompare() 진입. /api/heatmap-player-search 로 검색,
  * /api/player-stat-report 를 두 선수에 대해 호출해 헤더·레이더·지표 막대·최근폼 비교.
@@ -79,8 +81,8 @@
         }
         results.innerHTML = list.slice(0, 12).map(p =>
             `<button type="button" class="pc-res" data-pid="${p.playerId}">
-                <span class="pc-res-name">${p.name} <em class="pc-lg pc-lg-${p.league}">${p.league === "k1" ? "K1" : "K2"}</em></span>
-                <span class="pc-res-meta">${p.teamShort || p.teamName || ""}${p.detailLabel ? " · " + p.detailLabel : (p.position ? " · " + p.position : "")} · ${p.games}경기</span>
+                <span class="pc-res-name">${ttEsc(p.name)} <em class="pc-lg pc-lg-${p.league}">${p.league === "k1" ? "K1" : "K2"}</em></span>
+                <span class="pc-res-meta">${ttEsc(p.teamShort || p.teamName || "")}${ttEsc(p.detailLabel ? " · " + p.detailLabel : (p.position ? " · " + p.position : ""))} · ${p.games}경기</span>
             </button>`).join("");
         results.classList.remove("hidden");
         results.querySelectorAll(".pc-res").forEach(btn => {
@@ -156,14 +158,14 @@
 
     function headerCard(r, selp, col) {
         if (!selp) return `<div class="pc-card pc-card-empty">선수 미선택</div>`;
-        if (!r) return `<div class="pc-card"><div class="pc-card-name" style="color:${col}">${selp.name}</div>
+        if (!r) return `<div class="pc-card"><div class="pc-card-name" style="color:${col}">${ttEsc(selp.name)}</div>
             <div class="pc-card-warn">K리그2 상세 스탯 없음</div></div>`;
         const p = r.player;
         const lg = p.league ? `<em class="pc-lg pc-lg-${p.league.toLowerCase()}">${p.league}</em>` : "";
         const posTxt = (p.detail_label || p.pos_label || "") + (p.team ? " · " + p.team : "");
         const kpi = (v, l) => `<div class="pc-kpi"><div class="pc-kpi-v">${v}</div><div class="pc-kpi-l">${l}</div></div>`;
         return `<div class="pc-card" style="border-top:3px solid ${col}">
-            <div class="pc-card-name" style="color:${col}">${p.name} ${lg}</div>
+            <div class="pc-card-name" style="color:${col}">${ttEsc(p.name)} ${lg}</div>
             <div class="pc-card-meta">${posTxt}</div>
             <div class="pc-kpis">
                 ${kpi(p.games, "경기")}${kpi(p.goals, "골")}${kpi(p.assists, "도움")}
@@ -239,12 +241,12 @@
             const rc = m.result || "?";
             return `<div class="pc-form-row">
                 <span class="pc-form-res pc-res-${rc}">${RESULT[rc] || "?"}</span>
-                <span class="pc-form-opp">${m.is_home ? "vs" : "@"} ${m.opponent}</span>
+                <span class="pc-form-opp">${m.is_home ? "vs" : "@"} ${ttEsc(m.opponent)}</span>
                 <span class="pc-form-line">${m.goals ? "⚽" + m.goals : ""}${m.assists ? " 🎨" + m.assists : ""}</span>
                 <span class="pc-form-rating">${m.rating != null ? m.rating : "—"}</span>
             </div>`;
         }).join("") : '<div class="pc-form-empty">최근 경기 없음</div>';
         return `<div class="pc-form-col">
-            <div class="pc-form-cap" style="color:${col}">${r.player.name}</div>${rows}</div>`;
+            <div class="pc-form-cap" style="color:${col}">${ttEsc(r.player.name)}</div>${rows}</div>`;
     }
 })();

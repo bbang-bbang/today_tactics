@@ -589,7 +589,7 @@
                     : "날짜미상";
                 const score = (m.homeScore != null && m.awayScore != null) ? `${m.homeScore}:${m.awayScore}` : "-";
                 const badge = m.isAway ? `<span class="mp-badge mp-away">AWAY</span>` : `<span class="mp-badge mp-home">HOME</span>`;
-                li.innerHTML = `<span class="mp-check">☐</span><span class="mp-date">${date}</span>${badge}<span class="mp-home-team">${m.home}</span><span class="mp-vs">vs</span><span class="mp-away-team">${m.away}</span><span class="mp-score">${score}</span>`;
+                li.innerHTML = `<span class="mp-check">☐</span><span class="mp-date">${date}</span>${badge}<span class="mp-home-team">${escapeHtml(m.home)}</span><span class="mp-vs">vs</span><span class="mp-away-team">${escapeHtml(m.away)}</span><span class="mp-score">${score}</span>`;
 
                 li.addEventListener("click", async () => {
                     const eid = m.id;
@@ -1496,13 +1496,14 @@
         tooltipTarget = player;
         const age = calcAge(player.dob);
         const lines = [
-            `<b>${player.name}</b>`,
-            player.position ? `포지션: ${player.position}` : "",
-            `등번호: ${player.number}`,
-            player.height ? `신장: ${player.height}cm` : "",
-            player.weight ? `체중: ${player.weight}kg` : "",
+            // 스쿼드·저장 데이터는 누구나 쓸 수 있으므로 모든 값을 이스케이프한다(저장형 XSS 방지)
+            `<b>${escapeHtml(player.name)}</b>`,
+            player.position ? `포지션: ${escapeHtml(player.position)}` : "",
+            `등번호: ${escapeHtml(player.number)}`,
+            player.height ? `신장: ${escapeHtml(player.height)}cm` : "",
+            player.weight ? `체중: ${escapeHtml(player.weight)}kg` : "",
             age !== null ? `나이: ${age}세` : "",
-            player.dob ? `생년월일: ${player.dob.replace(/\//g, ".")}` : "",
+            player.dob ? `생년월일: ${escapeHtml(String(player.dob).replace(/\//g, "."))}` : "",
         ].filter(Boolean).join("<br>");
         playerTooltip.innerHTML = lines;
         const x = Math.min(clientX + 14, window.innerWidth - 160);
@@ -1993,7 +1994,7 @@
     loadModal.querySelector(".modal-backdrop").addEventListener("click", closeLoadModal);
     loadModalClose.addEventListener("click", closeLoadModal);
 
-    function escapeHtml(str) { const d = document.createElement("div"); d.textContent = str; return d.innerHTML; }
+    function escapeHtml(str) { const d = document.createElement("div"); d.textContent = str == null ? "" : String(str); return d.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
     function escapeAttr(str) { return str.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
 
     async function openLoadModal() {
@@ -2004,7 +2005,7 @@
         savesList.innerHTML = "";
         for (const s of saves) {
             const item = document.createElement("div"); item.className = "save-item";
-            item.innerHTML = `<div class="save-item-info"><div class="save-item-name">${escapeHtml(s.name)}</div><div class="save-item-meta">${s.formation} &middot; ${formatDate(s.updatedAt)}</div></div>
+            item.innerHTML = `<div class="save-item-info"><div class="save-item-name">${escapeHtml(s.name)}</div><div class="save-item-meta">${escapeHtml(s.formation)} &middot; ${formatDate(s.updatedAt)}</div></div>
             <div class="save-item-actions"><button class="btn-load-item" data-id="${s.id}">불러오기</button><button class="btn-overwrite-item" data-id="${s.id}" data-name="${escapeAttr(s.name)}">덮어쓰기</button><button class="btn-link-item" data-id="${s.id}" title="공유 링크 복사">🔗</button><button class="btn-delete-item" data-id="${s.id}">삭제</button></div>`;
             savesList.appendChild(item);
         }
