@@ -179,7 +179,7 @@ def invalidate_api_cache():
     if gen:
         _cache_gen_seen = gen   # 자기 자신이 방금 데운 캐시를 다시 비우지 않도록
 
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for, send_from_directory
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from authlib.integrations.flask_client import OAuth
 
 app = Flask(__name__)
@@ -441,7 +441,7 @@ def _auth_gate():
     if not LOGIN_REQUIRED:
         return None
     p = request.path
-    PUBLIC_PREFIXES = ("/static/", "/login", "/auth/", "/health", "/favicon", "/portfolio")
+    PUBLIC_PREFIXES = ("/static/", "/login", "/auth/", "/health", "/favicon")
     if any(p.startswith(x) for x in PUBLIC_PREFIXES):
         return None
     if session.get("user"):
@@ -553,13 +553,6 @@ def auth_me():
 @app.route("/health")
 def health():
     return jsonify({"ok": True})
-
-
-@app.route("/portfolio")
-def portfolio_page():
-    """개발자 포트폴리오(정적 HTML 1장). 경로 고정 — 사용자 입력으로 파일을 고르지 않는다. 짧은 캐시로 수정 반영 가능."""
-    resp = send_from_directory(os.path.join(BASE_DIR, "static", "portfolio"), "index.html", max_age=300)
-    return resp
 
 
 def _init_default_squads():
