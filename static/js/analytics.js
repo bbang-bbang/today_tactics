@@ -192,6 +192,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             }
             buildYearFilter(analytics.available_years || []);
             renderIdentity(meta, analytics, trend, rankings);
+            renderTeamBrief(meta, trend, rankings, insights);
             // 결과 분석
             renderTrend(trend, meta);
             renderMargin(trend, meta);
@@ -234,6 +235,106 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     function rankChip(r) {
         if (!r) return "";
         return `<div class="ta-stat-rank" style="color:${rankColor(r.pctl)}">리그 ${r.rank}<small>/${r.total}위</small></div>`;
+    }
+
+    // ── 팀 한 줄 진단 — 이미 불러온 데이터에서 규칙으로 문장을 만든다(근거 수치 병기, 임계값 미달이면 만들지 않음) ──
+    function jj(word, kind) {   // 조사 선택: 0 은/는 · 1 이/가 · 2 을/를
+        const w = String(word || ""), c = w.charCodeAt(w.length - 1);
+        const has = c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0;
+        return w + [["은", "는"], ["이", "가"], ["을", "를"]][kind][has ? 0 : 1];
+    }
+    function renderTeamBrief(meta, trend, rankings, insights) {
+        const host = document.getElementById("ta-brief");
+        if (!host) return;
+        const ms = trend.matches || [];
+        const name = meta.short || meta.name || "이 팀";
+        const lines = [];   // {score, tag, text, ev}
+        const ppg = rows => rows.length ? rows.reduce((a, m) => a + (m.result === "W" ? 3 : m.result === "D" ? 1 : 0), 0) / rows.length : 0;
+        const rk = key => {
+            const me = (rankings.teams || []).find(t => t.id === currentTeamId);
+            const total = (rankings.totals || {})[key];
+            const rank = me && me.eligible && me.ranks ? me.ranks[key] : null;
+            return rank && total >= 4 ? { rank, total } : null;
+        };
+        const third = t => Math.max(1, Math.round(t / 3));
+
+        // ① 팀 성격 (득점·실점 리그 순위)
+        const gf = rk("gf_per_game"), ga = rk("ga_per_game");
+        if (gf && ga) {
+            const atk = gf.rank <= third(gf.total), atkWeak = gf.rank > gf.total - third(gf.total);
+            const def = ga.rank <= third(ga.total), defWeak = ga.rank > ga.total - third(ga.total);
+            const type = atk && def ? "공수 모두 상위권인 강팀"
+                : atk && defWeak ? "화력은 좋지만 수비가 불안한 공격형 팀"
+                : def && atkWeak ? "실점은 적지만 득점이 아쉬운 수비형 팀"
+                : atkWeak && defWeak ? "공수 모두 고전하는 팀"
+                : atk ? "득점력이 강점인 팀" : def ? "수비가 강점인 팀" : "공수가 평범한 균형형 팀";
+            lines.push({ score: 100, tag: "성격", text: `${jj(name, 0)} ${type}.`,
+                ev: `득점 리그 ${gf.rank}/${gf.total}위 · 실점 ${ga.rank}/${ga.total}위` });
+        }
+        // ② 최근 흐름
+        if (ms.length >= 10) {
+            const all = ppg(ms), l5 = ppg(ms.slice(-5)), d = l5 - all;
+            const g5 = ms.slice(-5).reduce((a, m) => a + m.gf, 0) / 5, a5 = ms.slice(-5).reduce((a, m) => a + m.ga, 0) / 5;
+            if (Math.abs(d) >= 0.6) {
+                lines.push({ score: 90 + Math.abs(d) * 5, tag: "흐름",
+                    text: d > 0 ? `최근 5경기 상승세 — 시즌 평균보다 경기당 ${d.toFixed(1)}점을 더 따고 있다.`
+                                : `최근 5경기 하락세 — 시즌 평균보다 경기당 ${Math.abs(d).toFixed(1)}점 덜 따고 있다.`,
+                    ev: `경기당 승점 ${all.toFixed(2)} → ${l5.toFixed(2)} · 최근 5경기 평균 ${g5.toFixed(1)}득점 ${a5.toFixed(1)}실점` });
+            } else {
+                lines.push({ score: 40, tag: "흐름", text: "최근 흐름은 시즌 평균과 비슷하다.",
+                    ev: `경기당 승점 ${all.toFixed(2)} → ${l5.toFixed(2)}` });
+            }
+        }
+        // ③ 강점·약점 (순위가 가장 높은/낮은 지표)
+        const skip = new Set(["form_ppg_last5", "first_goal_win_pct", "first_conceded_win_pct", "gf_per_game", "ga_per_game"]);
+        const items = (rankings.metrics || []).filter(m => !skip.has(m.key)).map(m => ({ m, r: rk(m.key) })).filter(x => x.r);
+        if (items.length >= 3) {
+            const best = items.reduce((a, b) => a.r.rank / a.r.total <= b.r.rank / b.r.total ? a : b);
+            const worst = items.reduce((a, b) => a.r.rank / a.r.total >= b.r.rank / b.r.total ? a : b);
+            const parts = [];
+            if (best.r.rank <= third(best.r.total)) parts.push(`강점은 ${best.m.label}(리그 ${best.r.rank}/${best.r.total}위)`);
+            if (worst.r.rank > worst.r.total - third(worst.r.total)) parts.push(`약점은 ${worst.m.label}(리그 ${worst.r.rank}/${worst.r.total}위)`);
+            if (parts.length) lines.push({ score: 75, tag: "스킬", text: parts.join(", ") + ".", ev: "세부 지표 리그 순위 기준(스킬 프로필 탭)" });
+        }
+        // ④ 홈·원정
+        const hm = ms.filter(m => m.is_home), aw = ms.filter(m => !m.is_home);
+        if (hm.length >= 6 && aw.length >= 6) {
+            const gap = ppg(hm) - ppg(aw);
+            if (Math.abs(gap) >= 0.7) {
+                lines.push({ score: 70 + Math.abs(gap) * 3, tag: "홈·원정",
+                    text: gap > 0 ? `홈에서 훨씬 강하다 — 원정보다 경기당 ${gap.toFixed(1)}점을 더 딴다.` : `원정에서 더 잘한다 — 홈보다 경기당 ${Math.abs(gap).toFixed(1)}점이 높다.`,
+                    ev: `홈 ${ppg(hm).toFixed(2)}점/경기(${hm.length}경기) vs 원정 ${ppg(aw).toFixed(2)}점/경기(${aw.length}경기)` });
+            }
+        }
+        // ⑤ 득실 시간대 / 선제골
+        const gt = (insights && insights.goal_timing) || {};
+        if (gt.total >= 10) {
+            const peak = arr => { const t = arr.reduce((a, b) => a + b, 0); if (!t) return null; const i = arr.indexOf(Math.max(...arr)); return { i, n: arr[i], t, pct: Math.round(arr[i] / t * 100) }; };
+            const pa = peak(gt.against || []);
+            if (pa && pa.pct >= 30 && (gt.against || []).reduce((a, b) => a + b, 0) >= 6) {
+                lines.push({ score: 72 + pa.pct / 5, tag: "시간대", text: `${TIMING_LABELS[pa.i]}분에 실점이 몰린다 — 이 구간 집중력이 과제.`,
+                    ev: `실점 ${pa.t}골 중 ${pa.n}골(${pa.pct}%)` });
+            }
+            const pf = peak(gt.for || []);
+            if (pf && pf.pct >= 30 && (gt.for || []).reduce((a, b) => a + b, 0) >= 6) {
+                lines.push({ score: 68 + pf.pct / 5, tag: "시간대", text: `${TIMING_LABELS[pf.i]}분에 득점이 몰린다.`, ev: `득점 ${pf.t}골 중 ${pf.n}골(${pf.pct}%)` });
+            }
+        }
+        const fg = (insights && insights.first_goal) || {};
+        const cn = fg.conceded, sc = fg.scored;
+        const tot = o => o ? (o.w || 0) + (o.d || 0) + (o.l || 0) : 0;
+        if (cn && tot(cn) >= 5 && (cn.w || 0) / tot(cn) <= 0.2) {
+            lines.push({ score: 80, tag: "선제골", text: "먼저 실점하면 좀처럼 뒤집지 못한다.", ev: `선제 실점 ${tot(cn)}경기 중 ${cn.w || 0}승(${Math.round((cn.w || 0) / tot(cn) * 100)}%)` });
+        } else if (sc && tot(sc) >= 5 && (sc.w || 0) / tot(sc) >= 0.85) {
+            lines.push({ score: 70, tag: "선제골", text: "선제골을 넣으면 거의 지지 않는다.", ev: `선제 득점 ${tot(sc)}경기 중 ${sc.w || 0}승(${Math.round((sc.w || 0) / tot(sc) * 100)}%)` });
+        }
+
+        lines.sort((a, b) => b.score - a.score);
+        const shown = lines.slice(0, 5);
+        host.innerHTML = shown.length
+            ? `<div class="ta-brief-h">한 줄 진단</div><ul class="ta-brief-list">${shown.map(l =>
+                `<li><span class="ta-brief-k">${ttEsc(l.tag)}</span><span class="ta-brief-t">${ttEsc(l.text)}<small>${ttEsc(l.ev)}</small></span></li>`).join("")}</ul>`
+            : "";
     }
 
     // ── 아이덴티티 + 시즌 요약 ────────────────────────────────────
