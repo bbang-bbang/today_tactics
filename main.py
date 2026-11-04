@@ -5450,6 +5450,10 @@ def get_player_stat_report_official():
             f"WHERE k.player_kid = ? AND e.tournament_id IN (410, 777) AND {ycond} "
             "ORDER BY e.date_ts DESC LIMIT 1", (kid, year, year)).fetchone()
         tid = t[0]
+        # '전체' 범위에 실제로 포함된 시즌(해당 리그만) — 화면에 "K1 전체(2026)"처럼 범위를 밝히기 위함
+        scope_years = [r[0] for r in cur.execute(
+            f"SELECT DISTINCT {year_expr} FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
+            "WHERE k.player_kid = ? AND e.tournament_id = ? ORDER BY 1", (kid, tid))] if year == "all" else [year]
         # 득점 보정(공식 goal 누락분) — 본인·비교군 모두 같은 규칙이라 백분위가 공정하다. 규칙·근거는 _kpm_goal_adjust.
         # 매핑 테이블이 없는 DB 에서는 공식 값 그대로.
         has_map = bool(cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague_player_map'").fetchone())
@@ -5571,7 +5575,7 @@ def get_player_stat_report_official():
                 "yellows": me["yellow"] or 0, "reds": me["red"] or 0,
                 "xg": round(me["xg"], 2) if has_xg else None,               # 2026은 공식 xG 빈 값 → None
             },
-            "year": year, "available_years": years,
+            "year": year, "available_years": years, "scope_years": scope_years,
             "coverage": {"official_games": me["games"], "sofa_games": sofa_games},
             # 득점 보정 내역 — 공식 goals 가 경기 기록보다 적었던 경기 수·추가된 골 수(0이면 보정 없음)
             "goals_adjusted": {"added": adj_add.get(kid, 0), "games": adj_games.get(kid, 0)},

@@ -315,7 +315,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <div class="pr-player-header">
                 <div class="pr-pos-badge" style="background:${posColor}22;border-color:${posColor}55;color:${posColor}">${ttEsc(posLabel)}</div>
                 <div class="pr-player-name">${ttEsc(p.name)}</div>
-                <div class="pr-player-team">${ttEsc(p.team)} · ${ttEsc(p.league)} ${d.year === "all" ? "전체 시즌 누적" : ttEsc(d.year)}</div>
+                <div class="pr-player-team">${ttEsc(p.team)} · ${ttEsc(p.league)} ${d.year === "all" ? "전체 시즌 누적(" + ttEsc((d.scope_years || []).join("·")) + ")" : ttEsc(d.year)}</div>
                 <div class="pr-info-badges">
                     <span class="pr-badge">${p.games}경기</span>
                     <span class="pr-badge">${p.mins}분</span>
@@ -326,7 +326,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                     ${p.yellows ? `<span class="pr-badge">🟨${p.yellows}</span>` : ""}
                     ${p.reds    ? `<span class="pr-badge">🟥${p.reds}</span>` : ""}
                 </div>
-                <div class="pr-peer-note pr-peer-note-official">같은 리그·같은 포지션 <b>${ttEsc(p.peer_label)}</b> ${d.peer_count}명 대비 퍼센타일 (공식 기록 기준${d.year === "all" ? " · 현재 리그의 모든 시즌을 합산" : ""})</div>
+                <div class="pr-peer-note pr-peer-note-official">같은 리그·같은 포지션 <b>${ttEsc(p.peer_label)}</b> ${d.peer_count}명 대비 퍼센타일 (공식 기록 기준${d.year === "all" ? " · 이 리그에서 뛴 모든 시즌을 합산(다른 리그 시즌은 제외)" : ""})</div>
             </div>
         </div>
 
