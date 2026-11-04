@@ -6,7 +6,8 @@
 득점·카드·교체 기록은 양쪽에 중복으로, 라인업은 점수 NULL 쪽에만 붙어 있었다.
 
 규칙
-- 그룹: 같은 (home_team_id, away_team_id) 이고 date_ts 가 ±12h 안인 events.
+- 그룹: 같은 팀 조합(홈·원정 반대 포함)이 date_ts ±12h 안, 또는 같은 공식 경기에 매핑된 같은 팀 조합(연기 잔재).
+  홈·원정이 반대인 중복은 행 '삭제'만 허용(이동하면 is_home 이 뒤집힘) — 이동이 필요하면 건너뜀.
 - 대표(canon) 선택: 스코어 있음 > 딸린 행 많음 > id 작음.
 - 대표에 해당 테이블 행이 없으면 중복의 행을 대표로 '이동', 있으면 중복의 행은 '삭제'.
   단 득점·카드·교체(incident)는 더 많은 쪽 집합을 채택(덜 수집된 쪽을 버림).
@@ -49,21 +50,50 @@ def count(conn, table, col, eid):
 
 
 def find_groups(conn):
+    """중복 후보 그룹. 두 경우를 union 한다.
+    ① 같은 팀 조합(홈·원정이 뒤바뀐 경우 포함)이 ±12h 안에 있음 — 중복 등록
+    ② 같은 K리그 공식 경기(kleague_event_map 의 year·league·game·meet)에 매핑되고 팀 조합이 같음 — 연기·재편성으로
+       날짜가 달라진 옛 예정 경기 잔재"""
     rows = conn.execute(
         "SELECT id, home_team_id, away_team_id, date_ts, home_score, away_score FROM events "
-        "WHERE home_team_id IS NOT NULL AND away_team_id IS NOT NULL AND date_ts IS NOT NULL "
-        "ORDER BY home_team_id, away_team_id, date_ts, id").fetchall()
-    groups, cur = [], []
+        "WHERE home_team_id IS NOT NULL AND away_team_id IS NOT NULL AND date_ts IS NOT NULL").fetchall()
+    by_id = {r[0]: r for r in rows}
+    parent = {r[0]: r[0] for r in rows}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    pair = lambda r: (min(r[1], r[2]), max(r[1], r[2]))
+    srt = sorted(rows, key=lambda r: (pair(r), r[3], r[0]))
+    for i, r in enumerate(srt):                       # ① 같은 팀 조합 ±12h
+        j = i + 1
+        while j < len(srt) and pair(srt[j]) == pair(r) and srt[j][3] - r[3] <= WINDOW:
+            union(r[0], srt[j][0])
+            j += 1
+    has_map = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague_event_map'").fetchone()
+    if has_map:                                        # ② 같은 공식 경기 + 같은 팀 조합
+        seen = {}
+        for eid, y, lg, g, ms in conn.execute(
+                "SELECT sofa_event_id, year, league_id, game_id, meet_seq FROM kleague_event_map"):
+            if eid not in by_id:
+                continue
+            k = (y, lg, g, ms)
+            if k in seen and pair(by_id[seen[k]]) == pair(by_id[eid]):
+                union(seen[k], eid)
+            else:
+                seen.setdefault(k, eid)
+    comp = {}
     for r in rows:
-        if cur and r[1] == cur[-1][1] and r[2] == cur[-1][2] and r[3] - cur[0][3] <= WINDOW:
-            cur.append(r)
-        else:
-            if len(cur) > 1:
-                groups.append(cur)
-            cur = [r]
-    if len(cur) > 1:
-        groups.append(cur)
-    return groups
+        comp.setdefault(find(r[0]), []).append(r)
+    return [sorted(g, key=lambda r: r[0]) for g in comp.values() if len(g) > 1]
 
 
 def dep_total(conn, tables, eid):
@@ -74,13 +104,14 @@ def plan_group(conn, tables, grp):
     """그룹 하나의 병합 계획. 건너뛰면 (None, 사유)."""
     ev = []
     for (eid, h, a, ts, hs, as_) in grp:
-        ev.append({"id": eid, "hs": hs, "as": as_, "dep": dep_total(conn, tables, eid),
+        ev.append({"id": eid, "h": h, "a": a, "hs": hs, "as": as_, "dep": dep_total(conn, tables, eid),
                    "mps": count(conn, "match_player_stats", "event_id", eid)})
     scored = {(e["hs"], e["as"]) for e in ev if e["hs"] is not None}
     if len(scored) > 1:
         return None, f"스코어 불일치 {sorted(scored)} — 사람 확인"
     ev.sort(key=lambda e: (e["hs"] is None, -e["dep"], e["id"]))
     canon, dups = ev[0], ev[1:]
+    reversed_ids = {d["id"] for d in dups if (d["h"], d["a"]) != (canon["h"], canon["a"])}
     if canon["mps"] and any(d["mps"] for d in dups):
         return None, "선수 경기 스탯이 양쪽에 있음 — 자동 병합 안 함"
     actions = []
@@ -95,7 +126,12 @@ def plan_group(conn, tables, grp):
                 actions.append((d["id"], t, c, "replace", nd, nc))     # 대표 행 삭제 후 중복 행 이동
             else:
                 actions.append((d["id"], t, c, "drop", nd, nc))
-    return {"canon": canon["id"], "dups": [d["id"] for d in dups], "actions": actions}, None
+    # 홈·원정이 반대인 중복의 행을 대표로 옮기면 is_home/side 가 뒤집히므로 자동 이동 금지(삭제만 허용)
+    bad = [x for x in actions if x[0] in reversed_ids and x[3] != "drop"]
+    if bad:
+        return None, f"홈·원정이 반대인 중복에 이동할 행이 있음({[(b[1], b[3]) for b in bad]}) — 사람 확인"
+    return {"canon": canon["id"], "dups": [d["id"] for d in dups], "actions": actions,
+            "reversed": sorted(reversed_ids)}, None
 
 
 def main() -> int:
@@ -117,7 +153,8 @@ def main() -> int:
         print(f"  건너뜀 {[g[0] for g in grp]}: {why}")
     for p in plans:
         mv = [f"{t}:{k}({n})" for _, t, _, k, n, _ in p["actions"]]
-        print(f"  대표 {p['canon']} ← 중복 {p['dups']}  " + (", ".join(mv) if mv else "(딸린 행 없음)"))
+        rv = f" [홈·원정 반대: {p['reversed']}]" if p.get("reversed") else ""
+        print(f"  대표 {p['canon']} ← 중복 {p['dups']}{rv}  " + (", ".join(mv) if mv else "(딸린 행 없음)"))
     if not args.apply or not plans:
         conn.close()
         return 0
