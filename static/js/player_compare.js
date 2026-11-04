@@ -32,8 +32,12 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
     const sel = { a: null, b: null };       // 선택된 선수 {playerId, name, ...}
     const rep = { a: null, b: null };       // 가져온 리포트
-    const _repCache = {};
+    const _repCache = {};                   // "출처:playerId" → 응답
     let _radar = null;
+    // 데이터 출처. 두 선수는 항상 같은 출처로만 비교한다(지표 정의가 달라 섞으면 왜곡).
+    // 공식 우선 → 한 명이라도 공식 기록과 연결되지 않으면 둘 다 SofaScore 로 자동 전환(사용자가 직접 고르면 고정).
+    let source = "official", autoSource = true, loadSeq = 0;
+    const OFFICIAL_OFF = new Set(["touches"]);   // 공식 응답에 없는 지표
 
     function close() {
         modal.classList.add("hidden");
@@ -96,19 +100,44 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }
     const pickEl = slot => modal.querySelector(`.pc-pick[data-slot="${slot}"]`);
 
-    async function pick(slot, p) {
-        sel[slot] = p; rep[slot] = null;
+    async function fetchRep(p, src) {
+        const key = src + ":" + p.playerId;
+        if (_repCache[key]) return _repCache[key];
+        const base = src === "official" ? "/api/player-stat-report-official" : "/api/player-stat-report";
+        try {
+            const r = await fetch(base + "?playerId=" + encodeURIComponent(p.playerId));
+            const d = await r.json();
+            _repCache[key] = d;
+            return d;
+        } catch (_) { return { found: false }; }
+    }
+    const repOk = (r, src) => !!(r && r.found && (src !== "official" || r.official));
+
+    async function loadSlots() {
+        const slots = ["a", "b"].filter(s => sel[s]);
+        slots.forEach(s => { rep[s] = null; });
         renderBody();   // 로딩 표시
-        let data = _repCache[p.playerId];
-        if (!data) {
-            try {
-                const r = await fetch("/api/player-stat-report?playerId=" + encodeURIComponent(p.playerId));
-                data = await r.json();
-                _repCache[p.playerId] = data;
-            } catch (_) { data = { found: false }; }
+        const seq = ++loadSeq;
+        const res = await Promise.all(slots.map(s => fetchRep(sel[s], source)));
+        if (seq !== loadSeq) return;   // 더 최근 선택이 있으면 폐기
+        if (autoSource && source === "official" && res.some(r => !repOk(r, "official"))) {
+            source = "sofa"; autoSource = false;   // 공식 연결 불가 → 둘 다 SofaScore 로
+            return loadSlots();
         }
-        rep[slot] = data;
+        slots.forEach((s, i) => { rep[s] = res[i]; });
         renderBody();
+    }
+
+    function pick(slot, p) {
+        sel[slot] = p;
+        return loadSlots();
+    }
+
+    function srcToggle() {
+        const b = (s, label) =>
+            `<button type="button" class="pr-src-btn${source === s ? " active" : ""}" data-src="${s}" aria-pressed="${source === s}">${label}</button>`;
+        return `<div class="pr-source-toggle" role="group" aria-label="데이터 출처">
+            <span class="pr-src-label">데이터 출처</span>${b("sofa", "SofaScore")}${b("official", "공식 K리그 <small>베타</small>")}</div>`;
     }
 
     // ── 렌더 ──────────────────────────────────────────────
@@ -123,13 +152,17 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             bodyEl.innerHTML = '<div class="pc-empty">⏳ 선수 데이터 불러오는 중…</div>';
             return;
         }
-        const okA = ra && ra.found, okB = rb && rb.found;
+        const okA = repOk(ra, source), okB = repOk(rb, source);
         // 한 명만 선택됐거나 데이터 없음 처리
+        const noData = source === "official" ? "공식 기록과 연결되지 않음(SofaScore로 전환해 보세요)" : "상세 스탯 없음";
         const warn = [];
-        if (sel.a && !okA) warn.push(`${sel.a.name}: K리그2 상세 스탯 없음`);
-        if (sel.b && !okB) warn.push(`${sel.b.name}: K리그2 상세 스탯 없음`);
+        if (sel.a && !okA) warn.push(`${ttEsc(sel.a.name)}: ${noData}`);
+        if (sel.b && !okB) warn.push(`${ttEsc(sel.b.name)}: ${noData}`);
 
-        let html = "";
+        let html = srcToggle();
+        if (source === "official") {
+            html += `<div class="pc-warn" style="margin-bottom:10px">공식 K리그 기록 기준입니다. 출전 시간이 추가시간을 포함해 90분 환산이 SofaScore보다 낮게 나오고, 태클·드리블·경합 등은 정의가 달라 SofaScore 탭 수치와 직접 비교할 수 없습니다.</div>`;
+        }
         // 헤더 카드 2개
         html += `<div class="pc-cards">${headerCard(okA ? ra : null, sel.a, A_COL)}${headerCard(okB ? rb : null, sel.b, B_COL)}</div>`;
         if (warn.length) html += `<div class="pc-warn">⚠ ${warn.join(" · ")}</div>`;
@@ -153,13 +186,20 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                      </div>`;
         }
         bodyEl.innerHTML = html;
+        bodyEl.querySelectorAll(".pr-src-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                if (btn.dataset.src === source) return;
+                source = btn.dataset.src; autoSource = false;
+                loadSlots();
+            });
+        });
         if (okA && okB) drawRadar(ra, rb);
     }
 
     function headerCard(r, selp, col) {
         if (!selp) return `<div class="pc-card pc-card-empty">선수 미선택</div>`;
         if (!r) return `<div class="pc-card"><div class="pc-card-name" style="color:${col}">${ttEsc(selp.name)}</div>
-            <div class="pc-card-warn">K리그2 상세 스탯 없음</div></div>`;
+            <div class="pc-card-warn">${source === "official" ? "공식 기록과 연결되지 않음" : "상세 스탯 없음"}</div></div>`;
         const p = r.player;
         const lg = p.league ? `<em class="pc-lg pc-lg-${p.league.toLowerCase()}">${p.league}</em>` : "";
         const posTxt = (p.detail_label || p.pos_label || "") + (p.team ? " · " + p.team : "");
@@ -175,7 +215,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
     function statBars(ra, rb) {
         const A = ra.all_stats || {}, B = rb.all_stats || {};
-        return STATS.map(s => {
+        return STATS.filter(s => source !== "official" || !OFFICIAL_OFF.has(s.k)).map(s => {
             const a = +A[s.k] || 0, b = +B[s.k] || 0, tot = a + b;
             const ap = tot ? Math.round(a / tot * 100) : 50;
             const aWin = a > b, bWin = b > a;
@@ -196,6 +236,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
     function radarAxes(ra, rb) {
         const gk = ra.player.pos === "G" || rb.player.pos === "G";
+        if (gk && source === "official") return [["saves", "선방"], ["pass_pct", "패스%"], ["passes", "패스"], ["clears", "클리어링"]];
         return gk
             ? [["saves", "선방"], ["aer_pct", "공중볼%"], ["pass_pct", "패스%"], ["touches", "터치"], ["duel_pct", "듀얼%"]]
             : [["goals", "득점"], ["key_passes", "키패스"], ["drib_s", "드리블"], ["tackles", "태클"], ["aer_pct", "공중볼%"], ["pass_pct", "패스%"]];

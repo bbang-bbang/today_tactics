@@ -11,8 +11,12 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     let currentYear = null;
     let currentDob  = "";
     let currentShirt = null;
-    let currentSource = "sofa";   // "sofa" | "official"(K리그 공식 기록, 베타) — 선수를 새로 열 때마다 sofa 로 초기화
+    let currentSource = "sofa";   // "sofa" | "official"(K리그 공식 기록, 베타)
     let currentPid    = null;     // SofaScore 리포트에서 확정된 선수 id (공식 탭 조회 키)
+    // 선수를 새로 열면 공식 기록을 먼저 보여주고, 연결 불가·오류면 자동으로 SofaScore 로 되돌린다(2026-11-04).
+    // SofaScore 는 8월 이후 수집이 끊겨 있어 최신 시즌은 공식 쪽이 더 신선하다.
+    let tryOfficialFirst = false;
+    let lastSofa = null;          // 폴백용 — 첫 SofaScore 응답
     let radarChart    = null;
     let activityChart = null;
     let vsTeamsChart  = null;
@@ -25,6 +29,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         currentYear  = null;
         currentSource = "sofa";
         currentPid    = null;
+        lastSofa      = null;
+        tryOfficialFirst = true;
         load();
     });
 
@@ -42,6 +48,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         body.querySelectorAll(".pr-src-btn").forEach(btn => {
             btn.addEventListener("click", () => {
                 if (btn.dataset.src === currentSource) return;
+                tryOfficialFirst = false;
                 currentSource = btn.dataset.src;
                 currentYear = null;
                 load();
@@ -71,6 +78,14 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                         `</div>`;
                     return;
                 }
+                if (tryOfficialFirst && !currentYear && d.player && d.player.id) {
+                    lastSofa = d;
+                    currentPid = d.player.id;
+                    currentSource = "official";
+                    loadOfficial();
+                    return;
+                }
+                tryOfficialFirst = false;
                 render(d);
             })
             .catch(() => { body.innerHTML = `<div class="pr-empty">⚠️ 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>`; });
@@ -218,6 +233,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             .then(r => r.json())
             .then(renderOfficial)
             .catch(() => {
+                if (fallbackToSofa()) return;
                 body.innerHTML = srcToggle("official") + `<div class="pr-empty">⚠️ 공식 기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>`;
                 bindSource();
             });
@@ -231,12 +247,22 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         });
     }
 
+    // 공식 우선 모드에서 연결 불가·오류면 첫 SofaScore 응답으로 조용히 되돌린다. 되돌렸으면 true.
+    function fallbackToSofa() {
+        if (!tryOfficialFirst || !lastSofa) return false;
+        tryOfficialFirst = false;
+        currentSource = "sofa";
+        render(lastSofa);
+        return true;
+    }
+
     function renderOfficial(d) {
         if (radarChart)    { radarChart.destroy();    radarChart    = null; }
         if (activityChart) { activityChart.destroy(); activityChart = null; }
         if (vsTeamsChart)  { vsTeamsChart.destroy();  vsTeamsChart  = null; }
 
         if (!d || !d.official) {
+            if (fallbackToSofa()) return;
             bindYears(d && d.available_years, null);
             const who = d && d.player && d.player.name ? `<b>${ttEsc(d.player.name)}</b> 선수의 ` : "";
             const msg = OFFICIAL_REASON[d && d.reason] || "공식 기록을 불러오지 못했습니다.";
@@ -246,6 +272,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             return;
         }
 
+        tryOfficialFirst = false;
         const p = d.player;
         bindYears(d.available_years, d.year);
         const posLabel = p.pos_label || p.pos || "?";
