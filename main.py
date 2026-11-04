@@ -10755,6 +10755,204 @@ def _recap_streak(results):
     return wins, unbeaten, losses, escaped
 
 
+_JOSA = ("은는", "이가", "을를")
+
+
+def _j(word, kind):
+    """한국어 조사 선택 — 받침이 있으면 앞, 없으면 뒤 (kind: 0=은/는 1=이/가 2=을/를). 한글이 아니면 받침 없음으로 본다.
+    f-string 안에서 따옴표 중첩을 피하려고(운영 Python 3.11) 종류를 숫자로 받는다."""
+    w = str(word)
+    last = w[-1] if w else ""
+    has = "가" <= last <= "힣" and (ord(last) - 0xAC00) % 28 != 0
+    return w + (_JOSA[kind][0] if has else _JOSA[kind][1])
+
+
+def _recap_stories(c):
+    """경기 후 요약의 '이야기 후보' 풀 — 각 후보는 놀라움 점수(score)·종류(kind)·문장(text)·헤드라인 후보(heads)를 가진다.
+    고정 템플릿('A, B에 N-M 승리') 대신, 이 경기에서 실제로 드문 사실을 점수로 골라 헤드라인과 핵심 포인트로 쓴다.
+    입력 c: nm, hs, as_, goals, goals_complete, reds, stats, xg, table, games(side)→[(gf,ga)…이 경기 포함], eid
+    모든 문장은 근거 수치를 포함하고, 근거가 없으면 후보를 만들지 않는다(추측 금지)."""
+    nm, hs, as_, goals, complete = c["nm"], c["hs"], c["as_"], c["goals"], c["goals_complete"]
+    out = []
+
+    def add(score, kind, text, heads=None):
+        out.append({"score": score, "kind": kind, "text": text, "heads": heads or []})
+
+    def other(s):
+        return "away" if s == "home" else "home"
+
+    sc = {"home": hs, "away": as_}
+    res = "draw" if hs == as_ else ("home" if hs > as_ else "away")
+    stat = {s["key"]: s for s in c["stats"]}
+
+    # ── 득점 흐름 기반 ──
+    if complete and goals:
+        a = b = 0
+        lead_max = {"home": 0, "away": 0}      # 팀별 최대 리드(앞섰던 골 차)
+        deficit_max = {"home": 0, "away": 0}   # 팀별 최대 열세
+        turn = None                            # 역전 골
+        for g in goals:
+            a += g["side"] == "home"; b += g["side"] == "away"
+            d = a - b
+            lead_max["home"] = max(lead_max["home"], d); lead_max["away"] = max(lead_max["away"], -d)
+            deficit_max["home"] = max(deficit_max["home"], -d); deficit_max["away"] = max(deficit_max["away"], d)
+        if res != "draw":
+            w, l = res, other(res)
+            wg, lg = sc[w], sc[l]
+            if deficit_max[w] >= 1:
+                # 결과를 뒤집은 골(처음으로 승자가 앞선 골)
+                aa = bb = 0
+                for g in goals:
+                    aa += g["side"] == "home"; bb += g["side"] == "away"
+                    if (aa > bb and w == "home") or (bb > aa and w == "away"):
+                        turn = g; break
+                who = (turn["player"] or nm[w]) if turn else nm[w]
+                when = f"{turn['minute']}'" if turn else ""
+                sev = deficit_max[w]
+                add(88 + 4 * min(sev, 2), "comeback",
+                    f"{_j(nm[w], 0)} 한때 {sev}골 뒤졌지만 {when} {who}의 골로 앞서 나가 {wg}-{lg}로 이겼다.",
+                    [f"{nm[w]}, {sev}골 열세 뒤집고 {wg}-{lg} 역전승",
+                     f"{nm[l]} 웃지 못했다 — {_j(nm[w], 1)} {sev}골 차를 따라잡아 뒤집었다",
+                     f"{when} {who}, 승부를 뒤집었다 ({nm[w]} {wg}-{lg} {nm[l]})"])
+        # 리드를 지키지 못함 (2골 이상 앞서다 비기거나 짐)
+        for s in ("home", "away"):
+            if lead_max[s] >= 2 and res != s:
+                tail = "비겼다" if res == "draw" else "졌다"
+                add(86, "blown_lead",
+                    f"{_j(nm[s], 0)} 최대 {lead_max[s]}골 앞섰지만 {hs}-{as_}로 {tail}.",
+                    [f"{nm[s]}, {lead_max[s]}골 리드를 지키지 못했다 ({hs}-{as_})",
+                     f"{lead_max[s]}골 앞서다 {tail} — {nm[s]}의 아쉬운 {hs}-{as_}"])
+        # 막판 득점
+        last = goals[-1]
+        lm = last["minute"] + (last["added"] or 0)
+        if lm >= 88:
+            decisive = (res != "draw" and last["side"] == res and abs(hs - as_) == 1)
+            equal = (res == "draw" and hs > 0)      # 마지막 골이 나온 뒤 동점이면, 그 골이 동점골
+            who = last["player"] or nm[last["side"]]
+            if decisive and any(p["kind"] == "comeback" for p in out):
+                pass
+            elif decisive:
+                add(80, "late_winner", f"종료 직전 {last['minute']}'{'+' + str(last['added']) if last['added'] else ''} {who}의 골이 승부를 갈랐다.",
+                    [f"{last['minute']}' {who}, 막판에 {_j(nm[last['side']], 2)} 승리로 이끌었다",
+                     f"{nm[last['side']]} {hs}-{as_}, 종료 직전 {who}의 한 방"])
+            elif equal:
+                add(72, "late_equalizer", f"{last['minute']}' {who}의 동점골로 {_j(nm[last['side']], 1)} 승점 1점을 건졌다.",
+                    [f"{last['minute']}' {who}의 극적 동점골 ({nm['home']} {hs}-{as_} {nm['away']})"])
+        # 초반 폭풍: 한 팀이 전반 20분 안에 2골 이상
+        for s in ("home", "away"):
+            early = [g for g in goals if g["side"] == s and g["minute"] <= 20 and not g["own_goal"]]
+            if len(early) >= 2:
+                add(62, "blitz", f"{_j(nm[s], 0)} 경기 시작 {early[1]['minute']}분 만에 {len(early)}골을 몰아쳤다.",
+                    [f"{nm[s]}, 시작 {early[1]['minute']}분 만에 {len(early)}골 — 초반 폭풍"])
+        # 단시간 연속골
+        for s in ("home", "away"):
+            ms = [g["minute"] for g in goals if g["side"] == s]
+            for i in range(len(ms) - 1):
+                if 0 <= ms[i + 1] - ms[i] <= 5 and ms[i + 1] > 20:
+                    add(58, "quick_brace", f"{_j(nm[s], 0)} {ms[i]}'~{ms[i + 1]}' 사이 {ms[i + 1] - ms[i]}분 만에 연속골을 넣었다.")
+                    break
+        # 후반에만 골이 나온 경기
+        if len(goals) >= 3 and all(g["minute"] > 45 for g in goals):
+            add(50, "second_half", f"{len(goals)}골이 모두 후반에 터진 경기였다.")
+
+    # ── 퇴장 ──
+    for r in c["reds"]:
+        if r["minute"] <= 75:
+            s = r["side"]
+            n_after = max(0, 90 - r["minute"])
+            if res == s:
+                add(90, "ten_men_win", f"{_j(nm[s], 0)} {r['minute']}' 퇴장 이후 약 {n_after}분을 10명으로 버텨 이겼다.",
+                    [f"{nm[s]}, 10명으로 {hs if s == 'home' else as_}-{as_ if s == 'home' else hs} 승리 ({r['minute']}' 퇴장 악재)"])
+            elif res == "draw":
+                add(74, "ten_men_draw", f"{_j(nm[s], 0)} {r['minute']}' 퇴장에도 승점 1점을 지켰다.")
+            elif res == other(s) and r["minute"] <= 45:
+                add(56, "early_red", f"{_j(nm[s], 0)} 전반 {r['minute']}' 퇴장으로 경기가 크게 기울었다.")
+
+    # ── 지배했는데 못 이김 / 효율의 승리 (슈팅·xG 근거) ──
+    if "shots" in stat:
+        sh, sa = stat["shots"]["home"], stat["shots"]["away"]
+        xg_h, xg_a = c["xg"]
+        for s, shs, sho, xs, xo in (("home", sh, sa, xg_h, xg_a), ("away", sa, sh, xg_a, xg_h)):
+            dom = (shs - sho >= 8) or (xs and xo is not None and xs - xo >= 1.0)
+            if dom and res != s:
+                tail = "비겼다" if res == "draw" else "졌다"
+                ev_txt = f"슈팅 {shs}-{sho}" + (f", xG {xs:.1f}-{xo:.1f}" if xs and xo is not None else "")
+                add(76, "dominated", f"{_j(nm[s], 0)} {ev_txt}로 앞서고도 {tail}.",
+                    [f"{ev_txt}… 그래도 {_j(nm[s], 0)} {tail} ({hs}-{as_})",
+                     f"지배하고도 {tail} — {nm[s]}의 결정력 숙제"])
+            lean = (shs < sho) and res == s
+            if lean and sho - shs >= 6:
+                add(70, "efficient", f"{_j(nm[s], 0)} 슈팅 {shs}개로 {sc[s]}골을 넣어 상대({sho}개)를 이겼다.",
+                    [f"슈팅 {shs}-{sho}로 밀리고도 {nm[s]} 승리 — 효율의 승리"])
+
+    # ── 순위·흐름 맥락 ──
+    t = c["table"]
+    n_teams = t.get("teams") or 0
+    for s in ("home", "away"):
+        b = (t.get(s) or {}).get("before")
+        o = (t.get(other(s)) or {}).get("before")
+        if b and o and b["played"] >= 8:
+            if res == s and b["rank"] - o["rank"] >= 6:
+                add(78, "giant_killing", f"{b['rank']}위 {_j(nm[s], 1)} {o['rank']}위 {_j(nm[other(s)], 2)} 잡았다.",
+                    [f"{b['rank']}위 {nm[s]}, {o['rank']}위 {_j(nm[other(s)], 2)} 꺾는 이변"])
+    hb, ab = (t.get("home") or {}).get("before"), (t.get("away") or {}).get("before")
+    if hb and ab and n_teams >= 8 and hb["played"] >= 8:
+        if hb["rank"] <= 3 and ab["rank"] <= 3:
+            add(64, "top_clash", f"선두권 맞대결 — {hb['rank']}위 {nm['home']} 대 {ab['rank']}위 {nm['away']}.")
+        elif hb["rank"] > n_teams - 3 and ab["rank"] > n_teams - 3:
+            add(64, "bottom_clash", f"강등권 직접 대결 — {hb['rank']}위 {nm['home']} 대 {ab['rank']}위 {nm['away']}.")
+
+    # ── 팀 흐름: 연속 기록 끊기·득점 가뭄·무실점 ──
+    def trail(vals, pred):
+        n = 0
+        for v in reversed(vals):
+            if not pred(v):
+                break
+            n += 1
+        return n
+
+    for s in ("home", "away"):
+        g_all = c["games"](s)
+        prev = g_all[:-1]
+        if not prev:
+            continue
+        opp = other(s)
+        gf_now, ga_now = g_all[-1]
+        # 상대의 연승·무패를 끊음
+        og = c["games"](opp)[:-1]
+        if og and res == s:
+            wins = trail(og, lambda x: x[0] > x[1])
+            unb = trail(og, lambda x: x[0] >= x[1])
+            if wins >= 4:
+                add(72, "streak_end", f"{_j(nm[s], 1)} {nm[opp]}의 {wins}연승을 끊었다.",
+                    [f"{nm[opp]}의 {wins}연승, {_j(nm[s], 1)} 끊었다"])
+            elif unb >= 7:
+                add(70, "streak_end", f"{_j(nm[s], 1)} {nm[opp]}의 {unb}경기 무패를 끊었다.",
+                    [f"{nm[opp]}의 {unb}경기 무패 행진, {_j(nm[s], 1)} 멈췄다"])
+        # 득점 가뭄 탈출
+        drought = trail(prev, lambda x: x[0] == 0)
+        if drought >= 2 and gf_now >= 1:
+            add(55 + min(drought, 4) * 2, "drought_end", f"{_j(nm[s], 0)} {drought}경기 무득점 끝에 이 경기에서 {gf_now}골을 넣었다.")
+        # 연속 무실점
+        cs = trail(g_all, lambda x: x[1] == 0)
+        if cs >= 3:
+            add(60 + min(cs, 5), "clean_sheet", f"{_j(nm[s], 0)} {cs}경기 연속 무실점을 이어 갔다.",
+                [f"{nm[s]}, {cs}경기 연속 무실점 철벽"])
+        # 연속 실점 / 수비 불안
+        leak = trail(g_all, lambda x: x[1] >= 2)
+        if leak >= 3:
+            add(52, "leaky", f"{_j(nm[s], 0)} {leak}경기 연속 2실점 이상을 허용했다.")
+
+    # ── 경기 성격 ──
+    tot = hs + as_
+    if tot >= 6:
+        add(58, "goalfest", f"합계 {tot}골의 난타전이었다 ({hs}-{as_}).", [f"{tot}골 쏟아진 난타전 — {nm['home']} {hs}-{as_} {nm['away']}"])
+    elif tot == 0 and "shots" in stat:
+        sh, sa = stat["shots"]["home"], stat["shots"]["away"]
+        add(40, "scoreless", f"슈팅 {sh}-{_j(sa, 1)} 오갔지만 골은 나오지 않았다.", [f"{nm['home']}·{nm['away']}, 슈팅 {sh}-{sa}에도 0-0"])
+    return out
+
+
 @app.route("/api/match-recap")
 @cached_response(ttl=3600)
 def match_recap():
@@ -10946,6 +11144,47 @@ def match_recap():
                     headline = f"{nm[ws]}, {nm[ls]}에 {wg}-{lg_} 대승"
             elif wg - lg_ >= 3:
                 headline = f"{nm[ws]}, {nm[ls]}에 {wg}-{lg_} 대승"
+        # ── 이야기 후보 풀: 이 경기에서 실제로 드문 사실을 골라 헤드라인·핵심 포인트로 ──
+        def games_of(side):
+            ss = ev["home_team_id"] if side == "home" else ev["away_team_id"]
+            out = []
+            for r in sorted(base, key=lambda x: (x["date_ts"], x["id"])):
+                if r["date_ts"] > ts or (r["date_ts"] == ts and r["id"] > eid):
+                    continue
+                if ss == r["home_team_id"]:
+                    out.append((r["home_score"], r["away_score"]))
+                elif ss == r["away_team_id"]:
+                    out.append((r["away_score"], r["home_score"]))
+            return out
+        pool = sorted(_recap_stories({
+            "nm": nm, "hs": hs, "as_": as_, "goals": goals, "goals_complete": goals_complete, "reds": reds,
+            "stats": stats, "xg": (xg_h, xg_a), "table": table, "games": games_of, "eid": eid}),
+            key=lambda p: -p["score"])
+        head_c = next((p for p in pool if p["heads"] and p["score"] >= 70), None)
+        if head_c:
+            headline = head_c["heads"][eid % len(head_c["heads"])]
+        else:
+            # 특별한 사연이 없는 경기는 문장 틀만이라도 경기마다 달리한다(같은 문형 반복 방지)
+            if hs == as_:
+                alts = [f"{nm['home']} {hs}-{as_} {nm['away']}, 승점 1점씩", f"{nm['home']}·{nm['away']}, {hs}-{as_}로 승부를 가리지 못했다"]
+                headline = alts[eid % len(alts)] if hs else f"{nm['home']}·{nm['away']} 0-0 — 양 팀 무득점"
+            else:
+                w_, l_ = ("home", "away") if hs > as_ else ("away", "home")
+                wg_, lg2 = max(hs, as_), min(hs, as_)
+                alts = [f"{nm[w_]}, {nm[l_]}에 {wg_}-{lg2} 승리", f"{nm[w_]} {wg_}-{lg2} {nm[l_]}", f"{nm[w_]} 승 — {nm[l_]} 상대 {wg_}-{lg2}"]
+                headline = alts[eid % len(alts)]
+        used = {id(head_c)} if head_c else set()
+        insights, seen_kind = [], set()
+        for p in pool:
+            if id(p) in used or p["kind"] in seen_kind or p["score"] < 40:
+                continue
+            seen_kind.add(p["kind"])
+            insights.append({"kind": p["kind"], "text": p["text"]})
+            if len(insights) == 3:
+                break
+        if head_c and head_c["text"] and head_c["kind"] not in seen_kind:
+            insights.insert(0, {"kind": head_c["kind"], "text": head_c["text"]})
+            insights = insights[:3]
         kinds = {"streak": 0, "slump": 1, "table": 2, "player": 3, "red": 4, "xg": 5}
         badges.sort(key=lambda b: kinds.get(b["kind"], 9))
 
@@ -10954,7 +11193,7 @@ def match_recap():
             "league": "K1" if tid == 410 else "K2", "result": {"home": hs, "away": as_},
             "teams": {"home": {"id": th["id"], "name": th["name"], "short": nm["home"], "primary": th.get("primary")},
                       "away": {"id": ta["id"], "name": ta["name"], "short": nm["away"], "primary": ta.get("primary")}},
-            "headline": headline, "badges": badges[:6], "goals": goals, "goals_complete": goals_complete, "reds": reds,
+            "headline": headline, "insights": insights, "badges": badges[:6], "goals": goals, "goals_complete": goals_complete, "reds": reds,
             "mom": mom, "stats": stats, "table": table,
             "notes": ([] if goals_complete else
                       ["득점 상세 기록이 없어 타임라인 기반 요약은 생략했습니다."] if not goals and (hs + as_) > 0 else

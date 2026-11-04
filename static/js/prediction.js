@@ -1219,6 +1219,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             lines.push("⚽ " + r.goals.map(g => `${g.minute}${g.added ? "+" + g.added : ""}' ${g.player || T[g.side].short}${g.own_goal ? "(자책)" : g.penalty ? "(PK)" : ""}`).join(" · "));
         }
         if (r.mom) lines.push(`⭐ MVP ${r.mom.name} (${r.mom.team}, 평점 ${r.mom.rating})`);
+        if (r.insights && r.insights.length) r.insights.forEach(i => lines.push("• " + i.text));
         if (r.badges.length) lines.push("🔖 " + r.badges.map(b => b.text).join(" · "));
         lines.push(location.origin + location.pathname);
         return lines.join("\n");
@@ -1297,6 +1298,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <div class="rc-score"><span class="rc-tm rc-tm-home">${e(T.home.short)}</span>
                 <span class="rc-sc"><b>${sc.home}</b><i>:</i><b>${sc.away}</b></span><span class="rc-tm rc-tm-away">${e(T.away.short)}</span></div>
             <div class="rc-headline">${e(r.headline)}</div>
+            ${(r.insights && r.insights.length) ? `<ul class="rc-insights" aria-label="이 경기의 핵심 포인트">${r.insights.map(i => `<li class="rc-ins rc-ins-${e(i.kind)}">${e(i.text)}</li>`).join("")}</ul>` : ""}
             ${r.badges.length ? `<div class="rc-badges">${r.badges.map(b => `<span class="rc-badge rc-b-${b.kind}">${e(b.text)}</span>`).join("")}</div>` : ""}
             ${timeline}
             <div class="rc-grid">${mom}${table}${stats}</div>

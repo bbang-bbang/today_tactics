@@ -162,6 +162,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                     ${heightBadge}${weightBadge}
                 </div>
                 <div class="pr-peer-note">동일 포지션 <b>${peerLabel}</b> ${d.peer_count}명 대비 퍼센타일</div>
+                ${scoutLine(scoutNote(d.stat_items, posLabel, p.games, null))}
             </div>
         </div>
 
@@ -327,6 +328,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                     ${p.reds    ? `<span class="pr-badge">🟥${p.reds}</span>` : ""}
                 </div>
                 <div class="pr-peer-note pr-peer-note-official">같은 리그·같은 포지션 <b>${ttEsc(p.peer_label)}</b> ${d.peer_count}명 대비 퍼센타일 (공식 기록 기준${d.year === "all" ? " · 이 리그에서 뛴 모든 시즌을 합산(다른 리그 시즌은 제외)" : ""})</div>
+                ${scoutLine(scoutNote(d.stat_items, posLabel, p.games, p.mins))}
             </div>
         </div>
 
@@ -376,6 +378,55 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         return `<span class="pr-badge pr-badge-phys" title="${rank.rank}위/${rank.total}명">
             ${label} ${val} <span style="color:${color};font-size:0.7em">상위 ${100-rank.pct}%</span>
         </span>`;
+    }
+
+    /* ── 한 줄 해석 — 퍼센타일에서 유형·강점·약점을 문장으로 푼다(근거 수치 포함, 추측 금지) ───────────
+       규칙 기반: 같은 숫자를 보고 누구나 같은 결론을 얻도록 임계값을 고정(강점 ≥75, 약점 ≤25). 표본이 적으면 경고. */
+    const KEY_NAME = {
+        goals: "득점", assists: "도움", shots: "슈팅", sot: "유효슈팅", key_passes: "키패스", pass_pct: "패스 성공률",
+        passes: "패스 시도", drib_s: "드리블", drib_pct: "드리블 성공률", tackles: "태클", ints: "인터셉트",
+        clears: "걷어내기", aer_w: "공중볼", aer_pct: "공중볼 승률", duel_pct: "경합 승률", saves: "선방",
+        fouled: "파울 유도", blocked: "슈팅 차단", duel_w: "경합 승리",
+    };
+    function scoutNote(items, posLabel, games, mins) {
+        const pc = {};
+        (items || []).forEach(i => { if (i && i.key && i.pctile != null) pc[i.key] = i.pctile; });
+        const keys = Object.keys(pc).filter(k => KEY_NAME[k]);
+        if (keys.length < 4) return "";
+        const g = k => (pc[k] == null ? -1 : pc[k]);
+        const pos = String(posLabel || "").charAt(0).toUpperCase();   // F / M / D / G
+        let arch;
+        if (pos === "F") {
+            arch = (g("goals") >= 70 && g("sot") >= 60) ? "골 결정력형 공격수"
+                : (g("key_passes") >= 70 || g("assists") >= 70) ? "찬스 메이킹형 공격수"
+                : g("drib_s") >= 75 ? "돌파형 공격수"
+                : g("aer_w") >= 75 ? "제공권을 쓰는 타깃형 공격수" : "균형형 공격수";
+        } else if (pos === "M") {
+            arch = ((g("tackles") >= 70 || g("ints") >= 70) && g("key_passes") < 55) ? "볼 회수형 미드필더"
+                : (g("key_passes") >= 70 || g("assists") >= 70) ? "창의형 미드필더"
+                : g("drib_s") >= 75 ? "돌파형 미드필더"
+                : (g("passes") >= 75 && g("pass_pct") >= 65) ? "배급형 미드필더"
+                : g("goals") >= 75 ? "득점 가담형 미드필더" : "균형형 미드필더";
+        } else if (pos === "D") {
+            arch = (g("aer_w") >= 70 || g("clears") >= 70) ? "제공권·걷어내기가 강한 수비수"
+                : (g("passes") >= 70 || g("pass_pct") >= 75) ? "빌드업형 수비수"
+                : (g("tackles") >= 70 || g("ints") >= 70) ? "대인 수비형 수비수"
+                : (g("drib_s") >= 70 || g("key_passes") >= 70) ? "공격 가담형 수비수" : "균형형 수비수";
+        } else if (pos === "G") {
+            arch = g("saves") >= 70 ? "선방형 골키퍼" : g("pass_pct") >= 70 ? "빌드업형 골키퍼" : "균형형 골키퍼";
+        } else { arch = "선수"; }
+        const strong = keys.filter(k => pc[k] >= 75).sort((a, b) => pc[b] - pc[a]).slice(0, 2)
+            .map(k => `${KEY_NAME[k]}(상위 ${Math.max(1, 100 - pc[k])}%)`);
+        const weak = keys.filter(k => pc[k] <= 25 && k !== "passes").sort((a, b) => pc[a] - pc[b]).slice(0, 2)
+            .map(k => pc[k] <= 0 ? `${KEY_NAME[k]}(최하위)` : `${KEY_NAME[k]}(하위 ${pc[k]}%)`);
+        const parts = [];
+        parts.push(strong.length ? `${strong.join("·")}이 강점인 ${arch}.` : `뚜렷하게 앞서는 지표는 없는 ${arch}.`);
+        if (weak.length) parts.push(`보완점은 ${weak.join("·")}.`);
+        if ((games != null && games < 8) || (mins != null && mins < 450)) parts.push("출전이 적어 해석에 주의가 필요합니다.");
+        return parts.join(" ");
+    }
+    function scoutLine(note) {
+        return note ? `<div class="pr-scout-note"><span class="pr-scout-tag">한 줄 해석</span>${ttEsc(note)}</div>` : "";
     }
 
     /* ── 스탯 카드 ───────────────────────────────────────── */

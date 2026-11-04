@@ -9780,3 +9780,14 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ins-mini-track { display: inline-block; width: 44px; height: 6px; margin: 0 6px 1px 4px; background: rgba(255,255,255,0.08); border-radius: 3px; vertical-align: middle; overflow: hidden; }
 .ins-mini-bar { display: block; height: 100%; background: #7ecfff; border-radius: 3px; }
 .ins-sd-name { color: #9fb3cf; font-size: 0.74rem; }
+
+/* 경기 요약 — 핵심 포인트(이 경기에서 드문 사실 1~3개, 근거 수치 포함) */
+.rc-insights { list-style: none; margin: 8px 0 4px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.rc-ins { position: relative; padding-left: 14px; font-size: 0.82rem; line-height: 1.5; color: #c4d4ea; }
+.rc-ins::before { content: "▸"; position: absolute; left: 0; color: #6ea8ff; }
+
+/* 선수 리포트 — 한 줄 해석 */
+.pr-scout-note { width: 100%; margin-top: 8px; padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; line-height: 1.55;
+    color: #d4e2f4; background: rgba(78,164,248,0.08); border: 1px solid rgba(78,164,248,0.22); }
+.pr-scout-tag { display: inline-block; margin-right: 8px; padding: 1px 7px; border-radius: 4px; font-size: 0.68rem; font-weight: 700;
+    color: #cfe4ff; background: rgba(78,164,248,0.25); }
