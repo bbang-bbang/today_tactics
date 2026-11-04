@@ -7805,6 +7805,167 @@ def _ins_starters(conn, tid, ycond, yp):
     return out
 
 
+@app.route("/api/insights/storylines")
+@cached_response(ttl=3600)
+def insights_storylines():
+    """리그 화제 포인트 — 팀 흐름(상승·하락세, 진행 중인 연속 기록, 홈·원정 괴리, 막판 집중력)과
+    선수 발굴(공식 평점 상승세, 적게 뛰고도 공격 포인트가 높은 선수)을 '한 줄 해석 + 근거 수치' 카드로 만든다.
+    모든 카드는 임계값을 넘을 때만 만들고(억지 문장 금지), 근거 수치와 표본 수를 함께 준다."""
+    sc = _ins_scope()
+    if sc is None:
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label, tid, year, ycond, yp = sc
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
+    short = lambda t: info[t].get("short", info[t]["name"]) if t in info else str(t)
+
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        evs = _ins_events(conn, tid, ycond, yp)
+        late = conn.execute(
+            "SELECT e.home_team_id, e.away_team_id, g.is_home, g.minute, IFNULL(g.added_time,0) FROM goal_events g "
+            "JOIN events e ON e.id = g.event_id WHERE e.tournament_id = ? AND e.home_score IS NOT NULL" + ycond,
+            (tid, *yp)).fetchall()
+        has_kpm = bool(conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague_player_match'").fetchone())
+        prow = conn.execute(
+            "SELECT k.player_kid, k.player_name, k.team_id, e.date_ts, k.minutes, k.goals, k.assists, k.point "
+            "FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
+            "WHERE e.tournament_id = ? AND e.home_score IS NOT NULL" + ycond + " ORDER BY e.date_ts",
+            (tid, *yp)).fetchall() if has_kpm else []
+    finally:
+        conn.close()
+
+    seq = {}                                   # 팀 → [(gf, ga, is_home)] 시간순
+    for _eid, h, a, _ts, hs, as_ in evs:
+        seq.setdefault(h, []).append((hs, as_, True))
+        seq.setdefault(a, []).append((as_, hs, False))
+    seq = {t: v for t, v in seq.items() if t in info}
+
+    def trail(rows, pred):
+        n = 0
+        for r in reversed(rows):
+            if not pred(r):
+                break
+            n += 1
+        return n
+
+    ppg = lambda rows: sum(_ins_pts(r[0], r[1]) for r in rows) / len(rows) if rows else 0.0
+    team_cards, player_cards = [], []
+
+    # ① 최근 5경기 흐름 (상승·하락세)
+    moves = []
+    for t, rows in seq.items():
+        if len(rows) >= 10:
+            l5 = rows[-5:]
+            moves.append((ppg(l5) - ppg(rows), t, rows, l5))
+    for diff, t, rows, l5 in sorted(moves, key=lambda x: -x[0])[:2]:
+        if diff >= 0.8:
+            gf5, ga5 = sum(r[0] for r in l5) / 5, sum(r[1] for r in l5) / 5
+            gfs, gas = sum(r[0] for r in rows) / len(rows), sum(r[1] for r in rows) / len(rows)
+            team_cards.append({"kind": "rising", "team": short(t), "score": 80 + diff * 5,
+                "text": f"{_j(short(t), 0)} 최근 5경기 승점 {sum(_ins_pts(r[0], r[1]) for r in l5)}점으로 시즌 평균보다 경기당 {diff:.1f}점 더 따내는 상승세.",
+                "evidence": f"경기당 승점 {ppg(rows):.2f} → {ppg(l5):.2f} · 득점 {gfs:.1f} → {gf5:.1f} · 실점 {gas:.1f} → {ga5:.1f} (시즌 {len(rows)}경기)"})
+    for diff, t, rows, l5 in sorted(moves, key=lambda x: x[0])[:2]:
+        if diff <= -0.8:
+            gf5, ga5 = sum(r[0] for r in l5) / 5, sum(r[1] for r in l5) / 5
+            gfs, gas = sum(r[0] for r in rows) / len(rows), sum(r[1] for r in rows) / len(rows)
+            team_cards.append({"kind": "falling", "team": short(t), "score": 78 + abs(diff) * 5,
+                "text": f"{_j(short(t), 0)} 최근 5경기 승점 {sum(_ins_pts(r[0], r[1]) for r in l5)}점에 그쳐 시즌 평균보다 경기당 {abs(diff):.1f}점 덜 따내는 하락세.",
+                "evidence": f"경기당 승점 {ppg(rows):.2f} → {ppg(l5):.2f} · 득점 {gfs:.1f} → {gf5:.1f} · 실점 {gas:.1f} → {ga5:.1f} (시즌 {len(rows)}경기)"})
+
+    # ② 진행 중인 연속 기록 (종류별 1위 팀)
+    streak_defs = [
+        ("win_streak", "연승", lambda r: r[0] > r[1], 3, "{t} {n}연승 행진 중"),
+        ("unbeaten", "무패", lambda r: r[0] >= r[1], 6, "{t} {n}경기 연속 무패"),
+        ("clean_sheet", "무실점", lambda r: r[1] == 0, 3, "{t} {n}경기 연속 무실점 — 가장 단단한 수비"),
+        ("scoring_run", "득점", lambda r: r[0] >= 1, 10, "{t} {n}경기 연속 득점"),
+        ("losing", "연패", lambda r: r[0] < r[1], 3, "{t} {n}연패 — 반등이 급하다"),
+        ("winless", "무승", lambda r: r[0] <= r[1], 6, "{t} {n}경기째 승리가 없다"),
+    ]
+    losing_team = None
+    for kind, nm_, pred, thr, tpl in streak_defs:
+        best = max(((trail(rows, pred), t) for t, rows in seq.items()), default=(0, None))
+        if kind == "losing" and best[0] >= thr:
+            losing_team = best[1]
+        if kind == "winless" and best[1] == losing_team:
+            continue                      # 같은 팀의 연패와 무승 기록은 한 번만 말한다
+        if best[1] is not None and best[0] >= thr:
+            tied = [short(t) for t, rows in seq.items() if trail(rows, pred) == best[0]]
+            extra = f" (공동: {', '.join(tied)})" if len(tied) > 1 else ""
+            team_cards.append({"kind": kind, "team": short(best[1]), "score": 60 + min(best[0], 12),
+                "text": tpl.format(t=short(best[1]), n=best[0]) + ".",
+                "evidence": f"현재 진행 중인 {nm_} 기록 리그 최장{extra}"})
+
+    # ③ 홈·원정 괴리
+    gaps = []
+    for t, rows in seq.items():
+        hm, aw = [r for r in rows if r[2]], [r for r in rows if not r[2]]
+        if len(hm) >= 6 and len(aw) >= 6:
+            gaps.append((ppg(hm) - ppg(aw), t, hm, aw))
+    if gaps:
+        g, t, hm, aw = max(gaps, key=lambda x: x[0])
+        if g >= 1.0:
+            team_cards.append({"kind": "fortress", "team": short(t), "score": 66 + g * 3,
+                "text": f"{_j(short(t), 0)} 홈에서만 강하다 — 원정보다 경기당 {g:.1f}점을 더 딴다.",
+                "evidence": f"홈 {ppg(hm):.2f}점/경기 ({len(hm)}경기) vs 원정 {ppg(aw):.2f}점/경기 ({len(aw)}경기)"})
+        g, t, hm, aw = min(gaps, key=lambda x: x[0])
+        if g <= -0.4:
+            team_cards.append({"kind": "road_warrior", "team": short(t), "score": 64 + abs(g) * 3,
+                "text": f"{_j(short(t), 0)} 오히려 원정에서 더 잘한다 — 홈보다 경기당 {abs(g):.1f}점이 높다.",
+                "evidence": f"홈 {ppg(hm):.2f}점/경기 ({len(hm)}경기) vs 원정 {ppg(aw):.2f}점/경기 ({len(aw)}경기)"})
+
+    # ④ 막판 집중력 (80분 이후 득점 비중)
+    tot, lt = {}, {}
+    for h, a, is_home, minute, added in late:
+        team = h if is_home else a
+        if team not in info:
+            continue
+        tot[team] = tot.get(team, 0) + 1
+        if (minute or 0) + (added or 0) >= 80:
+            lt[team] = lt.get(team, 0) + 1
+    cand = [(lt.get(t, 0) / n, t, lt.get(t, 0), n) for t, n in tot.items() if n >= 12]
+    if cand:
+        r, t, k, n = max(cand)
+        if r >= 0.25:
+            team_cards.append({"kind": "late_goals", "team": short(t), "score": 64 + r * 20,
+                "text": f"{_j(short(t), 0)} 마지막 10분에 강하다 — 득점의 {r * 100:.0f}%가 80분 이후에 나왔다.",
+                "evidence": f"80분 이후 {k}골 / 전체 {n}골 (리그 평균 {sum(lt.values()) / max(1, sum(tot.values())) * 100:.0f}%)"})
+
+    # ⑤ 선수 발굴 (공식 기록: 평점 상승세 · 적게 뛰고도 공격 포인트 효율이 높은 선수)
+    by_p = {}
+    for kid, nm_, tm, ts, mins, g, a, pt in prow:
+        by_p.setdefault(kid, []).append((nm_, tm, ts, mins or 0, g or 0, a or 0, pt))
+    rising, gems = [], []
+    for kid, rows in by_p.items():
+        nm_, tm = rows[-1][0], rows[-1][1]
+        if tm not in info:
+            continue
+        pts = [r[6] for r in rows if r[6]]
+        if len(rows) >= 8 and len(pts) >= 8:
+            l5 = pts[-5:]
+            d = sum(l5) / len(l5) - sum(pts) / len(pts)
+            rising.append((d, nm_, tm, sum(l5) / len(l5), sum(pts) / len(pts), len(rows)))
+        mins = sum(r[3] for r in rows)
+        ga = sum(r[4] + r[5] for r in rows)
+        if 300 <= mins <= 1200 and ga >= 4:
+            gems.append((ga / mins * 90, nm_, tm, ga, mins, len(rows)))
+    for d, nm_, tm, l5, sv, n in sorted(rising, reverse=True)[:3]:
+        if d >= 0.5:
+            player_cards.append({"kind": "player_rising", "team": short(tm), "score": 70 + d * 10,
+                "text": f"{nm_}({short(tm)}) 최근 5경기 공식 평점 {l5:.2f}로 시즌 평균({sv:.2f})보다 {d:.2f} 올랐다 — 물오른 폼.",
+                "evidence": f"공식 평점 {sv:.2f} → {l5:.2f} (시즌 {n}경기 · 공식 playerPoint 기준)"})
+    for per90, nm_, tm, ga, mins, n in sorted(gems, reverse=True)[:3]:
+        player_cards.append({"kind": "player_gem", "team": short(tm), "score": 68 + per90 * 5,
+            "text": f"{nm_}({short(tm)}) {mins}분만 뛰고 공격 포인트 {ga}개 — 90분당 {per90:.2f}로 출전 시간 대비 효율이 높다.",
+            "evidence": f"{n}경기 · {mins}분 · 득점+도움 {ga} (출전 300~1,200분 선수 중, 소표본 주의)"})
+
+    cards = sorted(team_cards, key=lambda c: -c["score"]) + sorted(player_cards, key=lambda c: -c["score"])
+    return jsonify({
+        "league": label, "year": year, "cards": cards[:14],
+        "counts": {"team": len(team_cards), "player": len(player_cards)},
+        "limits": "최근 5경기·소표본은 우연의 영향이 크다 · 선수 지표는 공식 기록(2025~) 기준이며 평점 산식이 SofaScore와 다르다 · 상관일 뿐 인과가 아님",
+    })
+
+
 @app.route("/api/insights/scoring-dependence")
 @cached_response(ttl=3600)
 def insights_scoring_dependence():

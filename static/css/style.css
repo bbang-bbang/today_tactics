@@ -9791,3 +9791,17 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
     color: #d4e2f4; background: rgba(78,164,248,0.08); border: 1px solid rgba(78,164,248,0.22); }
 .pr-scout-tag { display: inline-block; margin-right: 8px; padding: 1px 7px; border-radius: 4px; font-size: 0.68rem; font-weight: 700;
     color: #cfe4ff; background: rgba(78,164,248,0.25); }
+
+/* 인사이트 > 심화 — 리그 화제 포인트 (한 줄 해석 카드) */
+.ins-story-list { list-style: none; margin: 6px 0 12px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px; }
+.ins-story { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+.ins-story-ic { font-size: 1.15rem; line-height: 1.3; }
+.ins-story-tx { min-width: 0; }
+.ins-story-line { font-size: 0.86rem; line-height: 1.5; color: #e0ebfa; font-weight: 600; }
+.ins-story-ev { margin-top: 3px; font-size: 0.74rem; line-height: 1.45; color: #8fa6c2; }
+.ins-story-rising, .ins-story-win_streak, .ins-story-player_rising { border-left: 3px solid #4ade80; }
+.ins-story-falling, .ins-story-losing, .ins-story-winless { border-left: 3px solid #f87171; }
+.ins-story-clean_sheet, .ins-story-unbeaten, .ins-story-fortress, .ins-story-road_warrior, .ins-story-late_goals, .ins-story-scoring_run { border-left: 3px solid #4ea4f8; }
+.ins-story-player_gem { border-left: 3px solid #fbbf24; }
+@media (max-width: 600px) { .ins-story-list { grid-template-columns: 1fr; } }

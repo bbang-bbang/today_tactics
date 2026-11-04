@@ -1278,6 +1278,25 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     });
   }
 
+  // ⓪ 리그 화제 포인트 — 규칙 기반 한 줄 해석 + 근거 수치 (팀 흐름 / 선수 발굴)
+  const STORY_ICON = { rising: "📈", falling: "📉", win_streak: "🔥", unbeaten: "🛡️", clean_sheet: "🧱", scoring_run: "⚽",
+    losing: "🥶", winless: "🕳️", fortress: "🏟️", road_warrior: "🚌", late_goals: "⏱️", player_rising: "🌟", player_gem: "💎" };
+  function renderStorylines(list) {
+    const el = document.getElementById("ins-story-body"); if (!el) return;
+    el.innerHTML = list.map(d => {
+      if (!d || !d.cards) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      if (!d.cards.length) return `${insHead(d)}<div class="ins-adv-empty">임계값을 넘는 화제 포인트가 아직 없습니다.</div>`;
+      const card = c => `<li class="ins-story ins-story-${escI(c.kind)}">
+          <span class="ins-story-ic" aria-hidden="true">${STORY_ICON[c.kind] || "•"}</span>
+          <div class="ins-story-tx"><div class="ins-story-line">${escI(c.text)}</div><div class="ins-story-ev">${escI(c.evidence)}</div></div></li>`;
+      const teams = d.cards.filter(c => !c.kind.startsWith("player_")), players = d.cards.filter(c => c.kind.startsWith("player_"));
+      return `${insHead(d)}
+        ${teams.length ? `<div class="ins-adv-sub-h">팀 흐름</div><ul class="ins-story-list">${teams.map(card).join("")}</ul>` : ""}
+        ${players.length ? `<div class="ins-adv-sub-h">선수 발굴 <span class="ins-clutch-hint">공식 기록 기준</span></div><ul class="ins-story-list">${players.map(card).join("")}</ul>` : ""}
+        <div class="ins-method">${escI(d.limits || "")}</div>`;
+    }).join("");
+  }
+
   function loadAdvanced() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     // 무음 실패 → 가시화: 실패한 인사이트명을 모아 1회 토스트 + console.warn (P5 견고성)
@@ -1287,6 +1306,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     const notify = () => { if (!flushed.v && failed.length && window.showToast) { flushed.v = true; window.showToast(`일부 인사이트를 불러오지 못했습니다: ${failed.join(", ")} (새로고침 해보세요)`); } };
     const xgLeagues = currentLeague === "all" ? ["k1", "k2"] : [currentLeague];
     Promise.allSettled([
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/storylines?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderStorylines).catch(warn("리그 화제 포인트")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/xg-luck?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderXgLuck).catch(warn("xG 운 보정")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/rest-effect?year=${currentYear}&league=${lg}`).then(r => r.json())))
