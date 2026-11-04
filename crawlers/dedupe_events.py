@@ -170,9 +170,12 @@ def main() -> int:
         conn.close()
         return 1
     conn.close()
-    gen = ROOT / ".cache_generation"
-    gen.write_text(str(time.time_ns()), encoding="ascii")
-    os.utime(gen, None)
+    gen = Path(args.db).resolve().parent / ".cache_generation"   # DB 와 같은 앱 디렉터리 (스크립트를 /tmp 에서 돌려도 안전)
+    try:
+        gen.write_text(str(time.time_ns()), encoding="ascii")
+        os.utime(gen, None)
+    except OSError as e:   # 병합은 이미 커밋됨 — 캐시 마커 실패만 안내
+        print(f"[경고] 캐시 마커 갱신 실패({e}) — 서버에서 touch {gen} 를 실행하세요")
     print(f"[완료] {len(plans)}그룹 병합 · 삭제 이벤트 {ndel}건 · 행 수 검증 통과 · 캐시 세대 갱신")
     return 0
 
