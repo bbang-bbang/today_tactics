@@ -10,6 +10,7 @@
 - ✅ **11/4 낮 갱신**: `--fill-missing` 완료(212명 추가·문제 경기 0, 캐시 갱신 완료) · 03:00 백업 크론 성공 · 득점 불일치 27/871경기(공식 원본 한계, 리포트가 보정) · QA 식 보정 커밋 `1ac40ef`. **name_ko REVIEW 8건 운영 적용 완료(22:10, 롤백 JSON `name_ko_fix_rollback_20261104_221005.json`)**. 상세 `checklist/work-log-2026-11-04.md` §0-A.
 - 오늘 배포 완료: 공식 선수 리포트 API+화면(SofaScore/공식 전환), 이름 중복 해소, **players.name_ko 교정 145건(운영 DB 변경, 롤백 JSON·백업 있음)**, 공식 리포트 득점 보정, 수집기 출전 ID 보강. 마지막 코드 커밋 `003a38f`.
 - ✅ PO 14건 재분류 운영 적용(22:31) · 공식 탭 기본값 전환(자동 SofaScore 폴백)·비교 모달 출처 전환 구현. 이상민 875787 name_ko 교정 적용(22:50). 데이터 정합성 작업은 근거 확실한 건 완료 — 잔여(이름 없는 93명·중복 321그룹·득점 27경기)는 의도적 보류. 다음: 11/9 크론 확인(STEP 23~28, PO 재분류). QA 120/121 — 실패 1건은 11/9 크론 PO 재분류 대기.
+- 🗓 **11/9(월) 05:00 크론 점검 절차**(읽기 전용, 서버 `/opt/today_tactics`): ① `/var/log/today_tactics/update.log` 마지막 실행의 STEP 23~28 성공(STEP 26 PO는 처리할 게 없는 게 정상) ② 월 02:00 `fetch_next_round.py`(`next_round.log`)가 `INSERT OR REPLACE events`를 하므로 **중복 이벤트 재발 여부** — `./venv/bin/python crawlers/dedupe_events.py --db players.db`(dry-run, 대상 그룹 0이어야 함; 있으면 `--apply --backup-dir /var/backups/today_tactics`는 사용자가 직접) ③ `./venv/bin/python qa_check.py` 121/121 ④ `analysis/audit_collection_gaps.py` '모든 소스 정상 범위'.
 - ⚠ 공식 사이트 부하에 민감: `--dry-run`도 실제 호출함 → 시험은 `--limit`·`--delay 2~3`.
 
 ## 0. ⏭ 재개 지점 (NEXT)
