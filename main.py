@@ -7951,7 +7951,7 @@ def insights_storylines():
     for d, nm_, tm, l5, sv, n in sorted(rising, reverse=True)[:3]:
         if d >= 0.5:
             player_cards.append({"kind": "player_rising", "team": short(tm), "score": 70 + d * 10,
-                "text": f"{nm_}({short(tm)}) 최근 5경기 공식 평점 {l5:.2f}로 시즌 평균({sv:.2f})보다 {d:.2f} 올랐다 — 물오른 폼.",
+                "text": f"{nm_}({short(tm)}) 최근 5경기 공식 평점은 {l5:.2f}, 시즌 평균({sv:.2f})보다 {d:.2f} 높다 — 물오른 폼.",
                 "evidence": f"공식 평점 {sv:.2f} → {l5:.2f} (시즌 {n}경기 · 공식 playerPoint 기준)"})
     for per90, nm_, tm, ga, mins, n in sorted(gems, reverse=True)[:3]:
         player_cards.append({"kind": "player_gem", "team": short(tm), "score": 68 + per90 * 5,
