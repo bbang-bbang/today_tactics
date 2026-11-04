@@ -4258,8 +4258,83 @@ def get_pre_match_brief():
         cands.append((66, f"빌드업이 {bh['name']}({bh['pos'] or '-'})에게 집중 — 이 선수를 압박해 전개를 끊어라",
                       f"{bh['matches']}경기 중 {bh['times']}경기({bh['pct']}%) 팀 패스 관여 1위, 최근 {bh['recent_n']}경기 중 {bh['recent_main']}경기 · "
                       f"허브 지분 {bh['share']:.1f}% (리그 평균 {bh['league_share']:.1f}%)"))
+    # ── ⑦-b 우리 팀 × 상대 맞춤 매치업 (두 팀을 겹쳐 봐야 보이는 포인트) ──
+    us_row = next((t for t in (rk.get("teams") or []) if t.get("id") == team_id), None)
+    us_ok = bool(us_row and us_row.get("eligible") and sample_ok)
+    third_of = lambda tot: max(1, round(tot / 3))   # noqa: E731
+    def rk_of(row, key):
+        tot = (rk.get("totals") or {}).get(key)
+        r = (row.get("ranks") or {}).get(key) if row else None
+        return (r, tot) if r and tot and tot >= 4 else (None, None)
+    def val_of(row, key):
+        m = metric_defs.get(key) or {}
+        return _brief_fmt(((row or {}).get("values") or {}).get(key), m.get("format"))
+    us_nm, op_nm = us_info.get("short", us_info["name"]), op_info.get("short", op_info["name"])
+    if us_ok:
+        # 공격 우위: 우리 득점력 상위 × 상대 실점 많음
+        (ra, ta), (rb, tb) = rk_of(us_row, "gf_per_game"), rk_of(my_row, "ga_per_game")
+        if ra and rb and ra <= third_of(ta) and rb > tb - third_of(tb):
+            cands.append((88, f"공격 우위 매치업 — {us_nm}의 득점력이 {op_nm}의 허술한 수비를 겨냥한다",
+                          f"우리 경기당 득점 {val_of(us_row, 'gf_per_game')}(리그 {ra}/{ta}위) vs 상대 경기당 실점 {val_of(my_row, 'ga_per_game')}(리그 {rb}/{tb}위)", "matchup"))
+        # 수비 경계: 상대 득점력 상위 × 우리 실점 많음
+        (ra, ta), (rb, tb) = rk_of(my_row, "gf_per_game"), rk_of(us_row, "ga_per_game")
+        if ra and rb and ra <= third_of(ta) and rb > tb - third_of(tb):
+            cands.append((87, f"수비 경계 매치업 — {op_nm}의 득점력이 {us_nm}의 실점 약점과 맞물린다",
+                          f"상대 경기당 득점 {val_of(my_row, 'gf_per_game')}(리그 {ra}/{ta}위) vs 우리 경기당 실점 {val_of(us_row, 'ga_per_game')}(리그 {rb}/{tb}위)", "matchup"))
+        # 경합: 우위/열세
+        (ra, ta), (rb, tb) = rk_of(us_row, "duel_won_pct"), rk_of(my_row, "duel_won_pct")
+        if ra and rb:
+            if ra <= third_of(ta) and rb > tb - third_of(tb):
+                cands.append((78, f"경합 싸움에서 앞선다 — 몸싸움·세컨볼 대결로 끌고 가라",
+                              f"경합 승률 우리 {val_of(us_row, 'duel_won_pct')}(리그 {ra}/{ta}위) vs 상대 {val_of(my_row, 'duel_won_pct')}(리그 {rb}/{tb}위)", "matchup"))
+            elif rb <= third_of(tb) and ra > ta - third_of(ta):
+                cands.append((78, f"경합에서 밀릴 수 있다 — 세컨볼·거리 유지로 대비",
+                              f"경합 승률 우리 {val_of(us_row, 'duel_won_pct')}(리그 {ra}/{ta}위) vs 상대 {val_of(my_row, 'duel_won_pct')}(리그 {rb}/{tb}위)", "matchup"))
+        # 최근 5경기 폼 격차
+        fu = (us_row.get("values") or {}).get("form_ppg_last5")
+        fo = (my_row.get("values") or {}).get("form_ppg_last5")
+        if isinstance(fu, (int, float)) and isinstance(fo, (int, float)) and abs(fu - fo) >= 0.8:
+            better = us_nm if fu > fo else op_nm
+            cands.append((74, f"최근 흐름은 {better} 쪽 — 경기당 승점 격차 {abs(fu - fo):.1f}점",
+                          f"최근 5경기 경기당 승점 {us_nm} {fu:.2f} vs {op_nm} {fo:.2f}", "form"))
+    # 휴식일 격차
+    ru, ro = matchup.get("rest_days_us"), matchup.get("rest_days_opp")
+    if isinstance(ru, (int, float)) and isinstance(ro, (int, float)) and abs(ru - ro) >= 2:
+        tired = op_nm if ro < ru else us_nm
+        cands.append((70, f"체력 변수 — {_j(tired, 1)} 더 짧게 쉬고 나온다",
+                      f"직전 경기 후 휴식 {us_nm} {ru}일 vs {op_nm} {ro}일", "rest"))
+    # 상대 전적 서사
+    if h2h["games"] >= 4:
+        wr, lr = h2h["win"] / h2h["games"], h2h["loss"] / h2h["games"]
+        if wr >= 0.6:
+            cands.append((72, f"{op_nm} 상대로 강했다 — 자신감을 가져가도 좋은 상성",
+                          f"맞대결 {h2h['games']}경기 {h2h['win']}승 {h2h['draw']}무 {h2h['loss']}패", "h2h"))
+        elif lr >= 0.6:
+            cands.append((76, f"{_j(op_nm, 0)} 껄끄러운 상대 — 맞대결 열세를 의식하라",
+                          f"맞대결 {h2h['games']}경기 {h2h['win']}승 {h2h['draw']}무 {h2h['loss']}패", "h2h"))
+
+    # 같은 종류의 결론이 겹치지 않게 고른다(시간대·선제골·약점 … 종류당 1개, 매치업은 2개까지)
+    def cat_of(c):
+        if len(c) > 3:
+            return c[3]
+        t = c[1]
+        for kw, cat in (("선제골", "firstgoal"), ("먼저", "firstgoal"), ("시간대", "timing"), ("실점", "timing"),
+                        ("득점이 몰림", "timing"), ("상대 약점", "weakness"), ("봉쇄", "threat"),
+                        ("세트피스", "setpiece"), ("빌드업", "hub")):
+            if kw in t:
+                return cat
+        return "other"
     cands.sort(key=lambda c: -c[0])
-    conclusions = [{"title": t, "evidence": e} for _p, t, e in cands[:3]]
+    picked, used = [], {}
+    for c in cands:
+        cat = cat_of(c)
+        if used.get(cat, 0) >= (2 if cat == "matchup" else 1):
+            continue
+        picked.append(c)
+        used[cat] = used.get(cat, 0) + 1
+        if len(picked) == 3:
+            break
+    conclusions = [{"title": c[1], "evidence": c[2]} for c in picked]
 
     # ── 신뢰도 경고 ──
     warnings = []
