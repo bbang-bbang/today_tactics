@@ -6,6 +6,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     const section  = document.getElementById("player-report-section");
     const body     = document.getElementById("pr-body");
     const yrFilter = document.getElementById("pr-year-filter");
+    const srcSlot  = document.getElementById("pr-src-slot");   // 출처 전환 — 연도 필터와 같은 줄(고정 영역, 본문 갱신과 무관)
 
     let currentName = null;
     let currentYear = null;
@@ -31,6 +32,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         currentPid    = null;
         lastSofa      = null;
         tryOfficialFirst = true;
+        if (srcSlot) srcSlot.innerHTML = "";
         load();
     });
 
@@ -38,14 +40,16 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     function srcToggle(active) {
         const b = (src, label, tip) =>
             `<button type="button" class="pr-src-btn${active === src ? " active" : ""}" data-src="${src}" aria-pressed="${active === src}" title="${tip}">${label}</button>`;
-        return `<div class="pr-source-toggle" role="group" aria-label="데이터 출처">
+        const html = `<div class="pr-source-toggle" role="group" aria-label="데이터 출처">
             <span class="pr-src-label">데이터 출처</span>
             ${b("sofa", "SofaScore", "기존 리포트 — 90분=풀타임 90분 기준")}
             ${b("official", "공식 K리그 <small>베타</small>", "K리그 공식 경기 기록 — 출전분이 추가시간 포함, 일부 지표 정의가 다름")}
         </div>`;
+        if (srcSlot) srcSlot.innerHTML = html; else return html;
+        return "";
     }
     function bindSource() {
-        body.querySelectorAll(".pr-src-btn").forEach(btn => {
+        (srcSlot || body).querySelectorAll(".pr-src-btn").forEach(btn => {
             btn.addEventListener("click", () => {
                 if (btn.dataset.src === currentSource) return;
                 tryOfficialFirst = false;
@@ -239,11 +243,14 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             });
     }
 
+    // 공식 탭 연도 필터 — [전체(현재 리그 누적), 연도…]. '전체'는 API year=all.
     function bindYears(years, active) {
-        yrFilter.innerHTML = (years || []).map(y =>
-            `<button class="pr-yr-btn${y === active ? " active" : ""}" data-y="${ttEsc(y)}">${ttEsc(y)}</button>`).join("");
+        const list = (years && years.length) ? ["전체", ...years] : [];
+        const act = active === "all" ? "전체" : active;
+        yrFilter.innerHTML = list.map(y =>
+            `<button class="pr-yr-btn${y === act ? " active" : ""}" data-y="${ttEsc(y)}" aria-pressed="${y === act}">${ttEsc(y)}</button>`).join("");
         yrFilter.querySelectorAll(".pr-yr-btn").forEach(btn => {
-            btn.addEventListener("click", () => { currentYear = btn.dataset.y; load(); });
+            btn.addEventListener("click", () => { currentYear = btn.dataset.y === "전체" ? "all" : btn.dataset.y; load(); });
         });
     }
 
@@ -308,7 +315,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <div class="pr-player-header">
                 <div class="pr-pos-badge" style="background:${posColor}22;border-color:${posColor}55;color:${posColor}">${ttEsc(posLabel)}</div>
                 <div class="pr-player-name">${ttEsc(p.name)}</div>
-                <div class="pr-player-team">${ttEsc(p.team)} · ${ttEsc(p.league)} ${ttEsc(d.year)}</div>
+                <div class="pr-player-team">${ttEsc(p.team)} · ${ttEsc(p.league)} ${d.year === "all" ? "전체 시즌 누적" : ttEsc(d.year)}</div>
                 <div class="pr-info-badges">
                     <span class="pr-badge">${p.games}경기</span>
                     <span class="pr-badge">${p.mins}분</span>
@@ -319,7 +326,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                     ${p.yellows ? `<span class="pr-badge">🟨${p.yellows}</span>` : ""}
                     ${p.reds    ? `<span class="pr-badge">🟥${p.reds}</span>` : ""}
                 </div>
-                <div class="pr-peer-note pr-peer-note-official">같은 리그·같은 포지션 <b>${ttEsc(p.peer_label)}</b> ${d.peer_count}명 대비 퍼센타일 (공식 기록 기준)</div>
+                <div class="pr-peer-note pr-peer-note-official">같은 리그·같은 포지션 <b>${ttEsc(p.peer_label)}</b> ${d.peer_count}명 대비 퍼센타일 (공식 기록 기준${d.year === "all" ? " · 현재 리그의 모든 시즌을 합산" : ""})</div>
             </div>
         </div>
 
@@ -379,10 +386,15 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                 <div class="pr-pct-info"><span>기록 없음</span></div>
             </div>`;
         }
-        const pct = item.pctile;
+        // 막대 길이 = 퍼센타일(길수록 좋음). 라벨은 위치를 그대로 말한다: 50 이상 "상위 N%", 미만 "하위 N%".
+        // 색 + 기호(▲▼)를 같이 써서 색만으로 좋고 나쁨을 전달하지 않는다.
+        const pct = Math.max(0, Math.min(100, item.pctile));
         const color = pct >= 75 ? "#4ade80" : pct >= 50 ? "#4ea4f8" : pct >= 25 ? "#fbbf24" : "#f87171";
         const grade = pct >= 90 ? "탁월" : pct >= 75 ? "우수" : pct >= 50 ? "평균이상" : pct >= 25 ? "평균이하" : "하위";
-        return `<div class="pr-stat-item">
+        const good = pct >= 50;
+        const where = good ? `상위 ${Math.max(1, 100 - pct)}%` : (pct <= 0 ? "최하위" : `하위 ${pct}%`);
+        const aria = `${item.label} ${item.val}, 비교군 대비 ${where}, ${grade}`;
+        return `<div class="pr-stat-item" role="group" aria-label="${ttEsc(aria)}">
             <div class="pr-stat-label">
                 <span class="pr-stat-icon">${item.icon}</span>
                 <span>${item.label}</span>
@@ -392,7 +404,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                 <div class="pr-pct-bar" style="width:${pct}%;background:${color}"></div>
             </div>
             <div class="pr-pct-info">
-                <span style="color:${color}">상위 ${100 - pct}%</span>
+                <span style="color:${color}">${good ? "▲" : "▼"} ${where}</span>
                 <span class="pr-grade" style="color:${color}">${grade}</span>
             </div>
         </div>`;

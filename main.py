@@ -5413,7 +5413,9 @@ def get_player_stat_report_official():
     import datetime as _dt
     name = request.args.get("name", "").strip()
     player_id = request.args.get("playerId", type=int)
-    year_arg = request.args.get("year", type=int)
+    year_raw = (request.args.get("year") or "").strip()
+    year_all = year_raw == "all"            # 전체(누적): 선수의 가장 최근 시즌 리그 안에서 모든 연도를 합산
+    year_arg = int(year_raw) if year_raw.isdigit() else None
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -5438,19 +5440,20 @@ def get_player_stat_report_official():
             "WHERE k.player_kid = ? AND e.tournament_id IN (410, 777) ORDER BY 1", (kid,))]
         if not years:
             return jsonify({**base, "official": False, "reason": "no_games"})
-        year = str(year_arg) if year_arg else years[-1]
-        if year not in years:
+        year = "all" if year_all else (str(year_arg) if year_arg else years[-1])
+        if year != "all" and year not in years:
             return jsonify({**base, "official": False, "reason": "no_year", "available_years": years})
 
+        ycond = f"(? = 'all' OR {year_expr} = ?)"          # 값 두 개(year, year)를 바인딩 — 외부 입력은 파라미터로만
         t = cur.execute(
             f"SELECT e.tournament_id FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
-            f"WHERE k.player_kid = ? AND e.tournament_id IN (410, 777) AND {year_expr} = ? "
-            "ORDER BY e.date_ts DESC LIMIT 1", (kid, year)).fetchone()
+            f"WHERE k.player_kid = ? AND e.tournament_id IN (410, 777) AND {ycond} "
+            "ORDER BY e.date_ts DESC LIMIT 1", (kid, year, year)).fetchone()
         tid = t[0]
         # 득점 보정(공식 goal 누락분) — 본인·비교군 모두 같은 규칙이라 백분위가 공정하다. 규칙·근거는 _kpm_goal_adjust.
         # 매핑 테이블이 없는 DB 에서는 공식 값 그대로.
         has_map = bool(cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague_player_map'").fetchone())
-        adj = _kpm_goal_adjust(cur, f"e.tournament_id = ? AND {year_expr} = ?", (tid, year)) if has_map else {}
+        adj = _kpm_goal_adjust(cur, f"e.tournament_id = ? AND {ycond}", (tid, year, year)) if has_map else {}
         adj_add, adj_games = {}, {}
         for (_eid, _kid), _n in adj.items():
             adj_add[_kid] = adj_add.get(_kid, 0) + _n
@@ -5460,13 +5463,13 @@ def get_player_stat_report_official():
         me = cur.execute(
             f"SELECT COUNT(*) games, SUM(k.minutes) mins, SUM(k.xg) xg, AVG(k.point) point, {sums} "
             f"FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
-            f"WHERE k.player_kid = ? AND e.tournament_id = ? AND {year_expr} = ?", (kid, tid, year)).fetchone()
+            f"WHERE k.player_kid = ? AND e.tournament_id = ? AND {ycond}", (kid, tid, year, year)).fetchone()
         me = dict(me)
         me["goals"] = (me["goals"] or 0) + adj_add.get(kid, 0)
         pos_row = cur.execute(
             f"SELECT k.position, COUNT(*) c FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
-            f"WHERE k.player_kid = ? AND e.tournament_id = ? AND {year_expr} = ? AND k.position IS NOT NULL "
-            "GROUP BY k.position ORDER BY c DESC LIMIT 1", (kid, tid, year)).fetchone()
+            f"WHERE k.player_kid = ? AND e.tournament_id = ? AND {ycond} AND k.position IS NOT NULL "
+            "GROUP BY k.position ORDER BY c DESC LIMIT 1", (kid, tid, year, year)).fetchone()
         pos_raw = pos_row[0] if pos_row else None
         eff_pos = _KPM_POS_TO_BROAD.get(pos_raw, "M")
         pos_label = pos_raw or "?"
@@ -5493,8 +5496,8 @@ def get_player_stat_report_official():
             for r in cur.execute(
                 f"SELECT k.player_kid, COUNT(*) games, SUM(k.minutes) mins, {sums} "
                 f"FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
-                f"WHERE e.tournament_id = ? AND {year_expr} = ? AND k.position = ? "
-                "GROUP BY k.player_kid HAVING mins >= 270 AND games >= 5", (tid, year, pos_raw)):
+                f"WHERE e.tournament_id = ? AND {ycond} AND k.position = ? "
+                "GROUP BY k.player_kid HAVING mins >= 270 AND games >= 5", (tid, year, year, pos_raw)):
                 rr = dict(r)
                 rr["goals"] = (rr["goals"] or 0) + adj_add.get(rr["player_kid"], 0)
                 peers[rr["player_kid"]] = metrics(rr)
@@ -5546,11 +5549,11 @@ def get_player_stat_report_official():
 
         last_team = cur.execute(
             f"SELECT k.team_id FROM kleague_player_match k JOIN events e ON e.id = k.event_id "
-            f"WHERE k.player_kid = ? AND e.tournament_id = ? AND {year_expr} = ? ORDER BY e.date_ts DESC LIMIT 1",
-            (kid, tid, year)).fetchone()
+            f"WHERE k.player_kid = ? AND e.tournament_id = ? AND {ycond} ORDER BY e.date_ts DESC LIMIT 1",
+            (kid, tid, year, year)).fetchone()
         sofa_games = cur.execute(
             f"SELECT COUNT(DISTINCT m.event_id) FROM match_player_stats m JOIN events e ON e.id = m.event_id "
-            f"WHERE m.player_id = ? AND e.tournament_id = ? AND {year_expr} = ?", (pid, tid, year)).fetchone()[0]
+            f"WHERE m.player_id = ? AND e.tournament_id = ? AND {ycond}", (pid, tid, year, year)).fetchone()[0]
         has_xg = me["xg"] is not None
 
         return jsonify({

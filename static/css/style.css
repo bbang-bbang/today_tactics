@@ -4704,7 +4704,9 @@ body {
 .pn-mode:active { background: rgba(255,255,255,0.2); }
 .pn-mode.is-on { background: var(--pn-accent); border-color: var(--pn-accent); color: #1a1030; }
 .pn-mode:focus-visible, #pn-match:focus-visible, #pn-th:focus-visible, .pn-node:focus-visible { outline: 2px solid #fde68a; outline-offset: 2px; }
-#pn-match { max-width: 260px; }
+#pn-match { max-width: 260px; color-scheme: dark; }
+#pn-match option { background: #16213a; color: #e8f2ff; }   /* 열린 목록이 밝은 배경 + 밝은 글자로 안 보이던 문제 */
+#pn-match option:disabled { color: #7f93b0; }
 .pn-scope { font-size: 0.78rem; color: var(--pn-muted); }
 .pn-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 @media (max-width: 900px) { .pn-grid { grid-template-columns: minmax(0, 1fr); } }
@@ -6187,7 +6189,10 @@ body.pr-expanded-lock {
 .pr-yr-btn:focus-visible { outline:2px solid #4ea4f8; outline-offset:2px; }
 
 /* 데이터 출처 전환(SofaScore / 공식 K리그) — 선수 리포트 상단 */
-.pr-source-toggle { display:flex; align-items:center; gap:6px; margin:0 0 12px; flex-wrap:wrap; }
+.pr-source-toggle { display:flex; align-items:center; gap:6px; margin:0; flex-wrap:wrap; }
+/* 출처 전환 + 연도 필터를 한 줄에 — 좁아지면 줄바꿈 */
+.pr-filter-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 16px; margin:0 0 12px; }
+.pr-src-slot { min-width:0; }
 .pr-src-label { font-size:0.72rem; color:#8aa0b8; margin-right:2px; }
 .pr-src-btn {
     background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.14);
@@ -6261,18 +6266,19 @@ body.pr-expanded-lock {
 /* 레이더 */
 .pr-radar-card {
     display: grid;
-    grid-template-columns: 220px 1fr;
+    grid-template-columns: minmax(240px, 300px) 1fr;
     align-items: start;
     gap: 20px;
 }
 .pr-radar-canvas-wrap { flex-shrink: 0; }
-#pr-radar-canvas { width: 100%; max-width: 220px; max-height: 220px; }
+#pr-radar-canvas { width: 100%; max-width: 300px; max-height: 300px; }
 .pr-stats-card { min-width: 0; }
 /* 모바일: 레이더와 지표 목록을 세로로 쌓는다(2열 고정이면 지표 열이 74px로 좁아져 글자가 세로로 깨짐). 터치 영역 확대. */
 @media (max-width: 600px) {
     .pr-radar-card { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-    #pr-radar-canvas { display: block; margin: 0 auto; }
+    #pr-radar-canvas { display: block; margin: 0 auto; max-width: 240px; max-height: 240px; }   /* 모바일: 첫 화면을 레이더가 독점하지 않게 */
     .pr-src-btn { min-height: 36px; padding: 8px 14px; }
+    .pr-yr-btn { min-height: 32px; padding: 5px 12px; }
 }
 
 /* 스탯 리스트 */
@@ -6296,6 +6302,7 @@ body.pr-expanded-lock {
     font-size:0.7rem; margin-top:2px;
 }
 .pr-grade { font-weight:600; }
+.pr-pct-info span:first-child { font-weight:600; }
 
 /* 활동량 */
 .pr-activity-card .pr-section-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
