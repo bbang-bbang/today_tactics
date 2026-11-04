@@ -226,10 +226,14 @@ with contextlib.redirect_stdout(io.StringIO()):
 if cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kleague_player_match'").fetchone():
     _kpm_bad = cur.execute("""
         SELECT COUNT(*) FROM events e WHERE e.id IN (SELECT event_id FROM kleague_player_match_log)
-          AND ((SELECT COALESCE(SUM(goals),0) FROM kleague_player_match k WHERE k.event_id=e.id AND k.is_home=1)
-               + (SELECT COUNT(*) FROM goal_events g WHERE g.event_id=e.id AND g.is_home=1 AND g.is_own_goal=1) != e.home_score
-            OR (SELECT COALESCE(SUM(goals),0) FROM kleague_player_match k WHERE k.event_id=e.id AND k.is_home=0)
-               + (SELECT COUNT(*) FROM goal_events g WHERE g.event_id=e.id AND g.is_home=0 AND g.is_own_goal=1) != e.away_score)
+          AND (
+            -- 공식합 == 스코어 이거나 공식합+자책골 == 스코어면 정상 (출처 간 자책골/굴절 정의 차이)
+            ((SELECT COALESCE(SUM(goals),0) FROM kleague_player_match k WHERE k.event_id=e.id AND k.is_home=1) != e.home_score
+             AND (SELECT COALESCE(SUM(goals),0) FROM kleague_player_match k WHERE k.event_id=e.id AND k.is_home=1)
+               + (SELECT COUNT(*) FROM goal_events g WHERE g.event_id=e.id AND g.is_home=1 AND g.is_own_goal=1) != e.home_score)
+            OR ((SELECT COALESCE(SUM(goals),0) FROM kleague_player_match k WHERE k.event_id=e.id AND k.is_home=0) != e.away_score
+             AND (SELECT COALESCE(SUM(goals),0) FROM kleague_player_match k WHERE k.event_id=e.id AND k.is_home=0)
+               + (SELECT COUNT(*) FROM goal_events g WHERE g.event_id=e.id AND g.is_home=0 AND g.is_own_goal=1) != e.away_score))
     """).fetchone()[0]
     # 공식 playerDetail.goal 은 추가시간 득점 등을 일부 빠뜨린다(2026-11-04 확인: 재호출에도 동일, 원본 한계 — 약 4%).
     # 리포트는 _kpm_goal_adjust 로 보정하므로 여기서는 '원본 불일치율이 평소(≤6%)를 넘는지'만 본다(수집 회귀 감시).
