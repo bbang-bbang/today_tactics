@@ -1424,6 +1424,49 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }).join("") + `<div class="ins-method">근거 — ${escI((list[0] && list[0].limits) || "")}</div>`;
   }
 
+  // ⑩ 패스량과 결과 (2026-11-05) — 패스를 많이 한 날 성적이 나쁜 건 '뒤진 팀이 공을 돌려서'. 앞선 시간 비중을 통제하면 관계가 사라진다.
+  const pctS = v => isNum(v) ? (v > 0 ? "+" : "") + v.toFixed(1) + "%" : "-";
+  function takePassVolume(d) {
+    const out = [], T = d.terciles || [], S = d.states || [];
+    const lo = T.find(t => t.key === "low"), hi = T.find(t => t.key === "high");
+    const tr = S.find(s => s.key === "trail"), cl = S.find(s => s.key === "close"), ld = S.find(s => s.key === "lead");
+    if (lo && hi) out.push(`평소보다 패스를 <b>많이 한 날</b>은 승점이 평소보다 <b>${sgn2(hi.pts_resid)}</b>, <b>적게 한 날</b>은 <b>${sgn2(lo.pts_resid)}</b>였습니다 — 하지만 이건 패스 때문이 아니라 <b>경기 흐름</b> 때문입니다.${insEv(`패스 ${pctS(hi.dev)} 구간 ${hi.n}팀-경기 vs ${pctS(lo.dev)} 구간 ${lo.n}팀-경기 · 평균 득실차 ${sgn2(hi.gd)} vs ${sgn2(lo.gd)}`)}`);
+    if (tr && ld && isNum(tr.dev) && isNum(ld.dev)) out.push(`앞서던 팀은 패스를 <b>${pctS(ld.dev)}</b> 줄이고, 뒤지던 팀은 <b>${pctS(tr.dev)}</b> 늘립니다. 앞선 시간대가 비슷한 경기끼리 비교하면 패스량과 득실차의 관계는 ${cl && isNum(cl.corr) ? `사라집니다(접전 상관 ${cl.corr.toFixed(2)})` : "뚜렷하지 않습니다"}.${insEv(`경기 상관(패스 평소 대비% ↔ 득실차) 통제 전 ${isNum(d.corr_dev_gd) ? d.corr_dev_gd.toFixed(2) : "-"} · 앞선 시간과의 상관 ${isNum(d.corr_dev_lead) ? d.corr_dev_lead.toFixed(2) : "-"} · 뒤진 경기 ${tr.corr} / 앞선 경기 ${ld.corr}${Math.abs(tr.corr) < 0.2 && Math.abs(ld.corr) < 0.2 ? " — 모두 0에 가까움" : ""}`)}`);
+    const flagged = (d.teams || []).filter(t => t.style);
+    flagged.slice(0, 2).forEach(t => out.push(`<b>${escI(t.short)}</b>${insPp(t.short, "은", "는")} ${t.style === "keep" ? "앞서도 패스를 거의 줄이지 않는 팀" : "앞서면 패스를 크게 줄이고 물러서는 팀"}입니다.${insEv(`앞선 ${t.lead_n}경기 평소 대비 ${pctS(t.lead_dev)} (리그 ${pctS(d.league_lead_dev)}) · z=${t.lead_z} · ${d.teams.length}팀을 동시에 비교한 결과라 우연일 가능성이 남음`)}`));
+    if (!flagged.length) {
+      const c = (d.teams || []).filter(t => isNum(t.lead_z)).sort((a, b) => Math.abs(b.lead_z) - Math.abs(a.lead_z))[0];
+      out.push(`앞섰을 때 패스를 줄이는 정도는 팀마다 달라 보이지만 어느 팀도 표본 오차를 넘지 않습니다.${c ? insEv(`가장 큰 차이: ${escI(c.short)} 앞선 ${c.lead_n}경기 평소 대비 ${pctS(c.lead_dev)} (리그 ${pctS(d.league_lead_dev)}, z=${c.lead_z} — 참고)`) : ""}`);
+    }
+    return out;
+  }
+  function renderPassVolume(list) {
+    const el = document.getElementById("ins-pv-body"); if (!el) return;
+    el.innerHTML = list.map(d => {
+      if (!d || !d.terciles) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      if (!d.terciles.length) return `${insHead(d)}${insWarn(d)}`;
+      const trows = d.terciles.map(t => `<tr><td class="ins-xl-team">${escI(t.label)}</td><td>${t.n}</td><td>${pctS(t.dev)}</td>
+        <td title="그 팀의 평소 승점(경기당) 대비"><b>${sgn2(t.pts_resid)}</b></td><td>${sgn2(t.gd)}</td></tr>`).join("");
+      const srows = d.states.map(s => `<tr><td class="ins-xl-team">${escI(s.label)}</td><td>${s.n}</td><td>${pctS(s.dev)}</td>
+        <td title="패스량(평소 대비%)과 득실차의 상관 — 0에 가까울수록 관계 없음${isNum(s.z) ? ` · z=${s.z}` : ""}">${isNum(s.corr) ? `<b>${s.corr > 0 ? "+" : ""}${s.corr.toFixed(2)}</b>` : "-"}</td></tr>`).join("");
+      const mark = t => t.style === "keep" ? ` <span class="ins-xl-up" aria-label="앞서도 패스 유지">▲</span>` : t.style === "sit" ? ` <span class="ins-xl-down" aria-label="앞서면 패스 크게 감소">▼</span>` : "";
+      const prows = d.teams.map(t => {
+        if (t.lead_dev == null) return `<tr class="ins-xl-skip"><td class="ins-xl-team">${escI(t.short)}</td><td>${t.games}</td><td>${t.avg_passes}</td><td colspan="2" class="ins-adv-empty">앞선 경기 ${t.lead_n} (${d.min_state}경기 미만)</td></tr>`;
+        return `<tr><td class="ins-xl-team">${escI(t.short)}</td><td>${t.games}</td><td>${t.avg_passes}</td>
+          <td title="앞선 ${t.lead_n}경기 · 리그 평균 ${pctS(d.league_lead_dev)} · z=${t.lead_z}"><b>${pctS(t.lead_dev)}</b>${mark(t)}</td>
+          <td title="뒤진 ${t.trail_n}경기">${t.trail_dev == null ? "-" : pctS(t.trail_dev)}</td></tr>`;
+      }).join("");
+      return `${insHead(d)}${insTake(takePassVolume(d))}${insWarn(d)}
+        <div class="ins-rs-cmp">패스 기록이 있는 ${d.matches}경기(${d.team_matches}팀-경기) · 팀 시즌 평균 패스와 승점의 상관 ${isNum(d.team_season_corr) ? (d.team_season_corr > 0 ? "+" : "") + d.team_season_corr.toFixed(2) : "-"} (${d.team_seasons}팀-시즌, 약한 편)</div>
+        <div class="ins-adv-sub-h">① 평소 대비 패스량별 성적</div>
+        <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>구분</th><th>팀-경기</th><th title="그 팀 평소 패스량 대비">패스 변화</th><th title="경기당 승점 − 그 팀 평소 승점">승점 잔차</th><th>평균 득실차</th></tr></thead><tbody>${trows}</tbody></table></div>
+        <div class="ins-adv-sub-h">② 경기 흐름(앞서 있던 시간)을 같게 놓고 보면</div>
+        <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>구분</th><th>팀-경기</th><th>패스 변화</th><th title="패스 변화와 득실차의 상관(0=무관)">패스↔득실차 상관</th></tr></thead><tbody>${srows}</tbody></table></div>
+        <div class="ins-adv-sub-h">③ 팀별 — 앞서면 패스를 얼마나 줄이나</div>
+        <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th>경기</th><th title="경기당 평균 총 패스">평균 패스</th><th title="경기 시간의 25%↑를 앞서 있던 경기에서 평소 대비 패스 변화(▲▼=리그와 z≥${d.z_flag} 차이)">앞섰을 때</th><th title="25%↑ 뒤져 있던 경기">뒤졌을 때</th></tr></thead><tbody>${prows}</tbody></table></div>`;
+    }).join("") + `<div class="ins-method">근거 — ${escI((list[0] && list[0].limits) || "")}</div>`;
+  }
+
   // ⑥ 실점 약점 지도 (2026-11-05) — 허용 슈팅이 '어디로·어떤 상황으로' 쏠리나 (비중 vs 리그 비중, |z|≥2만 표시)
   const WEAK_TIP = {
     goalmouth: "크로스·컷백 상황의 박스 안 마크", box_center: "수비 라인 사이·페널티 박스 중앙 공간 관리",
@@ -1702,6 +1745,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         .then(renderFormation).catch(warn("포메이션 상성")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/standings-trend?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderTrend).catch(warn("순위 추이")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/pass-volume?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderPassVolume).catch(warn("패스량과 결과")),
       fetch(`/api/insights/weather-effect?year=${currentYear}&league=${currentLeague}`).then(r => r.json())
         .then(d => renderWeather([d])).catch(warn("날씨 영향")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/rest-effect?year=${currentYear}&league=${lg}`).then(r => r.json())))

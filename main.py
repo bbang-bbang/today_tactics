@@ -8491,7 +8491,151 @@ def insights_opponent_strength():
     })
 
 
-_WX_MIN_N = 30               # 날씨 구간을 판정할 최소 경기 수
+_PV_MIN_TEAM_SEASON = 10     # 팀-시즌 평소 패스량(기준선) 계산에 필요한 최소 경기 수
+_PV_LEAD = 0.25              # 앞선/뒤진 시간 비중이 ±25% 이상이면 '앞선/뒤진 경기'
+_PV_MIN_STATE = 6            # 팀별 '앞설 때/뒤질 때' 패스 변화를 보여 줄 최소 경기 수
+_PV_Z = 2.5                  # 팀 특성 판정(리그 평균과의 차이) z 기준 — 12~17팀을 동시에 비교하므로 1.96 보다 엄격하게
+
+
+def _pv_corr(x, y):
+    n = len(x)
+    if n < 3:
+        return None
+    mx, my = sum(x) / n, sum(y) / n
+    d = math.sqrt(sum((a - mx) ** 2 for a in x) * sum((b - my) ** 2 for b in y))
+    return sum((a - mx) * (b - my) for a, b in zip(x, y)) / d if d else None
+
+
+@app.route("/api/insights/pass-volume")
+@cached_response(ttl=3600)
+def insights_pass_volume():
+    """패스량(점유 대리지표)은 결과의 원인인가 (2026-11-05). K리그 공식 패스 행렬의 팀 총 패스 수 사용.
+    핵심 발견: 평소보다 패스를 많이 한 날 성적이 나쁜 것은 '뒤진 팀이 공을 돌려서' — 앞선 시간 비중을 통제하면 관계가 사라진다.
+    각 팀의 앞선/뒤진 시간 비중은 득점 분 기록으로 계산(최종 스코어와 득점 기록이 일치하는 경기만 사용)."""
+    sc = _ins_scope()
+    if sc is None:
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label, tid, year, ycond, yp = sc
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        rows = conn.execute(
+            "SELECT e.id, e.date_ts, e.home_team_id, e.away_team_id, e.home_score, e.away_score, ph.total_passes, pa.total_passes "
+            "FROM events e JOIN kleague_pass_match ph ON ph.event_id = e.id AND ph.team_id = e.home_team_id "
+            "JOIN kleague_pass_match pa ON pa.event_id = e.id AND pa.team_id = e.away_team_id "
+            "WHERE e.tournament_id = ? AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL" + ycond, (tid, *yp)).fetchall()
+        goals = {}
+        for ev, t, m in conn.execute(
+                "SELECT g.event_id, g.team_id, g.minute FROM goal_events g JOIN events e ON e.id = g.event_id "
+                "WHERE e.tournament_id = ?" + ycond, (tid, *yp)):
+            goals.setdefault(ev, []).append((min(m or 0, 90), t))
+    finally:
+        conn.close()
+
+    matches = []                                 # (ev, season, home, away, hs, as, hp, ap, lead_share_home)
+    skipped = 0
+    for ev, ts, h, a, hs, as_, hp, ap in rows:
+        if h not in info or a not in info or not hp or not ap:
+            continue
+        g = sorted(goals.get(ev, []))
+        if sum(1 for _m, t in g if t == h) != hs or sum(1 for _m, t in g if t == a) != as_:
+            skipped += 1                         # 득점 기록이 최종 스코어와 안 맞으면 앞선 시간을 알 수 없다
+            continue
+        sh = sa = 0
+        last = 0
+        lead = 0.0
+        for m, t in g + [(90, None)]:
+            lead += max(0, m - last) * (1 if sh > sa else -1 if sh < sa else 0)
+            last = m
+            if t == h:
+                sh += 1
+            elif t == a:
+                sa += 1
+        matches.append((ev, datetime.fromtimestamp(ts).year, h, a, hs, as_, hp, ap, lead / 90))
+
+    tot = {}                                     # (팀, 시즌) → [패스 합, 승점 합, 경기 수]
+    for ev, season, h, a, hs, as_, hp, ap, _l in matches:
+        for t, p, gf, ga in ((h, hp, hs, as_), (a, ap, as_, hs)):
+            s = tot.setdefault((t, season), [0, 0, 0])
+            s[0] += p; s[1] += _ins_pts(gf, ga); s[2] += 1
+    recs = []                                    # 팀-경기: (team, dev%, lead_share, gd, pts_resid, passes)
+    for ev, season, h, a, hs, as_, hp, ap, lead in matches:
+        for t, p, gf, ga, ld in ((h, hp, hs, as_, lead), (a, ap, as_, hs, -lead)):
+            sp, spts, sn = tot[(t, season)]
+            if sn < _PV_MIN_TEAM_SEASON:
+                continue
+            bp = (sp - p) / (sn - 1)
+            pts = _ins_pts(gf, ga)
+            recs.append((t, (p - bp) / bp * 100, ld, gf - ga, pts - (spts - pts) / (sn - 1), p))
+    if len(recs) < 60:
+        return jsonify({"league": label, "year": year, "teams": [], "warnings": ["패스 기록이 있는 경기가 적어 계산할 수 없습니다."]})
+
+    n = len(recs)
+    srt = sorted(recs, key=lambda r: r[1])
+    k = n // 3
+    terciles = []
+    for key, name, seg in (("low", "평소보다 패스 적게", srt[:k]), ("mid", "평소 수준", srt[k:n - k]), ("high", "평소보다 패스 많이", srt[n - k:])):
+        terciles.append({"key": key, "label": name, "n": len(seg), "dev": round(sum(r[1] for r in seg) / len(seg), 1),
+                         "pts_resid": round(sum(r[4] for r in seg) / len(seg), 2), "gd": round(sum(r[3] for r in seg) / len(seg), 2)})
+
+    states = []
+    for key, name, lo, hi in (("trail", "대부분 뒤진 경기", -9, -_PV_LEAD), ("close", "접전", -_PV_LEAD, _PV_LEAD), ("lead", "대부분 앞선 경기", _PV_LEAD, 9)):
+        seg = [r for r in recs if lo <= r[2] < hi]
+        r_ = _pv_corr([x[1] for x in seg], [x[3] for x in seg]) if len(seg) > 30 else None
+        states.append({"key": key, "label": name, "n": len(seg),
+                       "dev": round(sum(x[1] for x in seg) / len(seg), 1) if seg else None,
+                       "corr": round(r_, 3) if r_ is not None else None,
+                       "z": round(math.atanh(max(-0.999, min(0.999, r_))) * math.sqrt(len(seg) - 3), 1) if r_ is not None else None})
+    corr_raw = _pv_corr([r[1] for r in recs], [r[3] for r in recs])
+    corr_lead = _pv_corr([r[1] for r in recs], [r[2] for r in recs])
+
+    per = {}
+    for t, dev, ld, gd, pr, p in recs:
+        d = per.setdefault(t, {"n": 0, "passes": 0, "lead": [], "trail": []})
+        d["n"] += 1; d["passes"] += p
+        if ld >= _PV_LEAD:
+            d["lead"].append(dev)
+        elif ld <= -_PV_LEAD:
+            d["trail"].append(dev)
+    all_lead = [r[1] for r in recs if r[2] >= _PV_LEAD]
+    lg_lead = sum(all_lead) / len(all_lead) if all_lead else 0.0
+    lg_sd = math.sqrt(sum((x - lg_lead) ** 2 for x in all_lead) / max(1, len(all_lead) - 1)) if all_lead else 0.0
+    teams = []
+    for t, d in per.items():
+        item = {"id": t, "short": info[t].get("short", info[t]["name"]), "games": d["n"], "avg_passes": round(d["passes"] / d["n"]),
+                "lead_n": len(d["lead"]), "trail_n": len(d["trail"]), "lead_dev": None, "trail_dev": None, "lead_z": None, "style": None}
+        if len(d["lead"]) >= _PV_MIN_STATE:
+            ld_ = sum(d["lead"]) / len(d["lead"])
+            item["lead_dev"] = round(ld_, 1)
+            se = lg_sd / math.sqrt(len(d["lead"])) if lg_sd else 0
+            item["lead_z"] = round((ld_ - lg_lead) / se, 1) if se else None
+            if item["lead_z"] is not None and abs(item["lead_z"]) >= _PV_Z:
+                item["style"] = "keep" if ld_ > lg_lead else "sit"      # keep=앞서도 패스 유지, sit=앞서면 크게 줄임
+        if len(d["trail"]) >= _PV_MIN_STATE:
+            item["trail_dev"] = round(sum(d["trail"]) / len(d["trail"]), 1)
+        teams.append(item)
+    teams.sort(key=lambda x: -x["avg_passes"])
+
+    xs, ys = [], []                              # 팀-시즌 평균 패스 vs PPG
+    for (t, season), (sp, spts, sn) in tot.items():
+        if sn >= _PV_MIN_TEAM_SEASON:
+            xs.append(sp / sn); ys.append(spts / sn)
+    team_season_corr = _pv_corr(xs, ys)
+    warnings = []
+    if skipped:
+        warnings.append(f"득점 기록이 최종 스코어와 맞지 않는 {skipped}경기는 앞선 시간을 알 수 없어 제외했습니다.")
+    return jsonify({
+        "league": label, "year": year, "team_matches": n, "matches": len(matches), "skipped": skipped,
+        "corr_dev_gd": round(corr_raw, 3) if corr_raw is not None else None,
+        "corr_dev_lead": round(corr_lead, 3) if corr_lead is not None else None,
+        "team_season_corr": round(team_season_corr, 2) if team_season_corr is not None else None, "team_seasons": len(xs),
+        "terciles": terciles, "states": states, "teams": teams,
+        "league_lead_dev": round(lg_lead, 1), "lead_threshold": _PV_LEAD, "min_state": _PV_MIN_STATE, "z_flag": _PV_Z, "warnings": warnings,
+        "limits": "팀 총 패스 수(K리그 공식 패스 행렬, 2023~) · 평소=그 팀의 같은 시즌 다른 경기 평균(해당 경기 제외) · 앞선 시간=득점 분 기록으로 계산(추가시간·분 단위 오차 무시, 득점 기록이 최종 스코어와 맞는 경기만) · 패스량은 점유율의 대리지표(상대 패스와 직접 비교하지 않음) · 상관이며 인과가 아님",
+    })
+
+
+_WX_MIN_N = 30              # 날씨 구간을 판정할 최소 경기 수
 _WX_Z = 2.5                  # 구간·지표가 많아(다중 비교) 1.96 이 아니라 2.5 이상일 때만 '차이 있음'
 _WX_TEMP = (("cold", "10℃ 미만", None, 10), ("cool", "10~20℃", 10, 20), ("warm", "20~28℃", 20, 28), ("hot", "28℃ 이상", 28, None))
 _WX_WIND = (("calm", "바람 약함(15km/h 미만)", None, 15), ("breeze", "보통(15~25)", 15, 25), ("strong", "강풍(25km/h 이상)", 25, None))
