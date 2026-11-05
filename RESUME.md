@@ -1,7 +1,7 @@
 # RESUME — 다른 PC / 새 세션에서 작업 재개 가이드
 
 > 이 파일 + `checklist/work-log-*.md` + git 커밋 기록만 보고 작업을 이어갈 수 있도록 정리.
-> 최종 갱신: 2026-11-02 (이후 상세: `checklist/backlog.md` P1 'SofaScore 수집 중단' · `checklist/history.md` 2026-11-01)
+> 최종 갱신: 2026-11-06 00:50 (11/5~11/6 작업 상세 → `checklist/work-log-2026-11-05.md` · 그 앞 → `work-log-2026-11-04.md`·`work-log-2026-11-03.md` · `checklist/backlog.md` P1 'SofaScore 수집 중단')
 
 ---
 
@@ -21,6 +21,7 @@
   - 🔥 **11/6 히트맵 좌우 반전 수정**(`964da1c`): 데이터 y는 **선수 본인 시점 우측=0→좌측=100**(공식 좌표로 검증: 오른쪽 풀백 평균 y≈19, 왼쪽≈78). 히트맵 탭·팀 형태·경기 리포트 평균 위치는 y 반전, 전술판 오버레이는 x도 거꾸로였음(A는 (x,100−y), B는 (100−x,y)가 정답). 좌/우측 라벨도 정정. 슛맵 y는 규약이 달라 건드리지 않음.
   - 🔎 알려진 사소한 것: Edge 콘솔의 404는 `/favicon.ico`(템플릿에 파비콘 링크 없음, 기능 무관).
   - ⚠ 주의: ① 운영 Python 3.11 — f-string 안 따옴표 중첩 금지(조사 헬퍼 `_j(word, 0|1|2)`는 숫자 코드로 받음) ② lazy 로드 JS(`analytics`·`insights` 등) 캐시 버전은 `templates/index.html`의 `TT_LAZY` JSON에서 올린다(정규식 일괄 치환 금지 — `player_analytics.js`와 섞임) ③ 이 PC의 Windows Python에서 한글 출력은 `PYTHONIOENCODING=utf-8`.
+- ⏭ **다음 세션 시작점(2026-11-06 00:50 마감)**: **11/9(월) 크론은 아직 실행 전**(서버 시각 11/6 00:31 KST 확인). 사전 점검만 끝냄 → 크론 정상 등록 4개(월 02:00 next_round · 매일 03:00 backup · 04:00 certbot · 월 05:00 update_data) · 11/5 03:00 백업 정상 · 서버 HEAD=최신 푸시와 일치 · 서버 `qa_check` 159/159 · `dedupe_events` 드라이런 0그룹 · 수집 공백 감사 '모든 소스 정상 범위' · `update_data.py`에 STEP 23~28 연결 확인. **11/9 크론은 STEP 23~28이 처음 도는 실행** — 과거 05:20~05:32에 끝났으므로 **05:40 이후** 새 세션에서 "11/9 크론 점검"이라고 요청(절차는 바로 아래). 11/9 02:00 `fetch_next_round.py`가 `INSERT OR REPLACE events`로 **중복 이벤트를 다시 만들 수 있으니** 드라이런(대상 그룹 0이어야 함)을 꼭 다시 볼 것. 로그는 매주 월~화 00:00 회전(update.log는 지금 0바이트 — 11/2 실행분은 `update.log-20261103`). 운영 접속은 rocky 계정, 키는 `~/.ssh/today-project.pem`, 한글 경로 문제로 Git Bash가 아니라 홈 경로 기준 ssh 사용 가능(이번엔 Git Bash ssh로도 동작). 한글이 섞인 원격 스크립트는 PowerShell 파이프에서 인코딩이 깨지니 **ASCII 스크립트를 파일로 만들어 `ssh ... "bash -s" < file`로 실행**할 것.
 - 🗓 **11/9(월) 05:00 크론 점검 절차**(읽기 전용, 서버 `/opt/today_tactics`): ① `/var/log/today_tactics/update.log` 마지막 실행의 STEP 23~28 성공(STEP 26 PO는 처리할 게 없는 게 정상) ② 월 02:00 `fetch_next_round.py`(`next_round.log`)가 `INSERT OR REPLACE events`를 하므로 **중복 이벤트 재발 여부** — `./venv/bin/python crawlers/dedupe_events.py --db players.db`(dry-run, 대상 그룹 0이어야 함; 있으면 `--apply --backup-dir /var/backups/today_tactics`는 사용자가 직접) ③ `./venv/bin/python qa_check.py` 121/121 ④ `analysis/audit_collection_gaps.py` '모든 소스 정상 범위'.
 - ⚠ 공식 사이트 부하에 민감: `--dry-run`도 실제 호출함 → 시험은 `--limit`·`--delay 2~3`.
 
