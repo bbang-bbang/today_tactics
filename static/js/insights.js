@@ -1335,6 +1335,62 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }).join("") + `<div class="ins-method">근거 — ${escI((list[0] && list[0].limits) || "")}</div>`;
   }
 
+  // ⑧ 라운드별 순위 추이 (2026-11-05) — 라운드 종료 시점 누적 승점 순위. 선은 중립색, 선택한 팀만 강조(굵기+라벨, 색에만 의존 안 함)
+  function takeTrend(d) {
+    const T = d.teams || [], n = (d.rounds || []).length, out = [];
+    if (!T.length) return out;
+    const lead = T[0], second = T[1];
+    out.push(`<b>${escI(lead.short)}</b>${insPp(lead.short, "이", "가")} <b>${lead.points}점</b>으로 선두${second ? ` — 2위 ${escI(second.short)}와 ${lead.points - second.points}점 차` : ""}입니다.${insEv(`${n}라운드 중 ${lead.weeks_first}라운드 선두 · 선두 교체 ${d.leader_changes}회${d.leader_changes === 0 ? "(선두가 한 번도 바뀌지 않음)" : ""}`)}`);
+    const w = d.window || 5, up = T.slice().sort((a, b) => b.delta_recent - a.delta_recent)[0], dn = T.slice().sort((a, b) => a.delta_recent - b.delta_recent)[0];
+    if (up && up.delta_recent >= 2) out.push(`최근 ${w}라운드 가장 많이 오른 팀은 <b>${escI(up.short)}</b> — <b>${up.delta_recent}계단</b> 상승해 ${up.rank}위입니다.${insEv(`${w}라운드 전 ${up.rank + up.delta_recent}위 → 현재 ${up.rank}위 · 승점 ${up.points}`)}`);
+    if (dn && dn.delta_recent <= -2) out.push(`반대로 <b>${escI(dn.short)}</b>${insPp(dn.short, "은", "는")} 최근 ${w}라운드 <b>${-dn.delta_recent}계단</b> 하락해 ${dn.rank}위입니다.${insEv(`${w}라운드 전 ${dn.rank + dn.delta_recent}위 → 현재 ${dn.rank}위 · 승점 ${dn.points}`)}`);
+    return out;
+  }
+  function renderTrend(list) {
+    const el = document.getElementById("ins-trend-body"); if (!el) return;
+    el.innerHTML = list.map((d, idx) => {
+      if (!d || !d.teams) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      if (!d.teams.length) return `${insHead(d)}${insWarn(d)}<div class="ins-adv-empty">순위 추이를 그릴 라운드가 부족합니다(${d.min_rounds || 5}라운드 이상 필요).</div>`;
+      const T = d.teams, N = T.length, n = d.rounds.length;
+      const W = 640, L = 30, R = 58, TOP = 10, RH = 21, H = TOP + N * RH + 20;
+      const X = i => L + (n > 1 ? i / (n - 1) : 0) * (W - L - R), Y = r => TOP + (r - 0.5) * RH;
+      const lead = T[0].id;
+      const lines = [...T.filter(t => t.id !== lead), ...T.filter(t => t.id === lead)].map(t => {   // 강조선이 맨 위에 그려지도록 선두를 마지막에
+        const path = t.ranks.map((r, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(r).toFixed(1)}`).join(" ");
+        return `<path class="ins-tr-line${t.id === lead ? " sel" : ""}" data-tid="${t.id}" d="${path}"><title>${escI(t.short)} — 현재 ${t.rank}위 (최고 ${t.best}위 · 최저 ${t.worst}위)</title></path>`;
+      }).join("");
+      const labs = T.map(t => `<text class="ins-tr-lab${t.id === lead ? " sel" : ""}" data-tid="${t.id}" x="${W - R + 6}" y="${Y(t.rank) + 4}">${escI(t.short)}</text>`).join("");
+      const axisY = Array.from({ length: N }, (_, i) => `<text class="ins-tr-axis" x="${L - 8}" y="${Y(i + 1) + 4}" text-anchor="end">${i + 1}</text>`).join("");
+      const ticks = d.rounds.map((r, i) => (i === 0 || i === n - 1 || (r % 5 === 0 && n - 1 - i > 2 && i > 2)) ? `<text class="ins-tr-axis" x="${X(i).toFixed(1)}" y="${H - 4}" text-anchor="middle">${r}R</text>` : "").join("");
+      const rows = T.map(t => {
+        const dl = t.delta_recent, mv = dl > 0 ? `<span class="ins-xl-up" aria-label="${dl}계단 상승">▲${dl}</span>` : dl < 0 ? `<span class="ins-xl-down" aria-label="${-dl}계단 하락">▼${-dl}</span>` : `<span class="ins-rs-n">–</span>`;
+        return `<tr data-tid="${t.id}" class="${t.id === lead ? "sel" : ""}"><td>${t.rank}</td>
+          <td class="ins-xl-team"><button type="button" class="ins-tr-pick" data-tid="${t.id}" aria-pressed="${t.id === lead}" title="이 팀의 순위선을 강조">${escI(t.short)}</button></td>
+          <td><b>${t.points}</b></td><td>${t.gap_to_first ? "−" + t.gap_to_first : "–"}</td><td title="${d.window || 5}라운드 전 대비 순위 변화">${mv}</td>
+          <td title="시즌 중 최고 · 최저 순위">${t.best}위 · ${t.worst}위</td><td title="라운드마다 평균 몇 계단 움직였나 — 클수록 순위가 자주 요동침">${f2(t.volatility)}</td></tr>`;
+      }).join("");
+      return `${insHead(d)}${insTake(takeTrend(d))}${insWarn(d)}
+        <div class="ins-tr-wrap" data-trend="${idx}">
+          <svg class="ins-tr-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escI(d.league)} ${d.season} 라운드별 순위 추이. 현재 1위 ${escI(T[0].short)}">${axisY}${ticks}${lines}${labs}</svg>
+          <div class="ins-rs-cmp">아래 표에서 팀 이름을 누르면 그 팀의 순위선이 굵게 강조됩니다 (위쪽 = 높은 순위).</div>
+          <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>순위</th><th>팀</th><th>승점</th><th title="1위와의 승점 차">1위와</th><th title="${d.window || 5}라운드 전 대비">최근 ${d.window || 5}R</th><th>최고·최저</th><th>변동성</th></tr></thead><tbody>${rows}</tbody></table></div>
+        </div>`;
+    }).join("") + `<div class="ins-method">근거 — ${escI((list[0] && list[0].limits) || "")}</div>`;
+    el.querySelectorAll(".ins-tr-wrap").forEach(wrap => {
+      wrap.addEventListener("click", e => {
+        const b = e.target.closest(".ins-tr-pick"); if (!b) return;
+        const tid = b.dataset.tid;
+        wrap.querySelectorAll("[data-tid]").forEach(x => {
+          const on = x.dataset.tid === tid;
+          if (x.tagName === "BUTTON") x.setAttribute("aria-pressed", String(on));
+          else x.classList.toggle("sel", on);
+        });
+        const line = wrap.querySelector(`path.ins-tr-line[data-tid="${tid}"]`);
+        if (line) line.parentNode.appendChild(line);      // 강조선을 맨 위로
+      });
+    });
+  }
+
   // ⑥ 실점 약점 지도 (2026-11-05) — 허용 슈팅이 '어디로·어떤 상황으로' 쏠리나 (비중 vs 리그 비중, |z|≥2만 표시)
   const WEAK_TIP = {
     goalmouth: "크로스·컷백 상황의 박스 안 마크", box_center: "수비 라인 사이·페널티 박스 중앙 공간 관리",
@@ -1611,6 +1667,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         .then(renderOppStrength).catch(warn("상대 수준별 성적")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/formation-matchup?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderFormation).catch(warn("포메이션 상성")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/standings-trend?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderTrend).catch(warn("순위 추이")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/rest-effect?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderRestEffect).catch(warn("휴식일")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/substitution-impact?year=${currentYear}&league=${lg}`).then(r => r.json())))

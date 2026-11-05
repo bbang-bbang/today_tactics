@@ -9843,3 +9843,19 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ins-wk-table th, .ins-wk-table td { text-align: center; }
 .ins-wk-table .ins-wk-sep { border-left: 1px solid rgba(255,255,255,0.14); }
 @media (max-width: 600px) { .ins-wk-legend { flex-direction: column; align-items: flex-start; } }
+
+/* 라운드별 순위 추이 — 선은 중립색, 선택 팀만 굵기·라벨 굵기로 강조(색에만 의존하지 않음) */
+.ins-tr-svg { display: block; width: 100%; height: auto; max-height: 460px; margin: 6px 0 4px; }
+.ins-tr-line { fill: none; stroke: rgba(255,255,255,0.26); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; transition: stroke 0.15s ease-in-out, stroke-width 0.15s ease-in-out; }
+.ins-tr-line.sel { stroke: #fbbf24; stroke-width: 3.4; }
+.ins-tr-lab { fill: #9fb4cc; font-size: 12px; font-weight: 500; transition: fill 0.15s ease-in-out; }
+.ins-tr-lab.sel { fill: #fde68a; font-weight: 800; }
+.ins-tr-axis { fill: #8da2bb; font-size: 11px; }
+.ins-tr-pick { font: inherit; font-weight: 700; color: #dbe7f7; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 2px 8px; cursor: pointer; transition: background 0.15s ease-in-out, border-color 0.15s ease-in-out; }
+.ins-tr-pick:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); }
+.ins-tr-pick:active { background: rgba(255,255,255,0.14); }
+.ins-tr-pick:focus-visible { outline: 2px solid #fde68a; outline-offset: 1px; }
+.ins-tr-pick[aria-pressed="true"] { color: #fde68a; border-color: #fbbf24; background: rgba(251,191,36,0.12); }
+.ins-tr-wrap tr.sel td { background: rgba(251,191,36,0.06); }
+@media (prefers-reduced-motion: reduce) { .ins-tr-line, .ins-tr-lab, .ins-tr-pick { transition: none; } }
+.ins-tr-wrap .ins-top-scroll { max-height: none; }   /* 순위표는 전 팀이 한눈에 보여야 함 */

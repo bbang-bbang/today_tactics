@@ -8491,7 +8491,104 @@ def insights_opponent_strength():
     })
 
 
-_FM_MIN_CELL = 8             # 포메이션 상성 칸을 보여 줄 최소 경기 수
+_TREND_MIN_ROUNDS = 5        # 순위 추이를 보여 줄 최소 완료 라운드 수
+_TREND_WINDOW = 5            # '최근 흐름' 비교 창(라운드)
+
+
+@app.route("/api/insights/standings-trend")
+@cached_response(ttl=3600)
+def insights_standings_trend():
+    """라운드별 순위 추이 (2026-11-05). 라운드 r 종료 시점의 누적 승점으로 순위를 매긴다
+    (승점 → 득실차 → 다득점, 프로젝트 순위 규칙과 동일). 팀이 라운드를 건너뛰면(연기) 직전 값 유지.
+    전 시즌(year=all)이면 가장 최근 시즌 하나만 쓴다 — 순위는 시즌 안에서만 의미가 있다."""
+    sc = _ins_scope()
+    if sc is None:
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label, tid, year, _ycond, _yp = sc
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        rows = conn.execute(
+            "SELECT e.round, e.home_team_id, e.away_team_id, e.home_score, e.away_score, e.date_ts FROM events e "
+            "WHERE e.tournament_id = ? AND e.round IS NOT NULL AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL "
+            "ORDER BY e.round", (tid,)).fetchall()
+    finally:
+        conn.close()
+    by_season = {}
+    for rd, h, a, hs, as_, ts in rows:
+        if h in info and a in info:
+            by_season.setdefault(datetime.fromtimestamp(ts).year, []).append((int(rd), h, a, hs, as_))
+    if not by_season:
+        return jsonify({"league": label, "year": year, "teams": [], "rounds": [], "warnings": ["경기 데이터가 없습니다."]})
+    season = int(year) if year != "all" and int(year) in by_season else max(by_season)
+    games = by_season[season]
+    warnings = []
+    if year == "all":
+        warnings.append(f"순위는 시즌 안에서만 의미가 있어 가장 최근 시즌({season})만 보여 줍니다.")
+    elif season != int(year):
+        return jsonify({"league": label, "year": year, "teams": [], "rounds": [], "warnings": ["이 시즌의 라운드 데이터가 없습니다."]})
+
+    teams_in = sorted({g[1] for g in games} | {g[2] for g in games})
+    expect = len(teams_in) // 2                      # 한 라운드에 열려야 하는 경기 수
+    per_round = {}
+    for rd, h, a, hs, as_ in games:
+        per_round.setdefault(rd, []).append((h, a, hs, as_))
+    done = [r for r in sorted(per_round) if len(per_round[r]) >= expect]
+    # 중간에 빈 라운드가 있으면 그 앞까지만 연속 구간으로 본다(연기 경기가 섞인 채 순위를 이어 붙이지 않음)
+    seq = []
+    for r in done:
+        if seq and r != seq[-1] + 1:
+            break
+        seq.append(r)
+    partial = [r for r in per_round if r not in seq and r > (seq[-1] if seq else 0)]
+    if partial:
+        warnings.append(f"{len(partial)}개 라운드는 아직 전 경기가 끝나지 않아 제외했습니다.")
+    if len(seq) < _TREND_MIN_ROUNDS:
+        return jsonify({"league": label, "year": year, "season": season, "teams": [], "rounds": seq,
+                        "min_rounds": _TREND_MIN_ROUNDS, "warnings": warnings + ["완료된 라운드가 적어 추이를 계산할 수 없습니다."]})
+
+    cum = {t: [0, 0, 0] for t in teams_in}           # pts, gf, ga
+    played = {t: 0 for t in teams_in}
+    rank_hist = {t: [] for t in teams_in}
+    pts_hist = {t: [] for t in teams_in}
+    for r in seq:
+        for h, a, hs, as_ in per_round[r]:
+            for t, gf, ga in ((h, hs, as_), (a, as_, hs)):
+                cum[t][0] += _ins_pts(gf, ga); cum[t][1] += gf; cum[t][2] += ga; played[t] += 1
+        order = sorted(teams_in, key=lambda t: (-cum[t][0], -(cum[t][1] - cum[t][2]), -cum[t][1]))
+        for i, t in enumerate(order):
+            rank_hist[t].append(i + 1)
+            pts_hist[t].append(cum[t][0])
+
+    n = len(seq)
+    w = min(_TREND_WINDOW, n - 1)
+    out = []
+    for t in teams_in:
+        rk = rank_hist[t]
+        steps = [abs(rk[i] - rk[i - 1]) for i in range(1, n)]
+        climb = [(rk[i - w] - rk[i], i) for i in range(w, n)]           # 양수 = 순위 상승
+        best_climb = max(climb) if climb else (0, 0)
+        leader_pts = max(pts_hist[o][-1] for o in teams_in)
+        out.append({
+            "id": t, "short": info[t].get("short", info[t]["name"]),
+            "ranks": rk, "pts": pts_hist[t],
+            "rank": rk[-1], "points": pts_hist[t][-1], "gap_to_first": leader_pts - pts_hist[t][-1],
+            "best": min(rk), "worst": max(rk), "weeks_first": sum(1 for x in rk if x == 1),
+            "delta_recent": rk[-1 - w] - rk[-1] if n > w else 0,
+            "volatility": round(sum(steps) / len(steps), 2) if steps else 0,
+            "best_climb": best_climb[0], "best_climb_round": seq[best_climb[1]] if climb else None,
+        })
+    out.sort(key=lambda x: x["rank"])
+    leaders = [min(teams_in, key=lambda t: rank_hist[t][i]) for i in range(n)]
+    leader_changes = sum(1 for i in range(1, n) if leaders[i] != leaders[i - 1])
+    return jsonify({
+        "league": label, "year": year, "season": season, "rounds": seq, "window": w, "min_rounds": _TREND_MIN_ROUNDS,
+        "teams": out, "leader_changes": leader_changes, "total_rounds": max(per_round), "warnings": warnings,
+        "limits": "라운드 종료 시점 누적 승점 기준 순위(승점→득실차→다득점) · 팀이 라운드를 건너뛰면 직전 값 유지 · 전 경기가 끝난 라운드만 사용 · 상대 맞대결(승자승) 미반영 · 순위 변화는 득실·승점 동률 처리에 따라 1단계 정도 달라질 수 있음",
+    })
+
+
+_FM_MIN_CELL = 8            # 포메이션 상성 칸을 보여 줄 최소 경기 수
 _FM_MIN_SIG = 10             # '유의'로 판정할 최소 경기 수(소표본에서 정규근사 z 는 과대평가)
 _FM_MIN_TEAM_GAMES = 5      # 팀 평소 PPG(기준선) 계산에 필요한 같은 시즌 최소 경기 수
 
