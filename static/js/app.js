@@ -409,7 +409,10 @@
 
         const flip = heatmapState.teamSide === "B";
         for (const pt of heatmapState.points) {
-            const nx = flip ? pt.x : 100 - pt.x;
+            // 데이터: x=0 자기 골문→100 상대 골문, y=선수 본인 시점 우측 0→좌측 100.
+            // 팀 A 는 왼쪽 진영에서 →(오른쪽) 공격 : x 그대로, 오른쪽이 아래쪽이라 y 반전.
+            // 팀 B 는 오른쪽 진영에서 ←(왼쪽) 공격 : x 반전, 오른쪽이 위쪽이라 y 그대로.
+            const nx = flip ? 100 - pt.x : pt.x;
             const ny = flip ? pt.y : 100 - pt.y;
             const px = r.x + (nx / 100) * r.w;
             const py = r.y + (ny / 100) * r.h;

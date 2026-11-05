@@ -297,7 +297,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const bh = H * 0.5, bw = 42;
         ctx.strokeRect(P, (H - bh) / 2, bw, bh);
         ctx.strokeRect(W - P - bw, (H - bh) / 2, bw, bh);
-        const fx = v => P + (v / 100) * (W - 2 * P), fy = v => P + (v / 100) * (H - 2 * P);
+        // 평균 위치 y 는 선수 본인 시점 우측=0 → 좌측=100 (오른쪽으로 공격하는 화면에서 오른쪽이 아래쪽 → 반전)
+        const fx = v => P + (v / 100) * (W - 2 * P), fy = v => P + ((100 - v) / 100) * (H - 2 * P);
         if (!nodes || !nodes.length) {
             ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "12px sans-serif";
             ctx.textAlign = "center"; ctx.fillText("평균 위치 데이터 없음", W / 2, H / 2);

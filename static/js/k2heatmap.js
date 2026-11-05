@@ -66,7 +66,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     // 히트맵 점을 경기장(라인 5~95%) 안쪽으로 매핑 — 살짝 더 들여 경기장보다 작게
     const FIELD_PAD = 0.06, FIELD_SPAN = 0.88;
     const fieldX = (x, W) => (FIELD_PAD + (x / 100) * FIELD_SPAN) * W;
-    const fieldY = (y, H) => (FIELD_PAD + (y / 100) * FIELD_SPAN) * H;
+    // 데이터 규약(SofaScore·공식 복구 공통): y 는 '선수 본인 시점'으로 우측=0 → 좌측=100 (오른쪽 풀백의 평균 y≈19, 왼쪽 풀백≈78).
+    // 공격 방향이 오른쪽(→)인 화면에서는 선수의 오른쪽이 아래쪽이므로 y 를 뒤집어 그린다 (prediction.js mapPos 의 HOME 과 동일).
+    const fieldY = (y, H) => (FIELD_PAD + ((100 - y) / 100) * FIELD_SPAN) * H;
 
     const apiBase = () => `/api/kleague${currentLeague === "k1" ? "1" : "2"}`;
 
@@ -586,7 +588,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }
 
     // 비교 인사이트 배너 — 두 좌표군의 차이를 자동 해석.
-    // 좌표: x=공격 방향(0=자기 골문, 100=상대 골문), y=좌우 폭(0~100).
+    // 좌표: x=공격 방향(0=자기 골문, 100=상대 골문), y=좌우 폭(0~100, 선수 본인 시점 우측=0 → 좌측=100).
     // 거리는 경기장 기준 환산 — 가로(길이) 105m, 세로(폭) 68m.
     const M_X = 1.05, M_Y = 0.68;   // 좌표 1단위 → m
     function pointStats(pts) {
@@ -627,7 +629,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
         // 2. 좌우 치우침
         const bc = Math.abs(b.my - 50), oc = Math.abs(o.my - 50);
-        const side = b.my < 50 ? "좌측" : "우측";
+        const side = b.my < 50 ? "우측" : "좌측";   // y 가 작을수록 선수의 오른쪽
         if (bc - oc >= 6)       cand.push({ s: (bc - oc) * 0.8, t: `<b>측면 치우침</b> ${side} 으로` });
         else if (bc - oc <= -6) cand.push({ s: (oc - bc) * 0.8, t: `<b>중앙 밀집</b> 평균보다 안쪽` });
 
@@ -675,7 +677,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
         // 헤드라인 — 절대 주 활동 지역 + 가장 두드러진 성향 한 줄 요약
         const zoneV = b.mx >= 60 ? "전방" : (b.mx < 40 ? "후방" : "중원");
-        const zoneH = bc < 5 ? "중앙" : (b.my < 50 ? "좌측" : "우측");
+        const zoneH = bc < 5 ? "중앙" : (b.my < 50 ? "우측" : "좌측");
         const tone = [];
         if (advM >= 3) tone.push("전진형");
         else if (advM <= -3) tone.push("후방형");

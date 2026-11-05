@@ -826,9 +826,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             if (metricsEl) metricsEl.innerHTML = '<p class="tc-hint">데이터 없음</p>';
             return;
         }
-        // x(0~100, 공격→오른쪽) → 캔버스 가로, y(0~100) → 세로
+        // x(0~100, 공격→오른쪽) → 캔버스 가로, y(0~100, 선수 본인 시점 우측=0→좌측=100) → 세로(오른쪽이 아래쪽이라 반전)
         const fx = v => PAD + (v / 100) * (W - 2 * PAD);
-        const fy = v => PAD + (v / 100) * (H - 2 * PAD);
+        const fy = v => PAD + ((100 - v) / 100) * (H - 2 * PAD);
         nodes.forEach(n => {
             const x = fx(n.x), y = fy(n.y), col = SHAPE_LINE_COLOR[n.line] || "#cbd5e1";
             ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2);
