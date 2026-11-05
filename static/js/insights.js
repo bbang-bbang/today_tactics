@@ -7,13 +7,13 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   let currentYear = "2026";
   let currentLeague = "all";  // "all" | "k1" | "k2"
   let currentPos = "all";     // "all"(통합) | "F" | "M" | "D" — 통합표 위 포지션 필터 칩
-  let topExpanded = false;    // TOP 퍼포머 전체 펼침 여부 (기본은 미리보기)
-  const TOP_PREVIEW = 20;     // 기본 노출 행 수 (나머지는 "더 보기")
+  const TOP_PREVIEW = 20;     // 기본 노출 행 수
+  const TOP_STEP = 30;        // "더 보기" 한 번에 늘어나는 행 수 (552명이 한 번에 펼쳐지지 않게)
+  let topShown = TOP_PREVIEW; // 현재 노출 행 수
 
-  // 정렬 상태 — 컬럼이 고정 종합 세트라 단일 상태 (공격기여 우선, 평점 2차)
-  const sortState = {
-    all: [{ key: "attack_pts", dir: -1 }, { key: "rating", dir: -1 }],
-  };
+  // 정렬 상태 — 기본은 종합 점수(같은 리그·포지션 안 백분위) 우선, 평점 2차
+  const DEFAULT_SORT = () => [{ key: "score", dir: -1 }, { key: "rating", dir: -1 }];
+  const sortState = { all: DEFAULT_SORT() };
 
   // 카드 패널 — 표별 정렬 상태 + 컬럼 정의
   const cardSortState = {
@@ -63,9 +63,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   //   raw 세부(xG·슈팅·패스%·키패스·공중볼%·결정력 등)는 행 클릭 → 선수 상세 드로어에서.
   const SORT_COLS = {
     all: [...LEAD,
-      { label: "골", key: "goals" },
-      { label: "도움", key: "assists" },
-      { label: "공격P", key: "attack_pts", primary: true, tip: "공격 기여 = 골 + 도움" },
+      { label: "골", key: "goals", tip: "공식 K리그 기록(2025~) — 없으면 SofaScore" },
+      { label: "도움", key: "assists", tip: "공식 K리그 기록(2025~) — 없으면 SofaScore" },
+      { label: "종합", key: "score", tip: "같은 리그·같은 세부 포지션 안에서의 백분위(0~100, 50=평균)를 역할별 가중치로 합산 — 아래 '산정 방식' 참고" },
       { label: "창출P", key: "create_score", tip: "창출 = (키패스 + 도움×2) / 90분" },
       { label: "수비P", key: "def_score", tip: "수비 = (태클 + 인터셉트×1.5 + 클리어 + 슈팅차단 + 볼회수×0.5 − 피드리블) / 90분 — 순수 수비행동" },
       { label: "몸싸움P", key: "duel_score", tip: "몸싸움 = (지상+공중 듀얼 승) / 90분 — 타깃형 공격수·센터백 등 피지컬 지배력" },
@@ -74,6 +74,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
   // 부문별 TOP 카드 정의 (각 부문 1위를 박스로) — key로 최댓값 리더 산출
   const CATEGORY_DEFS = [
+    { label: "종합",       icon: "🏆", key: "score",       fmt: v => `${v}점` },
     { label: "최다 득점",  icon: "🔥", key: "goals",       fmt: v => `${v}골` },
     { label: "최다 도움",  icon: "🤝", key: "assists",     fmt: v => `${v}도움` },
     { label: "결정력",     icon: "🎯", key: "xg_diff",     fmt: v => `${v > 0 ? "+" : ""}${v}` },
@@ -92,7 +93,19 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   function renderCell(col, r, rank) {
     if (col.key === null)   return `<td class="ins-rank">${rank}</td>`;
     if (col.key === "name") return `<td class="ins-name">${ttEsc(r.name)}</td>`;
-    if (col.key === "team") return `<td class="ins-team">${ttEsc(r.team || "-")}</td>`;
+    if (col.key === "team") {
+      const lg = (currentLeague === "all" && r.league) ? `<span class="ins-lg ins-lg-${ttEsc(r.league)}" title="${ttEsc(r.league)} 소속">${ttEsc(r.league)}</span> ` : "";
+      return `<td class="ins-team">${lg}${ttEsc(r.team || "-")}</td>`;
+    }
+    if (col.key === "games") {
+      const tip = `출전 ${r.mins || 0}분` + (r.games_sofa && r.games_sofa !== r.games ? ` · 세부 지표는 SofaScore 수집분(${r.games_sofa}경기) 기준` : "");
+      return `<td title="${ttEsc(tip)}">${r.games ?? "-"}</td>`;
+    }
+    if (col.key === "score") {
+      if (r.score == null) return `<td class="ins-score-cell"><span class="ins-rs-n">-</span></td>`;
+      const tip = `${r.score_group || ""} ${r.score_n || ""}명 중 백분위 가중 평균`;
+      return `<td class="ins-score-cell" title="${ttEsc(tip)}"><strong class="ins-score-num">${r.score.toFixed(1)}</strong><span class="ins-score-bar" aria-hidden="true"><i style="width:${Math.max(2, Math.min(100, r.score))}%"></i></span></td>`;
+    }
     if (col.key === "pos") {
       // 색상은 detail 기준 대분류로 정합(윙어=공격색 등), 라벨은 세부 우선
       const broad = (r.detail && DETAIL_BROAD[r.detail]) || r.pos;
@@ -183,7 +196,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         document.querySelectorAll(".ins-pos-tab").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
         currentPos = btn.dataset.pos;   // "all" | "F" | "M" | "D"
-        topExpanded = false;            // 필터 바꾸면 미리보기로 리셋
+        topShown = TOP_PREVIEW;         // 필터 바꾸면 미리보기로 리셋
         renderTopTable(window._insTopData);
       });
     });
@@ -197,7 +210,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       .then(r => r.json())
       .then(data => {
         window._insTopData = data;
-        topExpanded = false;   // 새 데이터(연도/리그 변경)면 미리보기로 리셋
+        topShown = TOP_PREVIEW;   // 새 데이터(연도/리그 변경)면 미리보기로 리셋
         const hasData = (data.all?.length || 0) > 0;
         showBlock("ins-panel-top", hasData);
         if (hasData) renderTopTable(data);
@@ -261,7 +274,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     host.querySelectorAll(".ins-cat-card").forEach(btn => {
       btn.addEventListener("click", () => {
         sortState.all = [{ key: btn.dataset.key, dir: -1 }];
-        topExpanded = false;
+        topShown = TOP_PREVIEW;
         renderTopTable(window._insTopData);
       });
     });
@@ -283,56 +296,64 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     const cols = SORT_COLS.all;          // 종합 컬럼 고정 — 칩은 행만 필터
     const rows = sortRows(raw, sortState.all);
     const total = rows.length;
-    const shown = topExpanded ? rows : rows.slice(0, TOP_PREVIEW);
+    const shown = rows.slice(0, topShown);
 
     const tbody = shown.map((r, i) =>
       `<tr>${cols.map(c => renderCell(c, r, i + 1)).join("")}</tr>`
     ).join("");
 
+    const remain = total - shown.length;
     const moreBtn = total > TOP_PREVIEW
-      ? `<button class="ins-top-more" type="button">${topExpanded ? "접기 ▲" : `더 보기 (전체 ${total}명) ▼`}</button>`
+      ? `<div class="ins-top-pager">${remain > 0 ? `<button class="ins-top-more" data-act="more" type="button">더 보기 (+${Math.min(TOP_STEP, remain)}명 · 남은 ${remain}명) ▼</button>` : ""}${topShown > TOP_PREVIEW ? `<button class="ins-top-more ins-top-fold" data-act="fold" type="button">접기 ▲</button>` : ""}</div>`
       : "";
 
-    // 리그 평균(현재 표 필터 기준) — 합성지표를 상대적으로 판단할 기준선
-    const avg = (k) => {
-      const v = raw.map(r => r[k]).filter(x => x != null);
-      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
-    };
-    const aAtk = avg("attack_pts").toFixed(1), aCre = avg("create_score").toFixed(1), aDef = avg("def_score").toFixed(1), aDuel = avg("duel_score").toFixed(1);
-    const fRow = (name, formula, avgv) =>
-      `<li><span class="ins-fm-name">${name}</span><span class="ins-fm-eq">${formula}</span><span class="ins-formula-avg">평균 ${avgv}</span></li>`;
+    // 종합 점수 산정 방식 — 가중치는 서버(meta.weights)가 단일 출처
+    const meta = data.meta || {};
+    const W = meta.weights || {}, GL = meta.group_labels || {};
+    const wLine = g => (W[g] || []).map(x => `${x.label} ${Math.round(x.w * 100)}%`).join(" · ");
+    const groups = DETAIL_TOKENS.has(currentPos) ? [currentPos] : Object.keys(W);
+    const wRows = groups.map(g => `<li><span class="ins-fm-name">${ttEsc(GL[g] || g)}</span><span class="ins-fm-eq">${ttEsc(wLine(g))}</span></li>`).join("");
+    const offN = meta.official_players || 0, allN = meta.players || 0;
+    const srcNote = (currentYear === "2025" || currentYear === "2026")
+      ? `골·도움: <b>공식 K리그 기록</b> ${offN}/${allN}명 (공식이 빠뜨린 득점은 경기 기록으로 보정 · 공식 선수 리포트와 같은 값 · 나머지는 SofaScore) · 창출·수비·몸싸움·평점: SofaScore 수집분`
+      : `이 시즌은 공식 선수 기록이 없어 전 지표가 SofaScore 수집분입니다`;
     const formulaNote =
       `<div class="ins-formula">
-         <div class="ins-formula-head">📐 합성 지수 <span class="ins-formula-tag">90분 환산 · 상대 비교용</span></div>
-         <ul class="ins-formula-list">
-           ${fRow("공격P", "골 + 도움", aAtk)}
-           ${fRow("창출P", "(키패스 + 도움×2) ÷ 90분", aCre)}
-           ${fRow("수비P", "(태클 + 인터셉트×1.5 + 클리어 + 슈팅차단 + 볼회수×0.5 − 피드리블) ÷ 90분", aDef)}
-           ${fRow("몸싸움P", "(지상+공중 듀얼 승) ÷ 90분", aDuel)}
-         </ul>
-         <div class="ins-formula-sub">표본 5경기·450분↑(per-90 안정화) · 평균은 현재 표(리그·포지션) 기준 · 선수 행 클릭 시 xG·패스% 등 원자료</div>
+         <div class="ins-formula-head">📐 종합 점수 <span class="ins-formula-tag">포지션·리그 내 백분위 · 50=평균</span></div>
+         <div class="ins-formula-sub">공격수만 상위에 오르지 않도록 <b>같은 리그·같은 세부 포지션끼리</b>만 비교해 0~100점으로 환산합니다(비교군 ${meta.min_cohort || 8}명 미만이면 K1+K2 합산). 표본 ${meta.min_games || 5}경기·${meta.min_minutes || 450}분↑.</div>
+         <details class="ins-formula-det"><summary>포지션별 산정 가중치 보기</summary><ul class="ins-formula-list">${wRows}</ul>
+           <div class="ins-formula-sub">창출P=(키패스+도움×2)÷90분 · 수비P=(태클+인터셉트×1.5+클리어+슈팅차단+볼회수×0.5−피드리블)÷90분 · 몸싸움P=(지상+공중 듀얼 승)÷90분 · 골키퍼는 '심화 인사이트 &gt; 골키퍼'</div></details>
+         <div class="ins-formula-sub">${srcNote} · 선수 행 클릭 시 상세 · 열 머리글 클릭=정렬(Shift+클릭=기준 추가)</div>
        </div>`;
     body.innerHTML =
       `${formulaNote}<div class="ins-top-scroll"><table class="ins-table">${buildThead("all")}<tbody>${tbody}</tbody></table></div>${moreBtn}`;
 
-    // 헤더 클릭 → 다중 정렬 (첫 클릭: 추가/내림 → 재클릭: 오름 → 한번 더: 제거)
+    // 헤더 클릭 → 그 열로 정렬(내림 → 오름 → 기본 정렬 복귀). Shift+클릭 → 정렬 기준 추가(다중 정렬: 내림 → 오름 → 제거)
     body.querySelectorAll(".ins-th-sort").forEach(th => {
-      th.addEventListener("click", () => {
+      th.addEventListener("click", ev => {
         const key  = th.dataset.key;
         const sorts = sortState.all;
         const idx  = sorts.findIndex(s => s.key === key);
-        if (idx === -1)               sorts.push({ key, dir: -1 });
-        else if (sorts[idx].dir === -1) sorts[idx].dir = 1;
-        else                          sorts.splice(idx, 1);
+        if (ev.shiftKey) {
+          if (idx === -1)               sorts.push({ key, dir: -1 });
+          else if (sorts[idx].dir === -1) sorts[idx].dir = 1;
+          else                          sorts.splice(idx, 1);
+          if (!sorts.length) sortState.all = DEFAULT_SORT();
+        } else if (sorts.length === 1 && idx === 0) {
+          sortState.all = sorts[0].dir === -1 ? [{ key, dir: 1 }] : DEFAULT_SORT();
+        } else {
+          sortState.all = [{ key, dir: -1 }];
+        }
+        topShown = TOP_PREVIEW;
         renderTopTable(window._insTopData);
       });
     });
 
     // 더 보기 / 접기 토글
-    body.querySelector(".ins-top-more")?.addEventListener("click", () => {
-      topExpanded = !topExpanded;
+    body.querySelectorAll(".ins-top-more").forEach(btn => btn.addEventListener("click", () => {
+      topShown = btn.dataset.act === "fold" ? TOP_PREVIEW : topShown + TOP_STEP;
       renderTopTable(window._insTopData);
-    });
+    }));
 
     // 행 클릭 → 드로어 열기 (선수 실제 포지션으로 상세 차트 정확도 유지)
     body.querySelectorAll("tbody tr").forEach((tr, i) => {

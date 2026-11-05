@@ -9859,3 +9859,20 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ins-tr-wrap tr.sel td { background: rgba(251,191,36,0.06); }
 @media (prefers-reduced-motion: reduce) { .ins-tr-line, .ins-tr-lab, .ins-tr-pick { transition: none; } }
 .ins-tr-wrap .ins-top-scroll { max-height: none; }   /* 순위표는 전 팀이 한눈에 보여야 함 */
+
+/* TOP 퍼포머 — 종합 점수 셀·리그 배지·더 보기 (2026-11-06). 색만으로 정보를 전달하지 않도록 K1/K2 는 글자로도 표기 */
+.ins-score-cell { white-space: nowrap; }
+.ins-score-num { display: inline-block; min-width: 2.6em; font-variant-numeric: tabular-nums; }
+.ins-score-bar { display: inline-block; vertical-align: middle; width: 54px; height: 6px; margin-left: 6px; border-radius: 3px; background: rgba(255,255,255,0.10); overflow: hidden; }
+.ins-score-bar > i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #4a82c7, #7ecfff); transition: width 0.2s ease-in-out; }
+.ins-lg { display: inline-block; padding: 0 5px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; line-height: 1.5; letter-spacing: 0.02em; }
+.ins-lg-K1 { color: #cfe6ff; background: rgba(74,130,199,0.28); border: 1px solid rgba(126,207,255,0.45); }
+.ins-lg-K2 { color: #ffe9b8; background: rgba(251,191,36,0.16); border: 1px solid rgba(251,191,36,0.45); }
+.ins-top-pager { display: flex; gap: 8px; margin-top: 8px; }
+.ins-top-pager .ins-top-more { flex: 1 1 auto; margin-top: 0; }
+.ins-top-pager .ins-top-fold { flex: 0 0 auto; min-width: 96px; }
+.ins-formula-det { margin: 6px 0 2px; }
+.ins-formula-det > summary { cursor: pointer; font-size: 0.82rem; color: #9fc4ee; padding: 2px 0; border-radius: 4px; transition: color 0.15s ease-in-out; }
+.ins-formula-det > summary:hover { color: #dbe9fb; }
+.ins-formula-det > summary:focus-visible { outline: 2px solid #fde68a; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .ins-score-bar > i, .ins-formula-det > summary { transition: none; } }

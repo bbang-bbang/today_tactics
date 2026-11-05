@@ -6755,6 +6755,87 @@ def _league_team_filter(league):
     return f"AND m.team_id IN ({placeholders})", tuple(ids)
 
 
+# ── TOP 퍼포머 종합 점수 (2026-11-06) ──────────────────────────────────────────
+# '골+도움 누적'만으로 줄 세우면 공격수만 상위에 오르므로, 같은 리그·같은 세부 포지션 안에서의 백분위(0~100)를
+# 역할별 가중치로 합산한다. 평점(SofaScore 종합 평가)을 35~40% 두어 지표가 못 잡는 기여를 보정.
+# 지표는 모두 SofaScore 수집 구간 안에서 90분 환산(골·도움 표시값은 공식 기록이라 따로 취급).
+_TP_WEIGHTS = {
+    "ST": {"goals90": .30, "xg90": .15, "create": .10, "duel": .10, "rating": .35},
+    "W":  {"atk90": .30, "create": .20, "goals90": .10, "duel": .05, "rating": .35},
+    "AM": {"atk90": .25, "create": .25, "goals90": .10, "def": .05, "rating": .35},
+    "CM": {"create": .20, "def": .15, "pass_acc": .10, "atk90": .10, "duel": .10, "rating": .35},
+    "DM": {"def": .25, "duel": .15, "pass_acc": .10, "create": .10, "rating": .40},
+    "FB": {"create": .15, "def": .20, "duel": .10, "atk90": .10, "pass_acc": .10, "rating": .35},
+    "CB": {"def": .30, "duel": .20, "pass_acc": .15, "rating": .35},
+}
+_TP_BROAD_TO_DETAIL = {"F": "ST", "M": "CM", "D": "CB"}      # 세부 포지션이 없을 때 대분류로 대체
+_TP_MIN_COHORT = 8                                             # 백분위를 낼 최소 비교군 크기
+_TP_OFFICIAL_COVER = 0.85                                      # 공식 출전 수가 SofaScore 출전 수의 이 비율 이상일 때만 공식 골·도움 사용
+_TP_METRIC_LABEL = {"goals90": "골/90", "xg90": "xG/90", "atk90": "골+도움/90", "create": "창출P", "def": "수비P",
+                    "duel": "몸싸움P", "pass_acc": "패스 성공률", "rating": "평점"}
+
+
+def _tp_metric(row, key):
+    """종합 점수용 지표 값(SofaScore 수집 구간 기준). 없으면 None."""
+    mins = row.get("mins") or 0
+    if key in ("goals90", "xg90", "atk90"):
+        if not mins:
+            return None
+        if key == "goals90":
+            return row["goals_sofa"] / mins * 90
+        if key == "xg90":
+            return row["xg"] / mins * 90
+        return (row["goals_sofa"] + row["assists_sofa"]) / mins * 90
+    return {"create": row.get("create_score"), "def": row.get("def_score"), "duel": row.get("duel_score"),
+            "pass_acc": row.get("pass_acc"), "rating": row.get("rating")}.get(key)
+
+
+def _tp_apply_scores(rows):
+    """각 행에 score(0~100)·score_n·score_group 을 단다. 비교군 = (리그, 세부 포지션) → 8명 미만이면 리그 합산."""
+    def grp(r):
+        return r.get("detail") or _TP_BROAD_TO_DETAIL.get(r.get("pos"), "CM")
+    for r in rows:                                             # 세부 포지션 기록이 없는 선수 → 대분류로 추정(포지션 칩 필터에서 빠지지 않게)
+        if not r.get("detail"):
+            r["detail"] = grp(r)
+            r["detail_label"] = DETAIL_POS_LABELS.get(r["detail"], "")
+            r["detail_est"] = True
+    cohorts = {}
+    for r in rows:
+        cohorts.setdefault((r.get("league") or "", grp(r)), []).append(r)
+        cohorts.setdefault(("*", grp(r)), []).append(r)
+
+    def pct(vals, v):
+        less = sum(1 for x in vals if x < v)
+        eq = sum(1 for x in vals if x == v)
+        return (less + 0.5 * eq) / len(vals) * 100
+
+    cache = {}                                                 # (비교군 키, 지표) → 값 리스트
+    for r in rows:
+        g = grp(r)
+        key = (r.get("league") or "", g)
+        pool_key = key if len(cohorts[key]) >= _TP_MIN_COHORT else ("*", g)
+        pool = cohorts[pool_key]
+        w = _TP_WEIGHTS.get(g)
+        r["score"], r["score_n"], r["score_group"] = None, len(pool), None
+        if not w or len(pool) < _TP_MIN_COHORT:
+            continue
+        num = den = 0.0
+        for m, wt in w.items():
+            v = _tp_metric(r, m)
+            if v is None:
+                continue
+            ck = (pool_key, m)
+            if ck not in cache:
+                cache[ck] = [x for x in (_tp_metric(o, m) for o in pool) if x is not None]
+            if len(cache[ck]) < _TP_MIN_COHORT:
+                continue
+            num += wt * pct(cache[ck], v)
+            den += wt
+        if den >= 0.5:                                         # 핵심 지표 절반 이상이 있어야 점수 부여
+            r["score"] = round(num / den, 1)
+            r["score_group"] = (("" if pool_key[0] == "*" else pool_key[0] + " ") + (DETAIL_POS_LABELS.get(g, g)))
+
+
 @app.route("/api/insights/top-performers")
 @cached_response(ttl=1800)
 def insights_top_performers():
@@ -6864,7 +6945,81 @@ def insights_top_performers():
             "duel_score": round((r["dw"] or 0) / mins * 90, 1) if mins else None,
             "rating": round(r["avg_rating"], 2) if r["avg_rating"] else None,
         }
-    result["all"] = [serialize_all(r) for r in rows]
+    all_rows = [serialize_all(r) for r in rows]
+    for x in all_rows:                                          # 종합 점수·xG 차이는 SofaScore 수집 구간 기준 값으로 유지
+        x["goals_sofa"], x["assists_sofa"] = x["goals"], x["assists"]
+    pids = [x["player_id"] for x in all_rows]
+
+    # ① 소속·리그 — 해당 기간 가장 최근에 뛴 팀(GROUP BY 가 임의 행의 team_id 를 집어 이적 선수가 엉뚱한 구단으로 보이던 문제)
+    team_league = {t["sofascore_id"]: t.get("league") for t in TEAMS}
+    latest = {}
+    if pids:
+        ph = ",".join("?" * len(pids))                          # 자리표시자만 조립(값은 전부 바인딩)
+        for pid_, tid_, md in conn.execute(
+                "SELECT player_id, team_id, MAX(match_date) FROM match_player_stats WHERE minutes_played>0 AND player_id IN (" + ph + ") "
+                + date_cond + " GROUP BY player_id, team_id", (*pids, *date_params)):
+            if pid_ not in latest or (md or "") > latest[pid_][1]:
+                latest[pid_] = (tid_, md or "")
+    for x in all_rows:
+        if x["player_id"] in latest:
+            tid_ = latest[x["player_id"]][0]
+            x["team"] = _ko_team(tid_, "")
+            x["team_id"] = tid_
+            x["league"] = team_league.get(tid_) or ""
+        else:
+            x["league"] = ""
+
+    # ② 골·도움 — 공식 K리그 선수 기록(2025~)이 있으면 그 값(SofaScore 는 일부 선수·최근 라운드에서 어긋남).
+    #    정의가 다른 세부 지표(태클·패스 등)는 섞지 않는다. 공식 출전 수가 SofaScore 출전 수의 85% 미만이면 불완전 → SofaScore 값 유지.
+    official, n_official = {}, 0
+    if pids and year in ("2025", "2026"):
+        try:
+            ys, ye = _year_range(year)
+            ltid = _league_tid(league)
+            tids = [ltid] if ltid else [_LEAGUE_TID_BY_KEY["K1"], _LEAGUE_TID_BY_KEY["K2"]]
+            ph = ",".join("?" * len(pids))
+            pt = ",".join("?" * len(tids))
+            for sid, g_, a_, n_ in conn.execute(
+                    "SELECT m.sofa_player_id, SUM(k.goals), SUM(k.assists), COUNT(*) FROM kleague_player_match k "
+                    "JOIN kleague_player_map m ON m.player_kid = k.player_kid JOIN events e ON e.id = k.event_id "
+                    "WHERE e.date_ts >= ? AND e.date_ts < ? AND e.tournament_id IN (" + pt + ") AND k.minutes > 0 "
+                    "AND m.sofa_player_id IN (" + ph + ") GROUP BY m.sofa_player_id", (ys, ye, *tids, *pids)):
+                official[sid] = (g_ or 0, a_ or 0, n_ or 0)
+            # 공식 선수 기록이 빠뜨린 득점(추가시간 득점 등)은 공식 선수 리포트와 같은 규칙(_kpm_goal_adjust)으로 보정 —
+            # 이 앱의 두 화면(TOP 퍼포머·선수 리포트)에서 같은 선수의 골 수가 달라지지 않게 한다.
+            adj_pid = {}
+            if official:
+                cur_ = conn.cursor()
+                adj = _kpm_goal_adjust(cur_, "e.date_ts >= ? AND e.date_ts < ? AND e.tournament_id IN (" + pt + ")", (ys, ye, *tids))
+                if adj:
+                    kid2sofa = {kid: sid for kid, sid in cur_.execute(
+                        "SELECT player_kid, sofa_player_id FROM kleague_player_map WHERE sofa_player_id IS NOT NULL")}
+                    for (_eid, kid), g_ in adj.items():
+                        if kid in kid2sofa:
+                            adj_pid[kid2sofa[kid]] = adj_pid.get(kid2sofa[kid], 0) + g_
+                for sid, (g_, a_, n_) in list(official.items()):
+                    official[sid] = (g_ + adj_pid.get(sid, 0), a_, n_)
+        except sqlite3.OperationalError:
+            official = {}                                       # 구 DB(공식 테이블 없음) → SofaScore 값 그대로
+    for x in all_rows:
+        o = official.get(x["player_id"])
+        if o and o[2] >= _TP_OFFICIAL_COVER * x["games"]:
+            x["games_sofa"] = x["games"]
+            x["goals"], x["assists"], x["games"] = o[0], o[1], max(o[2], x["games"])
+            x["attack_pts"] = x["goals"] + x["assists"]
+            x["src"] = "official"
+            n_official += 1
+        else:
+            x["src"] = "sofa"
+
+    _tp_apply_scores(all_rows)
+    result["all"] = all_rows
+    result["meta"] = {
+        "year": year, "league": league, "official_players": n_official, "players": len(all_rows),
+        "min_cohort": _TP_MIN_COHORT, "min_games": 5, "min_minutes": 450,
+        "weights": {g: [{"key": k, "label": _TP_METRIC_LABEL[k], "w": w} for k, w in ws.items()] for g, ws in _TP_WEIGHTS.items()},
+        "group_labels": {g: DETAIL_POS_LABELS.get(g, g) for g in _TP_WEIGHTS},
+    }
 
     conn.close()
     return jsonify(result)
