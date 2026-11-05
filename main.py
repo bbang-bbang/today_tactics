@@ -8221,6 +8221,153 @@ def insights_rotation():
 
 _OPP_TIER_MIN = 3            # 상대 등급(상위·중위·하위)별 PPG 를 보여 줄 최소 경기 수
 
+# 실점 약점 지도 — 슈팅맵 좌표: x = 골라인에서의 거리(PK 지점 평균 x≈10.9), y = 폭 0~100%.
+# 경기장 규격(105×68m) 기준: 6야드 박스 5.5m·폭 18.3m(→ y 36.5~63.5), 페널티 박스 16.5m.
+_WEAK_ZONES = (("goalmouth", "골문 앞"), ("box_center", "박스 중앙"), ("box_wide", "박스 측면"),
+               ("out_center", "중거리 정면"), ("out_wide", "중거리 측면"))
+_WEAK_SITS = (("open", "오픈 플레이"), ("counter", "역습"), ("setpiece", "세트피스"), ("penalty", "PK"))
+_WEAK_Z = 2.0                # 리그 평균 대비 허용 슈팅이 |z|≥2 일 때만 약점/강점으로 표시
+
+
+def _weak_zone(x, y):
+    if x is None or y is None:
+        return None
+    if x < 5.5 and 36.5 <= y <= 63.5:
+        return "goalmouth"
+    if x < 16.5:
+        return "box_center" if 30 <= y <= 70 else "box_wide"
+    return "out_center" if 30 <= y <= 70 else "out_wide"
+
+
+def _weak_sit(sit):
+    if sit in ("regular", "assisted"):
+        return "open"
+    if sit == "fast-break":
+        return "counter"
+    if sit == "penalty":
+        return "penalty"
+    if sit in ("corner", "free-kick", "set-piece", "throw-in-set-piece"):
+        return "setpiece"
+    return None
+
+
+@app.route("/api/insights/defensive-weakness")
+@cached_response(ttl=3600)
+def insights_defensive_weakness():
+    """실점 약점 지도 (2026-11-05) — 팀이 '어디서·어떤 상황에서' 슈팅·실점을 허용하나.
+    지역 5구역 × 상황 4종을 경기당 허용 슈팅으로 집계하고, 리그 평균 허용률로 기대한 수와 비교(포아송 z).
+    슈팅 수 기준(xG 보유율이 경기마다 달라 보조로만 제공). 자책골 제외."""
+    sc = _ins_scope()
+    if sc is None:
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label, tid, year, ycond, yp = sc
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        rows = conn.execute(
+            "SELECT e.id, e.home_team_id, e.away_team_id, s.is_home, s.x, s.y, s.situation, s.outcome, s.xg "
+            "FROM match_shotmap s JOIN events e ON e.id = s.event_id "
+            "WHERE e.tournament_id = ? AND e.home_score IS NOT NULL" + ycond, (tid, *yp)).fetchall()
+    finally:
+        conn.close()
+
+    zkeys = [k for k, _ in _WEAK_ZONES]
+    skeys = [k for k, _ in _WEAK_SITS]
+    blank = lambda: {"shots": 0, "goals": 0, "xg": 0.0, "xg_n": 0}   # noqa: E731
+    per = {}
+    for eid, h, a, is_home, x, y, sit, outcome, xg in rows:
+        if h not in info or a not in info or sit == "own-goal":
+            continue
+        dfn = a if is_home else h                 # 슈팅을 '허용한' 팀
+        d = per.setdefault(dfn, {"games": set(), "zones": {k: blank() for k in zkeys}, "sits": {k: blank() for k in skeys},
+                                 "shots": 0, "goals": 0})
+        d["games"].add(eid)
+        g = 1 if outcome == "goal" else 0
+        d["shots"] += 1; d["goals"] += g
+        for bucket, key in ((d["zones"], _weak_zone(x, y) if sit != "penalty" else None), (d["sits"], _weak_sit(sit))):
+            if key is None:
+                continue
+            b = bucket[key]
+            b["shots"] += 1; b["goals"] += g
+            if xg is not None:
+                b["xg"] += xg; b["xg_n"] += 1
+
+    games_total = sum(len(d["games"]) for d in per.values())
+    if games_total < 40:
+        return jsonify({"league": label, "year": year, "teams": [], "warnings": ["슈팅맵 표본이 부족해 계산할 수 없습니다."],
+                        "zones": [{"key": k, "label": l} for k, l in _WEAK_ZONES],
+                        "situations": [{"key": k, "label": l} for k, l in _WEAK_SITS], "min_games": _INS_MIN_GAMES})
+
+    def lg_rates(dim, keys):
+        out = {}
+        tot = sum(d[dim][k]["shots"] for d in per.values() for k in keys)
+        for k in keys:
+            s = sum(d[dim][k]["shots"] for d in per.values()); g = sum(d[dim][k]["goals"] for d in per.values())
+            out[k] = {"shots_pg": round(s / games_total, 2), "goal_pct": round(g / s * 100, 1) if s else None,
+                      "share": round(s / tot * 100, 1) if tot else 0,
+                      # 리그 전체에서 이 분류가 거의 없으면(예: K2 원본엔 'fast-break' 표기 없음) 판정에서 제외
+                      "available": s >= 0.05 * games_total, "_rate": s / games_total, "_p": s / tot if tot else 0}
+        return out
+    lg_z, lg_s = lg_rates("zones", zkeys), lg_rates("sits", skeys)
+    lg_total_rate = sum(d["shots"] for d in per.values()) / games_total
+
+    def cells(d, dim, keys, lg):
+        """volume: 경기당 허용 슈팅(리그 평균 대비 ratio) · shape: 허용 슈팅 중 이 분류 비중 vs 리그 비중(z).
+        약점 판정은 shape(z) — 슈팅을 많이 허용하는 팀이 모든 칸에서 '약점'이 되는 걸 피하고 '어디로 쏠리나'를 본다."""
+        n = len(d["games"]); out = {}
+        tot = sum(d[dim][k]["shots"] for k in keys if lg[k]["available"])
+        for k in keys:
+            b = d[dim][k]; L = lg[k]
+            if not L["available"]:
+                out[k] = None
+                continue
+            exp = L["_rate"] * n
+            p = L["_p"]
+            z = (b["shots"] / tot - p) / math.sqrt(p * (1 - p) / tot) if tot >= 30 and 0 < p < 1 and p * tot >= 5 else None
+            out[k] = {"shots": b["shots"], "goals": b["goals"], "shots_pg": round(b["shots"] / n, 2),
+                      "ratio": round(b["shots"] / exp, 2) if exp > 0 else None,
+                      "share": round(b["shots"] / tot * 100, 1) if tot else 0, "lg_share": L["share"],
+                      "z": round(z, 1) if z is not None else None,
+                      "xg_pg": round(b["xg"] / n, 2) if b["xg_n"] and b["xg_n"] >= 0.8 * b["shots"] else None}
+        return out
+
+    teams = []
+    for t, tinfo in info.items():
+        d = per.get(t)
+        short = tinfo.get("short", tinfo["name"])
+        if not d:
+            teams.append({"id": t, "short": short, "games": 0, "eligible": False})
+            continue
+        n = len(d["games"])
+        zc, scl = cells(d, "zones", zkeys, lg_z), cells(d, "sits", skeys, lg_s)
+        weak = [(k, v["z"]) for src in (zc, scl) for k, v in src.items() if v and v["z"] is not None and v["z"] >= _WEAK_Z]
+        strong = [(k, v["z"]) for src in (zc, scl) for k, v in src.items() if v and v["z"] is not None and v["z"] <= -_WEAK_Z]
+        teams.append({"id": t, "short": short, "games": n, "eligible": n >= _INS_MIN_GAMES,
+                      "shots_pg": round(d["shots"] / n, 2), "goals": d["goals"],
+                      "shots_ratio": round((d["shots"] / n) / lg_total_rate, 2) if lg_total_rate else None,
+                      "zones": zc, "situations": scl,
+                      "weak": [k for k, _ in sorted(weak, key=lambda w: -w[1])],
+                      "strong": [k for k, _ in sorted(strong, key=lambda w: w[1])]})
+    teams.sort(key=lambda t: (-(t.get("shots_pg") or 0) if t["eligible"] else 99, t["short"]))
+    clean = lambda o: {k: {kk: vv for kk, vv in v.items() if not kk.startswith("_")} for k, v in o.items()}   # noqa: E731
+    el = [t for t in teams if t["eligible"]]
+    for i, t in enumerate(sorted(el, key=lambda t: -t["shots_pg"])):
+        t["rank_shots"] = i + 1                   # 1 = 슈팅을 가장 많이 허용
+    warnings = []
+    if year == "all":
+        warnings.append("전 시즌 합산 — 감독·선수 구성이 바뀐 시즌이 섞여 있습니다.")
+    missing = [l for k, l in _WEAK_SITS if not lg_s[k]["available"]]
+    if missing:
+        warnings.append(f"이 리그 원본 슈팅맵에는 '{', '.join(missing)}' 분류가 거의 없어 해당 항목은 제외했습니다.")
+    return jsonify({
+        "league": label, "year": year, "teams": teams, "team_games": games_total,
+        "zones": [{"key": k, "label": l} for k, l in _WEAK_ZONES],
+        "situations": [{"key": k, "label": l} for k, l in _WEAK_SITS],
+        "league_zones": clean(lg_z), "league_situations": clean(lg_s), "league_shots_pg": round(lg_total_rate, 2),
+        "min_games": _INS_MIN_GAMES, "z_flag": _WEAK_Z, "warnings": warnings,
+        "limits": "슈팅맵(SofaScore) 기준 허용 슈팅 · 구역=골라인 거리·폭 좌표(105×68m 규격 환산) · z=(허용−리그 평균 기대)÷√기대, |z|≥2만 표시 · 좌우 측면은 구분하지 않음 · 슈팅 수는 상대 전력·경기 상황(앞서면 슈팅을 더 허용) 미보정",
+    })
+
 
 @app.route("/api/insights/opponent-strength")
 @cached_response(ttl=3600)

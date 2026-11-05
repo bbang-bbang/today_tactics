@@ -1297,6 +1297,80 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }).join("") + `<div class="ins-method">근거 — 상대 등급=같은 시즌 PPG 순위 3분할(상위·중위·하위) · ▲▼=이 팀 평소 PPG에 리그 전체의 등급별 낙폭을 적용한 기대보다 ±${OPP_REL}점 이상 · 셀에 마우스를 올리면 신뢰구간·z · 등급별 10경기 안팎이라 <b>대부분 참고용</b> · 일정 보정=상대 PPG(맞대결 제외)로 기대 승점을 적합해 보정 · 홈·원정·휴식일 미보정</div>`;
   }
 
+  // ⑥ 실점 약점 지도 (2026-11-05) — 허용 슈팅이 '어디로·어떤 상황으로' 쏠리나 (비중 vs 리그 비중, |z|≥2만 표시)
+  const WEAK_TIP = {
+    goalmouth: "크로스·컷백 상황의 박스 안 마크", box_center: "수비 라인 사이·페널티 박스 중앙 공간 관리",
+    box_wide: "측면 돌파 저지와 좁은 각도 슈팅 대응", out_center: "2선 압박 — 박스 앞 중거리 슈팅 허용",
+    out_wide: "측면 바깥 슈팅 허용(위험도는 낮은 편)", open: "오픈 플레이 빌드업 저지",
+    counter: "공격 전환 시 후방 대비(역습 허용)", setpiece: "코너·프리킥 등 세트피스 수비", penalty: "박스 안 파울(PK 허용)",
+  };
+  function takeWeakness(d) {
+    const ts = insElig(d), out = [], lab = {};
+    (d.zones || []).concat(d.situations || []).forEach(x => { lab[x.key] = x.label; });
+    // 팀별 약점 목록(z 내림차순). '오픈 플레이'는 세트피스·역습 비중의 거울상(합 100%)이라 문장 후보에서 제외.
+    const byTeam = ts.map(t => ({ t, f: (t.weak || []).filter(k => k !== "open").map(k => ({ k, c: (t.zones && t.zones[k]) || (t.situations && t.situations[k]) }))
+      .filter(x => x.c && isNum(x.c.z)) })).filter(o => o.f.length);
+    // 위험도 낮은 '중거리 측면'(득점 전환율 ~3%)은 문장 우선순위를 절반으로
+    const pri = x => x.c.z * (x.k === "out_wide" ? 0.5 : 1);
+    byTeam.forEach(o => o.f.sort((a, b) => pri(b) - pri(a)));
+    byTeam.sort((a, b) => pri(b.f[0]) - pri(a.f[0]));
+    byTeam.slice(0, 2).forEach(({ t, f }) => {
+      const m = f[0], more = f.slice(1, 3).map(x => `${escI(lab[x.k] || x.k)} ${x.c.share}%(리그 ${x.c.lg_share}%)`).join(", ");
+      out.push(`${insJo(t.short, "은", "는")} 허용 슈팅의 <b>${m.c.share}%</b>가 ${escI(lab[m.k] || m.k)}에서 나옵니다(리그 ${m.c.lg_share}%) — 점검 포인트: ${WEAK_TIP[m.k] || ""}.${insEv(`경기당 ${f2(m.c.shots_pg)}슈팅 · ${m.c.goals}실점 · z=${m.c.z.toFixed(1)}${more ? ` · 함께 쏠린 곳: ${more}` : ""}`)}`);
+    });
+    if (out.length < 2) {
+      const hi = ts.filter(t => isNum(t.shots_pg)), top = hi.length && insMax(hi, t => t.shots_pg);
+      if (top && isNum(top.shots_ratio) && top.shots_ratio >= 1.15) out.push(`${out.length ? "분포와 별개로, " : "허용 슈팅이 특정 지역으로 크게 쏠린 팀은 없습니다 — 차이는 '얼마나 많이 허용하나'에서 납니다. "}${insJo(top.short, "이", "가")} 경기당 <b>${f2(top.shots_pg)}개</b>로 가장 많이 허용합니다(리그 ${f2(d.league_shots_pg)}, ${top.shots_ratio.toFixed(2)}배).`);
+    }
+    return out;
+  }
+  function renderWeakness(list) {
+    const el = document.getElementById("ins-weak-body"); if (!el) return;
+    el.innerHTML = list.map(d => {
+      if (!d || !d.teams) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      if (!d.teams.length) return `${insHead(d)}${insWarn(d)}`;
+      const zs = d.zones || [], ss = (d.situations || []).filter(s => s.key !== "penalty" && d.league_situations[s.key] && d.league_situations[s.key].available);
+      const cell = (c, lgShare) => {
+        if (!c) return `<span class="ins-rs-n">-</span>`;
+        const flag = isNum(c.z) && c.z >= (d.z_flag || 2) ? ` <span class="ins-xl-down" aria-label="리그보다 많이 허용">▲</span>`
+          : isNum(c.z) && c.z <= -(d.z_flag || 2) ? ` <span class="ins-xl-up" aria-label="리그보다 적게 허용">▼</span>` : "";
+        return `<span title="경기당 ${f2(c.shots_pg)}슈팅 허용 · ${c.goals}실점 · 리그 비중 ${lgShare}%${isNum(c.z) ? ` · z=${c.z.toFixed(1)}` : ""}">${c.share}%${flag}</span>`;
+      };
+      const rows = d.teams.map(t => {
+        if (!t.eligible) return `<tr class="ins-xl-skip"><td class="ins-xl-team">${escI(t.short)}</td><td>${t.games}</td><td colspan="${1 + zs.length + ss.length}" class="ins-adv-empty">표본 부족 (${d.min_games}경기 미만)</td></tr>`;
+        return `<tr><td class="ins-xl-team">${escI(t.short)}</td><td>${t.games}</td>
+          <td title="리그 평균 대비 ${f2(t.shots_ratio)}배 (많이 허용한 순 ${t.rank_shots}위)"><b>${f2(t.shots_pg)}</b> ${insBar(t.shots_pg, 20)}</td>
+          ${zs.map(z => `<td>${cell(t.zones[z.key], d.league_zones[z.key].share)}</td>`).join("")}
+          ${ss.map(s => `<td class="${s === ss[0] ? "ins-wk-sep" : ""}">${cell(t.situations[s.key], d.league_situations[s.key].share)}</td>`).join("")}</tr>`;
+      }).join("");
+      const LZ = d.league_zones || {};
+      // 구역 안내 — 하프 피치 도식(골문 위쪽) + 리그 득점 전환율
+      const zl = k => LZ[k] && LZ[k].goal_pct != null ? LZ[k].goal_pct + "%" : "-";
+      // 1m = 220/68 px (폭 68m). 깊이: 6야드 5.5m→18px, 페널티 박스 16.5m→53px. 구역 경계 = 폭 30%·70%(x 66·154), 깊이 53px.
+      const zoneMap = `<svg class="ins-wk-pitch" viewBox="0 0 220 112" role="img" aria-label="구역 안내(리그 득점 전환율): 골문 앞 ${zl("goalmouth")}, 박스 중앙 ${zl("box_center")}, 박스 측면 ${zl("box_wide")}, 중거리 정면 ${zl("out_center")}, 중거리 측면 ${zl("out_wide")}">
+          <rect class="ins-wk-bg" x="0" y="0" width="220" height="112"/>
+          <rect class="ins-wk-hot" x="66" y="0" width="88" height="53"/><rect class="ins-wk-hot2" x="80" y="0" width="60" height="18"/>
+          <rect class="ins-wk-mark" x="45" y="0" width="130" height="53"/>
+          <line class="ins-wk-l" x1="0" y1="53" x2="220" y2="53"/><line class="ins-wk-l" x1="66" y1="0" x2="66" y2="112"/><line class="ins-wk-l" x1="154" y1="0" x2="154" y2="112"/>
+          <rect class="ins-wk-goal" x="98" y="0" width="24" height="3"/>
+          <text x="110" y="12" class="ins-wk-t">골문 앞 ${zl("goalmouth")}</text>
+          <text x="110" y="38" class="ins-wk-t">박스 중앙 ${zl("box_center")}</text>
+          <text x="33" y="25" class="ins-wk-t ins-wk-ts">박스 측면</text><text x="33" y="37" class="ins-wk-t ins-wk-ts">${zl("box_wide")}</text>
+          <text x="187" y="25" class="ins-wk-t ins-wk-ts">박스 측면</text><text x="187" y="37" class="ins-wk-t ins-wk-ts">${zl("box_wide")}</text>
+          <text x="110" y="84" class="ins-wk-t">중거리 정면 ${zl("out_center")}</text>
+          <text x="33" y="78" class="ins-wk-t ins-wk-ts">중거리 측면</text><text x="33" y="90" class="ins-wk-t ins-wk-ts">${zl("out_wide")}</text>
+          <text x="187" y="78" class="ins-wk-t ins-wk-ts">중거리 측면</text><text x="187" y="90" class="ins-wk-t ins-wk-ts">${zl("out_wide")}</text>
+        </svg>`;
+      return `${insHead(d)}${insTake(takeWeakness(d))}${insWarn(d)}
+        <div class="ins-wk-legend">${zoneMap}<div class="ins-rs-cmp">구역별 숫자 = 리그 전체 슈팅의 <b>득점 전환율</b>. 골문 앞 슈팅은 중거리보다 훨씬 위험하므로, 같은 비중 차이라도 골문 앞·박스 중앙 쏠림이 더 치명적입니다.<br>표의 % = 그 팀이 허용한 슈팅 중 해당 구역·상황 비중 · <span class="ins-xl-down">▲</span> 리그보다 쏠림(약점) · <span class="ins-xl-up">▼</span> 리그보다 적음 (|z|≥${d.z_flag || 2})</div></div>
+        <div class="ins-top-scroll"><table class="ins-table ins-xl-table ins-wk-table"><thead>
+          <tr><th rowspan="2">팀</th><th rowspan="2">경기</th><th rowspan="2" title="경기당 허용 슈팅 (막대 = 20개 기준)">허용 슈팅/경기<br><span class="ins-rs-n">리그 ${f2(d.league_shots_pg)}</span></th>
+            <th colspan="${zs.length}">허용 슈팅 비중 — 지역</th><th colspan="${ss.length}" class="ins-wk-sep">— 상황</th></tr>
+          <tr>${zs.map(z => `<th title="리그 비중 ${LZ[z.key] ? LZ[z.key].share : "-"}%">${escI(z.label)}</th>`).join("")}${ss.map(s => `<th class="${s === ss[0] ? "ins-wk-sep" : ""}" title="리그 비중 ${d.league_situations[s.key].share}%">${escI(s.label)}</th>`).join("")}</tr>
+        </thead><tbody>${rows}</tbody></table></div>`;
+    }).join("") + `<div class="ins-method">근거 — 슈팅맵(SofaScore) 허용 슈팅·자책골 제외 · 구역=골라인 거리·폭 좌표를 105×68m 규격으로 환산(6야드 박스 5.5m, 페널티 박스 16.5m) · ▲▼는 허용 슈팅 '비중'을 리그 비중과 비교한 z(|z|≥2) — 많이 허용하는 팀이 모든 칸에서 약점이 되지 않도록 분포만 봄 · 좌우 측면은 구분하지 않음 · 앞서는 팀은 슈팅을 더 허용하는 등 경기 상황 미보정 · 점검 포인트는 데이터가 가리키는 방향일 뿐 원인 단정 아님</div>`;
+  }
+
   // ① 득점 의존도
   function renderScoringDep(list) {
     const el = document.getElementById("ins-sdep-body"); if (!el) return;
@@ -1421,7 +1495,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   const FRESH_CARDS = {
     // 값: 소스 키 또는 [소스 키, 탭 카드에서 해당하는 탭 이름]
     "ins-top-body": "mps", "ins-gk-body": "mps", "ins-duel-body": "mps", "ins-xgluck-body": "mps",
-    "ins-subimp-body": ["mps", "팀별 교체 효과"], "ins-shooting-body": "shotmap", "ins-spp-body": "shotmap",
+    "ins-subimp-body": ["mps", "팀별 교체 효과"], "ins-shooting-body": "shotmap", "ins-spp-body": "shotmap", "ins-weak-body": "shotmap",
   };
   const _freshCache = {};
   function md(d) { const p = (d || "").split("-"); return p.length === 3 ? `${+p[1]}/${+p[2]}` : (d || "?"); }
@@ -1503,6 +1577,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         .then(renderSubImpact).catch(warn("교체 효과")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/setpiece-profile?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderSetpieceProfile).catch(warn("세트피스")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/defensive-weakness?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderWeakness).catch(warn("실점 약점 지도")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/scoring-dependence?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderScoringDep).catch(warn("득점 의존도")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/rotation?year=${currentYear}&league=${lg}`).then(r => r.json())))

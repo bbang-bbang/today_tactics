@@ -164,6 +164,13 @@ qa('opponent-strength 등급별 경기 합 = 팀 경기', lambda: assert_(all(su
 qa('opponent-strength 승무패 합 = 등급 경기·PPG 0~3', lambda: assert_(all(x['w'] + x['d'] + x['l'] == x['n'] and (x['ppg'] is None or 0 <= x['ppg'] <= 3) for t in _ose for x in t['tiers'].values())))
 qa('opponent-strength 보정 PPG 리그 평균 보존', lambda: assert_(abs(sum(t['adj_ppg'] * t['games'] for t in _ose) / sum(t['games'] for t in _ose) - d_os['league_ppg']) < 0.02))
 qa('opponent-strength 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/opponent-strength?league=zz') == 400))
+d_dw = get('/api/insights/defensive-weakness?league=k1&year=2026')
+_dwe = [t for t in d_dw['teams'] if t['eligible']]
+qa('defensive-weakness 키·구역 5·상황 4', lambda: assert_(_dwe and len(d_dw['zones']) == 5 and len(d_dw['situations']) == 4 and all(k in d_dw for k in ['league_zones', 'league_situations', 'limits'])))
+qa('defensive-weakness 구역 비중 합 ≈ 100%', lambda: assert_(all(abs(sum(c['share'] for c in t['zones'].values() if c) - 100) < 1 for t in _dwe)))
+qa('defensive-weakness 약점 판정은 |z|≥2만', lambda: assert_(all(((t['zones'].get(k) or t['situations'].get(k))['z'] >= d_dw['z_flag']) for t in _dwe for k in t['weak'])))
+qa('defensive-weakness K2 역습 분류 없음 → 제외(None)', lambda: assert_(all(t['situations']['counter'] is None for t in get('/api/insights/defensive-weakness?league=k2&year=2026')['teams'] if t['eligible'])))
+qa('defensive-weakness 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/defensive-weakness?league=zz') == 400))
 d_sub = get('/api/insights/substitution?year=2026&league=all')
 qa('교체 영향 최다 투입 이름 비어 있지 않음', lambda: assert_(all(f['name'] for f in d_sub['frequent'])))
 qa('날씨 인사이트 API 제거됨(404)', lambda: assert_(_brief_status('/api/insights/weather?year=2026&league=all') == 404))

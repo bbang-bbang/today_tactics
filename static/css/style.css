@@ -9827,3 +9827,19 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ins-take-list b { color: #f1f7ff; }
 .ins-take-ev { display: block; margin-top: 1px; font-size: 0.75rem; color: #8fa6c2; }
 @media (max-width: 600px) { .ins-take { flex-direction: column; gap: 6px; } }
+
+/* 인사이트 > 심화 — 실점 약점 지도 (구역 도식 + 비중 표) */
+.ins-wk-legend { display: flex; gap: 14px; align-items: center; margin: 4px 0 8px; }
+.ins-wk-legend .ins-rs-cmp { margin: 0; line-height: 1.55; }
+.ins-wk-pitch { flex: 0 0 220px; width: 220px; height: auto; border-radius: 6px; }
+.ins-wk-bg { fill: rgba(74,222,128,0.06); }
+.ins-wk-hot { fill: rgba(248,113,113,0.10); }
+.ins-wk-hot2 { fill: rgba(248,113,113,0.22); }
+.ins-wk-mark { fill: none; stroke: rgba(255,255,255,0.28); stroke-width: 1; }
+.ins-wk-l { stroke: rgba(255,255,255,0.18); stroke-width: 1; stroke-dasharray: 3 3; }
+.ins-wk-goal { fill: #e8f2ff; }
+.ins-wk-t { fill: #dbe7f7; font-size: 10px; font-weight: 700; text-anchor: middle; }
+.ins-wk-ts { fill: #9fb4cc; font-weight: 600; font-size: 9.5px; }
+.ins-wk-table th, .ins-wk-table td { text-align: center; }
+.ins-wk-table .ins-wk-sep { border-left: 1px solid rgba(255,255,255,0.14); }
+@media (max-width: 600px) { .ins-wk-legend { flex-direction: column; align-items: flex-start; } }
