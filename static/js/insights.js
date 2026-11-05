@@ -1297,6 +1297,44 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }).join("") + `<div class="ins-method">근거 — 상대 등급=같은 시즌 PPG 순위 3분할(상위·중위·하위) · ▲▼=이 팀 평소 PPG에 리그 전체의 등급별 낙폭을 적용한 기대보다 ±${OPP_REL}점 이상 · 셀에 마우스를 올리면 신뢰구간·z · 등급별 10경기 안팎이라 <b>대부분 참고용</b> · 일정 보정=상대 PPG(맞대결 제외)로 기대 승점을 적합해 보정 · 홈·원정·휴식일 미보정</div>`;
   }
 
+  // ⑦ 포메이션 상성 (2026-11-05) — 내 포메이션 × 상대 포메이션. 승점−평소 PPG 잔차의 z≥1.96일 때만 '상성'이라고 말한다.
+  function takeFormation(d) {
+    const ms = (d.matchups || []).filter(m => !m.mirror && isNum(m.z)), out = [];
+    const sig = ms.filter(m => m.significant).sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
+    sig.slice(0, 2).forEach(m => out.push(`내 <b>${escI(m.formation)}</b> 대 상대 <b>${escI(m.opp)}</b> 조합에서 팀 평소보다 경기당 <b>${sgn2(m.resid)}점</b> ${m.resid > 0 ? "더 따냈습니다" : "덜 따냈습니다"}.${insEv(`${m.n}경기 ${m.w}승 ${m.d}무 ${m.l}패 · z=${m.z.toFixed(1)} · ${d.tested || "여러"}개 조합 중 하나라 우연일 수 있음 — 다음 라운드에도 이어지는지 확인`)}`));
+    if (!out.length && (d.matches_with_formation || 0) >= 30) {
+      const top = ms.slice().sort((a, b) => Math.abs(b.z) - Math.abs(a.z))[0];
+      out.push(`포메이션 조합만으로 승점이 갈린다는 통계적 근거는 없습니다 — 어떤 상성도 표본 오차 범위입니다.${top ? insEv(`가장 쏠린 조합: ${escI(top.formation)} vs ${escI(top.opp)} (${top.n}경기, 평소 대비 ${sgn2(top.resid)}점, z=${top.z.toFixed(1)} — 참고)`) : ""}`);
+    }
+    return out;
+  }
+  function renderFormation(list) {
+    const el = document.getElementById("ins-fm-body"); if (!el) return;
+    el.innerHTML = list.map(d => {
+      if (!d || !d.formations) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      const ms = d.matchups || [];
+      if (!ms.length) return `${insHead(d)}${insWarn(d)}<div class="ins-adv-empty">표시할 포메이션 조합 표본이 부족합니다(조합당 ${d.min_cell}경기 이상 필요).</div>`;
+      const rowsF = [...new Set(ms.map(m => m.formation))], colsF = [...new Set(ms.map(m => m.opp))];
+      const own = {}; d.formations.forEach(f => { own[f.formation] = f; });
+      const cell = m => {
+        if (!m) return `<td class="ins-rs-n">-</td>`;
+        const rec = `${m.w}-${m.d}-${m.l}`;
+        if (m.mirror) return `<td title="같은 포메이션끼리 ${m.n}경기 · 무승부 ${m.d}경기 (서로 상쇄되어 상성 계산 제외)"><span class="ins-rs-n">미러 ${rec}</span></td>`;
+        const mark = m.significant ? ` <span class="${m.resid > 0 ? "ins-xl-up" : "ins-xl-down"}" aria-label="${m.resid > 0 ? "평소보다 유의하게 강함" : "평소보다 유의하게 약함"}">${m.resid > 0 ? "▲" : "▼"}</span>` : "";
+        return `<td title="${m.n}경기 ${m.w}승 ${m.d}무 ${m.l}패 · 득실 ${f2(m.gf)}:${f2(m.ga)} · 평소 대비 ${sgn2(m.resid)}점 · z=${isNum(m.z) ? m.z.toFixed(1) : "-"}${m.significant ? "" : " (표본 오차 범위)"}"><b>${f2(m.ppg)}</b>${mark}<span class="ins-rs-n"> ${rec}</span></td>`;
+      };
+      const rows = rowsF.map(f => {
+        const o = own[f];
+        return `<tr><td class="ins-xl-team">${escI(f)}</td><td>${o ? o.n : "-"}</td><td title="이 포메이션을 쓴 팀-경기의 평소 대비 승점 ${o ? sgn2(o.resid) : "-"}"><b>${o ? f2(o.ppg) : "-"}</b></td>
+          ${colsF.map(g => cell(ms.find(m => m.formation === f && m.opp === g))).join("")}</tr>`;
+      }).join("");
+      return `${insHead(d)}${insTake(takeFormation(d))}${insWarn(d)}
+        <div class="ins-rs-cmp">포메이션 기록이 있는 ${d.matches_with_formation}/${d.matches}경기 · 칸 = 경기당 승점 · 승-무-패 · ▲▼ = 팀 평소 대비 통계적으로 유의(z≥1.96, ${d.min_sig}경기↑)</div>
+        <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>내 포메이션</th><th>경기</th><th title="이 포메이션을 쓴 팀-경기의 경기당 승점">PPG</th>
+          ${colsF.map(g => `<th title="상대가 ${escI(g)}일 때">vs ${escI(g)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join("") + `<div class="ins-method">근거 — ${escI((list[0] && list[0].limits) || "")}</div>`;
+  }
+
   // ⑥ 실점 약점 지도 (2026-11-05) — 허용 슈팅이 '어디로·어떤 상황으로' 쏠리나 (비중 vs 리그 비중, |z|≥2만 표시)
   const WEAK_TIP = {
     goalmouth: "크로스·컷백 상황의 박스 안 마크", box_center: "수비 라인 사이·페널티 박스 중앙 공간 관리",
@@ -1571,6 +1609,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         .then(renderXgLuck).catch(warn("xG 운 보정")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/opponent-strength?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderOppStrength).catch(warn("상대 수준별 성적")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/formation-matchup?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderFormation).catch(warn("포메이션 상성")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/rest-effect?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderRestEffect).catch(warn("휴식일")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/substitution-impact?year=${currentYear}&league=${lg}`).then(r => r.json())))

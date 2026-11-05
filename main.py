@@ -8491,6 +8491,96 @@ def insights_opponent_strength():
     })
 
 
+_FM_MIN_CELL = 8             # 포메이션 상성 칸을 보여 줄 최소 경기 수
+_FM_MIN_SIG = 10             # '유의'로 판정할 최소 경기 수(소표본에서 정규근사 z 는 과대평가)
+_FM_MIN_TEAM_GAMES = 5      # 팀 평소 PPG(기준선) 계산에 필요한 같은 시즌 최소 경기 수
+
+
+@app.route("/api/insights/formation-matchup")
+@cached_response(ttl=3600)
+def insights_formation_matchup():
+    """포메이션 상성 (2026-11-05). 내 포메이션 × 상대 포메이션별 성적.
+    포메이션은 팀 전력과 뒤섞이기 쉬우므로(강팀이 특정 포메이션을 많이 씀) 원승점이 아니라
+    '그 팀의 시즌 평소 PPG(해당 경기 제외) 대비 승점 잔차'로 비교한다. 잔차 평균의 z≥1.96 일 때만 유의하다고 표시."""
+    sc = _ins_scope()
+    if sc is None:
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label, tid, year, ycond, yp = sc
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        evs = _ins_events(conn, tid, ycond, yp)
+        forms = {}
+        for ev, is_home, fm in conn.execute(
+                "SELECT ml.event_id, ml.is_home, ml.formation FROM match_lineups ml JOIN events e ON e.id = ml.event_id "
+                "WHERE e.tournament_id = ? AND ml.formation IS NOT NULL AND ml.formation != ''" + ycond +
+                " GROUP BY ml.event_id, ml.is_home", (tid, *yp)):
+            forms[(ev, 1 if is_home else 0)] = fm
+    finally:
+        conn.close()
+
+    # 시즌별 팀 승점 합·경기 수(포메이션 기록이 없는 경기도 포함 — 평소 전력 기준선)
+    tot = {}
+    for ev, h, a, ts, hs, as_ in evs:
+        season = datetime.fromtimestamp(ts).year
+        for t, gf, ga in ((h, hs, as_), (a, as_, hs)):
+            s = tot.setdefault((t, season), [0, 0])
+            s[0] += _ins_pts(gf, ga); s[1] += 1
+
+    recs = []                                    # (formation, opp_formation, pts, gf, ga, resid)
+    with_form = 0
+    for ev, h, a, ts, hs, as_ in evs:
+        fh, fa = forms.get((ev, 1)), forms.get((ev, 0))
+        if not fh or not fa:
+            continue
+        with_form += 1
+        season = datetime.fromtimestamp(ts).year
+        for t, f, g, gf, ga in ((h, fh, fa, hs, as_), (a, fa, fh, as_, hs)):
+            sp, sn = tot[(t, season)]
+            p = _ins_pts(gf, ga)
+            if sn - 1 < _FM_MIN_TEAM_GAMES:
+                continue
+            recs.append((f, g, p, gf, ga, p - (sp - p) / (sn - 1)))
+
+    def agg(rows):
+        n = len(rows)
+        res = [r[5] for r in rows]
+        m = sum(res) / n
+        sd = math.sqrt(sum((x - m) ** 2 for x in res) / (n - 1)) if n > 1 else 0.0
+        se = sd / math.sqrt(n) if n > 1 else 0.0
+        z = m / se if se > 0 else None
+        return {"n": n, "ppg": round(sum(r[2] for r in rows) / n, 2),
+                "gf": round(sum(r[3] for r in rows) / n, 2), "ga": round(sum(r[4] for r in rows) / n, 2),
+                "w": sum(1 for r in rows if r[2] == 3), "d": sum(1 for r in rows if r[2] == 1),
+                "l": sum(1 for r in rows if r[2] == 0),
+                "resid": round(m, 2), "z": round(z, 1) if z is not None else None,
+                "significant": z is not None and abs(z) >= 1.96 and n >= _FM_MIN_SIG}
+
+    by_f, by_pair = {}, {}
+    for r in recs:
+        by_f.setdefault(r[0], []).append(r)
+        by_pair.setdefault((r[0], r[1]), []).append(r)
+
+    formations = sorted(({"formation": f, **agg(rows)} for f, rows in by_f.items()), key=lambda x: -x["n"])
+    matchups = sorted(({"formation": f, "opp": g, "mirror": f == g, **agg(rows)}
+                       for (f, g), rows in by_pair.items() if len(rows) >= _FM_MIN_CELL),
+                      key=lambda x: -x["n"])
+    for m in matchups:
+        if m["mirror"]:                          # 같은 포메이션끼리는 서로 상쇄 — 잔차 대신 무승부 비율만 의미
+            m["resid"] = m["z"] = None
+            m["significant"] = False
+    warnings = []
+    if with_form < 30:
+        warnings.append("포메이션 기록이 있는 경기가 적어 상성을 판단하기 어렵습니다.")
+    elif year == "all":
+        warnings.append("전 시즌 합산 — 팀 평소 PPG 기준선은 시즌마다 따로 계산했습니다.")
+    return jsonify({
+        "league": label, "year": year, "matches": len(evs), "matches_with_formation": with_form,
+        "formations": formations, "matchups": matchups, "min_cell": _FM_MIN_CELL, "min_sig": _FM_MIN_SIG, "tested": len(matchups) - sum(1 for m in matchups if m["mirror"]),
+        "warnings": warnings,
+        "limits": "포메이션=경기 시작 라인업(K리그 포털) 기준, 경기 중 변경 미반영 · 잔차=승점−그 팀 시즌 평소 PPG(해당 경기 제외) · 잔차 평균 z≥1.96이고 10경기↑일 때만 유의 · 조합 20여 개를 한꺼번에 검사하므로 우연히 유의해 보이는 칸이 1~2개 섞일 수 있음(반복 확인 전엔 단정 금지) · 같은 포메이션끼리(미러)는 승무패 분포만 표시 · 홈·원정·상대 전력 미보정",
+    })
+
+
 @app.route("/api/insights/goal-aftermath")
 @cached_response(ttl=3600)
 def insights_goal_aftermath():
