@@ -995,7 +995,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
           <td><span class="ins-xl-badge ${cls}">${lbl} ${t.luck_ppg > 0 ? "+" : ""}${t.luck_ppg.toFixed(2)}</span></td></tr>`;
       }).join("");
       const warn = (d.warnings || []).map(w => `<div class="ins-xl-warn" role="note">⚠ ${escI(w)}</div>`).join("");
-      return `<div class="ins-adv-sub-h">${d.league} ${d.year} <span class="ins-clutch-hint">xG 보유 ${d.matches_with_xg}/${d.matches}경기</span></div>${warn}
+      return `<div class="ins-adv-sub-h">${d.league} ${d.year} <span class="ins-clutch-hint">xG 보유 ${d.matches_with_xg}/${d.matches}경기</span></div>${insTake(takeXgLuck(d))}${warn}
         <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>실제</th><th>팀</th><th>승점</th><th>xG 순위</th><th>차이</th><th title="경기당 승점: 실제 / 기대">PPG 실제/기대</th><th>판정</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }).join("") + `<div class="ins-method">근거 — 기대 승점=경기별 양 팀 xG를 포아송 분포로 환산한 승·무 확률(3·1점) · <b>xG가 있는 경기만</b> 실제·기대 모두 같은 경기로 비교 · 차이=xG 기준으론 몇 계단 더 위(▲)/아래(▼)인지 · 판정 ±${list[0] && list[0].ppg_band || 0.25} PPG 이상 · 팀당 ${list[0] && list[0].min_games || 5}경기 미만 제외 · 소표본이라 참고용</div>`;
   }
@@ -1022,7 +1022,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       const [vc, vi] = VERDICT[d.verdict.level] || VERDICT.insufficient;
       const warn = (d.warnings || []).map(w => `<div class="ins-xl-warn" role="note">⚠ ${escI(w)}</div>`).join("");
       return `<div class="ins-adv-sub-h">${d.league} ${d.year === "all" ? "전 시즌" : d.year} <span class="ins-clutch-hint">팀-경기 ${d.team_matches.toLocaleString()}건</span></div>
-        <div class="ins-rs-verdict ${vc}" role="status"><span aria-hidden="true">${vi}</span> ${escI(d.verdict.text)}${d.year !== "all" ? ` <span class="ins-rs-hint">단일 시즌은 표본이 작아, 상단 시즌 필터를 '전체'로 두면 더 정확합니다.</span>` : ""}</div>${warn}
+        <div class="ins-rs-verdict ${vc}" role="status"><span aria-hidden="true">${vi}</span> ${escI(d.verdict.text)}${d.year !== "all" ? ` <span class="ins-rs-hint">단일 시즌은 표본이 작아, 상단 시즌 필터를 '전체'로 두면 더 정확합니다.</span>` : ""}</div>${insTake(takeRest(d))}${warn}
         <div class="ins-rs-grid">
           <div><div class="ins-adv-sub-h">직전 경기와의 간격</div>${d.buckets.map(row).join("")}${cmpTxt(d.short_vs_normal, "3일 이하", "4일 이상")}</div>
           <div><div class="ins-adv-sub-h">홈·원정 휴식 격차 <span class="ins-clutch-hint">홈팀 PPG</span></div>${d.gap.map(row).join("")}${cmpTxt(d.gap_compare, "홈이 더 쉼", "원정이 더 쉼")}</div>
@@ -1055,7 +1055,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         `<li><span class="ins-adv-rank">${i + 1}</span><span class="ins-adv-nm">${ttEsc(b.name)}</span><span class="ins-adv-sub">${ttEsc(b.team)} · ${b.minutes}분 ${b.goals}골 ${b.assists}도움</span><b>${b.ga_per90.toFixed(2)}</b></li>`).join("");
       return `<div class="ins-adv-sub-h">${d.league} ${d.year === "all" ? "전 시즌" : d.year} <span class="ins-clutch-hint">첫 전술 교체 ${d.first_sub_samples.toLocaleString()}건</span></div>
         <div class="ins-rs-verdict ${vc}" role="status"><span aria-hidden="true">${vi}</span> ${escI(d.verdict.text)}
-          <span class="ins-rs-hint">리그 전체 평균: 교체 후 순득실 ${sg(d.league_mean)}골${d.league_ci != null ? ` ±${d.league_ci.toFixed(2)}` : ""} (교체 전 15분 대비)${d.year !== "all" ? " · 단일 시즌은 표본이 작아 시즌 필터 '전체' 권장" : ""}</span></div>
+          <span class="ins-rs-hint">리그 전체 평균: 교체 후 순득실 ${sg(d.league_mean)}골${d.league_ci != null ? ` ±${d.league_ci.toFixed(2)}` : ""} (교체 전 15분 대비)${d.year !== "all" ? " · 단일 시즌은 표본이 작아 시즌 필터 '전체' 권장" : ""}</span></div>${insTake(takeSubImpact(d))}
         <div class="ins-rs-grid ins-sb-grid">
           <div><div class="ins-adv-sub-h">팀별 교체 후 득실 변화 <span class="ins-clutch-hint">리그 평균 대비</span></div>
             <div class="ins-top-scroll"><table class="ins-table ins-xl-table ins-sb-table"><thead><tr><th>팀</th><th>경기</th><th>첫 교체</th><th>변화 (골)</th></tr></thead><tbody>${rows}</tbody></table></div></div>
@@ -1087,7 +1087,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
           <td><b class="${t.net > 0 ? "ins-xl-up" : t.net < 0 ? "ins-xl-down" : ""}">${t.net > 0 ? "+" : ""}${t.net.toFixed(2)}</b></td>
           <td>${share(t.for)}</td><td>${share(t.against)}</td><td>${t.for.head_share ?? "-"}%</td></tr>`;
       }).join("");
-      return `<div class="ins-adv-sub-h">${d.league} ${d.year === "all" ? "전 시즌" : d.year} <span class="ins-clutch-hint">기준 지표: 경기당 ${unit}</span></div>${warn}
+      return `<div class="ins-adv-sub-h">${d.league} ${d.year === "all" ? "전 시즌" : d.year} <span class="ins-clutch-hint">기준 지표: 경기당 ${unit}</span></div>${insTake(takeSetpiece(d))}${warn}
         <ul class="ins-spp-hls">${hl}</ul><div class="ins-spp-chips">${types}</div>
         <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th>경기</th><th title="팀이 만든 세트피스 ${unit}/경기">공격 ${unit}</th><th title="상대에게 허용한 세트피스 ${unit}/경기 — 낮을수록 좋음">허용 ${unit}</th><th title="공격−허용">순</th><th title="팀 득점 중 세트피스 비중">득점 SP%</th><th title="팀 실점 중 세트피스 비중 — 높을수록 세트피스 수비 취약">실점 SP%</th><th title="세트피스 슈팅 중 헤더 비율">헤더</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }).join("") + `<div class="ins-method">근거 — 슈팅맵 기반 · 세트피스=코너+프리킥+스로인+기타(PK 제외) · 순=공격−허용(경기당) · 순위는 정렬 가능한 ${list[0] && list[0].min_games || 8}경기↑ 팀만 · SP%는 득점·실점 중 세트피스 골 비중(†=골 ${list[0] && list[0].min_goals || 8}개 미만 소표본) · 행에 마우스를 올리면 공격 유형별 슈팅/경기</div>`;
@@ -1112,6 +1112,137 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   const insCmp = (c, a, b) => c ? `<div class="ins-rs-cmp">${a} − ${b}: <b>${c.diff > 0 ? "+" : ""}${c.diff.toFixed(2)} PPG</b> (z=${c.z > 0 ? "+" : ""}${c.z.toFixed(1)}) · ${c.significant ? "유의한 차이" : "오차 범위 안 — 차이 단정 불가"}</div>` : "";
   const insBar = (pct, max) => `<span class="ins-mini-track" aria-hidden="true"><i class="ins-mini-bar" style="width:${Math.min(100, pct / max * 100)}%"></i></span>`;
 
+  /* ── 카드별 '한 줄 해석' (2026-11-05) — 이미 받은 응답에서 규칙으로 문장을 만든다(신규 API 없음).
+     근거 수치를 함께 적고, 임계값을 못 넘으면 '두드러진 차이 없음'을 그대로 말한다(억지 결론 금지).
+     DB 문자열(팀·선수명)은 insJo/escI 로만 삽입. 숫자는 API가 준 값. */
+  const insTake = lines => {
+    const ls = (lines || []).filter(Boolean).slice(0, 2);
+    return ls.length ? `<div class="ins-take" role="note" aria-label="한 줄 해석"><span class="ins-take-tag" aria-hidden="true">한 줄 해석</span><ul class="ins-take-list">${ls.map(l => `<li>${l}</li>`).join("")}</ul></div>` : "";
+  };
+  const insEv = s => `<span class="ins-take-ev">${s}</span>`;
+  const isNum = v => typeof v === "number" && isFinite(v);
+  const f2 = v => isNum(v) ? v.toFixed(2) : "-";
+  const sgn2 = v => isNum(v) ? (v > 0 ? "+" : "") + v.toFixed(2) : "-";
+  // 이름 + 조사(받침 유무) — <b>이름</b>은/는. 한글이 아닌 끝 글자는 받침 없음 형태.
+  const insPp = (w, a, b) => { const s = String(w == null ? "" : w), c = s.charCodeAt(s.length - 1) - 0xAC00; return c >= 0 && c <= 11171 && c % 28 ? a : b; };
+  const insJo = (w, a, b) => `<b>${escI(w)}</b>${insPp(w, a, b)}`;
+  // 여러 팀 나열 + 조사 — 'A·B는' (조사는 마지막 이름 기준)
+  const insNames = (arr, a, b) => arr.map(t => `<b>${escI(t.short)}</b>`).join("·") + insPp(arr[arr.length - 1].short, a, b);
+  const insElig = d => (d && d.teams || []).filter(t => t && t.eligible);
+  const insMax = (arr, f) => arr.reduce((a, b) => (f(b) > f(a) ? b : a), arr[0]);
+
+  function takeXgLuck(d) {
+    const ts = insElig(d).filter(t => isNum(t.luck_ppg)); if (ts.length < 3) return [];
+    const band = d.ppg_band || 0.25, cov = d.matches ? d.matches_with_xg / d.matches : 0;
+    const cav = cov && cov < 0.6 ? ` · xG 있는 경기 ${Math.round(cov * 100)}%만 비교 — 참고용` : "";
+    const lucky = insMax(ts, t => t.luck_ppg), unlucky = insMax(ts, t => -t.luck_ppg), out = [];
+    if (lucky.luck_ppg >= band) out.push(`${insJo(lucky.short, "은", "는")} 경기 내용(xG)보다 경기당 <b>${sgn2(lucky.luck_ppg)}점</b>을 더 가져갔습니다 — 결정력·선방이 받쳐 준 결과라 같은 페이스를 장담하긴 어렵습니다.${insEv(`실제 PPG ${f2(lucky.ppg)} / 기대 ${f2(lucky.xppg)}${cav}`)}`);
+    if (unlucky.luck_ppg <= -band) out.push(`${insJo(unlucky.short, "은", "는")} 내용에 비해 결과가 경기당 <b>${sgn2(unlucky.luck_ppg)}점</b> 덜 나왔습니다 — 경기력이 유지되면 반등 여지가 가장 큰 팀입니다.${insEv(`실제 PPG ${f2(unlucky.ppg)} / 기대 ${f2(unlucky.xppg)}${cav}`)}`);
+    if (!out.length) out.push(`모든 팀의 결과가 xG 기대 승점 ±${band} PPG 안 — 지금 순위는 경기 내용을 대체로 그대로 반영합니다.${cav ? insEv(cav.slice(3)) : ""}`);
+    return out;
+  }
+  function takeRest(d) {
+    const c = d.short_vs_normal, s = (d.buckets || []).find(b => b.key === "short");
+    if (!c || !s || !s.n || s.n < 20) return ["3일 이하 휴식 경기 표본이 작아 아직 판단하기 이릅니다."];
+    const ev = insEv(`3일 이하 PPG ${f2(s.ppg)} (${s.n}경기) · 차이 ${sgn2(c.diff)} · z=${isNum(c.z) ? c.z.toFixed(1) : "-"}`);
+    const out = [c.significant
+      ? `3일 이하로 쉬고 나온 경기는 4일 이상 쉰 경기보다 경기당 승점이 <b>${f2(Math.abs(c.diff))}점</b> ${c.diff < 0 ? "낮습니다 — 연전 구간의 체력 관리·로테이션이 실제 성적에 반영됩니다." : "높습니다 — 짧은 휴식이 오히려 흐름을 이어 주는 모습입니다."}${ev}`
+      : `짧은 휴식(3일 이하) 뒤 성적 차이는 <b>${sgn2(c.diff)} PPG</b>로 오차 범위 안 — '체력 탓'이라는 패배 해석은 데이터로 뒷받침되지 않습니다.${ev}`];
+    const g = d.congestion_compare;
+    if (g && g.significant) out.push(`14일 안에 3경기 이상 치른 팀은 여유 있는 팀보다 경기당 <b>${sgn2(g.diff)}점</b> — 일정 밀집 자체가 의미 있는 변수입니다.`);
+    return out;
+  }
+  function takeSubImpact(d) {
+    const ts = (d.teams || []).filter(t => isNum(t.z) && isNum(t.vs_league)), out = [];
+    const sig = ts.filter(t => t.significant).sort((a, b) => b.vs_league - a.vs_league);
+    if (sig.length) {
+      const up = sig.filter(t => t.vs_league > 0), dn = sig.filter(t => t.vs_league < 0);
+      if (up.length) out.push(`${insNames(up, "은", "는")} 첫 교체 뒤 15분 순득실이 리그 평균보다 <b>${sgn2(up[0].vs_league)}골</b> 좋아집니다 — 벤치 카드가 실제로 흐름을 바꾸는 팀입니다.${insEv(`${up[0].n}경기 · ±${f2(up[0].ci)} · 여러 팀 동시 비교라 우연 가능성 있음`)}`);
+      if (dn.length) out.push(`${insJo(dn[dn.length - 1].short, "은", "는")} 첫 교체 뒤 오히려 순득실이 <b>${sgn2(dn[dn.length - 1].vs_league)}골</b> 나빠집니다 — 교체 타이밍·카드 점검이 필요합니다.`);
+    } else if (ts.length >= 3) {
+      const best = insMax(ts, t => t.vs_league);
+      out.push(`교체로 흐름이 확실히 바뀌는 팀은 아직 없습니다 — 가장 좋은 ${insJo(best.short, "도", "도")} 리그 평균 대비 ${sgn2(best.vs_league)}골로 오차 범위(±${f2(best.ci)}) 안입니다.`);
+    }
+    const b = (d.bench || [])[0], lg = d.league_ga_per90;
+    if (b && isNum(b.ga_per90) && isNum(lg) && lg > 0 && b.ga_per90 >= lg * 2) {
+      out.push(`가장 위협적인 조커는 <b>${escI(b.team)} ${escI(b.name)}</b> — 교체로 나와 90분당 공격포인트 <b>${f2(b.ga_per90)}</b>, 리그 평균(${f2(lg)})의 ${(b.ga_per90 / lg).toFixed(1)}배입니다.${insEv(`교체 출전 ${b.minutes}분 · ${b.goals}골 ${b.assists}도움 — 소표본`)}`);
+    }
+    return out;
+  }
+  function takeSetpiece(d) {
+    const ts = insElig(d).filter(t => isNum(t.net)); if (ts.length < 3) return [];
+    const k = d.xg_ok ? "xg_pg" : "shots_pg", unit = escI(d.metric || "슈팅"), out = [];
+    const best = insMax(ts, t => t.net), worst = insMax(ts, t => -t.net);
+    out.push(`세트피스 득실 1위는 <b>${escI(best.short)}</b>(경기당 순 ${unit} <b>${sgn2(best.net)}</b>), 최하위는 <b>${escI(worst.short)}</b>(<b>${sgn2(worst.net)}</b>)입니다.${insEv(`${escI(best.short)} 생산 ${f2(best.for && best.for[k])} / 허용 ${f2(best.against && best.against[k])} · ${escI(worst.short)} 생산 ${f2(worst.for && worst.for[k])} / 허용 ${f2(worst.against && worst.against[k])}`)}`);
+    const vul = ts.filter(t => t.against && isNum(t.against.goal_share) && !t.against.small_goals);
+    const v = vul.length && insMax(vul, t => t.against.goal_share);
+    const atk = ts.filter(t => t.for && isNum(t.for.goal_share) && !t.for.small_goals);
+    const a = atk.length && insMax(atk, t => t.for.goal_share);
+    if (v && v.against.goal_share >= 30) out.push(`${insJo(v.short, "은", "는")} 실점의 <b>${v.against.goal_share}%</b>를 세트피스로 내줍니다 — 코너·프리킥 수비 정비가 가장 급한 팀입니다.${insEv(`세트피스 실점 ${v.against.goals}골`)}`);
+    else if (a && a.for.goal_share >= 30) out.push(`${insJo(a.short, "은", "는")} 득점의 <b>${a.for.goal_share}%</b>를 세트피스로 만듭니다 — 상대라면 파울·코너 허용부터 줄여야 합니다.${insEv(`세트피스 득점 ${a.for.goals}골`)}`);
+    return out;
+  }
+  function takeScoringDep(d) {
+    const ts = insElig(d).filter(t => isNum(t.top1_share) && t.top && t.top[0]); if (ts.length < 3) return [];
+    const avg = d.league_top1_share, out = [];
+    const top = insMax(ts, t => t.top1_share);
+    if (isNum(avg) && top.top1_share >= avg + 8) out.push(`${insJo(top.short, "은", "는")} <b>${escI(top.top[0].name)}</b> 한 명이 팀 득점의 <b>${top.top1_share}%</b>를 책임집니다(리그 평균 ${avg}%) — 이 선수 봉쇄가 곧 공략법입니다.${insEv(`${top.top[0].goals}골 / 팀 ${top.goals}골`)}`);
+    const drops = ts.filter(t => t.ace && isNum(t.ace.ppg_with) && isNum(t.ace.ppg_without));
+    const dr = drops.length && insMax(drops, t => t.ace.ppg_with - t.ace.ppg_without);
+    if (dr && dr.ace.ppg_with - dr.ace.ppg_without >= 0.5) out.push(`${insJo(dr.short, "은", "는")} <b>${escI(dr.ace.name)}</b> 선발 시 경기당 <b>${f2(dr.ace.ppg_with)}점</b>, 비선발 시 <b>${f2(dr.ace.ppg_without)}점</b> — 에이스 결장 영향이 가장 큰 팀입니다.${insEv(`선발 ${dr.ace.n_with} · 비선발 ${dr.ace.n_without}경기 — 부상·로테이션이 섞여 인과 아님`)}`);
+    if (!out.length) { const lo = insMax(ts, t => -t.top1_share); out.push(`특정 선수에게 득점이 크게 쏠린 팀은 없습니다 — 가장 고르게 나뉜 팀은 <b>${escI(lo.short)}</b>(1위 득점자 비중 ${lo.top1_share}%, 리그 평균 ${isNum(avg) ? avg : "-"}%)입니다.`); }
+    return out;
+  }
+  function takeRotation(d) {
+    const ts = insElig(d).filter(t => isNum(t.avg_changes)); if (ts.length < 3) return [];
+    const hi = insMax(ts, t => t.avg_changes), lo = insMax(ts, t => -t.avg_changes), out = [];
+    out.push(`${insJo(hi.short, "이", "가")} 직전 경기 대비 평균 <b>${hi.avg_changes.toFixed(1)}명</b>을 바꿔 로테이션이 가장 잦고, ${insJo(lo.short, "은", "는")} <b>${lo.avg_changes.toFixed(1)}명</b>으로 가장 고정적입니다.${d.year === "all" ? "" : insEv(`고정 주전(선발 70%↑) ${escI(hi.short)} ${hi.core_size}명 · ${escI(lo.short)} ${lo.core_size}명`)}`);
+    const c = d.high_vs_stable;
+    if (c && c.significant) out.push(`선발을 4명 이상 바꾼 경기는 안정 운영보다 경기당 <b>${sgn2(c.diff)}점</b> — 의미 있는 차이라 로테이션 폭 조절이 성적과 연결됩니다.`);
+    return out;
+  }
+  function takeGameState(d) {
+    const A = d.league_avg || {}, out = [];
+    const led = insElig(d).filter(t => t.led && t.led.n >= 8 && isNum(t.led.hold_pct));
+    if (led.length >= 3) {
+      const best = insMax(led, t => t.led.hold_pct), worst = insMax(led, t => -t.led.hold_pct);
+      out.push(`리드 지키기 1위는 <b>${escI(best.short)}</b>(앞선 경기의 <b>${best.led.hold_pct}%</b> 승리), 최하위는 <b>${escI(worst.short)}</b>(<b>${worst.led.hold_pct}%</b> · 놓친 승점 ${worst.led.dropped_pts}점)입니다.${insEv(`리그 평균 ${A.hold_pct ?? "-"}% · 리드 경기 ${best.led.n} / ${worst.led.n}경기`)}`);
+    }
+    const tr = insElig(d).filter(t => t.trailed && t.trailed.n >= 8 && isNum(t.trailed.ppg));
+    const cb = tr.length && insMax(tr, t => t.trailed.ppg);
+    if (cb && isNum(A.trailed_ppg) && cb.trailed.ppg >= A.trailed_ppg + 0.25) out.push(`뒤져도 가장 많이 따라붙는 팀은 ${insJo(cb.short, "입니다", "입니다")} — 뒤진 경기에서 경기당 <b>${f2(cb.trailed.ppg)}점</b>(리그 ${f2(A.trailed_ppg)}).${insEv(`${cb.trailed.n}경기 · ${cb.trailed.w}승 ${cb.trailed.d}무 ${cb.trailed.l}패`)}`);
+    return out;
+  }
+  function takeAftermath(d) {
+    const ts = insElig(d), w = d.window || 10, L = d.league_total, out = [];
+    const bad = ts.filter(t => isNum(t.conc_z) && t.conc_z >= 2), calm = ts.filter(t => isNum(t.conc_z) && t.conc_z <= -2);
+    const fight = ts.filter(t => isNum(t.resp_z) && t.resp_z >= 2);
+    if (bad.length) out.push(`${insNames(bad, "은", "는")} 득점 후 ${w}분 안에 실점하는 일이 기대보다 잦습니다(${bad.map(t => `${t.conc_obs}회/기대 ${t.conc_exp.toFixed(1)}`).join(", ")}) — 골 직후 집중력 관리가 과제입니다.`);
+    if (fight.length) out.push(`${insNames(fight, "은", "는")} 실점 후 ${w}분 안에 곧바로 받아치는 반격력이 돋보입니다(${fight.map(t => `${t.resp_obs}회/기대 ${t.resp_exp.toFixed(1)}`).join(", ")}).`);
+    if (calm.length && out.length < 2) out.push(`${insNames(calm, "은", "는")} 득점 후 실점이 기대보다 적어 골 직후 버티는 힘이 좋습니다(${calm.map(t => `${t.conc_obs}회/기대 ${t.conc_exp.toFixed(1)}`).join(", ")}).`);
+    if (!out.length && L && isNum(L.conc_exp)) out.push(`득점 직후 ${w}분 실점은 리그 전체 <b>${L.conc_obs}건</b>으로 기대(${L.conc_exp.toFixed(1)}건) ${L.conc_z <= -2 ? "보다 오히려 적습니다" : "수준입니다"} — '넣자마자 먹는' 팀은 통계적으로 두드러지지 않습니다.`);
+    return out;
+  }
+  function takePassHub(d) {
+    const ts = insElig(d).filter(t => isNum(t.hub_share)); if (ts.length < 3) return [];
+    const POS = { GK: "GK", DF: "수비", MF: "미드", FW: "공격" };
+    const hi = insMax(ts, t => t.hub_share), lo = insMax(ts, t => -t.hub_share), m = hi.main_hub, out = [];
+    const avg = d.league_hub_share, hv = d.high_vs_low;
+    // 리그 전체에서 '몰아준 날 vs 분산된 날' 성적 차이가 유의하면 그 의미를 첫 줄로
+    if (hv && hv.significant && isNum(hv.diff)) out.push(hv.diff < 0
+      ? `팀이 평소보다 한 선수에게 패스를 몰아준 날은 고르게 나눈 날보다 경기당 승점이 <b>${f2(Math.abs(hv.diff))}점</b> 낮았습니다 — 빌드업이 한 곳에 막히면 고전하는 리그입니다.${insEv(`z=${hv.z.toFixed(1)} · 점유율·상대 압박·경기 상황이 섞여 인과는 아님`)}`
+      : `팀이 평소보다 핵심 선수에게 패스를 모은 날 경기당 승점이 <b>${f2(hv.diff)}점</b> 높았습니다 — 축이 되는 선수가 살아날 때 결과가 좋은 리그입니다.${insEv(`z=${hv.z.toFixed(1)} · 인과는 아님`)}`);
+    // 리그 평균과 2%p 미만 차이면 '쏠림'이라 부르지 않는다(팀 간 차이가 작다는 사실만 전달)
+    if (!isNum(avg) || hi.hub_share - avg < 2) {
+      out.push(`팀 간 빌드업 집중도 차이는 크지 않습니다 — 허브 지분 최고 <b>${escI(hi.short)}</b> ${hi.hub_share}%, 최저 <b>${escI(lo.short)}</b> ${lo.hub_share}% (리그 ${isNum(avg) ? avg : "-"}%).`);
+      return out;
+    }
+    const who = m && m.name && m.pct >= 40 ? ` 주로 <b>${escI(m.name)}</b>${m.pos ? `(${POS[m.pos] || escI(m.pos)})` : ""}${insPp(m.name, "을", "를")} 거쳐` : "";
+    out.push(`${insJo(hi.short, "은", "는")}${who} 빌드업이 한 선수에게 가장 몰리는 팀입니다(허브 지분 <b>${hi.hub_share}%</b>, 리그 ${avg}%) — 상대는 이 연결고리 압박이 첫 번째 열쇠입니다.${m && m.name ? insEv(`${escI(m.name)} 허브 경기 ${m.times}/${hi.matches} (${m.pct}%)`) : ""}`);
+    if (lo !== hi && avg - lo.hub_share >= 1) out.push(`${insJo(lo.short, "은", "는")} 허브 지분 <b>${lo.hub_share}%</b>로 패스가 가장 고르게 퍼진 팀 — 한 명만 막아서는 빌드업이 잘 끊기지 않습니다.${insEv(`시즌 중 허브가 된 선수 ${lo.hubs}명`)}`);
+    return out;
+  }
+
   // ① 득점 의존도
   function renderScoringDep(list) {
     const el = document.getElementById("ins-sdep-body"); if (!el) return;
@@ -1128,7 +1259,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
           <td title="${top}"><b>${t.top1_share}%</b> ${insBar(t.top1_share, 50)}<span class="ins-sd-name">${escI(t.top[0].name)}</span></td>
           <td>${t.top2_share}%</td><td>${ace}</td><td>${without}</td></tr>`;
       }).join("");
-      return `${insHead(d)}${insWarn(d)}
+      return `${insHead(d)}${insTake(takeScoringDep(d))}${insWarn(d)}
         <div class="ins-rs-cmp">리그 평균: 1위 득점자 <b>${d.league_top1_share ?? "-"}%</b> · 1·2위 합 <b>${d.league_top2_share ?? "-"}%</b></div>
         <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th title="자책골 제외 팀 득점">득점</th>
           <th title="팀 득점 1위 선수의 득점 비중 (막대 = 50% 기준)">1위 득점자 비중</th><th title="득점 1·2위 선수 합">1·2위 합</th>
@@ -1146,7 +1277,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const hp = t.high_ppg == null ? `<span class="ins-adv-empty">표본 부족</span>` : `${t.high_ppg.toFixed(2)}`;
         return `<tr><td class="ins-xl-team">${escI(t.short)}</td><td>${t.matches}</td><td><b>${t.avg_changes.toFixed(2)}</b>명 ${insBar(t.avg_changes, 6)}</td><td>${t.core_size}명</td><td>${t.high_n}경기 · PPG ${hp}</td></tr>`;
       }).join("");
-      return `${insHead(d)}${insVerdict(d.verdict)}${insWarn(d)}
+      return `${insHead(d)}${insVerdict(d.verdict)}${insTake(takeRotation(d))}${insWarn(d)}
         <div class="ins-rs-grid ins-rs-grid-2">
           <div><div class="ins-adv-sub-h">직전 경기 대비 선발 교체 인원 <span class="ins-clutch-hint">팀-경기 ${d.team_matches.toLocaleString()}건</span></div>${d.buckets.map(insPpgRow).join("")}${insCmp(d.high_vs_stable, "대폭", "안정")}</div>
           <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th title="직전 경기와 비교 가능한 경기 수">경기</th><th title="직전 경기 대비 평균 선발 교체 인원 (막대 = 6명 기준)">평균 교체</th>
@@ -1177,7 +1308,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       const gen = d.flagged.length
         ? `리드 지킨 비율이 리그 평균과 크게 다른 팀(|z|≥2): <b>${d.flagged.map(escI).join(", ")}</b> — 여러 팀을 동시에 보면 우연히도 나올 수 있어 참고용입니다.`
         : "리드 지킨 비율이 리그 평균과 크게 다른 팀은 없습니다 (모두 |z|&lt;2).";
-      return `${insHead(d)}${insWarn(d)}
+      return `${insHead(d)}${insTake(takeGameState(d))}${insWarn(d)}
         <div class="ins-rs-cmp">리그 평균: 리드를 잡은 경기의 <b>${A.hold_pct ?? "-"}%</b>를 승리로 마무리 · 뒤진 적 있는 경기에서 경기당 <b>${A.trailed_ppg != null ? A.trailed_ppg.toFixed(2) : "-"}</b>점 회복 <span class="ins-rs-n">(${d.matches}경기${d.skipped ? ` · 득점 기록 불일치 ${d.skipped}경기 제외` : ""})</span></div>
         <div class="ins-rs-cmp">${gen}</div>
         <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th>경기</th>
@@ -1200,7 +1331,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
           <td>${t.conceded}</td><td>${t.resp_obs}<span class="ins-rs-n"> / 기대 ${t.resp_exp.toFixed(1)}</span></td><td>${zTxt(t.resp_z)}</td></tr>`
         : `<tr class="ins-xl-skip"><td class="ins-xl-team">${escI(t.short)}</td><td colspan="6" class="ins-adv-empty">표본 부족 (${d.min_games}경기 미만)</td></tr>`).join("");
       const gen = d.flagged.length ? `기대와 크게 다른 팀(|z|≥2): <b>${d.flagged.map(escI).join(", ")}</b> — 여러 팀을 동시에 보면 우연히도 나올 수 있어 참고용입니다.` : "기대와 크게 다른 팀은 없습니다 (모두 |z|&lt;2).";
-      return `${insHead(d)}${insWarn(d)}
+      return `${insHead(d)}${insTake(takeAftermath(d))}${insWarn(d)}
         <div class="ins-rs-cmp">리그 전체: 득점 ${L.scored}골 중 ${d.window}분 안에 상대가 받아친 경우 <b>${L.conc_obs}</b>건 (평소 득실점률로 기대되는 <b>${L.conc_exp.toFixed(1)}</b>건) ${zTxt(L.conc_z)}</div>
         <div class="ins-rs-cmp">${gen}</div>
         <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th title="득점 횟수(자책골로 인정된 득점 포함)">득점</th>
@@ -1221,7 +1352,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         return `<tr><td class="ins-xl-team">${escI(t.short)}</td><td>${t.matches}</td><td><b>${t.hub_share}%</b> ${insBar(t.hub_share, 20)}</td><td>${t.top2_share}%</td>
           <td title="이 선수가 허브였던 경기 ${m.times}/${t.matches}">${escI(m.name)}${m.pos ? `<span class="ins-rs-n"> ${POS[m.pos] || escI(m.pos)}</span>` : ""} · ${m.pct}%</td><td>${t.hubs}명</td></tr>`;
       }).join("");
-      return `${insHead(d)}${insVerdict(d.verdict)}
+      return `${insHead(d)}${insVerdict(d.verdict)}${insTake(takePassHub(d))}
         <div class="ins-rs-cmp">리그 평균 허브 지분 <b>${d.league_hub_share ?? "-"}%</b> (한 선수가 팀 패스 관여의 몇 %를 차지하나 — 11명이 고르게 나누면 약 9%)</div>
         <div class="ins-rs-grid ins-rs-grid-2">
           <div><div class="ins-adv-sub-h">팀 평소 대비 허브 집중도별 성적 <span class="ins-clutch-hint">팀-경기 ${d.matches.toLocaleString()}건</span></div>${[d.hub_high, d.hub_low].map(insPpgRow).join("")}${insCmp(d.high_vs_low, "집중한 날", "분산된 날")}</div>
