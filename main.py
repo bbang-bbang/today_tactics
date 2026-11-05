@@ -4038,7 +4038,8 @@ def _brief_fmt(val, fmt):
 
 
 def _brief_formations(ss_id, tid, year):
-    """시즌 주 포메이션 + 최근 5경기 포메이션 (선발 라인업 기준)."""
+    """시즌 주 포메이션 + 최근 5경기 포메이션 (선발 라인업 기준).
+    주의: match_lineups.team_id 는 이적 선수가 현 소속팀으로 찍혀 오염돼 있다 → 팀 필터는 is_home + 경기의 홈/원정으로 건다."""
     out = {"main": None, "recent": []}
     conn = sqlite3.connect(DB_PATH)
     try:
@@ -4046,12 +4047,13 @@ def _brief_formations(ss_id, tid, year):
         rows = conn.execute("""
             SELECT ml.event_id, ml.formation, MAX(e.date_ts)
             FROM match_lineups ml JOIN events e ON e.id = ml.event_id
-            WHERE ml.team_id = ? AND e.tournament_id = ?
+            WHERE ((e.home_team_id = ? AND ml.is_home = 1) OR (e.away_team_id = ? AND ml.is_home = 0))
+              AND e.tournament_id = ?
               AND e.date_ts >= ? AND e.date_ts < ?
               AND e.home_score IS NOT NULL AND ml.formation IS NOT NULL AND ml.formation != ''
             GROUP BY ml.event_id, ml.formation
             ORDER BY MAX(e.date_ts) DESC
-        """, (ss_id, tid, ys, ye)).fetchall()
+        """, (ss_id, ss_id, tid, ys, ye)).fetchall()
     except (sqlite3.OperationalError, ValueError, TypeError):
         rows = []
     finally:
@@ -9979,10 +9981,11 @@ def next_round():
             SELECT ml.formation
             FROM match_lineups ml
             JOIN events e2 ON ml.event_id = e2.id
-            WHERE ml.team_id=? AND ml.formation IS NOT NULL AND ml.formation != ''
+            WHERE ((e2.home_team_id=? AND ml.is_home=1) OR (e2.away_team_id=? AND ml.is_home=0))
+              AND ml.formation IS NOT NULL AND ml.formation != ''
               AND e2.tournament_id=? AND e2.home_score IS NOT NULL
             ORDER BY e2.date_ts DESC LIMIT 1
-        """, (team_id, tid)).fetchone()
+        """, (team_id, team_id, tid)).fetchone()
         return row[0] if row else None
 
     matches = []

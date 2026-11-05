@@ -93,6 +93,9 @@ def _no_inline_script(path):
     return not inline and not re.search(r'<[a-z][^>]*\son[a-z]+\s*=', html)
 qa('보안: CSP — 템플릿 인라인 스크립트·핸들러 없음', lambda: assert_(_no_inline_script('/') and _no_inline_script('/leagues')))
 qa('brief 리그 불일치 400',lambda: assert_(_brief_status('/api/pre-match-brief?team=suwon&opp=ulsan') == 400))
+# match_lineups.team_id 는 이적 선수 현 소속으로 오염 → 팀 포메이션 표본이 실제 경기 수(리그 최대 38)를 넘으면 오염 재발
+_fm_of = [(((get(f'/api/pre-match-brief?team=jeonbuk&opp={o}&home=1') or {}).get('identity') or {}).get('formation') or {}).get('of') for o in ('anyang', 'ulsan', 'daejeon')]   # 안양: 오염 시 34→40경기로 과다 집계
+qa('brief 상대 포메이션 표본 ≤ 리그 경기 수(라인업 team_id 오염 방지)', lambda: assert_(all(x is None or x <= 34 for x in _fm_of), str(_fm_of)))
 qa('brief 동일팀/인젝션 400', lambda: assert_(_brief_status('/api/pre-match-brief?team=ulsan&opp=ulsan') == 400 and _brief_status("/api/pre-match-brief?team=x'+OR+'1'='1&opp=ulsan") == 400))
 
 # ── 2-c. xG 운 보정 순위 ──
