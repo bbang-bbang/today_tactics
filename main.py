@@ -8513,7 +8513,7 @@ def _pv_corr(x, y):
 def insights_pass_volume():
     """패스량(점유 대리지표)은 결과의 원인인가 (2026-11-05). K리그 공식 패스 행렬의 팀 총 패스 수 사용.
     핵심 발견: 평소보다 패스를 많이 한 날 성적이 나쁜 것은 '뒤진 팀이 공을 돌려서' — 앞선 시간 비중을 통제하면 관계가 사라진다.
-    각 팀의 앞선/뒤진 시간 비중은 득점 분 기록으로 계산(최종 스코어와 득점 기록이 일치하는 경기만 사용)."""
+    각 팀의 앞선/뒤진 시간 비중은 득점 분 기록으로 계산(최종 스코어와 득점 기록이 일치하는 경기만 사용, 자책골은 is_home 으로 귀속)."""
     sc = _ins_scope()
     if sc is None:
         return jsonify({"error": "league must be k1 or k2"}), 400
@@ -8528,9 +8528,10 @@ def insights_pass_volume():
             "WHERE e.tournament_id = ? AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL" + ycond, (tid, *yp)).fetchall()
         goals = {}
         for ev, t, m in conn.execute(
-                "SELECT g.event_id, g.team_id, g.minute FROM goal_events g JOIN events e ON e.id = g.event_id "
+                "SELECT g.event_id, g.is_home, g.minute FROM goal_events g JOIN events e ON e.id = g.event_id "
                 "WHERE e.tournament_id = ?" + ycond, (tid, *yp)):
-            goals.setdefault(ev, []).append((min(m or 0, 90), t))
+            # 득점이 인정되는 쪽은 is_home 이다(자책골은 team_id 가 '넣은 선수의 팀'이라 반대) — 자책골 경기도 그대로 사용
+            goals.setdefault(ev, []).append((min(m or 0, 90), 1 if t else 0))
     finally:
         conn.close()
 
@@ -8540,7 +8541,7 @@ def insights_pass_volume():
         if h not in info or a not in info or not hp or not ap:
             continue
         g = sorted(goals.get(ev, []))
-        if sum(1 for _m, t in g if t == h) != hs or sum(1 for _m, t in g if t == a) != as_:
+        if sum(1 for _m, t in g if t == 1) != hs or sum(1 for _m, t in g if t == 0) != as_:
             skipped += 1                         # 득점 기록이 최종 스코어와 안 맞으면 앞선 시간을 알 수 없다
             continue
         sh = sa = 0
@@ -8549,9 +8550,9 @@ def insights_pass_volume():
         for m, t in g + [(90, None)]:
             lead += max(0, m - last) * (1 if sh > sa else -1 if sh < sa else 0)
             last = m
-            if t == h:
+            if t == 1:
                 sh += 1
-            elif t == a:
+            elif t == 0:
                 sa += 1
         matches.append((ev, datetime.fromtimestamp(ts).year, h, a, hs, as_, hp, ap, lead / 90))
 
