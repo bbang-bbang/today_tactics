@@ -1243,6 +1243,60 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     return out;
   }
 
+  // ⑤ 상대 수준별 성적 (2026-11-05) — 상위·중위·하위권 상대 PPG 를 '제 전력 대비'로 읽는다
+  const OPP_TIER = { top: "상위권", mid: "중위권", bottom: "하위권" };
+  const OPP_REL = 0.3;   // 전력 대비 ±0.3 PPG 이상이면 ▲/▼ 표시
+  function takeOppStrength(d) {
+    const ts = insElig(d), out = [];
+    const pick = (k, sign) => {
+      const c = ts.filter(t => t.tiers && t.tiers[k] && isNum(t.tiers[k].rel) && t.tiers[k].n >= 5);
+      if (!c.length) return null;
+      const t = insMax(c, x => sign * x.tiers[k].rel);
+      return sign * t.tiers[k].rel >= OPP_REL ? { t, k, x: t.tiers[k] } : null;
+    };
+    const ev = (c) => insEv(`${c.x.w}승 ${c.x.d}무 ${c.x.l}패 · 전력 기준 기대 ${f2(c.x.exp)} · z=${isNum(c.x.z) ? c.x.z.toFixed(1) : "-"}${isNum(c.x.z) && Math.abs(c.x.z) >= 2 ? "" : " — 표본 오차 범위라 참고"}`);
+    const cands = [];
+    const g = pick("top", 1), w = pick("top", -1), s = pick("bottom", -1);
+    if (g) cands.push({ c: g, html: `${insJo(g.t.short, "은", "는")} 제 전력(경기당 ${f2(g.t.ppg)})에 비해 상위권 상대로 <b>${sgn2(g.x.rel)}점</b> 더 따냅니다 — 큰 경기에 강한 팀입니다(상위권 상대 ${f2(g.x.ppg)}).` });
+    if (w) cands.push({ c: w, html: `${insJo(w.t.short, "은", "는")} 상위권 상대로 경기당 <b>${f2(w.x.ppg)}점</b>에 그쳐 전력 대비 <b>${sgn2(w.x.rel)}</b> — 순위 경쟁 맞대결에서 승점을 놓치는 팀입니다.` });
+    if (s) cands.push({ c: s, html: `${insJo(s.t.short, "은", "는")} 하위권 상대로 경기당 <b>${f2(s.x.ppg)}점</b>, 전력 대비 <b>${sgn2(s.x.rel)}</b> — 잡아야 할 경기에서 승점을 흘립니다.` });
+    cands.sort((a, b) => Math.abs(b.c.x.z || 0) - Math.abs(a.c.x.z || 0));
+    cands.slice(0, 2).forEach(o => out.push(o.html + ev(o.c)));
+    if (!out.length && ts.length >= 3) out.push("상대 수준에 따른 뚜렷한 상성 패턴은 없습니다 — 모든 팀이 대체로 제 전력만큼 강팀에겐 덜, 약팀에겐 더 따냅니다.");
+    return out;
+  }
+  function renderOppStrength(list) {
+    const el = document.getElementById("ins-opp-body"); if (!el) return;
+    el.innerHTML = list.map(d => {
+      if (!d || !d.teams) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      if (!d.teams.length) return `${insHead(d)}${insWarn(d)}`;
+      const LT = d.league_tiers || {}, sm = !!d.sos_meaningful;
+      const cell = x => {
+        if (!x || x.ppg == null) return `<span class="ins-rs-n">표본 부족${x ? ` (${x.n})` : ""}</span>`;
+        const mark = isNum(x.rel) && x.rel >= OPP_REL ? ` <span class="ins-xl-up" aria-label="전력 대비 강함">▲</span>`
+          : isNum(x.rel) && x.rel <= -OPP_REL ? ` <span class="ins-xl-down" aria-label="전력 대비 약함">▼</span>` : "";
+        const tip = `${x.n}경기 ${x.w}승 ${x.d}무 ${x.l}패 · ±${f2(x.ci)} · 전력 기준 기대 ${f2(x.exp)} (차이 ${sgn2(x.rel)}${isNum(x.z) ? `, z=${x.z.toFixed(1)}` : ""})`;
+        return `<span title="${tip}"><b>${f2(x.ppg)}</b>${mark}<span class="ins-rs-n"> ${x.w}-${x.d}-${x.l}</span></span>`;
+      };
+      const rows = d.teams.map(t => {
+        if (!t.eligible) return `<tr class="ins-xl-skip"><td class="ins-xl-team">${escI(t.short)}</td><td>${t.games}</td><td colspan="${sm ? 6 : 4}" class="ins-adv-empty">표본 부족 (${d.min_games}경기 미만)</td></tr>`;
+        const adj = sm ? `<td title="상대 평균 PPG — 높을수록 어려운 일정 (${t.rank_sos}위)">${f2(t.sos)}</td>
+          <td title="일정 난이도 보정 PPG (실제 대비 ${sgn2(t.adj_diff)})"><b>${f2(t.adj_ppg)}</b>${t.rank_gap ? `<span class="${t.rank_gap > 0 ? "ins-xl-up" : "ins-xl-down"}"> ${t.rank_gap > 0 ? "▲" : "▼"}${Math.abs(t.rank_gap)}</span>` : ""}</td>` : "";
+        return `<tr><td class="ins-xl-team">${escI(t.short)}</td><td>${t.games}</td><td><b>${f2(t.ppg)}</b></td>
+          <td>${cell(t.tiers.top)}</td><td>${cell(t.tiers.mid)}</td><td>${cell(t.tiers.bottom)}</td>${adj}</tr>`;
+      }).join("");
+      const sos = d.sos_range ? (sm
+        ? `일정 난이도(상대 평균 PPG)가 팀마다 ${f2(d.sos_range[0])}~${f2(d.sos_range[1])}로 달라, 보정 PPG와 순위 변화(▲▼)를 함께 표시합니다.`
+        : `일정 난이도는 팀 간 차이가 거의 없습니다(상대 평균 PPG ${f2(d.sos_range[0])}~${f2(d.sos_range[1])}, 보정해도 최대 ${f2(d.max_adj)}점) — 서로 비슷한 횟수로 만나 순위가 곧 실력입니다.`) : "";
+      return `${insHead(d)}${insTake(takeOppStrength(d))}${insWarn(d)}
+        <div class="ins-rs-cmp">리그 전체 경기당 승점: 상위권 상대 <b>${f2(LT.top && LT.top.ppg)}</b> · 중위권 <b>${f2(LT.mid && LT.mid.ppg)}</b> · 하위권 <b>${f2(LT.bottom && LT.bottom.ppg)}</b></div>
+        <div class="ins-rs-cmp">${sos}</div>
+        <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th>경기</th><th title="경기당 승점">PPG</th>
+          <th title="시즌 순위 상위 1/3 팀 상대 PPG · 승-무-패 (▲▼ = 제 전력 대비 ±${OPP_REL} 이상)">상위권 상대</th><th title="중위 1/3 팀 상대">중위권 상대</th><th title="하위 1/3 팀 상대">하위권 상대</th>
+          ${sm ? `<th title="상대 평균 PPG (맞대결 제외)">일정 난이도</th><th title="상대 강도로 기대한 승점과의 차이를 리그 평균에 더한 값 · ▲▼=실제 순위 대비 변화">보정 PPG</th>` : ""}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join("") + `<div class="ins-method">근거 — 상대 등급=같은 시즌 PPG 순위 3분할(상위·중위·하위) · ▲▼=이 팀 평소 PPG에 리그 전체의 등급별 낙폭을 적용한 기대보다 ±${OPP_REL}점 이상 · 셀에 마우스를 올리면 신뢰구간·z · 등급별 10경기 안팎이라 <b>대부분 참고용</b> · 일정 보정=상대 PPG(맞대결 제외)로 기대 승점을 적합해 보정 · 홈·원정·휴식일 미보정</div>`;
+  }
+
   // ① 득점 의존도
   function renderScoringDep(list) {
     const el = document.getElementById("ins-sdep-body"); if (!el) return;
@@ -1441,6 +1495,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         .then(renderStorylines).catch(warn("리그 화제 포인트")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/xg-luck?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderXgLuck).catch(warn("xG 운 보정")),
+      Promise.all(xgLeagues.map(lg => fetch(`/api/insights/opponent-strength?year=${currentYear}&league=${lg}`).then(r => r.json())))
+        .then(renderOppStrength).catch(warn("상대 수준별 성적")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/rest-effect?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderRestEffect).catch(warn("휴식일")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/substitution-impact?year=${currentYear}&league=${lg}`).then(r => r.json())))

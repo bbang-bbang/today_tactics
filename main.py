@@ -8219,6 +8219,131 @@ def insights_rotation():
     })
 
 
+_OPP_TIER_MIN = 3            # 상대 등급(상위·중위·하위)별 PPG 를 보여 줄 최소 경기 수
+
+
+@app.route("/api/insights/opponent-strength")
+@cached_response(ttl=3600)
+def insights_opponent_strength():
+    """상대 난이도 보정 성적 (2026-11-05).
+    상대 강도 = 같은 시즌 그 상대의 PPG(이 팀과의 맞대결 제외 — 자기 결과가 상대 강도에 섞이지 않게).
+    리그 전체 팀-경기에서 승점 ~ a + b·상대강도 를 최소제곱으로 적합 → 팀별 (실제−기대) 평균을
+    리그 평균 PPG 에 더한 값이 '보정 PPG'. 상대 등급은 시즌 순위(PPG) 3분할(상위·중위·하위)."""
+    sc = _ins_scope()
+    if sc is None:
+        return jsonify({"error": "league must be k1 or k2"}), 400
+    label, tid, year, ycond, yp = sc
+    info = {t["sofascore_id"]: t for t in TEAMS if t.get("league") == label}
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        evs = _ins_events(conn, tid, ycond, yp)
+    finally:
+        conn.close()
+
+    # 시즌별로 묶는다(상대 강도·순위는 같은 시즌 안에서만 의미가 있음). _year_range 와 같은 로컬 시각 기준.
+    seasons = {}
+    for ev, h, a, ts, hs, as_ in evs:
+        seasons.setdefault(datetime.fromtimestamp(ts).year, []).append((h, a, hs, as_))
+
+    recs = []                                    # 팀-경기: (team, season, pts, gf, ga, opp_strength, tier)
+    for season, games in seasons.items():
+        tot, h2h = {}, {}                        # tot[t]=[pts, n] · h2h[(t,o)]=[pts, n] (t 가 o 상대로 얻은)
+        for h, a, hs, as_ in games:
+            for t, o, gf, ga in ((h, a, hs, as_), (a, h, as_, hs)):
+                p = _ins_pts(gf, ga)
+                s = tot.setdefault(t, [0, 0]); s[0] += p; s[1] += 1
+                s = h2h.setdefault((t, o), [0, 0]); s[0] += p; s[1] += 1
+        ranked = sorted(tot, key=lambda t: -tot[t][0] / tot[t][1])
+        nt = len(ranked)
+        tier = {t: ("top" if i < nt / 3 else "bottom" if i >= nt * 2 / 3 else "mid") for i, t in enumerate(ranked)}
+        for h, a, hs, as_ in games:
+            for t, o, gf, ga in ((h, a, hs, as_), (a, h, as_, hs)):
+                op, on = tot[o]
+                vp, vn = h2h[(o, t)]             # 상대 o 가 이 팀 t 를 상대로 얻은 승점 — 제외
+                if on - vn <= 0:
+                    continue
+                recs.append((t, season, _ins_pts(gf, ga), gf, ga, (op - vp) / (on - vn), tier[o]))
+
+    if len(recs) < 40:
+        return jsonify({"league": label, "year": year, "teams": [], "warnings": ["경기 표본이 부족해 계산할 수 없습니다."],
+                        "min_games": _INS_MIN_GAMES, "tier_min": _OPP_TIER_MIN})
+
+    n = len(recs)
+    mx = sum(r[5] for r in recs) / n
+    my = sum(r[2] for r in recs) / n
+    sxx = sum((r[5] - mx) ** 2 for r in recs)
+    b = sum((r[5] - mx) * (r[2] - my) for r in recs) / sxx if sxx > 0 else 0.0
+    a = my - b * mx
+
+    clean = lambda s: {k: v for k, v in s.items() if k != "_sd"}   # noqa: E731
+    TIERS = ("top", "mid", "bottom")
+    # 리그 기준선: 모든 팀이 각 등급 상대로 얻은 PPG (팀별 값과 비교하는 기준)
+    lg_tier = {k: _rest_stat([{"pts": r[2], "gf": r[3], "ga": r[4]} for r in recs if r[6] == k]) for k in TIERS}
+
+    per = {}
+    for t, season, p, gf, ga, s, tr in recs:
+        d = per.setdefault(t, {"pts": 0, "n": 0, "sos": 0.0, "resid": 0.0, "tiers": {k: [] for k in TIERS}})
+        d["pts"] += p; d["n"] += 1; d["sos"] += s; d["resid"] += p - (a + b * s)
+        d["tiers"][tr].append({"pts": p, "gf": gf, "ga": ga})
+
+    teams = []
+    for t, tinfo in info.items():
+        d = per.get(t)
+        short = tinfo.get("short", tinfo["name"])
+        if not d:
+            teams.append({"id": t, "short": short, "games": 0, "eligible": False})
+            continue
+        tiers, team_ppg = {}, d["pts"] / d["n"]
+        for k in TIERS:
+            L = d["tiers"][k]
+            st = _rest_stat(L)
+            out = {**clean(st), "w": sum(1 for x in L if x["pts"] == 3), "d": sum(1 for x in L if x["pts"] == 1),
+                   "l": sum(1 for x in L if x["pts"] == 0), "exp": None, "rel": None, "z": None}
+            if st["n"] < _OPP_TIER_MIN or lg_tier[k]["ppg"] is None:
+                out["ppg"] = out["ci"] = None
+            else:
+                # 기대 = 이 팀 평소 PPG + (리그 전체가 이 등급 상대로 보이는 평균 낙폭/상승).
+                # rel>0 이면 '제 전력보다 이 등급 상대로 강함'(예: 상위권 상대 rel>0 = 강팀 킬러).
+                base = lg_tier[k]
+                exp = team_ppg + base["ppg"] - my
+                se = (base["_sd"] or 0) / math.sqrt(st["n"])        # 리그 기준 분산으로 표준오차(소표본 sd 불안정 회피)
+                out["exp"] = round(exp, 2)
+                out["rel"] = round(st["ppg"] - exp, 2)
+                out["z"] = round((st["ppg"] - exp) / se, 1) if se > 0 else None
+            tiers[k] = out
+        teams.append({"id": t, "short": short, "games": d["n"], "eligible": d["n"] >= _INS_MIN_GAMES,
+                      "ppg": round(d["pts"] / d["n"], 2), "sos": round(d["sos"] / d["n"], 2),
+                      "adj_ppg": round(my + d["resid"] / d["n"], 2),
+                      "adj_diff": round(my + d["resid"] / d["n"] - d["pts"] / d["n"], 2),
+                      "tiers": tiers})
+    el = [t for t in teams if t["eligible"]]
+    for key, rk in (("ppg", "rank_actual"), ("adj_ppg", "rank_adj"), ("sos", "rank_sos")):
+        for i, t in enumerate(sorted(el, key=lambda t: -t[key])):
+            t[rk] = i + 1
+    for t in el:
+        t["rank_gap"] = t["rank_actual"] - t["rank_adj"]     # +면 보정 후 순위가 올라감(어려운 일정)
+    teams.sort(key=lambda t: (t.get("rank_actual") or 99, t["short"]))
+
+    sos_vals = [t["sos"] for t in el]
+    # 일정 보정이 의미 있는지: 보정으로 PPG 가 0.05 이상 바뀌는 팀이 있을 때만(리그 후반엔 모두 서로 비슷하게 만나 효과가 사라짐)
+    sos_spread = round(max(sos_vals) - min(sos_vals), 2) if sos_vals else 0
+    max_adj = max((abs(t["adj_diff"]) for t in el), default=0)
+    warnings = []
+    if year == "all":
+        warnings.append("전 시즌 합산 — 상대 강도와 등급은 시즌마다 따로 계산해 합쳤습니다.")
+    elif el and min(t["games"] for t in el) < 15:
+        warnings.append("시즌 초반이라 상대 강도 추정이 불안정합니다.")
+    return jsonify({
+        "league": label, "year": year, "teams": teams, "team_matches": n,
+        "league_ppg": round(my, 2), "slope": round(b, 2),
+        "sos_range": [min(sos_vals), max(sos_vals)] if sos_vals else None,
+        "sos_spread": sos_spread, "max_adj": round(max_adj, 2), "sos_meaningful": max_adj >= 0.05,
+        "league_tiers": {k: clean(v) for k, v in lg_tier.items()},
+        "min_games": _INS_MIN_GAMES, "tier_min": _OPP_TIER_MIN, "warnings": warnings,
+        "limits": "상대 강도=같은 시즌 상대 PPG(맞대결 제외) · 보정 PPG=리그 평균 + (실제 승점 − 상대 강도로 기대한 승점)의 평균, 기대식은 리그 전체 최소제곱 · 상대 등급=시즌 PPG 순위 3분할 · 홈·원정·휴식일 미보정 · 같은 리그 경기만",
+    })
+
+
 @app.route("/api/insights/goal-aftermath")
 @cached_response(ttl=3600)
 def insights_goal_aftermath():

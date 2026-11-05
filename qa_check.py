@@ -157,6 +157,13 @@ _phe = [t for t in d_ph['teams'] if t['eligible']]
 qa('pass-hub 키·허브 지분 범위', lambda: assert_(_phe and all(k in d_ph for k in ['verdict', 'high_vs_low', 'limits']) and all(5 < t['hub_share'] < 40 and t['top2_share'] > t['hub_share'] for t in _phe)))
 qa('pass-hub 주 허브 비율 ≤ 100', lambda: assert_(all(0 < t['main_hub']['pct'] <= 100 and t['hubs'] >= 1 for t in _phe)))
 qa('pass-hub 최근 허브 ≤5 + 주 허브 표시', lambda: assert_(all(1 <= len(t['recent_hubs']) <= 5 and all('is_main' in r for r in t['recent_hubs']) for t in _phe)))
+d_os = get('/api/insights/opponent-strength?league=k1&year=2026')
+_ose = [t for t in d_os['teams'] if t['eligible']]
+qa('opponent-strength 키·리그 기준선 3등급', lambda: assert_(_ose and all(k in d_os for k in ['league_tiers', 'sos_meaningful', 'limits']) and set(d_os['league_tiers']) == {'top', 'mid', 'bottom'}))
+qa('opponent-strength 등급별 경기 합 = 팀 경기', lambda: assert_(all(sum(t['tiers'][k]['n'] for k in ('top', 'mid', 'bottom')) == t['games'] for t in _ose)))
+qa('opponent-strength 승무패 합 = 등급 경기·PPG 0~3', lambda: assert_(all(x['w'] + x['d'] + x['l'] == x['n'] and (x['ppg'] is None or 0 <= x['ppg'] <= 3) for t in _ose for x in t['tiers'].values())))
+qa('opponent-strength 보정 PPG 리그 평균 보존', lambda: assert_(abs(sum(t['adj_ppg'] * t['games'] for t in _ose) / sum(t['games'] for t in _ose) - d_os['league_ppg']) < 0.02))
+qa('opponent-strength 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/opponent-strength?league=zz') == 400))
 d_sub = get('/api/insights/substitution?year=2026&league=all')
 qa('교체 영향 최다 투입 이름 비어 있지 않음', lambda: assert_(all(f['name'] for f in d_sub['frequent'])))
 qa('날씨 인사이트 API 제거됨(404)', lambda: assert_(_brief_status('/api/insights/weather?year=2026&league=all') == 404))
