@@ -1340,7 +1340,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     const T = d.teams || [], n = (d.rounds || []).length, out = [];
     if (!T.length) return out;
     const lead = T[0], second = T[1];
-    out.push(`<b>${escI(lead.short)}</b>${insPp(lead.short, "이", "가")} <b>${lead.points}점</b>으로 선두${second ? ` — 2위 ${escI(second.short)}와 ${lead.points - second.points}점 차` : ""}입니다.${insEv(`${n}라운드 중 ${lead.weeks_first}라운드 선두 · 선두 교체 ${d.leader_changes}회${d.leader_changes === 0 ? "(선두가 한 번도 바뀌지 않음)" : ""}`)}`);
+    out.push(`<b>${escI(lead.short)}</b>${insPp(lead.short, "이", "가")} <b>${lead.points}점</b>으로 선두${second ? ` — 2위 ${escI(second.short)}${insPp(second.short, "과", "와")} ${lead.points - second.points}점 차` : ""}입니다.${insEv(`${n}라운드 중 ${lead.weeks_first}라운드 선두 · 선두 교체 ${d.leader_changes}회${d.leader_changes === 0 ? "(선두가 한 번도 바뀌지 않음)" : ""}`)}`);
     const w = d.window || 5, up = T.slice().sort((a, b) => b.delta_recent - a.delta_recent)[0], dn = T.slice().sort((a, b) => a.delta_recent - b.delta_recent)[0];
     if (up && up.delta_recent >= 2) out.push(`최근 ${w}라운드 가장 많이 오른 팀은 <b>${escI(up.short)}</b> — <b>${up.delta_recent}계단</b> 상승해 ${up.rank}위입니다.${insEv(`${w}라운드 전 ${up.rank + up.delta_recent}위 → 현재 ${up.rank}위 · 승점 ${up.points}`)}`);
     if (dn && dn.delta_recent <= -2) out.push(`반대로 <b>${escI(dn.short)}</b>${insPp(dn.short, "은", "는")} 최근 ${w}라운드 <b>${-dn.delta_recent}계단</b> 하락해 ${dn.rank}위입니다.${insEv(`${w}라운드 전 ${dn.rank + dn.delta_recent}위 → 현재 ${dn.rank}위 · 승점 ${dn.points}`)}`);
