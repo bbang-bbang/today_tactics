@@ -8491,7 +8491,102 @@ def insights_opponent_strength():
     })
 
 
-_TREND_MIN_ROUNDS = 5        # 순위 추이를 보여 줄 최소 완료 라운드 수
+_WX_MIN_N = 30               # 날씨 구간을 판정할 최소 경기 수
+_WX_Z = 2.5                  # 구간·지표가 많아(다중 비교) 1.96 이 아니라 2.5 이상일 때만 '차이 있음'
+_WX_TEMP = (("cold", "10℃ 미만", None, 10), ("cool", "10~20℃", 10, 20), ("warm", "20~28℃", 20, 28), ("hot", "28℃ 이상", 28, None))
+_WX_WIND = (("calm", "바람 약함(15km/h 미만)", None, 15), ("breeze", "보통(15~25)", 15, 25), ("strong", "강풍(25km/h 이상)", 25, None))
+_WX_PRECIP_CODE = 51         # WMO 날씨 코드 51 이상 = 이슬비·비·눈 등 강수
+
+
+@app.route("/api/insights/weather-effect")
+@cached_response(ttl=3600)
+def insights_weather_effect():
+    """날씨가 득점·홈 어드밴티지에 영향을 주나 (2026-11-05). 리그 전체 경기 대상.
+    득점은 '같은 리그·시즌 평균 대비 잔차', 홈 승률은 '같은 리그·시즌 홈 승률을 기대값으로 한 초과 승수'로 보정해
+    K2가 득점이 많거나 시즌별 수준이 다른 효과를 걷어낸다. 날씨는 경기 시각 기상(Open-Meteo, 경기장 좌표)."""
+    lg = (request.args.get("league") or "all").lower()
+    if lg not in ("k1", "k2", "all"):
+        return jsonify({"error": "league must be k1, k2 or all"}), 400
+    tids = [_LEAGUE_TID_BY_KEY["K1"], _LEAGUE_TID_BY_KEY["K2"]] if lg == "all" else [_LEAGUE_TID_BY_KEY[lg.upper()]]
+    label = "K1+K2" if lg == "all" else lg.upper()
+    year = (request.args.get("year") or "all").strip()
+    if year != "all" and not year.isdigit():
+        year = "all"
+    ycond, yp = "", ()
+    if year != "all":
+        lo, hi = _year_range(year)
+        ycond, yp = " AND e.date_ts >= ? AND e.date_ts < ?", (lo, hi)
+    ph = ",".join("?" * len(tids))               # 자리표시자만 조립(값은 모두 바인딩)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        all_ev = conn.execute(
+            "SELECT COUNT(*) FROM events e WHERE e.tournament_id IN (" + ph + ") AND e.home_score IS NOT NULL" + ycond, (*tids, *yp)).fetchone()[0]
+        rows = conn.execute(
+            "SELECT e.id, e.date_ts, e.home_score, e.away_score, MAX(m.temperature), MAX(m.wind_speed), MAX(m.weather_code), e.tournament_id "
+            "FROM events e JOIN match_player_stats m ON m.event_id = e.id "
+            "WHERE e.tournament_id IN (" + ph + ") AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL AND m.temperature IS NOT NULL" + ycond +
+            " GROUP BY e.id", (*tids, *yp)).fetchall()
+    finally:
+        conn.close()
+    n = len(rows)
+    if n < 60:
+        return jsonify({"league": label, "year": year, "matches": all_ev, "matches_with_weather": n, "groups": {},
+                        "warnings": ["날씨가 기록된 경기가 적어 분석할 수 없습니다."], "min_n": _WX_MIN_N, "z_flag": _WX_Z})
+
+    seasons = {}                                 # 시즌별 득점 평균·홈 승률(보정 기준)
+    for _, ts, hs, as_, _t, _w, _c, tournament in rows:
+        s = seasons.setdefault((tournament, datetime.fromtimestamp(ts).year), [0, 0, 0])
+        s[0] += hs + as_; s[1] += 1 if hs > as_ else 0; s[2] += 1
+    base = {y: (v[0] / v[2], v[1] / v[2]) for y, v in seasons.items()}
+    recs = []                                    # (temp, wind, precip, goals, goals_resid, home_win, p0)
+    for _, ts, hs, as_, temp, wind, code, tournament in rows:
+        gm, p0 = base[(tournament, datetime.fromtimestamp(ts).year)]
+        recs.append((temp, wind, (code or 0) >= _WX_PRECIP_CODE, hs + as_, hs + as_ - gm, 1 if hs > as_ else 0, p0, hs == as_))
+    allres = [r[4] for r in recs]
+    sd_all = math.sqrt(sum(x * x for x in allres) / max(1, n - 1))
+
+    def stat(g):
+        k = len(g)
+        out = {"n": k, "goals": None, "goals_resid": None, "goals_z": None, "home_win_pct": None, "home_win_exp": None,
+               "home_win_z": None, "draw_pct": None, "goals_diff": False, "home_diff": False}
+        if not k:
+            return out
+        out["goals"] = round(sum(r[3] for r in g) / k, 2)
+        out["draw_pct"] = round(sum(1 for r in g if r[7]) / k * 100, 1)
+        out["home_win_pct"] = round(sum(r[5] for r in g) / k * 100, 1)
+        out["home_win_exp"] = round(sum(r[6] for r in g) / k * 100, 1)
+        if k >= _WX_MIN_N:
+            mr = sum(r[4] for r in g) / k
+            out["goals_resid"] = round(mr, 2)
+            out["goals_z"] = round(mr / (sd_all / math.sqrt(k)), 1) if sd_all > 0 else None
+            var = sum(r[6] * (1 - r[6]) for r in g)
+            out["home_win_z"] = round((sum(r[5] for r in g) - sum(r[6] for r in g)) / math.sqrt(var), 1) if var > 0 else None
+            out["goals_diff"] = out["goals_z"] is not None and abs(out["goals_z"]) >= _WX_Z
+            out["home_diff"] = out["home_win_z"] is not None and abs(out["home_win_z"]) >= _WX_Z
+        return out
+
+    def band(lo, hi, idx):
+        return [r for r in recs if (lo is None or r[idx] >= lo) and (hi is None or r[idx] < hi)]
+
+    groups = {
+        "temp": [{"key": k, "label": lb, **stat(band(lo, hi, 0))} for k, lb, lo, hi in _WX_TEMP],
+        "wind": [{"key": k, "label": lb, **stat(band(lo, hi, 1))} for k, lb, lo, hi in _WX_WIND],
+        "precip": [{"key": "dry", "label": "강수 없음", **stat([r for r in recs if not r[2]])},
+                   {"key": "wet", "label": "비·눈(강수)", **stat([r for r in recs if r[2]])}],
+    }
+    overall = {"n": n, "goals": round(sum(r[3] for r in recs) / n, 2),
+               "home_win_pct": round(sum(r[5] for r in recs) / n * 100, 1), "draw_pct": round(sum(1 for r in recs if r[7]) / n * 100, 1)}
+    warnings = []
+    if n < all_ev * 0.8:
+        warnings.append(f"날씨가 기록된 경기가 {n}/{all_ev}경기뿐입니다 — 일부 경기는 빠져 있습니다.")
+    return jsonify({
+        "league": label, "year": year, "matches": all_ev, "matches_with_weather": n, "overall": overall, "groups": groups,
+        "min_n": _WX_MIN_N, "z_flag": _WX_Z, "warnings": warnings,
+        "limits": "경기 시작 시각 기상(Open-Meteo·경기장 좌표) · 득점=같은 리그·시즌 평균 대비, 홈 승률=같은 리그·시즌 홈 승률 대비로 보정 · 구간·지표를 18개 안팎 동시에 비교하므로 |z|≥2.5·30경기↑일 때만 '차이 있음' · 기온은 시즌 시기·킥오프 시간(저녁 경기 등)과 얽혀 있어 상관일 뿐 인과가 아님",
+    })
+
+
+_TREND_MIN_ROUNDS = 5       # 순위 추이를 보여 줄 최소 완료 라운드 수
 _TREND_WINDOW = 5            # '최근 흐름' 비교 창(라운드)
 
 

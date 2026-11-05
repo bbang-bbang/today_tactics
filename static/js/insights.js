@@ -1391,6 +1391,39 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     });
   }
 
+  // ⑨ 날씨 영향 (2026-11-05) — 기온·강수·바람이 득점·홈 승률에 영향을 주나. 리그·시즌 평균 대비 보정, |z|≥2.5·30경기↑만 '차이 있음'
+  function takeWeather(d) {
+    const out = [], G = d.groups || {};
+    const all = [].concat(G.temp || [], G.wind || [], G.precip || []);
+    all.filter(g => g.goals_diff).sort((a, b) => Math.abs(b.goals_z) - Math.abs(a.goals_z)).forEach(g => out.push(
+      `<b>${escI(g.label)}</b> 경기는 경기당 <b>${f2(g.goals)}골</b>로 같은 리그·시즌 평균보다 <b>${sgn2(g.goals_resid)}골</b> ${g.goals_resid > 0 ? "많았습니다" : "적었습니다"}.${insEv(`${g.n}경기 · z=${g.goals_z.toFixed(1)} · 구간·지표 18개를 동시에 비교한 결과라 우연일 가능성이 남음 · 상관일 뿐 원인은 아님(여름=시즌 후반·저녁 경기와 얽힘)`)}`));
+    all.filter(g => g.home_diff).forEach(g => out.push(
+      `<b>${escI(g.label)}</b> 경기에서 홈 승률이 <b>${g.home_win_pct}%</b>로 기대(${g.home_win_exp}%)와 달랐습니다.${insEv(`${g.n}경기 · z=${g.home_win_z.toFixed(1)}`)}`));
+    if (!out.length && (d.matches_with_weather || 0) >= 60) out.push(`기온·강수·바람이 득점이나 홈 승률을 가른다는 통계적 근거는 없습니다 — 어느 구간도 표본 오차 범위입니다.`);
+    return out;
+  }
+  function renderWeather(list) {
+    const el = document.getElementById("ins-wx-body"); if (!el) return;
+    el.innerHTML = list.map(d => {
+      if (!d || !d.groups) return `<div class="ins-adv-empty">데이터 없음</div>`;
+      if (!Object.keys(d.groups).length) return `${insHead(d)}${insWarn(d)}`;
+      const flag = (diff, z, v) => !diff ? "" : ` <span class="${v > 0 ? "ins-xl-up" : "ins-xl-down"}" aria-label="${v > 0 ? "평균보다 높음" : "평균보다 낮음"}(유의)">${v > 0 ? "▲" : "▼"}</span>`;
+      const row = g => {
+        if (g.n < d.min_n) return `<tr class="ins-xl-skip"><td class="ins-xl-team">${escI(g.label)}</td><td>${g.n}</td><td colspan="4" class="ins-adv-empty">표본 부족 (${d.min_n}경기 미만)</td></tr>`;
+        return `<tr><td class="ins-xl-team">${escI(g.label)}</td><td>${g.n}</td>
+          <td title="리그·시즌 평균 대비 ${sgn2(g.goals_resid)}골 · z=${isNum(g.goals_z) ? g.goals_z.toFixed(1) : "-"}"><b>${f2(g.goals)}</b>${flag(g.goals_diff, g.goals_z, g.goals_resid)} <span class="ins-rs-n">${sgn2(g.goals_resid)}</span></td>
+          <td title="같은 리그·시즌 기대 ${g.home_win_exp}% · z=${isNum(g.home_win_z) ? g.home_win_z.toFixed(1) : "-"}"><b>${g.home_win_pct}%</b>${flag(g.home_diff, g.home_win_z, g.home_win_pct - g.home_win_exp)} <span class="ins-rs-n">기대 ${g.home_win_exp}%</span></td>
+          <td>${g.draw_pct}%</td></tr>`;
+      };
+      const table = (title, gs) => `<div class="ins-adv-sub-h">${title}</div>
+        <div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>구간</th><th>경기</th><th title="경기당 총득점 · 같은 리그·시즌 평균 대비">경기당 득점</th><th title="홈 승률 · 같은 리그·시즌 기대값">홈 승률</th><th>무승부</th></tr></thead><tbody>${gs.map(row).join("")}</tbody></table></div>`;
+      const o = d.overall || {};
+      return `${insHead(d)}${insTake(takeWeather(d))}${insWarn(d)}
+        <div class="ins-rs-cmp">날씨가 기록된 ${d.matches_with_weather}/${d.matches}경기 · 전체 평균 경기당 <b>${f2(o.goals)}골</b> · 홈 승률 <b>${o.home_win_pct}%</b> · 무승부 <b>${o.draw_pct}%</b> · ▲▼ = 통계적으로 유의(|z|≥${d.z_flag})</div>
+        ${table("🌡 기온", d.groups.temp)}${table("🌧 강수", d.groups.precip)}${table("💨 바람", d.groups.wind)}`;
+    }).join("") + `<div class="ins-method">근거 — ${escI((list[0] && list[0].limits) || "")}</div>`;
+  }
+
   // ⑥ 실점 약점 지도 (2026-11-05) — 허용 슈팅이 '어디로·어떤 상황으로' 쏠리나 (비중 vs 리그 비중, |z|≥2만 표시)
   const WEAK_TIP = {
     goalmouth: "크로스·컷백 상황의 박스 안 마크", box_center: "수비 라인 사이·페널티 박스 중앙 공간 관리",
@@ -1669,6 +1702,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         .then(renderFormation).catch(warn("포메이션 상성")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/standings-trend?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderTrend).catch(warn("순위 추이")),
+      fetch(`/api/insights/weather-effect?year=${currentYear}&league=${currentLeague}`).then(r => r.json())
+        .then(d => renderWeather([d])).catch(warn("날씨 영향")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/rest-effect?year=${currentYear}&league=${lg}`).then(r => r.json())))
         .then(renderRestEffect).catch(warn("휴식일")),
       Promise.all(xgLeagues.map(lg => fetch(`/api/insights/substitution-impact?year=${currentYear}&league=${lg}`).then(r => r.json())))

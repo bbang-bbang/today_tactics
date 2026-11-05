@@ -184,6 +184,13 @@ qa('standings-trend 매 라운드 순위는 1~N 순열', lambda: assert_(all(sor
 qa('standings-trend 누적 승점 단조 증가 · 라운드당 최대 +3', lambda: assert_(all(0 <= b - a <= 3 for t in d_tr['teams'] for a, b in zip(t['pts'], t['pts'][1:]))))
 qa('standings-trend 현재 순위 = 승점 내림차순', lambda: assert_([t['points'] for t in d_tr['teams']] == sorted((t['points'] for t in d_tr['teams']), reverse=True)))
 qa('standings-trend 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/standings-trend?league=zz') == 400))
+d_wx = get('/api/insights/weather-effect?league=all&year=all')
+_wg = [g for gs in d_wx['groups'].values() for g in gs]
+qa('weather-effect 키·구간 9개(기온4·강수2·바람3)', lambda: assert_(len(d_wx['groups']['temp']) == 4 and len(d_wx['groups']['precip']) == 2 and len(d_wx['groups']['wind']) == 3 and all(k in d_wx for k in ['overall', 'z_flag', 'min_n', 'limits'])))
+qa('weather-effect 기온·바람·강수 구간 경기 합 = 날씨 기록 경기', lambda: assert_(all(sum(g['n'] for g in d_wx['groups'][k]) == d_wx['matches_with_weather'] for k in ('temp', 'wind', 'precip'))))
+qa('weather-effect 유의는 30경기↑·|z|≥기준만', lambda: assert_(all((not g['goals_diff'] or (g['n'] >= d_wx['min_n'] and abs(g['goals_z']) >= d_wx['z_flag'])) and (not g['home_diff'] or (g['n'] >= d_wx['min_n'] and abs(g['home_win_z']) >= d_wx['z_flag'])) for g in _wg)))
+qa('weather-effect 득점 잔차 가중합 ≈ 0(리그·시즌 보정)', lambda: assert_(abs(sum(g['goals_resid'] * g['n'] for g in d_wx['groups']['temp'] if g['goals_resid'] is not None)) < 0.15 * d_wx['matches_with_weather']))
+qa('weather-effect 잘못된 league 400', lambda: assert_(_brief_status('/api/insights/weather-effect?league=zz') == 400))
 d_sub = get('/api/insights/substitution?year=2026&league=all')
 qa('교체 영향 최다 투입 이름 비어 있지 않음', lambda: assert_(all(f['name'] for f in d_sub['frequent'])))
 qa('날씨 인사이트 API 제거됨(404)', lambda: assert_(_brief_status('/api/insights/weather?year=2026&league=all') == 404))
