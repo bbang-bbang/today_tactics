@@ -9876,3 +9876,64 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .ins-formula-det > summary:hover { color: #dbe9fb; }
 .ins-formula-det > summary:focus-visible { outline: 2px solid #fde68a; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .ins-score-bar > i, .ins-formula-det > summary { transition: none; } }
+
+/* ── tt-dash ── 차트 개편 대시보드 셸 (spec 2026-11-06 §4.2·4.3) ─────────────── */
+:root {
+    --tt-bg: #0b1220; --tt-card: #111a2e; --tt-line: #1f2a44; --tt-text: #e5e7eb; --tt-sub: #94a3b8;
+    --tt-pos: #34d399; --tt-neg: #f87171; --tt-neutral: #475569; --tt-accent: #e8435a;
+    --tt-accent-strong: #be123c; /* 흰 글씨 4.5:1 이상 확보용 선택 상태 배경 */
+}
+.tt-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+.tt-card { grid-column: span 6; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 10px;
+    padding: 14px; color: var(--tt-text); font-size: 13px; line-height: 1.5; letter-spacing: -0.01em; min-width: 0; }
+.tt-card--L { grid-column: span 8; }
+.tt-card--M { grid-column: span 6; }
+.tt-card--S { grid-column: span 4; }
+.tt-card-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+.tt-card-title { margin: 0; font-size: 15px; font-weight: 700; color: #f1f5f9; }
+.tt-card-icon { margin-right: 6px; }
+.tt-card-q { margin: 2px 0 0; font-size: 12px; color: var(--tt-sub); }
+.tt-card-take { margin: 8px 0; padding: 6px 10px; border-left: 3px solid var(--tt-accent); background: #1e293b;
+    border-radius: 4px; font-size: 13px; color: #f1f5f9; }
+.tt-card-warn { margin: 4px 0; font-size: 12px; color: #fde68a; }
+.tt-card-chart { position: relative; height: 260px; margin-top: 8px; }
+.tt-card--L .tt-card-chart { height: 320px; }
+.tt-card--S .tt-card-chart { height: 200px; }
+.tt-card-chart > canvas { display: block; }
+.tt-chart-empty, .tt-chart-error { height: 100%; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--tt-sub); border: 1px dashed var(--tt-line); border-radius: 8px; }
+.tt-chart-error { color: #fca5a5; }
+.tt-card-evidence { margin-top: 10px; font-size: 12px; }
+.tt-card-evidence > summary { cursor: pointer; color: #93c5fd; padding: 4px 0; transition: color 0.15s ease-in-out; }
+.tt-card-evidence > summary:hover { color: #dbeafe; }
+.tt-card-evidence > summary:focus-visible { outline: 2px solid var(--tt-accent); outline-offset: 2px; border-radius: 3px; }
+/* 리그 토글 · 테마 칩 */
+.tt-lg-toggle, .tt-chips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.tt-chips { margin: 0 0 12px; gap: 6px; }
+.tt-lg-btn, .tt-chip { font: inherit; font-size: 12px; cursor: pointer; color: #cbd5e1; background: transparent;
+    border: 1px solid #334155; border-radius: 999px; padding: 3px 10px;
+    transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out, border-color 0.15s ease-in-out; }
+.tt-lg-btn:hover, .tt-chip:hover { border-color: #64748b; color: #f1f5f9; }
+.tt-lg-btn:active, .tt-chip:active { transform: translateY(1px); }
+.tt-lg-btn:focus-visible, .tt-chip:focus-visible { outline: 2px solid var(--tt-accent); outline-offset: 2px; }
+.tt-lg-btn[aria-selected="true"], .tt-chip[aria-selected="true"] { background: var(--tt-accent-strong); border-color: var(--tt-accent-strong);
+    color: #fff; font-weight: 700; }
+.tt-lg-btn:disabled, .tt-chip:disabled { opacity: .45; cursor: not-allowed; }
+/* KPI 줄 */
+.tt-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.tt-kpi { background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 10px; padding: 10px 14px; min-width: 0; }
+.tt-kpi-l { font-size: 12px; color: var(--tt-sub); }
+.tt-kpi-v { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: #f8fafc; line-height: 1.25; }
+.tt-kpi-d { font-size: 12px; color: var(--tt-sub); }
+.tt-kpi-d--up { color: var(--tt-pos); }
+.tt-kpi-d--down { color: var(--tt-neg); }
+.tt-kpi-hint { font-size: 12px; color: var(--tt-sub); }
+@media (max-width: 1279px) {
+    .tt-card--L { grid-column: span 12; }
+    .tt-card--M, .tt-card--S { grid-column: span 6; }
+}
+@media (max-width: 899px) {
+    .tt-card, .tt-card--L, .tt-card--M, .tt-card--S { grid-column: span 12; }
+    .tt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) { .tt-lg-btn, .tt-chip, .tt-card-evidence > summary { transition: none; } }
