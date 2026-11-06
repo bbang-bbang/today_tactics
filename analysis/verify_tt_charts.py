@@ -30,7 +30,7 @@ def open_with_csp(page, url, wait="networkidle"):
             headers["content-security-policy"] = PROD_CSP
             route.fulfill(response=resp, headers=headers)
         else:
-            route.continue_()
+            route.fallback()  # 먼저 등록된 다른 라우트(예: vendor 404)에 양보
     page.route("**/*", handle)
     page.goto(BASE + url, wait_until=wait)
 
@@ -140,6 +140,74 @@ def check_canvas_has_aria(pw):
     browser.close()
     assert role == "img", role
     assert label, label
+    assert errs == [], errs
+
+
+SPIKE_IDS = ["sp-bump", "sp-quad", "sp-forest", "sp-dumb", "sp-heat"]
+
+
+def _spike(pw, browser_name="chromium", width=1440, block_vendor=False):
+    browser, page = _new_page(pw, browser_name=browser_name, width=width)
+    errs = collect_errors(page)
+    if block_vendor:
+        page.route("**/static/vendor/**", lambda r: r.fulfill(status=404, body="nope"))
+    open_with_csp(page, "/static/dev/chart_spike.html")
+    # wait_for_function 은 문자열 eval 이라 CSP(unsafe-eval 없음)에 막힌다 → evaluate 폴링
+    for _ in range(100):
+        if page.evaluate("window.__spikeDone === true"):
+            break
+        time.sleep(0.2)
+    else:
+        raise AssertionError("spike did not finish in 20s")
+    return browser, page, errs
+
+
+def check_spike_all_presets_ok(pw, browser_name="chromium"):
+    browser, page, errs = _spike(pw, browser_name)
+    res = page.evaluate("window.__spikeResults")
+    serr = page.evaluate("window.__spikeError || null")
+    browser.close()
+    assert serr is None, serr
+    bad = {k: v for k, v in (res or {}).items() if not (v.get("ok") and v.get("nonBlank"))}
+    assert set(res or {}) == set(SPIKE_IDS), res
+    assert not bad, bad
+    assert errs == [], errs
+
+
+def check_spike_firefox(pw):
+    check_spike_all_presets_ok(pw, "firefox")
+
+
+def check_spike_screenshots(pw):
+    import os
+    os.makedirs("analysis/output", exist_ok=True)
+    for w in (1440, 1280, 900):
+        browser, page, errs = _spike(pw, width=w)
+        page.screenshot(path=f"analysis/output/tt_spike_{w}.png", full_page=True)
+        browser.close()
+        assert errs == [], (w, errs)
+
+
+def check_tera_missing_fallback(pw):
+    browser, page, errs = _spike(pw, block_vendor=True)
+    n_err = page.evaluate("document.querySelectorAll('.tt-chart-error').length")
+    n_open = page.evaluate("document.querySelectorAll('details.tt-card-evidence[open]').length")
+    browser.close()
+    # forest 는 어댑터 자체 Canvas 렌더러라 TERA 없이도 그려진다 → 나머지 4장만 오류 표시
+    assert n_err == 4, f"error placeholders={n_err}"
+    assert n_open == 4, f"open evidence={n_open}"
+    perr = [e for e in errs if e.startswith("pageerror")]
+    assert perr == [], perr
+
+
+def check_existing_tabs_clean(pw):
+    browser, page = _new_page(pw)
+    errs = collect_errors(page)
+    open_with_csp(page, "/")
+    for ws in ["predict", "team", "player", "heatmap", "tactics"]:
+        page.evaluate(f"document.querySelector('.ws-tab[data-ws={ws}]').click()")
+        time.sleep(3)
+    browser.close()
     assert errs == [], errs
 
 

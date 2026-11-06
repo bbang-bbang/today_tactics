@@ -28,6 +28,18 @@
   function ensureVisible(hex, bg) {
     return { fill: hex, stroke: contrast(hex, bg || THEME.bg) < 3 ? THEME.text : null };
   }
+  // 배경 대비가 minRatio 이상이 될 때까지 흰색 쪽으로 섞는다(이미 충분하면 그대로).
+  function lighten(hex, minRatio, bg) {
+    const base = bg || THEME.bg;
+    if (contrast(hex, base) >= minRatio) return hex;
+    const h = String(hex).replace("#", "");
+    const rgb = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    for (let t = 0.05; t <= 1.0001; t += 0.05) {
+      const mix = "#" + rgb.map((c) => Math.round(c + (255 - c) * t).toString(16).padStart(2, "0")).join("");
+      if (contrast(mix, base) >= minRatio) return mix;
+    }
+    return "#ffffff";
+  }
   const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
   // defaults 위에 cfg 를 덮는다(cfg 우선). 둘 다 건드리지 않고 새 객체 반환.
   function merge(defaults, cfg) {
@@ -124,7 +136,7 @@
     function draw(mode) {
       if (dead) return;
       const T = lib();
-      if (!T) { showError(slot, new Error("TeraChart not loaded")); return; }
+      if (!T && current.__renderer !== "forest") { showError(slot, new Error("TeraChart not loaded")); return; }
       try {
         const [w, h] = size();
         if (!canvas) {
@@ -135,6 +147,7 @@
           handle.canvas = canvas;
         }
         canvas.style.width = w + "px"; canvas.style.height = h + "px";
+        if (current.__renderer === "forest") { drawForest(canvas, current, w, h); drawn = true; return; }
         const cfg = finalConfig(current, w, h);
         const reduce = reducedMotion();
         if (mode === "update" && !reduce) T.update(canvas, cfg, { duration: UPDATE_MS });
@@ -172,7 +185,7 @@
       if (io) io.disconnect();
       if (ro) ro.disconnect();
       const T = lib();
-      if (canvas && T && typeof T.stop === "function") { try { T.stop(canvas); } catch (_) { /* noop */ } }
+      if (canvas && T && typeof T.stop === "function" && current.__renderer !== "forest") { try { T.stop(canvas); } catch (_) { /* noop */ } }
       if (canvas) canvas.remove();
       handles && handles.delete(slot);
     };
@@ -207,9 +220,11 @@
       return r == null ? null : { type: "text", x: last, y: n + 1 - r, text: t.short, style: { color: THEME.text, fontSize: 12 } };
     }).filter(Boolean);
     return {
-      type: "line", smooth: true, showMarkers: false,
+      // smooth(catmullrom)는 순위선이 고리처럼 튀어(스파이크) overshoot 없는 monotone 보간 사용
+      type: "line", curveType: "monotone", showMarkers: false,
       xAxis: { categories: o.rounds.map((r) => "R" + r) },
-      yAxis: { min: 1, max: n, tickInterval: 1, __rankLabels: true }, // SPIKE: 눈금을 'N위'로 — TERA 라벨 포매터 확인
+      yAxis: { min: 1, max: n, autoScale: false,
+        labels: { formatter: (v) => (Math.abs(v - Math.round(v)) < 1e-6 && v >= 1 && v <= n ? `${n + 1 - Math.round(v)}위` : "") } },
       legend: { enabled: false },
       annotations: labels,
       series,
@@ -235,18 +250,65 @@
     if (!rows.some((r) => !r.insufficient)) return EMPTY();
     const zero = o.zero || 0;
     const m = _forestModel(rows, zero);
+    // TERA range-bar/boxplot/dumbbell 은 기준선(plotLines)·소수 눈금을 그리지 못해(Phase 0 스파이크)
+    // 이 프리셋만 어댑터 자체 Canvas 렌더러(drawForest)로 그린다. spec §4.6 대체 규칙.
     return {
-      type: "range-bar",
-      barWidth: "18%", borderRadius: 2,
-      series: [{
-        name: "95% 신뢰구간", color: "rgba(148,163,184,0.55)",
-        data: m.categories.map((name, i) => (m.ranges[i] ? { name, low: m.ranges[i].low, high: m.ranges[i].high } : { name, low: null, high: null })),
-      }],
-      xAxis: { plotLines: [{ value: zero, color: "rgba(229,231,235,0.45)", width: 1.5, dashArray: "4,3" }] },
-      __points: m.points, // SPIKE: 추정치 점을 range-bar 위에 겹치는 방법(annotations/mixed) 확인
+      __renderer: "forest",
+      __model: m,
       __zero: zero,
+      __zeroLabel: o.zeroLabel || "기준",
+      __unit: o.unit || "",
       __aria: `효과 추정치와 95% 신뢰구간, ${rows.length}개 구간${o.unit ? ` (${o.unit})` : ""}`,
     };
+  }
+
+  // forest 전용 Canvas 렌더러 (브라우저). 행마다: 라벨 | CI 선 + 추정치 점 | 값. 기준선은 점선.
+  function drawForest(canvas, spec, w, h) {
+    const dpr = (root.devicePixelRatio || 1);
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const m = spec.__model, z = spec.__zero;
+    const vals = [z];
+    m.ranges.forEach((r) => { if (r) vals.push(r.low, r.high); });
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const pad = (hi - lo) * 0.08 || 0.1; lo -= pad; hi += pad;
+    const font = `${THEME.fontSize}px ${THEME.font}`;
+    ctx.font = font;
+    const labelW = Math.min(w * 0.38, Math.max(...m.categories.map((c) => ctx.measureText(c).width)) + 12);
+    const valW = 64, top = 8, bottom = 28;
+    const x0 = labelW, x1 = w - valW;
+    const X = (v) => x0 + (v - lo) / (hi - lo) * (x1 - x0);
+    const rowH = (h - top - bottom) / Math.max(1, m.categories.length);
+    // 눈금 (소수 2자리)
+    ctx.fillStyle = THEME.sub; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.strokeStyle = THEME.grid; ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const v = lo + (hi - lo) * i / 4, x = X(v);
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, h - bottom); ctx.stroke();
+      ctx.fillText(v.toFixed(2), x, h - bottom + 6);
+    }
+    // 기준선
+    ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = "rgba(229,231,235,0.6)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(X(z), top); ctx.lineTo(X(z), h - bottom); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = THEME.sub; ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.fillText(`${spec.__zeroLabel} ${z.toFixed(2)}`, Math.min(X(z) + 4, x1 - 60), top);
+    // 행
+    m.categories.forEach((label, i) => {
+      const cy = top + rowH * (i + 0.5);
+      const r = m.ranges[i], p = m.points[i];
+      ctx.textBaseline = "middle"; ctx.textAlign = "right";
+      ctx.fillStyle = r ? THEME.text : THEME.sub;
+      ctx.fillText(label, x0 - 10, cy);
+      if (!r) return;
+      ctx.strokeStyle = "rgba(148,163,184,0.85)"; ctx.lineWidth = 3; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(X(r.low), cy); ctx.lineTo(X(r.high), cy); ctx.stroke();
+      ctx.fillStyle = p.color; ctx.strokeStyle = THEME.bg; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.rect(X(p.y) - 5, cy - 5, 10, 10); ctx.fill(); ctx.stroke();
+      ctx.textAlign = "left"; ctx.fillStyle = THEME.text;
+      ctx.fillText(p.y.toFixed(2), x1 + 8, cy);
+    });
   }
 
   function dumbbell(o) {
@@ -272,31 +334,41 @@
     const pts = (o && o.points) || [];
     if (!pts.length) return EMPTY();
     const hl = Array.isArray(o.highlight) && o.highlight.length ? new Set(o.highlight) : null;
-    const data = pts.map((p) => {
-      const v = ensureVisible(p.color || THEME.neutral);
+    // TERA scatter 는 점별 색·마커 외곽선을 무시한다(스파이크) → 팀마다 series 1개, 어두운 색은 밝혀서 칠함
+    const series = pts.map((p) => {
       const on = !hl || hl.has(p.id);
       return {
-        x: p.x, y: p.y, name: p.label,
-        color: on ? v.fill : THEME.neutral,
-        borderColor: v.stroke || v.fill, borderWidth: v.stroke ? 1.5 : 0,
-        dataLabel: on ? p.label : "",
+        name: p.label,
+        color: on ? lighten(p.color || THEME.neutral, 3) : THEME.neutral,
+        marker: { size: on ? 9 : 7, symbol: "circle" },
+        data: [on ? { x: p.x, y: p.y, label: p.label } : { x: p.x, y: p.y }],
       };
     });
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+    // 대각선이 있으면 x·y 공통 범위(정사각 좌표) — 그래야 y=x 가 비율 좌표 (0,1)→(1,0) 이 된다
+    const span = (a) => { const lo = Math.min(...a), hi = Math.max(...a), pad = (hi - lo) * 0.08 || 0.1; return [r2(lo - pad), r2(hi + pad)]; };
+    const [xMin, xMax] = o.diagonal ? span(xs.concat(ys)) : span(xs);
+    const [yMin, yMax] = o.diagonal ? [xMin, xMax] : span(ys);
     const plotX = o.xMid != null ? [{ value: o.xMid, color: "rgba(148,163,184,0.5)", width: 1, dashArray: "4,3" }] : [];
     const plotY = o.yMid != null ? [{ value: o.yMid, color: "rgba(148,163,184,0.5)", width: 1, dashArray: "4,3" }] : [];
+    const ann = [];
+    if (o.diagonal) ann.push({ type: "line", x: 0, y: 1, x2: 1, y2: 0, style: { color: "#94a3b8", dashArray: "4,3" } });
+    const ql = o.quadrantLabels || [];
+    const pos = [[0.03, 0.04], [0.72, 0.04], [0.03, 0.9], [0.68, 0.9]]; // tl, tr, bl, br (비율, y 는 위에서부터)
+    ql.forEach((t, i) => { if (t) ann.push({ type: "text", x: pos[i][0], y: pos[i][1], text: t, style: { color: THEME.sub, fontSize: 12 } }); });
     const out = {
       type: "scatter",
-      xAxis: { type: "linear", autoScale: true, title: o.xTitle, plotLines: plotX },
-      yAxis: { type: "linear", autoScale: true, title: o.yTitle, plotLines: plotY },
+      pointLabels: { enabled: true },
+      xAxis: { type: "linear", autoScale: false, min: xMin, max: xMax, title: o.xTitle, labels: { format: "number:0.0" }, plotLines: plotX },
+      yAxis: { type: "linear", autoScale: false, min: yMin, max: yMax, title: o.yTitle, labels: { format: "number:0.0" }, plotLines: plotY },
       legend: { enabled: false },
-      series: [{ name: "teams", marker: { size: 9, symbol: "circle" }, data }],
-      __quadrantLabels: o.quadrantLabels || null, // SPIKE: 모서리 라벨 annotation 좌표계 확인
+      annotations: ann,
+      series,
       __aria: `${o.xTitle} 대비 ${o.yTitle} 산점도, ${pts.length}개`,
     };
     if (o.diagonal) {
-      const all = pts.flatMap((p) => [p.x, p.y]);
-      const lo = Math.min(...all), hi = Math.max(...all);
-      out.__diagonal = [{ x: lo, y: lo }, { x: hi, y: hi }]; // SPIKE: y=x 점선 그리는 방법 확인
+      const all = xs.concat(ys);
+      out.__diagonal = [{ x: Math.min(...all), y: Math.min(...all) }, { x: Math.max(...all), y: Math.max(...all) }];
     }
     return out;
   }
@@ -328,7 +400,7 @@
       nullColor: "#1e293b", cellRadius: 3, cellPadding: 2, showColorBar: true, showValues: true,
       valueTextStyle: { fontSize: 12, decimals: o.decimals == null ? 2 : o.decimals, color: "#f8fafc" },
       colorBarStyle: { title: o.colorTitle || "" },
-      series: [{ name: o.colorTitle || "value", data }],
+      data, // TERA heatmap 은 최상위 data 를 읽는다(series 안은 무시 — 스파이크)
       __scale: scale,
       __aria: `${rows.length}×${cols.length} 히트맵 행렬`,
     };
@@ -336,7 +408,7 @@
 
   const presets = { bump, _forestModel, forest, dumbbell, quadrant, heatMatrix };
 
-  const TTChart = { THEME, util: { contrast, ensureVisible, merge }, withTheme, isEmpty, mount, presets };
+  const TTChart = { THEME, util: { contrast, ensureVisible, lighten, merge }, withTheme, isEmpty, mount, presets };
   root.TTChart = TTChart;
   if (typeof module !== "undefined" && module.exports) module.exports = TTChart;
 })(typeof globalThis !== "undefined" ? globalThis : this);

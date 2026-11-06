@@ -92,6 +92,22 @@ test("forest_significant_colors", () => {
   assert.deepEqual(m.points.map((p) => p.color), [THEME.pos, THEME.neg, THEME.text]);
 });
 
+test("forest_uses_canvas_renderer", () => {
+  // TERA 로는 기준선·소수 눈금이 안 그려져(스파이크) 어댑터 자체 Canvas 렌더러로 그린다
+  const c = P.forest({ rows: [{ label: "3일 이하", est: 1.24, lo: 0.98, hi: 1.5, n: 82 }], zero: 1.33 });
+  assert.equal(c.__renderer, "forest");
+  assert.equal(c.__zero, 1.33);
+  assert.deepEqual(c.__model.ranges, [{ low: 0.98, high: 1.5 }]);
+});
+
+test("bump_monotone_rank_labels", () => {
+  const c = P.bump({ rounds: [1, 2], teams: [seoul], nTeams: 12 });
+  assert.equal(c.curveType, "monotone");
+  assert.equal(c.yAxis.labels.formatter(12), "1위");
+  assert.equal(c.yAxis.labels.formatter(1), "12위");
+  assert.equal(c.yAxis.labels.formatter(2.5), "");
+});
+
 test("forest_empty", () => {
   assert.deepEqual(P.forest({ rows: [{ label: "a", est: 1, lo: 0, hi: 2, n: 3, insufficient: true }] }), { __empty: true });
 });
@@ -113,16 +129,40 @@ test("quadrant_diagonal_range", () => {
   assert.deepEqual(c.__diagonal, [{ x: 0.78, y: 0.78 }, { x: 1.89, y: 1.89 }]);
 });
 
-test("quadrant_dark_color_stroke", () => {
+test("quadrant_dark_color_lightened", () => {
+  // TERA 가 마커 외곽선을 무시하므로(스파이크) 어두운 팀 색은 배경 대비 3:1 이 되도록 밝혀서 칠한다
   const c = P.quadrant({ points: [{ id: 1, label: "전북", x: 1, y: 1, color: "#0a4436" }], xTitle: "x", yTitle: "y" });
-  const pt = c.series.flatMap((s) => s.data)[0];
-  assert.equal(pt.borderColor, THEME.text);
+  assert.ok(util.contrast(c.series[0].color, THEME.bg) >= 3, c.series[0].color);
+});
+
+test("quadrant_series_per_point_with_label", () => {
+  const c = P.quadrant({ points: [{ id: 1, label: "서울", x: 1.55, y: 1.89, color: "#ef3744" },
+    { id: 2, label: "광주", x: 0.79, y: 0.78, color: "#f3ad02" }], xTitle: "x", yTitle: "y" });
+  assert.equal(c.series.length, 2);
+  assert.equal(c.series[0].color, "#ef3744");
+  assert.deepEqual(c.series[1].data, [{ x: 0.79, y: 0.78, label: "광주" }]);
+  assert.equal(c.pointLabels.enabled, true);
+});
+
+test("quadrant_diagonal_annotation_ratio", () => {
+  const c = P.quadrant({ points: [{ id: 1, label: "a", x: 1.0, y: 1.0, color: "#ef3744" },
+    { id: 2, label: "b", x: 2.0, y: 2.0, color: "#ef3744" }], xTitle: "x", yTitle: "y", diagonal: true });
+  // 축 범위가 x·y 공통이면 y=x 는 좌하(0,1)→우상(1,0) 비율 좌표
+  const line = c.annotations.find((a) => a.type === "line");
+  assert.deepEqual([line.x, line.y, line.x2, line.y2], [0, 1, 1, 0]);
+  assert.equal(c.xAxis.min, c.yAxis.min); assert.equal(c.xAxis.max, c.yAxis.max);
+});
+
+test("util_lighten_reaches_contrast", () => {
+  const out = util.lighten("#0a4436", 3);
+  assert.ok(util.contrast(out, THEME.bg) >= 3, out);
+  assert.equal(util.lighten("#ef3744", 3), "#ef3744");
 });
 
 test("heatMatrix_cells", () => {
   const c = P.heatMatrix({ rows: ["서울", "광주"], cols: ["상위권", "중위권", "하위권"], values: [[2.17, 1.92, 1.8], [null, 1.1, 0.5]] });
   assert.equal(c.type, "heatmap");
-  const data = c.series[0].data;
+  const data = c.data; // TERA heatmap 은 최상위 data 를 읽는다(스파이크)
   assert.equal(data.length, 6);
   assert.ok(data.some((d) => d.x === 0 && d.y === 1 && d.value === null));
 });
