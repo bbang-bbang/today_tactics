@@ -329,3 +329,33 @@ test("pitchZones_unavailable_keeps_label", () => {
   const c = P.pitchZones({ geom: GEOM, values: { out_wide: null }, labels: { out_wide: "중거리 측면" } });
   assert.ok(c.__zones.filter((z) => z.key === "out_wide").every((z) => z.label === "중거리 측면" && z.hatch));
 });
+
+// ── Phase 2a: paceLine · diverging ──
+test("paceLine_two_series", () => {
+  const c = P.paceLine({ labels: ["R1", "R2"], team: { name: "강원", color: "#f55947", data: [0, 1] }, ref: { name: "리그 평균", data: [1.3, 2.6] } });
+  assert.equal(c.type, "line"); assert.equal(c.curveType, "linear");
+  assert.equal(c.series.length, 2);
+  assert.deepEqual(c.series[0].data, [{ y: 0 }, { y: 1 }]);
+  assert.equal(c.series[0].lineWidth, 3); assert.equal(c.series[1].dashArray, "4,3");
+  assert.deepEqual(c.xAxis.categories, ["R1", "R2"]);
+});
+
+test("paceLine_without_ref", () => {
+  const c = P.paceLine({ labels: ["R1"], team: { name: "a", color: "#ef3744", data: [3] } });
+  assert.equal(c.series.length, 1);
+});
+
+test("paceLine_empty", () => {
+  assert.deepEqual(P.paceLine({ labels: [], team: { name: "a", data: [] } }), { __empty: true });
+});
+
+test("diverging_left_negative", () => {
+  const c = P.diverging({ categories: ["0-15", "16-30"], left: { name: "실점", color: "#f87171", data: [6, 5] }, right: { name: "득점", color: "#34d399", data: [3, 5] } });
+  assert.equal(c.type, "row-bar"); assert.equal(c.stacking, "normal");
+  assert.deepEqual(c.series[0].data, [-6, -5]); assert.deepEqual(c.series[1].data, [3, 5]);
+  assert.equal(c.xAxis.min, -6); assert.equal(c.xAxis.max, 6);   // 좌우 대칭
+});
+
+test("diverging_empty", () => {
+  assert.deepEqual(P.diverging({ categories: [], left: { data: [] }, right: { data: [] } }), { __empty: true });
+});

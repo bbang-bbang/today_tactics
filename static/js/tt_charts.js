@@ -505,6 +505,36 @@
     };
   }
 
+  // 누적 페이스 선: 팀(굵게) vs 기준(회색 점선). 누적값은 계단처럼 움직여 곡선 보간 대신 직선.
+  function paceLine(o) {
+    const labels = (o && o.labels) || [];
+    if (!labels.length || !o.team || !(o.team.data || []).length) return EMPTY();
+    const pt = (v) => (v == null ? null : { y: v });
+    const series = [{ name: o.team.name, color: lighten(o.team.color || THEME.accent, 3), lineWidth: 3, data: o.team.data.map(pt) }];
+    if (o.ref && (o.ref.data || []).some((v) => v != null)) {
+      series.push({ name: o.ref.name, color: THEME.sub, lineWidth: 1.5, dashArray: "4,3", data: o.ref.data.map(pt) });
+    }
+    return { type: "line", curveType: "linear", showMarkers: false, legend: { enabled: true, position: "bottom" },
+      xAxis: { categories: labels }, series,
+      __aria: `${o.team.name} 누적 승점${series.length > 1 ? ` vs ${o.ref.name}` : ""}, ${labels.length}경기` };
+  }
+
+  // 좌우 대칭 막대: 왼쪽(음수로 그림)·오른쪽 — 축은 ±최댓값으로 대칭
+  function diverging(o) {
+    const cats = (o && o.categories) || [];
+    if (!cats.length) return EMPTY();
+    const L = o.left.data.map((v) => -(v || 0)), R = o.right.data.map((v) => v || 0);
+    const m = Math.max(1, ...L.map(Math.abs), ...R);
+    return { type: "row-bar", stacking: "normal", borderRadius: 2,
+      yAxis: { categories: cats, labelWidth: 50 },
+      xAxis: { min: -m, max: m, autoScale: false, plotLines: [{ value: 0, color: THEME.text, width: 1 }] },
+      legend: { enabled: true, position: "bottom" },
+      series: [{ name: o.left.name, color: lighten(o.left.color || THEME.neg, 3), data: L },
+               { name: o.right.name, color: lighten(o.right.color || THEME.pos, 3), data: R }],
+      __rows: cats.length,
+      __aria: `${o.left.name}(왼쪽)·${o.right.name}(오른쪽) 비교, ${cats.length}개 구간` };
+  }
+
   // ── 자체 Canvas 렌더러 공통 ──
   function prepCanvas(canvas, w, h) {
     const dpr = root.devicePixelRatio || 1;
@@ -641,7 +671,7 @@
   const CUSTOM = { forest: (c, s, w, h) => drawForest(c, s, w, h), timelineGrid: drawTimelineGrid, pitchZones: drawPitchZones };
 
   const presets = { bump, _forestModel, forest, dumbbell, quadrant, heatMatrix, stacked100, barRef, sankey,
-    _gridLayout, _cellStyle, _fitText, timelineGrid, pitchZones };
+    _gridLayout, _cellStyle, _fitText, timelineGrid, pitchZones, paceLine, diverging };
 
   const TTChart = { THEME, util: { contrast, ensureVisible, lighten, merge }, withTheme, isEmpty, mount, destroyAll, presets };
   root.TTChart = TTChart;
