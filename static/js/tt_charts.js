@@ -516,12 +516,13 @@
     if (!labels.length || !o.team || !(o.team.data || []).length) return EMPTY();
     const pt = (v) => (v == null ? null : { y: v });
     const series = [{ name: o.team.name, color: lighten(o.team.color || THEME.accent, 3), lineWidth: 3, data: o.team.data.map(pt) }];
+    (o.extra || []).forEach((e) => series.push({ name: e.name, color: lighten(e.color || THEME.pos, 3), lineWidth: 3, data: e.data.map(pt) }));
     if (o.ref && (o.ref.data || []).some((v) => v != null)) {
       series.push({ name: o.ref.name, color: THEME.sub, lineWidth: 1.5, dashArray: "4,3", data: o.ref.data.map(pt) });
     }
     return { type: "line", curveType: "linear", showMarkers: false, legend: { enabled: true, position: "bottom" },
       xAxis: { categories: labels }, series,
-      __aria: `${o.team.name} 누적 승점${series.length > 1 ? ` vs ${o.ref.name}` : ""}, ${labels.length}경기` };
+      __aria: `${series.map((x) => x.name).join(" vs ")} 누적 승점, ${labels.length}경기` };
   }
 
   // 좌우 대칭 막대: 왼쪽(음수로 그림)·오른쪽 — 축은 ±최댓값으로 대칭

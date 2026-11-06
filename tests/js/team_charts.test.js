@@ -85,3 +85,34 @@ test("team_builders_empty", () => {
   assert.deepEqual(TeamCharts.weather({ weather: {} }), { __empty: true });
   assert.deepEqual(TeamCharts.timing({ goal_timing: {} }), { __empty: true });
 });
+
+// ── Phase 2b: 팀 비교 페이스 ──
+const mk = (season, cums, avgs) => ({ short: "X", matches: cums.map((c, i) => ({ season, season_cum_pts: c, league_avg_cum_pts: avgs ? avgs[i] : null })) });
+
+test("paceCompare_unequal_lengths", () => {
+  const c = TeamCharts.paceCompare(mk(2026, [3, 4, 7], [1, 2, 3]), mk(2026, [1, 4], [1, 2]), { colorA: "#f55947", colorB: "#1d5fa5", sameLeague: true });
+  assert.deepEqual(c.xAxis.categories, ["R1", "R2", "R3"]);
+  assert.deepEqual(c.series[1].data, [{ y: 1 }, { y: 4 }, null]);
+  assert.deepEqual(c.series[2].data.map((p) => p && p.y), [1, 2, 3]);
+});
+
+test("paceCompare_cross_league_no_ref", () => {
+  const c = TeamCharts.paceCompare(mk(2026, [3], [1]), mk(2026, [1], [1]), { colorA: "#f55947", colorB: "#1d5fa5", sameLeague: false });
+  assert.equal(c.series.length, 2);
+  assert.match(c.__note, /리그가 달라/);
+});
+
+test("paceCompare_close_colors", () => {
+  const c = TeamCharts.paceCompare(mk(2026, [3], [1]), mk(2026, [1], [1]), { colorA: "#ef3744", colorB: "#df242b", sameLeague: true });
+  assert.equal(c.series[1].color, TTChart.util.lighten("#f59e0b", 3));
+});
+
+test("paceCompare_latest_season", () => {
+  const a = { short: "A", matches: [...mk(2025, [3, 6]).matches, ...mk(2026, [1]).matches] };
+  const c = TeamCharts.paceCompare(a, mk(2026, [3]), { colorA: "#f55947", colorB: "#1d5fa5", sameLeague: true });
+  assert.deepEqual(c.series[0].data, [{ y: 1 }]);
+});
+
+test("paceCompare_empty", () => {
+  assert.deepEqual(TeamCharts.paceCompare({ matches: [] }, { matches: [] }, {}), { __empty: true });
+});

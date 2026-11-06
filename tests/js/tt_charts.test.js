@@ -366,3 +366,11 @@ test("barRef_label_width_fits_long_names", () => {
   const s = P.stacked100({ categories: ["대전 하나 시티즌"], parts: [{ name: "a", data: [100] }] });
   assert.ok(s.yAxis.labelWidth >= 8 * 12);
 });
+
+test("paceLine_extra_series", () => {
+  const c = P.paceLine({ labels: ["R1", "R2"], team: { name: "A", color: "#f55947", data: [3, 4] },
+    extra: [{ name: "B", color: "#1d5fa5", data: [1, null] }], ref: { name: "리그 평균", data: [1.3, 2.6] } });
+  assert.deepEqual(c.series.map((s) => s.name), ["A", "B", "리그 평균"]);
+  assert.equal(c.series[1].lineWidth, 3);
+  assert.deepEqual(c.series[1].data, [{ y: 1 }, null]);
+});

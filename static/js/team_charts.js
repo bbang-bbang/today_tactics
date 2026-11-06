@@ -81,7 +81,38 @@
       left: { name: "실점", color: THEME.neg, data: g.against }, right: { name: "득점", color: THEME.pos, data: g.for } });
   }
 
-  const TeamCharts = { pace, strip, month, homeAway, vsOpp, weather, timing };
+  // 팀 비교: 두 팀 시즌 누적 승점 (+ 같은 리그면 리그 평균 페이스). 각 팀 최근 시즌, 짧은 쪽은 null 패딩.
+  const ALT_B = "#f59e0b";
+  function paceCompare(trA, trB, o) {
+    o = o || {};
+    const latest = (tr) => {
+      const ms = (tr && tr.matches) || [];
+      if (!ms.length) return { ms: [], season: null };
+      const s = Math.max(...ms.map((m) => m.season));
+      return { ms: ms.filter((m) => m.season === s), season: s, all: ms.length };
+    };
+    const A = latest(trA), B = latest(trB);
+    const n = Math.max(A.ms.length, B.ms.length);
+    if (!n) return { __empty: true };
+    const pad = (ms, f) => Array.from({ length: n }, (_, i) => (i < ms.length ? f(ms[i]) : null));
+    const longer = A.ms.length >= B.ms.length ? A.ms : B.ms;
+    let colorB = o.colorB || ALT_B;
+    if (o.colorA && TT.util.contrast(o.colorA, colorB) < 1.6) colorB = ALT_B;   // 두 팀 색이 비슷하면 B 를 대체색으로
+    const spec = P.paceLine({
+      labels: Array.from({ length: n }, (_, i) => "R" + (i + 1)),
+      team: { name: (trA && trA.short) || "A", color: o.colorA, data: pad(A.ms, (m) => m.season_cum_pts) },
+      extra: [{ name: (trB && trB.short) || "B", color: colorB, data: pad(B.ms, (m) => m.season_cum_pts) }],
+      ref: o.sameLeague ? { name: "리그 평균", data: pad(longer, (m) => m.league_avg_cum_pts) } : null,
+    });
+    const notes = [];
+    if (!o.sameLeague) notes.push("두 팀 리그가 달라 리그 평균선은 생략");
+    if (A.season !== B.season) notes.push(`시즌이 다름 (${A.season} vs ${B.season})`);
+    else if (A.all > A.ms.length || (B.all || 0) > B.ms.length) notes.push(`${A.season} 시즌만 표시`);
+    if (notes.length) spec.__note = notes.join(" · ");
+    return spec;
+  }
+
+  const TeamCharts = { pace, strip, month, homeAway, vsOpp, weather, timing, paceCompare };
   root.TeamCharts = TeamCharts;
   if (typeof module !== "undefined" && module.exports) module.exports = TeamCharts;
 })(typeof globalThis !== "undefined" ? globalThis : this);
