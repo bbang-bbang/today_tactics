@@ -1,9 +1,15 @@
 # RESUME — 다른 PC / 새 세션에서 작업 재개 가이드
 
 > 이 파일 + `checklist/work-log-*.md` + git 커밋 기록만 보고 작업을 이어갈 수 있도록 정리.
-> 최종 갱신: 2026-11-06 00:50 (11/5~11/6 작업 상세 → `checklist/work-log-2026-11-05.md` · 그 앞 → `work-log-2026-11-04.md`·`work-log-2026-11-03.md` · `checklist/backlog.md` P1 'SofaScore 수집 중단')
+> 최종 갱신: 2026-11-07 (11/7 레이아웃 개편 → `checklist/work-log-2026-11-07.md`) · 이전: 2026-11-06 00:50 (11/5~11/6 작업 상세 → `checklist/work-log-2026-11-05.md` · 그 앞 → `work-log-2026-11-04.md`·`work-log-2026-11-03.md` · `checklist/backlog.md` P1 'SofaScore 수집 중단')
 
 ---
+
+## 0-0. 🖥 2026-11-07 레이아웃 개편 마감 (최신)
+**상세·구현 메모·잔여는 `checklist/work-log-2026-11-07.md`.** 요약:
+- ✅ 페이지 최대 폭 **1600px**(`#app`) · 탭바 헤더 바로 아래 sticky · **심화 인사이트는 팀 탭 3번째 모드**(선수 탭=랭킹·카드) · 시즌 시뮬 바=경기예측 탭 · 매치 선택 영역은 전술판·경기예측만, 그 외 탭은 한 줄 요약+'변경' · 전술판 HUD 한 줄 복구(선수 개별분석 패널 460px) · 매치 선택 헤더 바 형태+접힘 시 선택 매치 칩. 캐시 `style.css?v=124`·`workspace.js?v=19`·`insights.js?v=61`.
+- 🚀 **배포 = `git push origin main`만** (GitHub Actions 'Deploy to production'이 운영 reset+restart). 운영 HEAD `1efb258` 일치 확인. `deploy/deploy.sh`는 **운영 `players.db`를 덮어쓰므로 쓰지 말 것**(백업 없음·users 테이블 손실).
+- ⏳ 잔여: ① HUD 1440px 이하 두 줄 ② `verify_tt_charts.py` 팀 탭 경로로 수정 ③ 선수 패널 460px·Firefox/Edge/모바일 점검 ④ 운영 `static/dev/` probe 공개 정리 검토 ⑤ 11/9(월) 05:00 크론 점검(아래 0-A).
 
 ## 0-A. 🌙 2026-11-04 새벽 중단 지점 (가장 먼저 읽을 것)
 **상세·명령·함정은 `checklist/work-log-2026-11-04.md`.** 요약:

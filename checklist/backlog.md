@@ -143,6 +143,13 @@ sudo systemctl daemon-reload && sudo systemctl restart today_tactics
 
 ## 🟡 P2 — 시간 날 때 처리
 
+### [ ] 🖥 11/7 레이아웃 개편 후속 (상세 `checklist/work-log-2026-11-07.md`)
+- 전술판 HUD가 1440px 이하에서 두 줄로 꺾임(두 번째 줄 좌우 반전·`vs` 매달림) — 노트북 폭용 재설계. Canvas 코어 무관(HTML/CSS).
+- `analysis/verify_tt_charts.py`: 심화 인사이트가 팀 탭으로 이동 → 선수 탭 기준 경로 수정 필요.
+- 선수 개별분석 패널 600→460px 축소 후 레이더·스탯 바·확대 모달 점검, Firefox·Edge·모바일(≤720px) 확인.
+- 운영 `static/dev/`(probe 페이지) 공개 노출 — 참조처(`tests/js`·verify 스크립트) 확인 후 정리.
+- 요약 줄이 전술판 수동 변경 팀도 '선택 매치'로 표기 — 필요 시 매치 클릭 id를 별도 저장.
+
 ### [x] ~~선수 상세 스탯·비교 K1(tid=410) 지원~~ — 2026-06-15 완료
 `player-stat-report`의 tid=777 하드코딩 8곳을 선수 리그 자동 판정(최근 경기 기준, 검색 배지와 일치)으로 일반화. 피어/백분위/세부포지션/활동량/신체랭크 모두 해당 리그 내 계산. 응답에 `league` 추가. ⚖️ 선수 비교는 K1+K2 검색 허용 + 교차 리그 백분위 주석. 검증: K1 선수(146 K1 피어)·K2 회귀(일류첸코 91경기 동일)·K1↔K2 비교 PASS.
 
