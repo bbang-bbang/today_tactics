@@ -359,3 +359,10 @@ test("diverging_left_negative", () => {
 test("diverging_empty", () => {
   assert.deepEqual(P.diverging({ categories: [], left: { data: [] }, right: { data: [] } }), { __empty: true });
 });
+
+test("barRef_label_width_fits_long_names", () => {
+  const c = P.barRef({ categories: ["대전 하나 시티즌", "11월 (1경기)"], values: [1, 2] });
+  assert.ok(c.yAxis.labelWidth >= 8 * 12, `labelWidth ${c.yAxis.labelWidth}`);   // 8글자 × 12px
+  const s = P.stacked100({ categories: ["대전 하나 시티즌"], parts: [{ name: "a", data: [100] }] });
+  assert.ok(s.yAxis.labelWidth >= 8 * 12);
+});

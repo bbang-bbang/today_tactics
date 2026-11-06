@@ -32,7 +32,7 @@ def open_with_csp(page, url, wait="networkidle"):
         else:
             route.fallback()  # 먼저 등록된 다른 라우트(예: vendor 404)에 양보
     page.route("**/*", handle)
-    page.goto(BASE + url, wait_until=wait)
+    page.goto(BASE + url, wait_until=wait, timeout=90000)   # 로컬 개발 서버 콜드 스타트 대비
 
 
 def collect_errors(page):
@@ -536,6 +536,101 @@ def check_custom_renderers_draw(pw):
         browser.close()
         assert all(i > 0.01 for i in inks), (block, inks)
         assert [e for e in errs if e.startswith("pageerror")] == [], errs
+
+
+# ── Phase 2a: 팀 분석 ─────────────────────────────────────────────
+TEAM_RESULT_SLOTS = ["trend", "strip", "month", "ha", "vs", "weather"]
+TEAM_INS_SLOTS = ["timing"]
+
+
+def _team_ink(page, key):
+    return page.evaluate(f"""(()=>{{const c=document.querySelector('#ta-{key}-slot canvas'); if(!c) return 0;
+        const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data; let n=0;
+        for(let i=3;i<d.length;i+=4) if(d[i]>0) n++; return n/(d.length/4);}})()""")
+
+
+def _open_team(pw, team="gangwon", width=1440, block_vendor=False, routes=()):
+    browser, page = _new_page(pw, width=width)
+    errs = collect_errors(page)
+    if block_vendor:
+        page.route("**/static/vendor/**", lambda r: r.fulfill(status=404, body="nope"))
+    for pat, fn in routes:
+        page.route(pat, fn)
+    open_with_csp(page, "/")
+    page.evaluate("document.querySelector('.ws-tab[data-ws=team]').click()")
+    _wait(page, "document.querySelectorAll('#ta-team-select option').length > 5")
+    if team:
+        page.select_option("#ta-team-select", team)
+        _wait(page, "document.getElementById('ta-team-name').textContent.trim() !== '' && document.getElementById('ta-team-name').textContent !== '불러오는 중…'")
+        _wait(page, "typeof window.TeamCharts === 'object' || !!document.querySelector('#ta-trend-slot .tt-chart-error')", timeout=60)
+        page.evaluate("document.getElementById('ta-trend-slot').scrollIntoView({block:'center'})")
+        _wait(page, "!!document.querySelector('#ta-trend-slot canvas, #ta-trend-slot .tt-chart-error')")
+    return browser, page, errs
+
+
+def _scroll_slots(page, keys):
+    for k in keys:
+        page.evaluate(f"(document.getElementById('ta-{k}-slot')||document.body).scrollIntoView({{block:'center'}})")
+        time.sleep(0.4)
+
+
+def check_team_charts_render(pw):
+    browser, page, errs = _open_team(pw)
+    _scroll_slots(page, TEAM_RESULT_SLOTS); time.sleep(0.8)
+    inks = {k: _team_ink(page, k) for k in TEAM_RESULT_SLOTS}
+    page.evaluate("document.querySelector('.ta-tab-btn[data-tab=insights]').click()"); time.sleep(0.6)
+    _scroll_slots(page, TEAM_INS_SLOTS); time.sleep(0.8)
+    inks.update({k: _team_ink(page, k) for k in TEAM_INS_SLOTS})
+    browser.close()
+    blank = {k: v for k, v in inks.items() if v <= 0.01}
+    assert not blank, blank
+    assert errs == [], errs
+
+
+def check_team_switch_stale(pw):
+    def slow(route):
+        if "teamId=ulsan" in route.request.url:
+            time.sleep(3)
+        route.fallback()
+    browser, page, errs = _open_team(pw, team=None, routes=[("**/api/team-analytics**", slow)])
+    page.select_option("#ta-team-select", "ulsan")
+    time.sleep(0.3)
+    page.select_option("#ta-team-select", "gangwon")
+    try:   # 강원 응답(콜드 ~6s) 뒤에 늦은 울산 응답(3s 지연)이 와도 강원이 남아야 한다
+        _wait(page, "/강원/.test(document.getElementById('ta-team-name').textContent)", timeout=30)
+    except AssertionError:
+        pass
+    time.sleep(4)
+    name = page.evaluate("document.getElementById('ta-team-name').textContent")
+    browser.close()
+    assert "강원" in name, name
+
+
+def check_team_tera_fail(pw):
+    browser, page, errs = _open_team(pw, block_vendor=True)
+    _scroll_slots(page, TEAM_RESULT_SLOTS); time.sleep(0.6)
+    n_err = page.evaluate("document.querySelectorAll('#ta-panel-results .tt-chart-error').length")
+    n_tbl = page.evaluate("document.querySelectorAll('#ta-panel-results details.tt-card-evidence[open]').length")
+    browser.close()
+    # 결과 탭 TERA 차트: pace·month·ha·vs (strip=timelineGrid, weather=forest 는 자체 Canvas)
+    assert n_err == 4, n_err
+    assert n_tbl >= 2, n_tbl          # 표가 있는 패널(홈/원정·상대별)의 근거가 펼쳐짐
+    assert [e for e in errs if e.startswith("pageerror")] == []
+
+
+def check_team_year_all_note(pw):
+    browser, page, errs = _open_team(pw)
+    page.evaluate("Array.from(document.querySelectorAll('#ta-year-filter button, .ta-year-btn')).find(b => /전체/.test(b.textContent)).click()")
+    _wait(page, "/시즌만 표시/.test((document.getElementById('ta-trend-scope')||{}).textContent||'')", timeout=20)
+    browser.close()
+
+
+def check_inline_height_preserved(pw):
+    browser, page, errs = _probe(pw)
+    page.evaluate("probe.line('slot-short')"); time.sleep(0.5)
+    h = page.evaluate("document.getElementById('slot-short').offsetHeight")
+    browser.close()
+    assert h == 64, h
 
 
 CHECKS = {name: fn for name, fn in globals().items() if name.startswith("check_")}

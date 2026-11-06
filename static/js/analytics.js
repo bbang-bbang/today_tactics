@@ -167,7 +167,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     });
 
     // ── 메인 로드 ─────────────────────────────────────────────────
+    let _loadSeq = 0;   // 팀·연도 전환 연타 시 늦게 온 이전 응답 무시
     function loadAll() {
+        const tok = ++_loadSeq;
         bodyEl.classList.remove("hidden");
         emptyEl.classList.add("hidden");
         const meta = teamMeta[currentTeamId] || {};
@@ -184,6 +186,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             fetch(`/api/team-shotmap?teamId=${currentTeamId}&side=for${yp}`).then(r => r.json()).catch(e => ({ __err: "슛맵(공격)", _e: e })),
             fetch(`/api/team-shotmap?teamId=${currentTeamId}&side=against${yp}`).then(r => r.json()).catch(e => ({ __err: "슛맵(수비)", _e: e })),
         ]).then(([analytics, trend, rankings, insights, shape, smFor, smAgainst]) => {
+            if (tok !== _loadSeq) return;   // 이미 다른 팀/연도를 선택함
             // 선택 데이터 로드 실패 가시화: 빈 결과("데이터 없음")와 "불러오기 실패"를 구분 (P5 견고성)
             const failed = [insights, shape, smFor, smAgainst].filter(x => x && x.__err);
             if (failed.length) {
@@ -384,49 +387,33 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }
 
     // ── 결과 ① 시즌 득/실 트렌드 + 누적 승점 ─────────────────────
-    function renderTrend(trend, meta) {
-        destroyChart("ta-trend");
-        const el = document.getElementById("ta-trend");
-        const ms = trend.matches || [];
-        const scope = document.getElementById("ta-trend-scope");
-        if (scope) scope.textContent = ms.length ? `${ms.length}경기` : "";
-        if (!ms.length) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>데이터 없음</p>"; return; }
-        const ink = readableInk(meta.primary || "#4ea4f8");
-        const labels = ms.map((m, i) => `${i + 1}R`);
-        charts["ta-trend"] = new Chart(el, {
-            data: {
-                labels,
-                datasets: [
-                    { type: "bar", label: "누적 승점", data: ms.map(m => m.cum_pts), yAxisID: "yPts",
-                      backgroundColor: hexToRgba(meta.primary || "#4ea4f8", 0.18), borderRadius: 3, order: 3 },
-                    { type: "line", label: "득점", data: ms.map(m => m.gf), yAxisID: "yGoals",
-                      borderColor: ink, backgroundColor: ink, tension: 0.3, pointRadius: 2, borderWidth: 2.4, order: 1 },
-                    { type: "line", label: "실점", data: ms.map(m => m.ga), yAxisID: "yGoals",
-                      borderColor: "#f87171", backgroundColor: "#f87171", borderDash: [5, 4], tension: 0.3, pointRadius: 2, borderWidth: 2, order: 2 },
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                interaction: { mode: "index", intersect: false },
-                plugins: {
-                    ...BASE_PLUGINS,
-                    tooltip: {
-                        ...BASE_PLUGINS.tooltip,
-                        callbacks: {
-                            title: items => { const m = ms[items[0].dataIndex]; return `${m.date} ${m.is_home ? "vs" : "@"} ${m.opponent}`; },
-                            afterTitle: items => { const m = ms[items[0].dataIndex]; return `${m.gf}:${m.ga} (${m.result})`; },
-                        }
-                    }
-                },
-                scales: {
-                    x: { ticks: { color: "#7a8fa8", font: { size: 9 }, maxRotation: 0, autoSkipPadding: 16 }, grid: { display: false } },
-                    yGoals: { position: "left", beginAtZero: true, ticks: { color: "#9fb2c8", font: { size: 10 }, precision: 0 }, grid: { color: "rgba(255,255,255,0.06)" } },
-                    yPts: { position: "right", beginAtZero: true, ticks: { color: hexToRgba(meta.primary || "#4ea4f8", 0.9), font: { size: 10 } }, grid: { display: false } },
-                }
+    // ── 차트 개편 Phase 2a: TERA 차트 마운트 (모듈 미로드·실패 시 오류 박스 + 근거 펼침) ──
+    function mountTeam(slotId, build, aria) {
+        const slot = document.getElementById(slotId);
+        if (!slot) return;
+        const tok = _loadSeq;
+        const go = () => {
+            if (tok !== _loadSeq) return;
+            if (window.TTChart && window.TeamCharts) {
+                try { TTChart.mount(slot, build(), { ariaLabel: aria }); return; }
+                catch (e) { console.warn("[team-analysis] chart build failed:", aria, e); }
             }
-        });
+            slot.innerHTML = '<div class="tt-chart-error" role="alert">차트를 불러오지 못했습니다</div>';
+            const ev = slot.parentElement && slot.parentElement.querySelector("details.tt-card-evidence");
+            if (ev) ev.open = true;
+        };
+        (window.ttTeamReady || Promise.resolve()).catch(() => {}).then(go);
     }
 
+    function renderTrend(trend, meta) {
+        const ms = trend.matches || [];
+        const scope = document.getElementById("ta-trend-scope");
+        const seasons = new Set(ms.map(m => m.season));
+        if (scope) scope.textContent = !ms.length ? "" : seasons.size > 1
+            ? `${Math.max(...seasons)} 시즌만 표시 (연도를 고르면 그 시즌)` : `${ms.length}경기`;
+        mountTeam("ta-trend-slot", () => TeamCharts.pace(trend, meta.primary || "#4ea4f8"), "누적 승점과 리그 평균 페이스");
+        mountTeam("ta-strip-slot", () => TeamCharts.strip(trend, meta.short || trend.short || "결과"), "경기별 결과 띠");
+    }
     // ── 결과 ①-b 득실 마진 분포 (점수차별 경기 수) ───────────────
     function renderMargin(trend, meta) {
         destroyChart("ta-margin");
@@ -486,39 +473,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
     // ── 결과 ② 월별 승률 ─────────────────────────────────────────
     function renderMonth(rows) {
-        destroyChart("ta-month");
-        const el = document.getElementById("ta-month");
-        if (!rows.length) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>데이터 없음</p>"; return; }
-        const MIN = 4;   // 이 미만 월은 표본 부족 → 막대 회색(승률 신뢰도 낮음 표시)
-        const labels = rows.map(r => r.month + "월");
-        const pct = rows.map(r => winPct(r.w, r.games));
-        const colors = rows.map(r => r.games < MIN ? "rgba(120,134,153,0.55)" : winColor(winPct(r.w, r.games)));
-        charts["ta-month"] = new Chart(el, {
-            type: "bar",
-            data: {
-                labels,
-                datasets: [{ label: "승률", data: pct, backgroundColor: colors, borderRadius: 4, maxBarThickness: 38 }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    ...BASE_PLUGINS, legend: { display: false },
-                    tooltip: {
-                        ...BASE_PLUGINS.tooltip,
-                        callbacks: {
-                            label: c => `승률 ${c.parsed.y}%`,
-                            afterBody: items => { const r = rows[items[0].dataIndex]; return `${r.games}경기  ${r.w}승 ${r.d}무 ${r.l}패` + (r.games < MIN ? "  ⚠표본 적음" : ""); }
-                        }
-                    }
-                },
-                scales: {
-                    x: { ticks: { color: "#c0d0e0", font: { size: 11 } }, grid: { display: false } },
-                    y: { beginAtZero: true, max: 100, ticks: { color: "#7a8fa8", font: { size: 10 }, callback: v => v + "%" }, grid: { color: "rgba(255,255,255,0.06)" } }
-                }
-            }
-        });
+        mountTeam("ta-month-slot", () => TeamCharts.month({ by_month: rows }), "월별 경기당 승점");
     }
-
     // ── 결과 ③ 홈/원정 성적 (연도 합산) ───────────────────────────
     function renderHomeAway(byYearHa) {
         const agg = { home: { games: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0 }, away: { games: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0 } };
@@ -542,11 +498,13 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         document.getElementById("ta-ha-table").innerHTML =
             `<tr><th>구분</th><th>승률</th><th>전적</th><th>경기</th><th>득실</th></tr>` +
             row("🏠 홈", "home") + row("✈ 원정", "away");
+        mountTeam("ta-ha-slot", () => TeamCharts.homeAway({ by_year_ha: byYearHa }), "홈과 원정 경기당 승점·득점·실점");
     }
 
     // ── 결과 ④ 상대팀별 전적 ──────────────────────────────────────
     function renderVsOpponents(rows) {
         const tbl = document.getElementById("ta-vs-table");
+        mountTeam("ta-vs-slot", () => TeamCharts.vsOpp({ vs_opponents: rows }), "상대팀별 경기당 승점");
         if (!rows.length) { tbl.innerHTML = "<tr><td class='chart-empty'>데이터 없음</td></tr>"; return; }
 
         const MIN = 4;   // 이 미만 상대는 승률 신뢰도 낮음 → 후순위 + 배지 약화
@@ -584,6 +542,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             { title: "🌬 풍속", rows: weather.by_wind || [] },
         ];
         const host = document.getElementById("ta-weather");
+        mountTeam("ta-weather-slot", () => TeamCharts.weather({ weather }), "날씨 구간별 경기당 승점과 95% 구간");
         const hasAny = groups.some(g => g.rows.length);
         if (!hasAny) { host.innerHTML = "<p class='chart-empty'>날씨 표본 없음</p>"; return; }
         const MIN = 4;   // 이 미만 구간은 승률 신뢰도 낮음(표본 부족) → 약화 표시
@@ -624,35 +583,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
     // ① 득점·실점 시간대 (15분 × 6버킷)
     function renderGoalTiming(gt, meta) {
-        destroyChart("ta-timing");
-        const el = document.getElementById("ta-timing");
-        const forA = gt.for || [], agA = gt.against || [];
-        if (!gt.total) { el.closest(".chart-wrap").innerHTML = "<p class='chart-empty'>골 데이터 없음</p>"; return; }
-        const ink = readableInk(meta.primary || "#4ea4f8");
-        charts["ta-timing"] = new Chart(el, {
-            type: "bar",
-            data: {
-                labels: TIMING_LABELS,
-                datasets: [
-                    { label: "득점", data: forA, backgroundColor: "rgba(52,211,153,0.85)", borderRadius: 3, maxBarThickness: 26 },
-                    { label: "실점", data: agA, backgroundColor: "rgba(240,90,80,0.8)", borderRadius: 3, maxBarThickness: 26 },
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    ...BASE_PLUGINS,
-                    tooltip: { ...BASE_PLUGINS.tooltip, callbacks: { title: items => items[0].label + "분", label: c => `${c.dataset.label} ${c.parsed.y}골` } }
-                },
-                scales: {
-                    x: { ticks: { color: "#c0d0e0", font: { size: 10 } }, grid: { display: false } },
-                    y: { beginAtZero: true, ticks: { color: "#7a8fa8", font: { size: 10 }, precision: 0, stepSize: 1 }, grid: { color: "rgba(255,255,255,0.06)" } }
-                }
-            }
-        });
+        mountTeam("ta-timing-slot", () => TeamCharts.timing({ goal_timing: gt.total ? gt : {} }), "15분 구간별 실점과 득점");
     }
-
-    // ② 선제골 영향 (선제 득점 시 / 선제 실점 시 → W/D/L)
     function renderFirstGoal(fg) {
         destroyChart("ta-firstgoal");
         const el = document.getElementById("ta-firstgoal");

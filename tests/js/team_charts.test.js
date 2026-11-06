@@ -76,13 +76,6 @@ test("timing_diverging", () => {
   assert.deepEqual(c.series[1].data, I.goal_timing.for);
 });
 
-test("firstGoal_links_sum", () => {
-  const c = TeamCharts.firstGoal(I);
-  const f = I.first_goal;
-  const total = ["w", "d", "l"].reduce((s, k) => s + f.scored[k] + f.conceded[k], 0);
-  assert.equal(c.links.reduce((s, l) => s + l.value, 0), total);
-});
-
 test("team_builders_empty", () => {
   assert.deepEqual(TeamCharts.pace({ matches: [] }, "#fff"), { __empty: true });
   assert.deepEqual(TeamCharts.strip({ matches: [] }, "x"), { __empty: true });
@@ -91,5 +84,4 @@ test("team_builders_empty", () => {
   assert.deepEqual(TeamCharts.vsOpp({ vs_opponents: [] }), { __empty: true });
   assert.deepEqual(TeamCharts.weather({ weather: {} }), { __empty: true });
   assert.deepEqual(TeamCharts.timing({ goal_timing: {} }), { __empty: true });
-  assert.deepEqual(TeamCharts.firstGoal({ first_goal: {} }), { __empty: true });
 });

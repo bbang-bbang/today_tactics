@@ -81,19 +81,7 @@
       left: { name: "실점", color: THEME.neg, data: g.against }, right: { name: "득점", color: THEME.pos, data: g.for } });
   }
 
-  function firstGoal(ins) {
-    const f = (ins && ins.first_goal) || {};
-    if (!f.scored || !f.conceded) return { __empty: true };
-    const R = { w: "승", d: "무", l: "패" };
-    const links = [];
-    for (const [src, k] of [["선제 득점", "scored"], ["선제 실점", "conceded"]]) {
-      for (const r of ["w", "d", "l"]) links.push({ source: src, target: R[r], value: f[k][r] || 0 });
-    }
-    return P.sankey({ nodes: ["선제 득점", "선제 실점", "승", "무", "패"], links,
-      colors: { "선제 득점": THEME.pos, "선제 실점": THEME.neg, "승": THEME.pos, "무": THEME.neutral, "패": THEME.neg } });
-  }
-
-  const TeamCharts = { pace, strip, month, homeAway, vsOpp, weather, timing, firstGoal };
+  const TeamCharts = { pace, strip, month, homeAway, vsOpp, weather, timing };
   root.TeamCharts = TeamCharts;
   if (typeof module !== "undefined" && module.exports) module.exports = TeamCharts;
 })(typeof globalThis !== "undefined" ? globalThis : this);
