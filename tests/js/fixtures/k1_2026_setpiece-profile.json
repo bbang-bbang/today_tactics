@@ -1,0 +1,514 @@
+{
+  "highlights": [
+    {
+      "kind": "attack",
+      "team": "\uc804\ubd81",
+      "text": "\uc804\ubd81: \uc138\ud2b8\ud53c\uc2a4 \uc288\ud305 \uc0dd\uc0b0 \uacbd\uae30\ub2f9 4.55 (\ub9ac\uadf8 \ud3c9\uade0 3.66, 1\uc704)"
+    },
+    {
+      "kind": "attack",
+      "team": "\uac15\uc6d0",
+      "text": "\uac15\uc6d0: \uc138\ud2b8\ud53c\uc2a4 \uc288\ud305 \uc0dd\uc0b0 \uacbd\uae30\ub2f9 4.33 (\ub9ac\uadf8 \ud3c9\uade0 3.66, 2\uc704)"
+    },
+    {
+      "kind": "defence",
+      "team": "\uad11\uc8fc",
+      "text": "\uad11\uc8fc: \uc138\ud2b8\ud53c\uc2a4 \uc288\ud305 \ud5c8\uc6a9 \uacbd\uae30\ub2f9 4.61 (\ub9ac\uadf8 \ud3c9\uade0 3.66) \u2014 \uc138\ud2b8\ud53c\uc2a4 \uc218\ube44 \ucde8\uc57d 12/12\uc704"
+    },
+    {
+      "kind": "defence",
+      "team": "\ubd80\ucc9c",
+      "text": "\ubd80\ucc9c: \uc138\ud2b8\ud53c\uc2a4 \uc288\ud305 \ud5c8\uc6a9 \uacbd\uae30\ub2f9 4.36 (\ub9ac\uadf8 \ud3c9\uade0 3.66) \u2014 \uc138\ud2b8\ud53c\uc2a4 \uc218\ube44 \ucde8\uc57d 11/12\uc704"
+    }
+  ],
+  "league": "K1",
+  "league_types": [
+    {
+      "goal_pct": 8.0,
+      "goals": 60,
+      "key": "corner",
+      "label": "\ucf54\ub108",
+      "shots": 749,
+      "xg_per_shot": null
+    },
+    {
+      "goal_pct": 7.3,
+      "goals": 11,
+      "key": "free-kick",
+      "label": "\ud504\ub9ac\ud0a5",
+      "shots": 150,
+      "xg_per_shot": null
+    },
+    {
+      "goal_pct": 7.7,
+      "goals": 12,
+      "key": "throw-in-set-piece",
+      "label": "\uc2a4\ub85c\uc778",
+      "shots": 156,
+      "xg_per_shot": null
+    },
+    {
+      "goal_pct": 8.4,
+      "goals": 33,
+      "key": "set-piece",
+      "label": "\uae30\ud0c0",
+      "shots": 393,
+      "xg_per_shot": null
+    }
+  ],
+  "limits": "PK \uc81c\uc678. \ub4dd\uc810\u00b7\uc2e4\uc810 \ube44\uc911\uc740 \uc288\ud305\ub9f5 \uace8 \uae30\uc900(\uc790\ucc45 \uc81c\uc678). \uacf5\uaca9=\ud300\uc774 \ub9cc\ub4e0 \uc138\ud2b8\ud53c\uc2a4 \uc288\ud305, \uc218\ube44=\uc0c1\ub300\uc5d0\uac8c \ud5c8\uc6a9\ud55c \uc288\ud305.",
+  "metric": "\uc288\ud305",
+  "min_games": 8,
+  "min_goals": 8,
+  "teams": [
+    {
+      "against": {
+        "by_type_pg": {
+          "corner": 1.91,
+          "free-kick": 0.33,
+          "set-piece": 0.48,
+          "throw-in-set-piece": 0.24
+        },
+        "goal_share": 17,
+        "goals": 8,
+        "head_share": 43,
+        "shots_pg": 2.97,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "eligible": true,
+      "for": {
+        "by_type_pg": {
+          "corner": 1.85,
+          "free-kick": 0.39,
+          "set-piece": 1.3,
+          "throw-in-set-piece": 0.45
+        },
+        "goal_share": 23,
+        "goals": 12,
+        "head_share": 48,
+        "shots_pg": 4.0,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "games": 33,
+      "id": "ulsan",
+      "net": 1.03,
+      "rank_against": 2,
+      "rank_for": 3,
+      "short": "\uc6b8\uc0b0"
+    },
+    {
+      "against": {
+        "by_type_pg": {
+          "corner": 1.3,
+          "free-kick": 0.39,
+          "set-piece": 0.97,
+          "throw-in-set-piece": 0.21
+        },
+        "goal_share": 23,
+        "goals": 8,
+        "head_share": 38,
+        "shots_pg": 2.88,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "eligible": true,
+      "for": {
+        "by_type_pg": {
+          "corner": 2.15,
+          "free-kick": 0.27,
+          "set-piece": 0.94,
+          "throw-in-set-piece": 0.42
+        },
+        "goal_share": 30,
+        "goals": 13,
+        "head_share": 38,
+        "shots_pg": 3.79,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "games": 33,
+      "id": "incheon",
+      "net": 0.91,
+      "rank_against": 1,
+      "rank_for": 7,
+      "short": "\uc778\ucc9c"
+    },
+    {
+      "against": {
+        "by_type_pg": {
+          "corner": 1.45,
+          "free-kick": 0.24,
+          "set-piece": 0.97,
+          "throw-in-set-piece": 0.45
+        },
+        "goal_share": 17,
+        "goals": 5,
+        "head_share": 42,
+        "shots_pg": 3.12,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "eligible": true,
+      "for": {
+        "by_type_pg": {
+          "corner": 2.0,
+          "free-kick": 0.42,
+          "set-piece": 1.21,
+          "throw-in-set-piece": 0.36
+        },
+        "goal_share": 23,
+        "goals": 14,
+        "head_share": 39,
+        "shots_pg": 4.0,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "games": 33,
+      "id": "fcseoul",
+      "net": 0.88,
+      "rank_against": 3,
+      "rank_for": 3,
+      "short": "\uc11c\uc6b8"
+    },
+    {
+      "against": {
+        "by_type_pg": {
+          "corner": 1.45,
+          "free-kick": 0.27,
+          "set-piece": 1.09,
+          "throw-in-set-piece": 0.7
+        },
+        "goal_share": 27,
+        "goals": 8,
+        "head_share": 37,
+        "shots_pg": 3.52,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "eligible": true,
+      "for": {
+        "by_type_pg": {
+          "corner": 1.94,
+          "free-kick": 0.36,
+          "set-piece": 1.7,
+          "throw-in-set-piece": 0.33
+        },
+        "goal_share": 22,
+        "goals": 9,
+        "head_share": 32,
+        "shots_pg": 4.33,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "games": 33,
+      "id": "gangwon",
+      "net": 0.81,
+      "rank_against": 6,
+      "rank_for": 2,
+      "short": "\uac15\uc6d0"
+    },
+    {
+      "against": {
+        "by_type_pg": {
+          "corner": 1.88,
+          "free-kick": 0.42,
+          "set-piece": 1.03,
+          "throw-in-set-piece": 0.48
+        },
+        "goal_share": 15,
+        "goals": 5,
+        "head_share": 41,
+        "shots_pg": 3.82,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "eligible": true,
+      "for": {
+        "by_type_pg": {
+          "corner": 2.24,
+          "free-kick": 0.45,
+          "set-piece": 1.39,
+          "throw-in-set-piece": 0.45
+        },
+        "goal_share": 33,
+        "goals": 14,
+        "head_share": 47,
+        "shots_pg": 4.55,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "games": 33,
+      "id": "jeonbuk",
+      "net": 0.73,
+      "rank_against": 7,
+      "rank_for": 1,
+      "short": "\uc804\ubd81"
+    },
+    {
+      "against": {
+        "by_type_pg": {
+          "corner": 1.7,
+          "free-kick": 0.36,
+          "set-piece": 0.82,
+          "throw-in-set-piece": 0.45
+        },
+        "goal_share": 22,
+        "goals": 9,
+        "head_share": 45,
+        "shots_pg": 3.33,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "eligible": true,
+      "for": {
+        "by_type_pg": {
+          "corner": 1.94,
+          "free-kick": 0.52,
+          "set-piece": 0.91,
+          "throw-in-set-piece": 0.36
+        },
+        "goal_share": 23,
+        "goals": 12,
+        "head_share": 41,
+        "shots_pg": 3.73,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "games": 33,
+      "id": "daejeon",
+      "net": 0.4,
+      "rank_against": 4,
+      "rank_for": 8,
+      "short": "\ub300\uc804"
+    },
+    {
+      "against": {
+        "by_type_pg": {
+          "corner": 2.15,
+          "free-kick": 0.42,
+          "set-piece": 0.94,
+          "throw-in-set-piece": 0.39
+        },
+        "goal_share": 35,
+        "goals": 13,
+        "head_share": 37,
+        "shots_pg": 3.91,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "eligible": true,
+      "for": {
+        "by_type_pg": {
+          "corner": 2.15,
+          "free-kick": 0.33,
+          "set-piece": 0.88,
+          "throw-in-set-piece": 0.58
+        },
+        "goal_share": 28,
+        "goals": 11,
+        "head_share": 34,
+        "shots_pg": 3.94,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "games": 33,
+      "id": "jeju",
+      "net": 0.03,
+      "rank_against": 8,
+      "rank_for": 5,
+      "short": "\uc81c\uc8fc"
+    },
+    {
+      "against": {
+        "by_type_pg": {
+          "corner": 1.67,
+          "free-kick": 0.33,
+          "set-piece": 1.55,
+          "throw-in-set-piece": 0.36
+        },
+        "goal_share": 29,
+        "goals": 12,
+        "head_share": 36,
+        "shots_pg": 3.91,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "eligible": true,
+      "for": {
+        "by_type_pg": {
+          "corner": 2.67,
+          "free-kick": 0.58,
+          "set-piece": 0.58,
+          "throw-in-set-piece": 0.06
+        },
+        "goal_share": 18,
+        "goals": 6,
+        "head_share": 40,
+        "shots_pg": 3.88,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "games": 33,
+      "id": "gimcheon",
+      "net": -0.03,
+      "rank_against": 8,
+      "rank_for": 6,
+      "short": "\uae40\ucc9c"
+    },
+    {
+      "against": {
+        "by_type_pg": {
+          "corner": 1.79,
+          "free-kick": 0.39,
+          "set-piece": 0.88,
+          "throw-in-set-piece": 0.42
+        },
+        "goal_share": 28,
+        "goals": 11,
+        "head_share": 39,
+        "shots_pg": 3.48,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "eligible": true,
+      "for": {
+        "by_type_pg": {
+          "corner": 1.7,
+          "free-kick": 0.24,
+          "set-piece": 0.7,
+          "throw-in-set-piece": 0.7
+        },
+        "goal_share": 30,
+        "goals": 9,
+        "head_share": 38,
+        "shots_pg": 3.33,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "games": 33,
+      "id": "pohang",
+      "net": -0.15,
+      "rank_against": 5,
+      "rank_for": 9,
+      "short": "\ud3ec\ud56d"
+    },
+    {
+      "against": {
+        "by_type_pg": {
+          "corner": 2.12,
+          "free-kick": 0.42,
+          "set-piece": 1.15,
+          "throw-in-set-piece": 0.27
+        },
+        "goal_share": 15,
+        "goals": 7,
+        "head_share": 40,
+        "shots_pg": 3.97,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "eligible": true,
+      "for": {
+        "by_type_pg": {
+          "corner": 1.33,
+          "free-kick": 0.36,
+          "set-piece": 0.97,
+          "throw-in-set-piece": 0.55
+        },
+        "goal_share": 20,
+        "goals": 8,
+        "head_share": 35,
+        "shots_pg": 3.21,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "games": 33,
+      "id": "anyang",
+      "net": -0.76,
+      "rank_against": 10,
+      "rank_for": 10,
+      "short": "\uc548\uc591"
+    },
+    {
+      "against": {
+        "by_type_pg": {
+          "corner": 2.3,
+          "free-kick": 0.64,
+          "set-piece": 1.03,
+          "throw-in-set-piece": 0.39
+        },
+        "goal_share": 32,
+        "goals": 15,
+        "head_share": 34,
+        "shots_pg": 4.36,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "eligible": true,
+      "for": {
+        "by_type_pg": {
+          "corner": 1.52,
+          "free-kick": 0.36,
+          "set-piece": 1.09,
+          "throw-in-set-piece": 0.24
+        },
+        "goal_share": 19,
+        "goals": 6,
+        "head_share": 45,
+        "shots_pg": 3.21,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "games": 33,
+      "id": "bucheon",
+      "net": -1.15,
+      "rank_against": 11,
+      "rank_for": 10,
+      "short": "\ubd80\ucc9c"
+    },
+    {
+      "against": {
+        "by_type_pg": {
+          "corner": 2.97,
+          "free-kick": 0.3,
+          "set-piece": 1.0,
+          "throw-in-set-piece": 0.33
+        },
+        "goal_share": 22,
+        "goals": 15,
+        "head_share": 43,
+        "shots_pg": 4.61,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "eligible": true,
+      "for": {
+        "by_type_pg": {
+          "corner": 1.21,
+          "free-kick": 0.24,
+          "set-piece": 0.24,
+          "throw-in-set-piece": 0.21
+        },
+        "goal_share": 7,
+        "goals": 2,
+        "head_share": 32,
+        "shots_pg": 1.91,
+        "small_goals": false,
+        "xg_pg": null
+      },
+      "games": 33,
+      "id": "gwangju",
+      "net": -2.7,
+      "rank_against": 12,
+      "rank_for": 12,
+      "short": "\uad11\uc8fc"
+    }
+  ],
+  "warnings": [
+    "\uc138\ud2b8\ud53c\uc2a4 \uc288\ud305\uc758 xG \ubcf4\uc720\uc728\uc774 \ub0ae\uc544 xG \ub300\uc2e0 \uc288\ud305 \uc218\ub85c \ube44\uad50\ud569\ub2c8\ub2e4."
+  ],
+  "xg_ok": false,
+  "year": "2026"
+}

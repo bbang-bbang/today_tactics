@@ -1,0 +1,118 @@
+{
+  "buckets": [
+    {
+      "ci": 0.26,
+      "ga": 1.07,
+      "gf": 1.02,
+      "key": "short",
+      "label": "3\uc77c \uc774\ud558",
+      "n": 82,
+      "ppg": 1.24,
+      "win_pct": 29.3
+    },
+    {
+      "ci": 0.21,
+      "ga": 1.2,
+      "gf": 1.4,
+      "key": "mid",
+      "label": "4~6\uc77c",
+      "n": 147,
+      "ppg": 1.52,
+      "win_pct": 40.8
+    },
+    {
+      "ci": 0.19,
+      "ga": 1.33,
+      "gf": 1.18,
+      "key": "long",
+      "label": "7\uc77c \uc774\uc0c1",
+      "n": 154,
+      "ppg": 1.21,
+      "win_pct": 28.6
+    }
+  ],
+  "congestion": [
+    {
+      "ci": 0.25,
+      "ga": 1.21,
+      "gf": 1.19,
+      "key": "low",
+      "label": "14\uc77c \ub0b4 0~1\uacbd\uae30",
+      "n": 98,
+      "ppg": 1.38,
+      "win_pct": 34.7
+    },
+    {
+      "ci": 0.18,
+      "ga": 1.24,
+      "gf": 1.31,
+      "key": "mid",
+      "label": "14\uc77c \ub0b4 2\uacbd\uae30",
+      "n": 169,
+      "ppg": 1.33,
+      "win_pct": 31.4
+    },
+    {
+      "ci": 0.24,
+      "ga": 1.22,
+      "gf": 1.15,
+      "key": "high",
+      "label": "14\uc77c \ub0b4 3\uacbd\uae30\u2191",
+      "n": 116,
+      "ppg": 1.32,
+      "win_pct": 35.3
+    }
+  ],
+  "congestion_compare": {
+    "diff": -0.06,
+    "significant": false,
+    "z": -0.3
+  },
+  "gap": [
+    {
+      "ci": 0.98,
+      "ga": 1.25,
+      "gf": 1.5,
+      "key": "home_more",
+      "label": "\ud648\uc774 2\uc77c\u2191 \ub354 \uc27c",
+      "n": 4,
+      "ppg": 1.5,
+      "win_pct": 25.0
+    },
+    {
+      "ci": 0.18,
+      "ga": 1.27,
+      "gf": 1.14,
+      "key": "even",
+      "label": "\ube44\uc2b7 (\u00b11\uc77c)",
+      "n": 178,
+      "ppg": 1.29,
+      "win_pct": 31.5
+    },
+    {
+      "ci": 1.03,
+      "ga": 1.0,
+      "gf": 2.0,
+      "key": "away_more",
+      "label": "\uc6d0\uc815\uc774 2\uc77c\u2191 \ub354 \uc27c",
+      "n": 9,
+      "ppg": 1.67,
+      "win_pct": 55.6
+    }
+  ],
+  "gap_compare": null,
+  "league": "K1",
+  "limits": "\ud734\uc2dd\uc77c\uc740 \uac19\uc740 \ub9ac\uadf8 \uc9c1\uc804 \uacbd\uae30 \uae30\uc900 \u2014 \ucef5\u00b7ACL \ub4f1 \ub2e4\ub978 \ub300\ud68c\ub294 \ubc18\uc601\ub418\uc9c0 \uc54a\uc74c",
+  "short_vs_normal": {
+    "diff": -0.12,
+    "significant": false,
+    "z": -0.8
+  },
+  "team_matches": 383,
+  "verdict": {
+    "level": "none",
+    "text": "\ud734\uc2dd\uc77c\u00b7\uc5f0\uc804\uc774 \uc131\uc801\uc5d0 \uc601\ud5a5\uc744 \uc900\ub2e4\ub294 \ud1b5\uacc4\uc801 \uadfc\uac70\ub294 \ud655\uc778\ub418\uc9c0 \uc54a\uc558\uc2b5\ub2c8\ub2e4 (\ucc28\uc774\uac00 \ud45c\ubcf8 \uc624\ucc28 \ubc94\uc704 \uc548)."
+  },
+  "warnings": [],
+  "year": "2026"
+}

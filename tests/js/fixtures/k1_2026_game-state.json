@@ -1,0 +1,357 @@
+{
+  "flagged": [
+    "\uad11\uc8fc",
+    "\uae40\ucc9c"
+  ],
+  "league": "K1",
+  "league_avg": {
+    "hold_pct": 65,
+    "led_games": 206,
+    "trailed_games": 206,
+    "trailed_ppg": 0.55
+  },
+  "limits": "\ub9ac\ub4dc\u00b7\ub4a4\uc9d0 = \uacbd\uae30 \uc911 \ud55c \ubc88\uc774\ub77c\ub3c4 \uc55e\uc120/\ub4a4\uc9c4 \uacbd\uae30(\uc591\ucabd \ub2e4 \ud574\ub2f9 \uac00\ub2a5) \u00b7 \ub9ac\ub4dc \uc9c0\ud0a8 \ube44\uc728 = \uadf8\uc911 \uc2b9\ub9ac \ube44\uc728 \u00b7 \uc2dc\uac01\uc740 \ubd84+\ucd94\uac00\uc2dc\uac04, \uacbd\uae30 \uc885\ub8cc\ub294 95\ubd84(\ub9c8\uc9c0\ub9c9 \uace8\uc774 \ub354 \ub2a6\uc73c\uba74 \uadf8 \uc9c1\ud6c4)\uc73c\ub85c \uadfc\uc0ac \u00b7 \ub4dd\uc810 \uae30\ub85d\uc774 \uc2a4\ucf54\uc5b4\uc640 \ub9de\ub294 \uacbd\uae30\ub9cc \u00b7 \uc0c1\ub300 \uac15\ub3c4\u00b7\ud1f4\uc7a5 \ubbf8\ubcf4\uc815\uc774\ub77c \ucc38\uace0\uc6a9",
+  "matches": 204,
+  "min_games": 8,
+  "skipped": 0,
+  "teams": [
+    {
+      "eligible": true,
+      "games": 34,
+      "id": 7646,
+      "led": {
+        "d": 3,
+        "dropped_pts": 9,
+        "hold_pct": 83,
+        "l": 1,
+        "n": 24,
+        "w": 20,
+        "z": 1.9
+      },
+      "share": [
+        34,
+        54,
+        12
+      ],
+      "short": "\uc11c\uc6b8",
+      "trailed": {
+        "d": 0,
+        "l": 7,
+        "n": 8,
+        "ppg": 0.38,
+        "pts": 3,
+        "w": 1
+      }
+    },
+    {
+      "eligible": true,
+      "games": 34,
+      "id": 7653,
+      "led": {
+        "d": 1,
+        "dropped_pts": 11,
+        "hold_pct": 80,
+        "l": 3,
+        "n": 20,
+        "w": 16,
+        "z": 1.4
+      },
+      "share": [
+        25,
+        47,
+        28
+      ],
+      "short": "\uc6b8\uc0b0",
+      "trailed": {
+        "d": 3,
+        "l": 12,
+        "n": 20,
+        "ppg": 0.9,
+        "pts": 18,
+        "w": 5
+      }
+    },
+    {
+      "eligible": true,
+      "games": 34,
+      "id": 34220,
+      "led": {
+        "d": 2,
+        "dropped_pts": 7,
+        "hold_pct": 79,
+        "l": 1,
+        "n": 14,
+        "w": 11,
+        "z": 1.1
+      },
+      "share": [
+        20,
+        55,
+        25
+      ],
+      "short": "\uac15\uc6d0",
+      "trailed": {
+        "d": 8,
+        "l": 8,
+        "n": 17,
+        "ppg": 0.65,
+        "pts": 11,
+        "w": 1
+      }
+    },
+    {
+      "eligible": true,
+      "games": 34,
+      "id": 7650,
+      "led": {
+        "d": 2,
+        "dropped_pts": 7,
+        "hold_pct": 79,
+        "l": 1,
+        "n": 14,
+        "w": 11,
+        "z": 1.1
+      },
+      "share": [
+        24,
+        54,
+        22
+      ],
+      "short": "\ud3ec\ud56d",
+      "trailed": {
+        "d": 4,
+        "l": 13,
+        "n": 17,
+        "ppg": 0.24,
+        "pts": 4,
+        "w": 0
+      }
+    },
+    {
+      "eligible": true,
+      "games": 34,
+      "id": 7645,
+      "led": {
+        "d": 3,
+        "dropped_pts": 12,
+        "hold_pct": 72,
+        "l": 2,
+        "n": 18,
+        "w": 13,
+        "z": 0.6
+      },
+      "share": [
+        21,
+        55,
+        24
+      ],
+      "short": "\ub300\uc804",
+      "trailed": {
+        "d": 5,
+        "l": 10,
+        "n": 19,
+        "ppg": 0.89,
+        "pts": 17,
+        "w": 4
+      }
+    },
+    {
+      "eligible": true,
+      "games": 34,
+      "id": 7649,
+      "led": {
+        "d": 5,
+        "dropped_pts": 10,
+        "hold_pct": 71,
+        "l": 0,
+        "n": 17,
+        "w": 12,
+        "z": 0.5
+      },
+      "share": [
+        23,
+        56,
+        21
+      ],
+      "short": "\uc81c\uc8fc",
+      "trailed": {
+        "d": 4,
+        "l": 11,
+        "n": 17,
+        "ppg": 0.59,
+        "pts": 10,
+        "w": 2
+      }
+    },
+    {
+      "eligible": true,
+      "games": 34,
+      "id": 7648,
+      "led": {
+        "d": 6,
+        "dropped_pts": 15,
+        "hold_pct": 65,
+        "l": 1,
+        "n": 20,
+        "w": 13,
+        "z": -0.0
+      },
+      "share": [
+        21,
+        61,
+        18
+      ],
+      "short": "\uc778\ucc9c",
+      "trailed": {
+        "d": 3,
+        "l": 11,
+        "n": 16,
+        "ppg": 0.56,
+        "pts": 9,
+        "w": 2
+      }
+    },
+    {
+      "eligible": true,
+      "games": 34,
+      "id": 6908,
+      "led": {
+        "d": 4,
+        "dropped_pts": 17,
+        "hold_pct": 63,
+        "l": 3,
+        "n": 19,
+        "w": 12,
+        "z": -0.2
+      },
+      "share": [
+        23,
+        63,
+        14
+      ],
+      "short": "\uc804\ubd81",
+      "trailed": {
+        "d": 3,
+        "l": 9,
+        "n": 12,
+        "ppg": 0.25,
+        "pts": 3,
+        "w": 0
+      }
+    },
+    {
+      "eligible": true,
+      "games": 34,
+      "id": 32675,
+      "led": {
+        "d": 6,
+        "dropped_pts": 18,
+        "hold_pct": 58,
+        "l": 2,
+        "n": 19,
+        "w": 11,
+        "z": -0.7
+      },
+      "share": [
+        27,
+        54,
+        19
+      ],
+      "short": "\uc548\uc591",
+      "trailed": {
+        "d": 6,
+        "l": 10,
+        "n": 18,
+        "ppg": 0.67,
+        "pts": 12,
+        "w": 2
+      }
+    },
+    {
+      "eligible": true,
+      "games": 34,
+      "id": 92539,
+      "led": {
+        "d": 5,
+        "dropped_pts": 22,
+        "hold_pct": 44,
+        "l": 4,
+        "n": 16,
+        "w": 7,
+        "z": -1.8
+      },
+      "share": [
+        18,
+        57,
+        26
+      ],
+      "short": "\ubd80\ucc9c",
+      "trailed": {
+        "d": 4,
+        "l": 16,
+        "n": 21,
+        "ppg": 0.33,
+        "pts": 7,
+        "w": 1
+      }
+    },
+    {
+      "eligible": true,
+      "games": 34,
+      "id": 48912,
+      "led": {
+        "d": 4,
+        "dropped_pts": 14,
+        "hold_pct": 33,
+        "l": 2,
+        "n": 9,
+        "w": 3,
+        "z": -2.0
+      },
+      "share": [
+        11,
+        55,
+        34
+      ],
+      "short": "\uad11\uc8fc",
+      "trailed": {
+        "d": 5,
+        "l": 18,
+        "n": 24,
+        "ppg": 0.33,
+        "pts": 8,
+        "w": 1
+      }
+    },
+    {
+      "eligible": true,
+      "games": 34,
+      "id": 7647,
+      "led": {
+        "d": 10,
+        "dropped_pts": 23,
+        "hold_pct": 31,
+        "l": 1,
+        "n": 16,
+        "w": 5,
+        "z": -2.8
+      },
+      "share": [
+        16,
+        63,
+        21
+      ],
+      "short": "\uae40\ucc9c",
+      "trailed": {
+        "d": 6,
+        "l": 9,
+        "n": 17,
+        "ppg": 0.71,
+        "pts": 12,
+        "w": 2
+      }
+    }
+  ],
+  "warnings": [],
+  "year": "2026"
+}

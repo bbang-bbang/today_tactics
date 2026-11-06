@@ -1,0 +1,245 @@
+{
+  "bench": [
+    {
+      "apps": 8,
+      "assists": 3,
+      "ga_per90": 1.6,
+      "goals": 2,
+      "minutes": 281,
+      "name": "\uc1a1\ubbfc\uaddc",
+      "player_id": 1025782,
+      "team": "\uc11c\uc6b8"
+    },
+    {
+      "apps": 13,
+      "assists": 1,
+      "ga_per90": 1.59,
+      "goals": 3,
+      "minutes": 226,
+      "name": "\ud2f0\uc544\uace0",
+      "player_id": 874173,
+      "team": "\uc804\ubd81"
+    },
+    {
+      "apps": 8,
+      "assists": 1,
+      "ga_per90": 1.49,
+      "goals": 2,
+      "minutes": 181,
+      "name": "\ub9c8\uc0ac",
+      "player_id": 387874,
+      "team": "\ub300\uc804"
+    },
+    {
+      "apps": 9,
+      "assists": 1,
+      "ga_per90": 1.43,
+      "goals": 3,
+      "minutes": 252,
+      "name": "\ub8e8\ube45\uc190",
+      "player_id": 920010,
+      "team": "\ub300\uc804"
+    },
+    {
+      "apps": 16,
+      "assists": 3,
+      "ga_per90": 1.38,
+      "goals": 4,
+      "minutes": 458,
+      "name": "\ub514\uc624\uace0",
+      "player_id": 1018176,
+      "team": "\ub300\uc804"
+    },
+    {
+      "apps": 25,
+      "assists": 0,
+      "ga_per90": 1.22,
+      "goals": 8,
+      "minutes": 590,
+      "name": "\uc544\ubd80\ub2ec\ub77c",
+      "player_id": 1014036,
+      "team": "\uac15\uc6d0"
+    },
+    {
+      "apps": 15,
+      "assists": 2,
+      "ga_per90": 1.1,
+      "goals": 3,
+      "minutes": 410,
+      "name": "\uc774\uc2b9\ubaa8",
+      "player_id": 889703,
+      "team": "\uc11c\uc6b8"
+    },
+    {
+      "apps": 10,
+      "assists": 0,
+      "ga_per90": 1.07,
+      "goals": 4,
+      "minutes": 336,
+      "name": "\uc57c\uace0",
+      "player_id": 1019266,
+      "team": "\uc6b8\uc0b0"
+    }
+  ],
+  "bench_min_apps": 4,
+  "bench_min_minutes": 180,
+  "first_sub_samples": 401,
+  "league": "K1",
+  "league_ci": 0.1,
+  "league_ga_per90": 0.35,
+  "league_mean": 0.04,
+  "limits": "\uad50\uccb4\ub294 \uc9c0\uace0 \uc788\uac70\ub098 \uacbd\uae30\uac00 \ud750\ub97c \ub54c \uc774\ub904\uc9c0\ub294 \uacbd\uc6b0\uac00 \ub9ce\uc544 \uc804\ud6c4 \ubcc0\ud654\uc5d0 \uacbd\uae30 \uc0c1\ud669\uc774 \uc11e\uc785\ub2c8\ub2e4. \uc778\uacfc\uac00 \uc544\ub2cc \ucc38\uace0 \uc9c0\ud45c\uc785\ub2c8\ub2e4.",
+  "min_team_n": 8,
+  "teams": [
+    {
+      "avg_first_min": 50.6,
+      "ci": 0.31,
+      "eligible": true,
+      "id": "daejeon",
+      "mean": 0.24,
+      "n": 34,
+      "short": "\ub300\uc804",
+      "significant": false,
+      "vs_league": 0.2,
+      "z": 1.3
+    },
+    {
+      "avg_first_min": 55.7,
+      "ci": 0.34,
+      "eligible": true,
+      "id": "jeju",
+      "mean": 0.18,
+      "n": 34,
+      "short": "\uc81c\uc8fc",
+      "significant": false,
+      "vs_league": 0.14,
+      "z": 0.8
+    },
+    {
+      "avg_first_min": 53.7,
+      "ci": 0.27,
+      "eligible": true,
+      "id": "gimcheon",
+      "mean": 0.12,
+      "n": 34,
+      "short": "\uae40\ucc9c",
+      "significant": false,
+      "vs_league": 0.08,
+      "z": 0.6
+    },
+    {
+      "avg_first_min": 54.8,
+      "ci": 0.3,
+      "eligible": true,
+      "id": "incheon",
+      "mean": 0.12,
+      "n": 33,
+      "short": "\uc778\ucc9c",
+      "significant": false,
+      "vs_league": 0.08,
+      "z": 0.5
+    },
+    {
+      "avg_first_min": 58.6,
+      "ci": 0.37,
+      "eligible": true,
+      "id": "bucheon",
+      "mean": 0.09,
+      "n": 34,
+      "short": "\ubd80\ucc9c",
+      "significant": false,
+      "vs_league": 0.05,
+      "z": 0.3
+    },
+    {
+      "avg_first_min": 53.5,
+      "ci": 0.25,
+      "eligible": true,
+      "id": "jeonbuk",
+      "mean": 0.06,
+      "n": 34,
+      "short": "\uc804\ubd81",
+      "significant": false,
+      "vs_league": 0.02,
+      "z": 0.2
+    },
+    {
+      "avg_first_min": 52.2,
+      "ci": 0.35,
+      "eligible": true,
+      "id": "ulsan",
+      "mean": 0.03,
+      "n": 32,
+      "short": "\uc6b8\uc0b0",
+      "significant": false,
+      "vs_league": -0.01,
+      "z": -0.0
+    },
+    {
+      "avg_first_min": 57.5,
+      "ci": 0.42,
+      "eligible": true,
+      "id": "anyang",
+      "mean": -0.03,
+      "n": 33,
+      "short": "\uc548\uc591",
+      "significant": false,
+      "vs_league": -0.07,
+      "z": -0.3
+    },
+    {
+      "avg_first_min": 49.5,
+      "ci": 0.29,
+      "eligible": true,
+      "id": "pohang",
+      "mean": -0.06,
+      "n": 34,
+      "short": "\ud3ec\ud56d",
+      "significant": false,
+      "vs_league": -0.1,
+      "z": -0.7
+    },
+    {
+      "avg_first_min": 52.0,
+      "ci": 0.27,
+      "eligible": true,
+      "id": "gangwon",
+      "mean": -0.06,
+      "n": 33,
+      "short": "\uac15\uc6d0",
+      "significant": false,
+      "vs_league": -0.1,
+      "z": -0.7
+    },
+    {
+      "avg_first_min": 50.3,
+      "ci": 0.39,
+      "eligible": true,
+      "id": "gwangju",
+      "mean": -0.12,
+      "n": 33,
+      "short": "\uad11\uc8fc",
+      "significant": false,
+      "vs_league": -0.16,
+      "z": -0.8
+    },
+    {
+      "avg_first_min": 51.1,
+      "ci": 0.42,
+      "eligible": true,
+      "id": "fcseoul",
+      "mean": -0.12,
+      "n": 33,
+      "short": "\uc11c\uc6b8",
+      "significant": false,
+      "vs_league": -0.16,
+      "z": -0.7
+    }
+  ],
+  "verdict": {
+    "level": "none",
+    "text": "\uad50\uccb4 \ud6c4 \ub4dd\uc2e4 \ubcc0\ud654\uac00 \ub9ac\uadf8 \ud3c9\uade0\uacfc \uc720\uc758\ud558\uac8c \ub2e4\ub978 \ud300\uc740 \uc5c6\uc2b5\ub2c8\ub2e4 \u2014 \ud300 \uac04 \ucc28\uc774\ub294 \ud45c\ubcf8 \uc624\ucc28 \ubc94\uc704\uc785\ub2c8\ub2e4."
+  },
+  "window": 15,
+  "year": "2026"
+}
