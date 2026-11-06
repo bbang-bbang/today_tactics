@@ -211,6 +211,68 @@ def check_existing_tabs_clean(pw):
     assert errs == [], errs
 
 
+def check_update_empty_to_data(pw):
+    browser, page, errs = _probe(pw)
+    page.evaluate("probe.empty('slot-b')")
+    page.evaluate("probe.updateTo('slot-b', 'line')"); time.sleep(1.0)
+    n, ink = page.evaluate("probe.canvases('slot-b')"), page.evaluate("probe.inkRatio('slot-b')")
+    left = page.evaluate("document.querySelectorAll('#slot-b .tt-chart-empty').length")
+    browser.close()
+    assert (n, left) == (1, 0), (n, left)
+    assert ink > 0.01, ink
+    assert errs == [], errs
+
+
+def check_update_data_to_empty(pw):
+    browser, page, errs = _probe(pw)
+    page.evaluate("probe.line('slot-a')"); time.sleep(0.6)
+    page.evaluate("probe.updateTo('slot-a', 'empty')"); time.sleep(0.4)
+    n = page.evaluate("probe.canvases('slot-a')")
+    empty = page.evaluate("document.querySelectorAll('#slot-a .tt-chart-empty').length")
+    error = page.evaluate("document.querySelectorAll('#slot-a .tt-chart-error').length")
+    browser.close()
+    assert (n, empty, error) == (0, 1, 0), (n, empty, error)
+    assert errs == [], errs
+
+
+def check_tooltip_text_readable(pw):
+    browser, page, errs = _probe(pw)
+    page.evaluate("probe.line('slot-a')"); time.sleep(1.2)
+    box = page.locator("#slot-a").bounding_box()
+    page.mouse.move(box["x"] + box["width"] * 0.40, box["y"] + box["height"] * 0.5); time.sleep(0.2)
+    page.mouse.move(box["x"] + box["width"] * 0.42, box["y"] + box["height"] * 0.45); time.sleep(0.6)
+    colors = page.evaluate("""Array.from(document.querySelectorAll('.tc-hover-tooltip, .tc-hover-tooltip *'))
+        .filter(e => e.textContent.trim()).map(e => getComputedStyle(e).color)""")
+    browser.close()
+    assert colors, "tooltip not found"
+
+    def lum(rgb):
+        import re
+        c = [int(x) / 255 for x in re.findall(r"\d+", rgb)[:3]]
+        c = [v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4 for v in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    bg = lum("rgb(11,17,32)")
+    worst = min((max(lum(c), bg) + 0.05) / (min(lum(c), bg) + 0.05) for c in colors)
+    assert worst >= 4.5, f"tooltip contrast {worst:.2f} colors={set(colors)}"
+
+
+def check_lazy_loader_tera_fail(pw):
+    """실제 lazy 로더 경로: TERA 가 404 여도 어댑터는 로드돼 mount 가 오류 박스로 폴백해야 한다."""
+    browser, page = _new_page(pw)
+    errs = collect_errors(page)
+    page.route("**/static/vendor/**", lambda r: r.fulfill(status=404, body="nope"))
+    open_with_csp(page, "/")
+    ok = page.evaluate("""() => window.ttLoadCharts().then(() => {
+        const s = document.createElement('div'); s.style.height = '100px'; document.body.appendChild(s);
+        TTChart.mount(s, {type:'line', series:[{data:[1,2]}]}, {lazy:false});
+        return !!s.querySelector('.tt-chart-error') && typeof TTDash === 'object';
+    })""")
+    browser.close()
+    assert ok is True, ok
+    perr = [e for e in errs if e.startswith("pageerror")]
+    assert perr == [], perr
+
+
 CHECKS = {name: fn for name, fn in globals().items() if name.startswith("check_")}
 
 

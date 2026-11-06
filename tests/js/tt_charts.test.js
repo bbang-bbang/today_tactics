@@ -171,3 +171,22 @@ test("heatMatrix_diverging_symmetric", () => {
   const c = P.heatMatrix({ rows: ["a", "b"], cols: ["x", "y"], values: [[2.17, 1.0], [0.5, 1.33]], center: 1.33 });
   assert.equal(c.__scale.min, 0.49); assert.equal(c.__scale.max, 2.17);
 });
+
+// ── Final review fixes ───────────────────────────────────────────────
+test("withTheme_tooltip_text_readable", () => {
+  // TERA 툴팁은 tooltip.style / headerStyle / rowStyle 의 color 를 읽는다(기본 #333 → 다크 배경에서 안 보임)
+  const t = TTChart.withTheme({ type: "line" }).tooltip;
+  assert.equal(t.style.color, THEME.text);
+  assert.equal(t.headerStyle.color, THEME.text);
+  assert.equal(t.rowStyle.color, THEME.text);
+});
+
+test("bump_dark_color_lightened", () => {
+  const c = P.bump({ rounds: [1], teams: [{ id: 5, short: "전북", color: "#0a4436", ranks: [4] }], nTeams: 12 });
+  assert.ok(util.contrast(c.series[0].color, THEME.bg) >= 3, c.series[0].color);
+});
+
+test("dumbbell_dark_color_lightened", () => {
+  const c = P.dumbbell({ categories: ["a"], a: { name: "x", color: "#0a4436", data: [1] }, b: { name: "y", color: "#8e272b", data: [2] } });
+  for (const s of c.series) assert.ok(util.contrast(s.color, THEME.bg) >= 3, s.color);
+});

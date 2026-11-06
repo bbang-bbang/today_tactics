@@ -68,8 +68,11 @@
       yAxis: { labels: { style: { ...lbl } }, titleStyle: { ...lbl } },
       grid: { color: THEME.grid, lineWidth: 0.5 },
       legend: { labelStyle: { ...lbl } },
+      // TERA 툴팁은 style/headerStyle/rowStyle 의 color 를 읽는다(미지정 시 #333 → 다크 배경에서 안 보임)
       tooltip: { enabled: true, backgroundColor: "rgba(11,17,32,0.95)", borderColor: "rgba(148,163,184,0.4)",
-        textStyle: { color: THEME.text, fontSize: THEME.fontSize, fontFamily: THEME.font } },
+        style: { color: THEME.text, fontSize: THEME.fontSize, fontFamily: THEME.font },
+        headerStyle: { color: THEME.text, fontSize: THEME.fontSize, fontWeight: "700" },
+        rowStyle: { color: THEME.text, fontSize: THEME.fontSize } },
       fontFamily: THEME.font,
     };
   }
@@ -117,16 +120,25 @@
     if (ev) ev.open = true;
   }
 
+  // 화면 코드가 들고 있는 핸들이 계속 유효하도록, 새 mount 결과의 메서드를 기존 핸들 객체로 옮긴다
+  function rebind(target, fresh) {
+    target.update = fresh.update; target.destroy = fresh.destroy;
+    Object.defineProperty(target, "canvas", { configurable: true, enumerable: true, get: () => fresh.canvas });
+    if (handles) handles.set(fresh.__slot, target);
+    return target;
+  }
+
   function mount(slot, spec, opts) {
     opts = opts || {};
     const prev = handles && handles.get(slot);
     if (prev) prev.destroy();
     slot.querySelectorAll(".tt-chart-empty, .tt-chart-error").forEach((n) => n.remove());
 
-    const handle = { canvas: null, update: () => {}, destroy: () => {} };
+    const handle = { canvas: null, update: () => {}, destroy: () => {}, __slot: slot };
     if (isEmpty(spec)) {
       placeholder(slot, "tt-chart-empty", EMPTY_TXT);
       handle.destroy = () => { slot.querySelectorAll(".tt-chart-empty").forEach((n) => n.remove()); handles && handles.delete(slot); };
+      handle.update = (next) => rebind(handle, mount(slot, next, opts));
       handles && handles.set(slot, handle);
       return handle;
     }
@@ -142,7 +154,7 @@
         if (!canvas) {
           canvas = document.createElement("canvas");
           canvas.setAttribute("role", "img");
-          canvas.setAttribute("aria-label", opts.ariaLabel || spec.__aria || "차트");
+          canvas.setAttribute("aria-label", opts.ariaLabel || current.__aria || "차트");
           slot.appendChild(canvas);
           handle.canvas = canvas;
         }
@@ -178,7 +190,13 @@
       io.observe(slot);
     } else start();
 
-    handle.update = (next) => { current = next; if (drawn) draw("update"); };
+    handle.update = (next) => {
+      // 빈 데이터로 바뀌거나 렌더러(TERA ↔ 자체 Canvas)가 바뀌면 같은 canvas 를 재사용할 수 없다 → 다시 mount
+      if (isEmpty(next) || (next && next.__renderer) !== (current && current.__renderer)) { rebind(handle, mount(slot, next, opts)); return; }
+      current = next;
+      if (canvas) canvas.setAttribute("aria-label", opts.ariaLabel || current.__aria || "차트");
+      if (drawn) draw("update");
+    };
     handle.destroy = () => {
       dead = true;
       clearTimeout(timer);
@@ -208,7 +226,7 @@
       const on = !hl || hl.has(t.id);
       return {
         name: t.short,
-        color: on ? t.color : THEME.neutral,
+        color: on ? lighten(t.color || THEME.neutral, 3) : THEME.neutral,
         lineWidth: hl ? (on ? 3 : 1.5) : 2,
         opacity: on ? 1 : 0.5,
         data: t.ranks.map((r) => (r == null ? null : { y: n + 1 - r })),
@@ -321,8 +339,8 @@
       type: "dumbbell", orientation: "horizontal",
       categories: cats,
       series: [
-        { name: o.a.name, color: o.a.color || THEME.neg, data: o.a.data.map(fix) },
-        { name: o.b.name, color: o.b.color || THEME.pos, data: o.b.data.map(fix) },
+        { name: o.a.name, color: lighten(o.a.color || THEME.neg, 3), data: o.a.data.map(fix) },
+        { name: o.b.name, color: lighten(o.b.color || THEME.pos, 3), data: o.b.data.map(fix) },
       ],
       connectorWidth: 3, markerRadius: 7, showValueLabels: true, showDelta: true,
       legend: { enabled: true, position: "bottom" },

@@ -47,6 +47,11 @@
     }
     // 순서 의존 모듈은 직렬 로드 (team_compare → analytics 원래 순서 유지)
     async function lazyLoadSeq(names) { for (const n of names) await lazyLoad(n); }
+    // 차트 개편 모듈 로더: TERA 번들이 실패해도 어댑터(tt_charts)·셸(tt_dash)은 반드시 로드해야
+    // mount() 가 "차트를 불러오지 못했습니다" 폴백 + 근거 표 펼침으로 동작한다 (ReferenceError 방지)
+    window.ttLoadCharts = () => lazyLoad("tera")
+        .catch((e) => console.warn("TERA load failed — charts fall back to evidence tables", e))
+        .then(() => lazyLoadSeq(["tt_charts", "tt_dash"]));
     const lazyReady = (names) => names.every((n) => !_lazyMap[n] || (_lazyState[n] && _lazyState[n].done));
     function lazyFail(e) {
         console.warn("lazy load failed:", e);

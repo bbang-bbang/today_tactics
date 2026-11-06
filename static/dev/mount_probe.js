@@ -5,8 +5,9 @@
   const slot = (id) => document.getElementById(id);
   window.probe = {
     line: (id) => { window.__h = TTChart.mount(slot(id), LINE, { lazy: false }); return true; },
-    empty: (id) => { TTChart.mount(slot(id), { __empty: true }, { lazy: false }); return true; },
+    empty: (id) => { window.__hs = window.__hs || {}; window.__hs[id] = TTChart.mount(slot(id), { __empty: true }, { lazy: false }); return true; },
     remount: (id, n) => { for (let i = 0; i < n; i++) TTChart.mount(slot(id), LINE, { lazy: false }); return true; },
+    updateTo: (id, kind) => { const h = window.__hs && window.__hs[id]; (h || window.__h).update(kind === "empty" ? { __empty: true } : LINE); return true; },
     destroy: () => { window.__h.destroy(); return true; },
     canvases: (id) => slot(id).querySelectorAll("canvas").length,
     cssWidth: (id) => { const c = slot(id).querySelector("canvas"); return c ? c.getBoundingClientRect().width : 0; },
