@@ -47,3 +47,6 @@ qa_results.txt
 .understand-anything/
 
 .superpowers/
+
+# 작업 중 임시 스크린샷 (차트 개편 검증용) — 결과 스크린샷(tt_*.png)만 추적
+analysis/output/_*.png
