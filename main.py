@@ -1898,7 +1898,7 @@ def get_team_analytics():
     w_rows = cur.fetchall()
 
     def bucket_weather(rows, key_fn, labels):
-        buckets = {lbl: {"games":0,"w":0,"d":0,"l":0,"gf":0,"ga":0} for lbl in labels}
+        buckets = {lbl: {"games":0,"w":0,"d":0,"l":0,"gf":0,"ga":0,"_pts":[]} for lbl in labels}
         for _, result, gf, ga, temp, hum, wind in rows:
             lbl = key_fn(temp, hum, wind)
             if lbl and result:
@@ -1907,7 +1907,20 @@ def get_team_analytics():
                 b[result] += 1
                 b["gf"] += gf or 0
                 b["ga"] += ga or 0
-        return [{"label": k, **v} for k, v in buckets.items() if v["games"] > 0]
+                b["_pts"].append(3 if result == "w" else 1 if result == "d" else 0)
+        out = []
+        for k, v in buckets.items():
+            if v["games"] <= 0:
+                continue
+            # 차트 개편(2026-11-06) additive: 경기당 승점 + 95% 구간(경기 승점 표본 표준편차, n<4 이면 없음)
+            n = v["games"]; pts = v.pop("_pts")
+            ppg = (3 * v["w"] + v["d"]) / n
+            ci = None
+            if n >= 4:
+                sd = math.sqrt(sum((p_ - ppg) ** 2 for p_ in pts) / (n - 1))
+                ci = round(1.96 * sd / math.sqrt(n), 2)
+            out.append({"label": k, **v, "ppg": round(ppg, 2), "ci": ci})
+        return out
 
     temp_labels  = ["영하~5도","5~15도","15~25도","25도~"]
     hum_labels   = ["건조(<40%)","보통(40~65%)","습함(65%+)"]
@@ -1934,6 +1947,9 @@ def get_team_analytics():
             "by_temp": by_temp,
             "by_hum": by_hum,
             "by_wind": by_wind,
+            # 날씨 표본 전체 경기당 승점 (forest 기준선용, additive)
+            "overall_ppg": round(sum(3 if r[1] == "w" else 1 if r[1] == "d" else 0 for r in w_rows if r[1]) /
+                                 max(1, sum(1 for r in w_rows if r[1])), 2) if w_rows else None,
         },
     })
 
@@ -2511,7 +2527,49 @@ def get_team_trend():
             "result":    result,
             "pts":       pts,
             "cum_pts":   cum_pts,
+            "_ts":       ts,
         })
+
+    # 차트 개편(2026-11-06) additive: 시즌 구분·시즌 누적 승점·리그 평균 페이스
+    #   league_avg_cum_pts = 같은 리그·같은 시즌, 그 경기 날짜(현지)까지 끝난 경기 기준 리그 팀 평균 누적 승점
+    _loc_year = lambda t: datetime.fromtimestamp(t).year            # noqa: E731
+    _loc_day = lambda t: datetime.fromtimestamp(t).strftime("%Y-%m-%d")   # noqa: E731
+    seasons = sorted({_loc_year(m["_ts"]) for m in matches})
+    pace = {}                                                       # (season, day) → 리그 평균 누적
+    if seasons:
+        conn2 = sqlite3.connect(db_path)
+        try:
+            lg_rows = conn2.execute(
+                "SELECT date_ts, home_team_id, away_team_id, home_score, away_score FROM events "
+                "WHERE tournament_id = ? AND home_score IS NOT NULL "
+                "AND CAST(strftime('%Y', datetime(date_ts,'unixepoch','localtime')) AS INTEGER) BETWEEN ? AND ? "
+                "ORDER BY date_ts ASC", (tid, seasons[0], seasons[-1])).fetchall()
+        finally:
+            conn2.close()
+        by_season = {}
+        for ts_, h_, a_, hs_, as_ in lg_rows:
+            by_season.setdefault(_loc_year(ts_), []).append((ts_, h_, a_, hs_, as_))
+        for yr, evs in by_season.items():
+            teams_n = len({x[1] for x in evs} | {x[2] for x in evs})
+            cum, i = {}, 0
+            days = sorted({_loc_day(x[0]) for x in evs})
+            for day in days:
+                while i < len(evs) and _loc_day(evs[i][0]) <= day:
+                    _ts_, h_, a_, hs_, as_ = evs[i]
+                    cum[h_] = cum.get(h_, 0) + (3 if hs_ > as_ else 1 if hs_ == as_ else 0)
+                    cum[a_] = cum.get(a_, 0) + (3 if as_ > hs_ else 1 if hs_ == as_ else 0)
+                    i += 1
+                pace[(yr, day)] = round(sum(cum.values()) / teams_n, 2) if teams_n else None
+    season_cum, cur_season = 0, None
+    for m in matches:
+        ts_ = m.pop("_ts")
+        yr = _loc_year(ts_)
+        if yr != cur_season:
+            season_cum, cur_season = 0, yr
+        season_cum += m["pts"]
+        m["season"] = yr
+        m["season_cum_pts"] = season_cum
+        m["league_avg_cum_pts"] = pace.get((yr, _loc_day(ts_)))
 
     return jsonify({
         "team":    team_info["name"],

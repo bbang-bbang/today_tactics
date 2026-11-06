@@ -572,6 +572,44 @@ def _tp_goals_ge_events():
     assert_(not bad, f"{len(bad)}명 미공개 경기 골 누락: {bad[:4]}")
 qa('TOP 퍼포머 공식 골 ≥ 경기 득점 기록 (2026)', _tp_goals_ge_events)
 
+# ── 차트 개편 Phase 2a: 팀 분석 API 필드 추가 (additive) ──
+_TT = None
+def _tt_all():
+    global _TT
+    if _TT is None:
+        _TT = get('/api/team-trend?teamId=gangwon')          # 연도 미지정 = 전 시즌
+    return _TT
+def _trend_season_reset():
+    ms = _tt_all()['matches']
+    assert_(ms and all('season' in m and 'season_cum_pts' in m for m in ms), 'season/season_cum_pts 없음')
+    prev = None
+    for m in ms:
+        if m['season'] != prev:
+            assert_(m['season_cum_pts'] == m['pts'], f"{m['date']} 시즌 첫 경기 누적 {m['season_cum_pts']} != {m['pts']}")
+            prev = m['season']
+qa('trend season_cum_pts 시즌별 리셋', _trend_season_reset)
+def _trend_league_avg():
+    ms = get('/api/team-trend?teamId=gangwon&year=2026')['matches']
+    vals = [m.get('league_avg_cum_pts') for m in ms]
+    assert_(all(v is not None for v in vals), 'league_avg_cum_pts null')
+    assert_(all(b >= a for a, b in zip(vals, vals[1:])), '단조 비감소 아님')
+    assert_(all(0 <= v <= 3 * (i + 1) + 3 for i, v in enumerate(vals)), '범위 이상')
+qa('trend league_avg_cum_pts 단조 비감소·범위', _trend_league_avg)
+qa('trend 기존 키 불변', lambda: assert_({'event_id', 'date', 'opponent', 'is_home', 'gf', 'ga', 'result', 'pts', 'cum_pts'}
+    <= set(_tt_all()['matches'][0])))
+def _ta_weather_ci():
+    w = get('/api/team-analytics?teamId=gangwon&year=2026')['weather']
+    assert_(w.get('overall_ppg') is not None, 'overall_ppg 없음')
+    for k in ('by_temp', 'by_hum', 'by_wind'):
+        for r in w[k]:
+            assert_('ppg' in r and 'ci' in r, f"{k} {r.get('label')} ppg/ci 없음")
+            assert_(abs(r['ppg'] - (3 * r['w'] + r['d']) / r['games']) < 0.01, f"{r['label']} ppg")
+            if r['games'] < 4:
+                assert_(r['ci'] is None, f"{r['label']} n<4 인데 ci")
+qa('team-analytics weather ppg·ci', _ta_weather_ci)
+qa('team-analytics weather 기존 키 불변', lambda: assert_({'label', 'games', 'w', 'd', 'l', 'gf', 'ga'}
+    <= set(get('/api/team-analytics?teamId=gangwon&year=2026')['weather']['by_temp'][0])))
+
 # ── 결과 출력 ──
 passed = sum(1 for r in results if r[0] == 'PASS')
 failed = [r for r in results if r[0] == 'FAIL']
