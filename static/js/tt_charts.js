@@ -456,7 +456,56 @@
     };
   }
 
-  const presets = { bump, _forestModel, forest, dumbbell, quadrant, heatMatrix };
+  // 100% 누적 가로 막대 (TERA row-bar stacking:'percent' — Phase 1b 랩 검증)
+  function stacked100(o) {
+    const cats = (o && o.categories) || [], parts = (o && o.parts) || [];
+    if (!cats.length || !parts.length) return EMPTY();
+    return {
+      type: "row-bar", stacking: "percent", borderRadius: 2,
+      yAxis: { categories: cats, labelWidth: 56 },
+      xAxis: { min: 0, max: 100, labels: { format: "number:0" } },
+      legend: { enabled: true, position: "bottom" },
+      series: parts.map((p) => ({ name: p.name, color: lighten(p.color || THEME.neutral, 3), data: p.data.map((v) => (v == null ? 0 : r2(v))) })),
+      __rows: cats.length,
+      __aria: `${parts.map((p) => p.name).join("·")} 비중, ${cats.length}개 항목`,
+    };
+  }
+
+  // 기준선이 있는 가로 막대 — 축은 0부터(잘린 축은 차이를 과장). TERA lollipop 은 기준선을 못 그려 row-bar 사용.
+  function barRef(o) {
+    const cats = (o && o.categories) || [];
+    if (!cats.length) return EMPTY();
+    const unit = o.unit || "";
+    const lines = o.ref != null ? [{ value: o.ref, color: "rgba(229,231,235,0.8)", width: 1.5, dashArray: "4,3",
+      label: `${o.refLabel || "기준"} ${o.ref}${unit}` }] : [];
+    return {
+      type: "row-bar", borderRadius: 3,
+      yAxis: { categories: cats, labelWidth: 56 },
+      xAxis: { min: 0, autoScale: true, plotLines: lines, labels: { format: "number:0" } },
+      dataLabels: { enabled: true, position: "outside", style: { color: THEME.text, fontSize: 12 } },
+      legend: { enabled: false },
+      series: [{ name: o.name || "값", color: lighten(o.color || THEME.accent, 3), data: o.values.map((v) => (v == null ? null : r2(v))) }],
+      __rows: cats.length,
+      __aria: `${o.name || "값"} 막대, ${cats.length}개${o.ref != null ? `, ${o.refLabel || "기준"} ${o.ref}${unit}` : ""}`,
+    };
+  }
+
+  // Sankey — 노드 라벨을 id 로 쓰고 값 0 링크는 뺀다
+  function sankey(o) {
+    const links = ((o && o.links) || []).filter((l) => l.value > 0);
+    if (!links.length) return EMPTY();
+    const PAL = [THEME.accent, THEME.pos, THEME.neg, "#f59e0b", THEME.neutral, "#60a5fa"];
+    const colors = o.colors || {};
+    const nodes = (o.nodes || []).map((n, i) => ({ id: n, label: n, color: colors[n] || PAL[i % PAL.length] }));
+    return {
+      type: "sankey", nodeWidth: 16, nodePadding: 12, linkOpacity: 0.5, linkGradient: true,
+      nodeLabelStyle: { color: THEME.text, fontSize: 12, fontWeight: 600 },
+      nodes, links: links.map((l) => ({ source: l.source, target: l.target, value: l.value })),
+      __aria: `흐름도: ${links.map((l) => `${l.source}→${l.target} ${l.value}`).join(", ")}`,
+    };
+  }
+
+  const presets = { bump, _forestModel, forest, dumbbell, quadrant, heatMatrix, stacked100, barRef, sankey };
 
   const TTChart = { THEME, util: { contrast, ensureVisible, lighten, merge }, withTheme, isEmpty, mount, destroyAll, presets };
   root.TTChart = TTChart;

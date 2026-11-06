@@ -5,8 +5,9 @@
   const results = {};
   window.__spikeResults = results;
 
-  const [st, xg, rest, opp, gs] = await Promise.all(
-    ["standings-trend", "xg-luck", "rest-effect", "opponent-strength", "game-state"].map(get));
+  const [st, xg, rest, opp, gs, sdep, hub, aft] = await Promise.all(
+    ["standings-trend", "xg-luck", "rest-effect", "opponent-strength", "game-state",
+     "scoring-dependence", "pass-hub", "goal-aftermath"].map(get));
 
   const colorOf = {};
   (xg.teams || []).forEach((t) => { colorOf[t.short] = t.primary; });
@@ -53,6 +54,20 @@
         return TTChart.presets.heatMatrix({ rows: ok.map((t) => t.short), cols: ["상위권", "중위권", "하위권"], center: opp.league_ppg,
           colorTitle: "PPG", values: ok.map((t) => ["top", "mid", "bottom"].map((k) => (t.tiers[k] ? t.tiers[k].ppg : null))) });
       } },
+    { id: "sp-stack", size: "M", icon: "🎯", title: "득점 의존도", question: "1·2위 득점자 비중", warnings: sdep.warnings || [],
+      spec: () => { const ts = (sdep.teams || []).filter((t) => t.eligible).sort((a, b) => b.top1_share - a.top1_share);
+        return TTChart.presets.stacked100({ categories: ts.map((t) => t.short), parts: [
+          { name: "1위 득점자", color: TTChart.THEME.accent, data: ts.map((t) => t.top1_share) },
+          { name: "2위 득점자", color: "#f59e0b", data: ts.map((t) => t.top2_share - t.top1_share) },
+          { name: "나머지", color: TTChart.THEME.neutral, data: ts.map((t) => 100 - t.top2_share) }] }); } },
+    { id: "sp-bar", size: "M", icon: "🕸️", title: "패스 허브 의존도", question: "허브 1인 지분", warnings: [],
+      spec: () => { const ts = (hub.teams || []).filter((t) => t.eligible).sort((a, b) => b.hub_share - a.hub_share);
+        return TTChart.presets.barRef({ categories: ts.map((t) => t.short), values: ts.map((t) => t.hub_share), ref: hub.league_hub_share, refLabel: "리그 평균", unit: "%", name: "허브 지분" }); } },
+    { id: "sp-sankey", size: "M", icon: "⚡", title: "득점 직후 10분", question: "골 넣고 무슨 일이?", warnings: aft.warnings || [],
+      spec: () => { const f = (aft.league_total || {}).flow || {};
+        return TTChart.presets.sankey({ nodes: ["득점", "추가골만", "실점만", "둘 다", "변화 없음"], links: [
+          { source: "득점", target: "추가골만", value: f.extra_only || 0 }, { source: "득점", target: "실점만", value: f.conc_only || 0 },
+          { source: "득점", target: "둘 다", value: f.both || 0 }, { source: "득점", target: "변화 없음", value: f.none || 0 }] }); } },
   ];
   const grid = document.getElementById("spike-grid");
   grid.innerHTML = cards.map((c) => TTDash.cardHtml({ ...c, evidenceHtml: evidence })).join("");

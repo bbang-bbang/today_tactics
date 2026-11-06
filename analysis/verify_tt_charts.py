@@ -143,7 +143,7 @@ def check_canvas_has_aria(pw):
     assert errs == [], errs
 
 
-SPIKE_IDS = ["sp-bump", "sp-quad", "sp-forest", "sp-dumb", "sp-heat"]
+SPIKE_IDS = ["sp-bump", "sp-quad", "sp-forest", "sp-dumb", "sp-heat", "sp-stack", "sp-bar", "sp-sankey"]
 
 
 def _spike(pw, browser_name="chromium", width=1440, block_vendor=False):
@@ -194,8 +194,8 @@ def check_tera_missing_fallback(pw):
     n_open = page.evaluate("document.querySelectorAll('details.tt-card-evidence[open]').length")
     browser.close()
     # forest 는 어댑터 자체 Canvas 렌더러라 TERA 없이도 그려진다 → 나머지 4장만 오류 표시
-    assert n_err == 4, f"error placeholders={n_err}"
-    assert n_open == 4, f"open evidence={n_open}"
+    assert n_err == 7, f"error placeholders={n_err}"
+    assert n_open == 7, f"open evidence={n_open}"
     perr = [e for e in errs if e.startswith("pageerror")]
     assert perr == [], perr
 

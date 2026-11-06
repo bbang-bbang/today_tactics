@@ -207,3 +207,47 @@ test("forest_rows_meta", () => {
   const c = P.forest({ rows: [{ label: "a", est: 1, lo: 0, hi: 2, n: 30 }, { label: "b", est: 1, lo: 0, hi: 2, n: 30 }] });
   assert.equal(c.__rows, 2);
 });
+
+// ── Phase 1b: stacked100 · barRef · sankey ──
+test("stacked100_shape", () => {
+  const c = P.stacked100({ categories: ["광주", "인천", "울산"], parts: [
+    { name: "1위", color: "#e8435a", data: [36.7, 30, 25] }, { name: "나머지", color: "#475569", data: [63.3, 70, 75] }] });
+  assert.equal(c.type, "row-bar"); assert.equal(c.stacking, "percent");
+  assert.equal(c.series.length, 2); assert.equal(c.series[0].data.length, 3);
+  assert.deepEqual(c.yAxis.categories, ["광주", "인천", "울산"]);
+  assert.equal(c.__rows, 3);
+});
+
+test("stacked100_empty", () => {
+  assert.deepEqual(P.stacked100({ categories: [], parts: [] }), { __empty: true });
+});
+
+test("barRef_reference_line_from_zero", () => {
+  const c = P.barRef({ categories: ["인천", "대전"], values: [15.8, 13.1], ref: 14.8, refLabel: "리그 평균", unit: "%" });
+  assert.equal(c.type, "row-bar");
+  assert.equal(c.xAxis.min, 0);   // 잘린 축 금지(차이 과장 방지)
+  assert.equal(c.xAxis.plotLines[0].value, 14.8);
+  assert.match(c.xAxis.plotLines[0].label, /리그 평균 14\.8%/);
+  assert.deepEqual(c.series[0].data, [15.8, 13.1]);
+  assert.equal(c.__rows, 2);
+});
+
+test("barRef_empty", () => {
+  assert.deepEqual(P.barRef({ categories: [], values: [] }), { __empty: true });
+});
+
+test("sankey_links", () => {
+  const c = P.sankey({ nodes: ["득점", "추가골만", "실점만", "변화 없음"], links: [
+    { source: "득점", target: "추가골만", value: 40 }, { source: "득점", target: "실점만", value: 48 },
+    { source: "득점", target: "변화 없음", value: 410 }] });
+  assert.equal(c.type, "sankey");
+  assert.equal(c.nodes.length, 4);
+  assert.ok(c.nodes.every((n) => n.id && n.label));
+  const ids = new Set(c.nodes.map((n) => n.id));
+  assert.ok(c.links.every((l) => ids.has(l.source) && ids.has(l.target)));
+  assert.equal(c.links.reduce((s, l) => s + l.value, 0), 498);
+});
+
+test("sankey_empty", () => {
+  assert.deepEqual(P.sankey({ nodes: ["a"], links: [] }), { __empty: true });
+});
