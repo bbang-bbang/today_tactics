@@ -641,6 +641,33 @@ def _trend_league_avg_k2_members():
     assert_(abs((last['league_avg_cum_pts'] or 0) - exp) <= 0.05, f"API {last['league_avg_cum_pts']} vs 기대 {exp} (구성원 {len(members)}팀)")
 qa('trend K2 리그 평균 = 리그 구성원 기준', _trend_league_avg_k2_members)
 
+def _trend_league_avg_current_season_members():
+    """현재 시즌은 시즌 초반에도 리그 구성원이 정확해야 한다(경기 수 기준 25% 문턱은 초반엔 무력 — 리뷰 M2).
+    → 현재 시즌은 팀 마스터(TEAMS)의 리그 소속으로 판정: 첫 경기일 리그 평균 = 그날까지 소속 팀 승점 합 / 소속 팀 수."""
+    import datetime as _dt
+    yr = str(_dt.date.today().year)
+    ms = get(f'/api/team-trend?teamId=suwon&year={yr}')['matches']
+    if not ms:
+        return
+    first = ms[0]
+    k2 = {t['sofascore_id'] for t in get('/api/teams') if t.get('league') == 'K2' and t.get('sofascore_id')}
+    c3 = sqlite3.connect('players.db')
+    try:
+        rows = c3.execute(
+            "SELECT home_team_id, away_team_id, home_score, away_score FROM events "
+            "WHERE tournament_id = 777 AND home_score IS NOT NULL "
+            "AND strftime('%Y', datetime(date_ts,'unixepoch','localtime')) = ? "
+            "AND date(datetime(date_ts,'unixepoch','localtime')) <= ?", (yr, first['date'])).fetchall()
+    finally:
+        c3.close()
+    tot = 0
+    for h, a, hs, as_ in rows:
+        if h in k2 and a in k2:
+            tot += (3 if hs > as_ else 1 if hs == as_ else 0) + (3 if as_ > hs else 1 if hs == as_ else 0)
+    exp = round(tot / len(k2), 2)
+    assert_(abs((first['league_avg_cum_pts'] or 0) - exp) <= 0.05, f"첫 경기일 API {first['league_avg_cum_pts']} vs 기대 {exp} ({len(k2)}팀)")
+qa('trend 현재 시즌 리그 평균 = 팀 마스터 리그 소속 기준', _trend_league_avg_current_season_members)
+
 # ── 결과 출력 ──
 passed = sum(1 for r in results if r[0] == 'PASS')
 failed = [r for r in results if r[0] == 'FAIL']
