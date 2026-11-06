@@ -741,8 +741,43 @@ def check_player_switch_stale(pw):
     assert "가브리엘" in txt and "석현준" not in txt, txt[:80]
 
 
-CHECKS = {name: fn for name, fn in globals().items() if name.startswith("check_")}
+def check_player_close_before_ready_no_render(pw):
+    """열자마자 닫으면 닫힌 모달에 뒤늦게 렌더·차트 마운트하지 않아야 한다(리뷰 I2)."""
+    browser, page = _new_page(pw)
+    errs = collect_errors(page)
+    open_with_csp(page, "/")
+    page.evaluate("document.dispatchEvent(new CustomEvent('playerSelected', {detail: {playerId: 106249}}))")
+    time.sleep(0.15)
+    page.evaluate("document.querySelector('#player-analytics-modal .pa-close').click()")
+    time.sleep(8)
+    has = page.evaluate("!!document.getElementById('pa-rating-slot')")
+    browser.close()
+    assert has is False, "closed modal was rendered"
 
+
+def check_player_year_switch_destroys_old_charts(pw):
+    """연도 전환 시 이전 차트 핸들이 destroy 돼야 한다(옵저버·애니메이션 누수 방지) — 리뷰 I1.
+    TTChart.mount 를 감싸 이후 생성되는 핸들의 destroy 호출을 기록하고, 연도를 두 번 바꿔 첫 전환분이 정리됐는지 본다."""
+    browser, page, errs = _open_player(pw)
+    page.evaluate("""(() => { window.__hs = []; const orig = TTChart.mount;
+        TTChart.mount = function (slot, spec, opts) { const h = orig.call(this, slot, spec, opts);
+            const d = h.destroy; const rec = { dead: false }; h.destroy = function () { rec.dead = true; return d.apply(this, arguments); };
+            window.__hs.push(rec); return h; }; })()""")
+    btns = page.evaluate("Array.from(document.querySelectorAll('#player-analytics-modal .pa-year-btn')).map(b => b.dataset.year)")
+    assert len(btns) >= 2, btns
+    page.evaluate(f"document.querySelector('#player-analytics-modal .pa-year-btn[data-year=\"{btns[1]}\"]').click()")
+    _wait(page, "window.__hs.length >= 2", timeout=40)
+    n_first = page.evaluate("window.__hs.length")
+    page.evaluate(f"document.querySelector('#player-analytics-modal .pa-year-btn[data-year=\"{btns[0]}\"]').click()")
+    _wait(page, f"window.__hs.length > {n_first}", timeout=40)
+    time.sleep(1)
+    dead = page.evaluate(f"window.__hs.slice(0, {n_first}).map(r => r.dead)")
+    browser.close()
+    assert dead and all(dead), dead
+
+
+
+CHECKS = {name: fn for name, fn in globals().items() if name.startswith("check_")}
 
 def main(argv):
     names = argv or list(CHECKS)

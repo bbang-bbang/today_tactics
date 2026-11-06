@@ -27,6 +27,7 @@
     // 평점은 좁은 범위(6~8)에서 움직여 0부터 그리면 평평해 보인다 — 선 그래프라 축을 줌인(최저 평점 -1, 하한 3)
     const lo = Math.max(3, Math.floor(Math.min(...rated.map((m) => m.rating))) - 1);
     spec.yAxis = { ...(spec.yAxis || {}), min: lo, max: 10, autoScale: false };
+    spec.showMarkers = true;   // 경기 1개·평점 사이 null 이어도 점이 보이게
     if (multi) spec.__note = `${season} 시즌만 표시`;
     return spec;
   }
@@ -34,7 +35,7 @@
   // 포지션별 칸 진하기 지표 — 골키퍼 선방, 수비수 수비 행동, 그 외 공격포인트(골+도움)
   const STRIP_BY_POS = {
     G: { f: (m) => m.saves || 0, vMax: 8, what: "선방" },
-    D: { f: (m) => m.def || 0, vMax: 8, what: "수비 행동(태클·인터셉트·클리어)" },
+    D: { f: (m) => m.def || 0, vMax: 8, what: "수비 행동(태클·인터셉트)" },   // API def = tackles + interceptions
     X: { f: (m) => (m.goals || 0) + (m.assists || 0), vMax: 3, what: "공격포인트(골+도움)" },
   };
   function strip(trend, pos) {

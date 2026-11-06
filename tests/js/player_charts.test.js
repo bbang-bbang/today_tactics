@@ -54,3 +54,16 @@ test("ratingLine_axis_zoomed", () => {
   const c = PlayerCharts.ratingLine([m(2026, "3/1", 6.3, 0, 0, "D"), m(2026, "3/8", 8.5, 2, 0, "W")]);
   assert.equal(c.yAxis.min, 5); assert.equal(c.yAxis.max, 10); assert.equal(c.yAxis.autoScale, false);
 });
+
+// ── Phase 3 리뷰 ──
+test("ratingLine_markers_visible", () => {
+  // 경기 1개·평점 사이 null 이어도 점이 보이도록 마커를 켠다
+  assert.equal(PlayerCharts.ratingLine([m(2026, "3/1", 6.5, 0, 0, "D")]).showMarkers, true);
+});
+
+test("strip_defender_legend_matches_api", () => {
+  // API def = 태클 + 인터셉트 (클리어 미포함)
+  const df = PlayerCharts.strip([{ year: 2026, date: "3/1", rating: 7, saves: 0, def: 6, result: "D" }], "D");
+  assert.match(df.__model.legend, /태클·인터셉트/);
+  assert.ok(!/클리어/.test(df.__model.legend), df.__model.legend);
+});

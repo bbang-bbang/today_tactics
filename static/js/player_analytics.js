@@ -24,6 +24,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
 
     function closeModal() {
+        _loadSeq++;        // 닫은 뒤 늦게 도착한 응답·차트 모듈이 닫힌 모달에 렌더하지 않도록
         modal.classList.add("hidden");
         destroyCharts();
     }
@@ -32,6 +33,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     let _loadSeq = 0;   // 선수·연도 연타 전환 시 늦게 온 이전 응답 무시
     function loadData(playerId, year) {
         const tok = ++_loadSeq;
+        destroyCharts();   // 본문을 스켈레톤으로 바꾸기 전에 기존 차트 정리(분리된 슬롯의 옵저버·애니메이션 누수 방지)
         if (window.ttPlayerReady) window.ttPlayerReady().catch(() => {});   // 차트 모듈은 데이터와 병렬로
         const url = `/api/player-analytics?playerId=${playerId}${year ? `&year=${year}` : ""}`;
         modal.querySelector(".pa-body-inner").innerHTML = `
