@@ -8389,14 +8389,31 @@ _WEAK_SITS = (("open", "오픈 플레이"), ("counter", "역습"), ("setpiece", 
 _WEAK_Z = 2.0                # 리그 평균 대비 허용 슈팅이 |z|≥2 일 때만 약점/강점으로 표시
 
 
+_WEAK_SIX_X, _WEAK_SIX_Y = 5.5, (36.5, 63.5)     # 6야드 박스 깊이(m)·폭(%)
+_WEAK_BOX_X = 16.5                              # 페널티 박스 깊이(m)
+_WEAK_MID_Y = (30, 70)                          # '중앙' 폭(%)
+_WEAK_DRAW_X = 40                               # 지도 표시 상한(m) — 판정과 무관, 그림용
+# 차트 개편(2026-11-06): 실점 약점 지도 구역 사각형 — _weak_zone 과 같은 상수에서 생성, 배열 앞쪽이 우선 (additive)
+_WEAK_GEOM = (
+    ("goalmouth", 0, _WEAK_SIX_X, _WEAK_SIX_Y[0], _WEAK_SIX_Y[1]),
+    ("box_center", 0, _WEAK_BOX_X, _WEAK_MID_Y[0], _WEAK_MID_Y[1]),
+    ("box_wide", 0, _WEAK_BOX_X, 0, _WEAK_MID_Y[0]),
+    ("box_wide", 0, _WEAK_BOX_X, _WEAK_MID_Y[1], 100),
+    ("out_center", _WEAK_BOX_X, _WEAK_DRAW_X, _WEAK_MID_Y[0], _WEAK_MID_Y[1]),
+    ("out_wide", _WEAK_BOX_X, _WEAK_DRAW_X, 0, _WEAK_MID_Y[0]),
+    ("out_wide", _WEAK_BOX_X, _WEAK_DRAW_X, _WEAK_MID_Y[1], 100),
+)
+_WEAK_GEOM_JSON = [{"key": k, "x0": x0, "x1": x1, "y0": y0, "y1": y1} for k, x0, x1, y0, y1 in _WEAK_GEOM]
+
+
 def _weak_zone(x, y):
     if x is None or y is None:
         return None
-    if x < 5.5 and 36.5 <= y <= 63.5:
+    if x < _WEAK_SIX_X and _WEAK_SIX_Y[0] <= y <= _WEAK_SIX_Y[1]:
         return "goalmouth"
-    if x < 16.5:
-        return "box_center" if 30 <= y <= 70 else "box_wide"
-    return "out_center" if 30 <= y <= 70 else "out_wide"
+    if x < _WEAK_BOX_X:
+        return "box_center" if _WEAK_MID_Y[0] <= y <= _WEAK_MID_Y[1] else "box_wide"
+    return "out_center" if _WEAK_MID_Y[0] <= y <= _WEAK_MID_Y[1] else "out_wide"
 
 
 def _weak_sit(sit):
@@ -8455,7 +8472,7 @@ def insights_defensive_weakness():
     games_total = sum(len(d["games"]) for d in per.values())
     if games_total < 40:
         return jsonify({"league": label, "year": year, "teams": [], "warnings": ["슈팅맵 표본이 부족해 계산할 수 없습니다."],
-                        "zones": [{"key": k, "label": l} for k, l in _WEAK_ZONES],
+                        "zones": [{"key": k, "label": l} for k, l in _WEAK_ZONES], "zones_geom": _WEAK_GEOM_JSON,
                         "situations": [{"key": k, "label": l} for k, l in _WEAK_SITS], "min_games": _INS_MIN_GAMES})
 
     def lg_rates(dim, keys):
@@ -8521,7 +8538,7 @@ def insights_defensive_weakness():
         warnings.append(f"이 리그 원본 슈팅맵에는 '{', '.join(missing)}' 분류가 거의 없어 해당 항목은 제외했습니다.")
     return jsonify({
         "league": label, "year": year, "teams": teams, "team_games": games_total,
-        "zones": [{"key": k, "label": l} for k, l in _WEAK_ZONES],
+        "zones": [{"key": k, "label": l} for k, l in _WEAK_ZONES], "zones_geom": _WEAK_GEOM_JSON,
         "situations": [{"key": k, "label": l} for k, l in _WEAK_SITS],
         "league_zones": clean(lg_z), "league_situations": clean(lg_s), "league_shots_pg": round(lg_total_rate, 2),
         "min_games": _INS_MIN_GAMES, "z_flag": _WEAK_Z, "warnings": warnings,
@@ -8852,7 +8869,7 @@ def insights_weather_effect():
 
     def stat(g):
         k = len(g)
-        out = {"n": k, "goals": None, "goals_resid": None, "goals_z": None, "home_win_pct": None, "home_win_exp": None,
+        out = {"n": k, "goals": None, "goals_resid": None, "goals_z": None, "goals_ci": None, "home_win_pct": None, "home_win_exp": None,
                "home_win_z": None, "draw_pct": None, "goals_diff": False, "home_diff": False}
         if not k:
             return out
@@ -8864,6 +8881,8 @@ def insights_weather_effect():
             mr = sum(r[4] for r in g) / k
             out["goals_resid"] = round(mr, 2)
             out["goals_z"] = round(mr / (sd_all / math.sqrt(k)), 1) if sd_all > 0 else None
+            # 차트 개편(2026-11-06): goals_z 와 같은 표준오차의 95% 구간 반폭 — forest plot 용 (additive)
+            out["goals_ci"] = round(1.96 * sd_all / math.sqrt(k), 2) if sd_all > 0 else None
             var = sum(r[6] * (1 - r[6]) for r in g)
             out["home_win_z"] = round((sum(r[5] for r in g) - sum(r[6] for r in g)) / math.sqrt(var), 1) if var > 0 else None
             out["goals_diff"] = out["goals_z"] is not None and abs(out["goals_z"]) >= _WX_Z

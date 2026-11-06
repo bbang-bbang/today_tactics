@@ -508,6 +508,40 @@ qa('aftermath 기존 키 불변', lambda: assert_(
     {'id', 'short', 'scored', 'conc_obs', 'conc_exp', 'conc_z', 'conceded', 'resp_obs', 'resp_exp', 'resp_z', 'eligible'}
     <= set(next(t for t in _aft()['teams'] if t.get('eligible')))))
 
+def _wx_ci():
+    d = get('/api/insights/weather-effect?year=2026&league=k1')
+    rows = [r for g in (d.get('groups') or {}).values() for r in g]
+    assert_(rows, 'weather groups 비어 있음')
+    for r in rows:
+        assert_('goals_ci' in r, f"{r.get('label')} goals_ci 없음")
+        if r.get('goals_resid') is not None and r.get('goals_z') is not None:
+            assert_(r['goals_ci'] is not None and r['goals_ci'] > 0, f"{r.get('label')} ci={r['goals_ci']}")
+qa('weather goals_ci 양수 또는 null', _wx_ci)
+qa('weather 기존 키 불변', lambda: assert_({'n', 'goals', 'goals_resid', 'goals_z', 'home_win_pct', 'label', 'key'}
+    <= set(get('/api/insights/weather-effect?year=2026&league=k1')['groups']['temp'][0])))
+_WK = None
+def _wk():
+    global _WK
+    if _WK is None:
+        _WK = get('/api/insights/defensive-weakness?year=2026&league=k1')
+    return _WK
+def _wk_geom():
+    g = _wk().get('zones_geom') or []
+    assert_(len(g) == 7, f'{len(g)}개')
+    assert_({z['key'] for z in g} == {'goalmouth', 'box_center', 'box_wide', 'out_center', 'out_wide'}, str({z['key'] for z in g}))
+qa('weakness zones_geom 7개 사각형·키 5종', _wk_geom)
+def _wk_geom_match():
+    g = _wk()['zones_geom']
+    def zone_at(x, y):   # 우선순위 = 배열 순서 (앞쪽이 우선)
+        for z in g:
+            if z['x0'] <= x < z['x1'] and z['y0'] <= y <= z['y1']:
+                return z['key']
+    for (x, y), want in {(3, 50): 'goalmouth', (10, 50): 'box_center', (10, 10): 'box_wide', (25, 50): 'out_center',
+                         (25, 90): 'out_wide', (5.4, 36.4): 'box_center'}.items():
+        assert_(zone_at(x, y) == want, f'({x},{y}) {zone_at(x, y)} != {want}')
+qa('weakness zones_geom 경계 = _weak_zone', _wk_geom_match)
+qa('weakness 기존 키 불변', lambda: assert_({'teams', 'zones', 'situations', 'min_games'} <= set(_wk())))
+
 # ── 결과 출력 ──
 passed = sum(1 for r in results if r[0] == 'PASS')
 failed = [r for r in results if r[0] == 'FAIL']
