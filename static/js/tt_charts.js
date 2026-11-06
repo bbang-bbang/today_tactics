@@ -115,7 +115,8 @@
     if (err) console.warn("[TTChart] render failed:", err);
     slot.querySelectorAll("canvas, .tt-chart-error").forEach((c) => c.remove());
     placeholder(slot, "tt-chart-error", ERROR_TXT, "alert");
-    const card = slot.closest && slot.closest(".tt-card");
+    // 카드(인사이트 .tt-card) 또는 팀 분석 패널(.tc-panel) 안의 근거 표를 펼친다
+    const card = slot.closest && slot.closest(".tt-card, .tc-panel");
     const ev = card && card.querySelector("details.tt-card-evidence");
     if (ev) ev.open = true;
   }
@@ -151,7 +152,9 @@
     }
 
     // 행이 많은 차트(dumbbell·heatMatrix·forest)는 행 수에 비례해 슬롯을 키운다
-    slot.style.height = "";
+    // HTML 에 직접 적은 높이(예: 결과 띠 64px)는 기준 높이로 보존하고, 어댑터가 늘린 높이만 되돌린다
+    if (slot.dataset.ttBaseH === undefined) slot.dataset.ttBaseH = slot.style.height || "";
+    slot.style.height = slot.dataset.ttBaseH;
     if (spec.__rows > 0) {
       const base = parseFloat(getComputedStyle(slot).height) || 0;
       slot.style.height = Math.max(base, spec.__rows * (opts.rowPx || ROW_PX) + ROW_PAD) + "px";
@@ -244,6 +247,8 @@
   // 반환 config 의 __* 키는 테스트·접근성용 메타이며 finalConfig 가 TERA 에 넘기기 전에 제거한다.
   const EMPTY = () => ({ __empty: true });
   const r2 = (v) => Math.round(v * 100) / 100;
+  // 가로 막대 카테고리 라벨 폭: 가장 긴 라벨 글자 수 × 12px(+여백), 40~160px
+  const labelW = (cats) => Math.max(40, Math.min(160, 8 + 12 * Math.max(0, ...cats.map((c) => String(c).length))));
 
   // 순위 추이: y = nTeams+1-rank 로 뒤집어 1위가 위로 가게 그린다.
   function bump(o) {
@@ -462,7 +467,7 @@
     if (!cats.length || !parts.length) return EMPTY();
     return {
       type: "row-bar", stacking: "percent", borderRadius: 2,
-      yAxis: { categories: cats, labelWidth: 56 },
+      yAxis: { categories: cats, labelWidth: labelW(cats) },
       xAxis: { min: 0, max: 100, labels: { format: "number:0" } },
       legend: { enabled: true, position: "bottom" },
       series: parts.map((p) => ({ name: p.name, color: lighten(p.color || THEME.neutral, 3), data: p.data.map((v) => (v == null ? 0 : r2(v))) })),
@@ -480,7 +485,7 @@
       label: `${o.refLabel || "기준"} ${o.ref}${unit}` }] : [];
     return {
       type: "row-bar", borderRadius: 3,
-      yAxis: { categories: cats, labelWidth: 56 },
+      yAxis: { categories: cats, labelWidth: labelW(cats) },
       xAxis: { min: 0, autoScale: true, plotLines: lines, labels: { format: "number:0" } },
       dataLabels: { enabled: true, position: "outside", style: { color: THEME.text, fontSize: 12 } },
       legend: { enabled: false },
@@ -503,6 +508,37 @@
       nodes, links: links.map((l) => ({ source: l.source, target: l.target, value: l.value })),
       __aria: `흐름도: ${links.map((l) => `${l.source}→${l.target} ${l.value}`).join(", ")}`,
     };
+  }
+
+  // 누적 페이스 선: 팀(굵게) vs 기준(회색 점선). 누적값은 계단처럼 움직여 곡선 보간 대신 직선.
+  function paceLine(o) {
+    const labels = (o && o.labels) || [];
+    if (!labels.length || !o.team || !(o.team.data || []).length) return EMPTY();
+    const pt = (v) => (v == null ? null : { y: v });
+    const series = [{ name: o.team.name, color: lighten(o.team.color || THEME.accent, 3), lineWidth: 3, data: o.team.data.map(pt) }];
+    (o.extra || []).forEach((e) => series.push({ name: e.name, color: lighten(e.color || THEME.pos, 3), lineWidth: 3, data: e.data.map(pt) }));
+    if (o.ref && (o.ref.data || []).some((v) => v != null)) {
+      series.push({ name: o.ref.name, color: THEME.sub, lineWidth: 1.5, dashArray: "4,3", data: o.ref.data.map(pt) });
+    }
+    return { type: "line", curveType: "linear", showMarkers: false, legend: { enabled: true, position: "bottom" },
+      xAxis: { categories: labels }, series,
+      __aria: `${series.map((x) => x.name).join(" vs ")} 누적 승점, ${labels.length}경기` };
+  }
+
+  // 좌우 대칭 막대: 왼쪽(음수로 그림)·오른쪽 — 축은 ±최댓값으로 대칭
+  function diverging(o) {
+    const cats = (o && o.categories) || [];
+    if (!cats.length) return EMPTY();
+    const L = o.left.data.map((v) => -(v || 0)), R = o.right.data.map((v) => v || 0);
+    const m = Math.max(1, ...L.map(Math.abs), ...R);
+    return { type: "row-bar", stacking: "normal", borderRadius: 2,
+      yAxis: { categories: cats, labelWidth: 50 },
+      xAxis: { min: -m, max: m, autoScale: false, plotLines: [{ value: 0, color: THEME.text, width: 1 }] },
+      legend: { enabled: true, position: "bottom" },
+      series: [{ name: o.left.name, color: lighten(o.left.color || THEME.neg, 3), data: L },
+               { name: o.right.name, color: lighten(o.right.color || THEME.pos, 3), data: R }],
+      __rows: cats.length,
+      __aria: `${o.left.name}(왼쪽)·${o.right.name}(오른쪽) 비교, ${cats.length}개 구간` };
   }
 
   // ── 자체 Canvas 렌더러 공통 ──
@@ -641,7 +677,7 @@
   const CUSTOM = { forest: (c, s, w, h) => drawForest(c, s, w, h), timelineGrid: drawTimelineGrid, pitchZones: drawPitchZones };
 
   const presets = { bump, _forestModel, forest, dumbbell, quadrant, heatMatrix, stacked100, barRef, sankey,
-    _gridLayout, _cellStyle, _fitText, timelineGrid, pitchZones };
+    _gridLayout, _cellStyle, _fitText, timelineGrid, pitchZones, paceLine, diverging };
 
   const TTChart = { THEME, util: { contrast, ensureVisible, lighten, merge }, withTheme, isEmpty, mount, destroyAll, presets };
   root.TTChart = TTChart;
