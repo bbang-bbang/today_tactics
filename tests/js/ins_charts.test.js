@@ -114,3 +114,9 @@ test("labels_are_plain_strings", () => {
   assert.equal(c.series[0].data[0].label, evil);
   assert.ok(!JSON.stringify(c).includes("__html"));
 });
+
+test("collapse_only_chartless_cards_with_takes", () => {
+  const col = InsCharts.CARDS.filter((c) => c.collapse).map((c) => c.key).sort();
+  assert.deepEqual(col, ["aft", "hub", "rot", "sdep", "weak", "weather"]);
+  for (const c of InsCharts.CARDS.filter((c) => c.collapse)) assert.equal(c.chart, false, c.key);
+});

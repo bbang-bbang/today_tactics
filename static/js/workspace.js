@@ -149,6 +149,9 @@
             }).catch(lazyFail);
         },
         player() {
+            // 차트 개편: 인사이트(랭킹 탭)는 바로 띄우고, 차트 모듈(TERA 1.2MB)은 병렬로 받아 둔다.
+            // 심화 탭은 window.ttChartsReady 를 기다린 뒤 그린다 (insights.js loadAdvanced).
+            if (!window.ttChartsReady) window.ttChartsReady = window.ttLoadCharts().then(() => lazyLoad("ins_charts"));
             lazyLoadSeq(["insights"]).then(() => {
                 requestAnimationFrame(() => resizeChartsIn(panels.player));
             }).catch(lazyFail);
