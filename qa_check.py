@@ -484,6 +484,30 @@ qa('rotation 기존 키 불변', lambda: assert_(
     {'id', 'short', 'matches', 'eligible', 'avg_changes', 'core_size', 'high_n', 'high_ppg'}
     <= set(next(t for t in _rot()['teams'] if t.get('eligible')))))
 
+_AFT = None
+def _aft():
+    global _AFT
+    if _AFT is None:
+        _AFT = get('/api/insights/goal-aftermath?year=2026&league=k1')
+    return _AFT
+_FLOW_KEYS = ('extra_only', 'conc_only', 'both', 'none')
+def _aft_flow_sum():
+    d = _aft()
+    for t in [x for x in d['teams'] if x.get('eligible')] + [dict(d['league_total'], short='리그')]:
+        f = t.get('flow')
+        assert_(f and set(f) == set(_FLOW_KEYS), f"{t['short']} flow={f}")
+        assert_(sum(f[k] for k in _FLOW_KEYS) == t['scored'], f"{t['short']} {sum(f.values())}!={t['scored']}")
+qa('aftermath flow 합 = scored', _aft_flow_sum)
+def _aft_flow_conc():
+    d = _aft()
+    for t in [x for x in d['teams'] if x.get('eligible')] + [dict(d['league_total'], short='리그')]:
+        f = t['flow']
+        assert_(f['conc_only'] + f['both'] == t['conc_obs'], f"{t['short']} {f} conc_obs={t['conc_obs']}")
+qa('aftermath flow conc_only+both = conc_obs', _aft_flow_conc)
+qa('aftermath 기존 키 불변', lambda: assert_(
+    {'id', 'short', 'scored', 'conc_obs', 'conc_exp', 'conc_z', 'conceded', 'resp_obs', 'resp_exp', 'resp_z', 'eligible'}
+    <= set(next(t for t in _aft()['teams'] if t.get('eligible')))))
+
 # ── 결과 출력 ──
 passed = sum(1 for r in results if r[0] == 'PASS')
 failed = [r for r in results if r[0] == 'FAIL']

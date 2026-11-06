@@ -9112,7 +9112,8 @@ def insights_goal_aftermath():
     rate_f = {t: gf[t] / (n_games[t] * 90.0) for t in n_games}
     rate_a = {t: ga[t] / (n_games[t] * 90.0) for t in n_games}
 
-    st = {t: {"scored": 0, "conc_obs": 0, "conc_exp": 0.0, "conceded": 0, "resp_obs": 0, "resp_exp": 0.0} for t in n_games}
+    st = {t: {"scored": 0, "conc_obs": 0, "conc_exp": 0.0, "conceded": 0, "resp_obs": 0, "resp_exp": 0.0,
+              "flow": {"extra_only": 0, "conc_only": 0, "both": 0, "none": 0}} for t in n_games}
     for ev, glist in by_ev.items():
         _id, h, a, _ts, _hs, _as = evmap[ev]
         glist.sort()
@@ -9124,6 +9125,10 @@ def insights_goal_aftermath():
             st[scorer]["scored"] += 1
             st[scorer]["conc_obs"] += 1 if opp_scored else 0
             st[scorer]["conc_exp"] += 1 - math.exp(-rate_a[scorer] * win)
+            # 차트 개편(2026-11-06): 같은 창 안 '추가골 × 실점' 4분기 (상호배타, 합 = scored) — Sankey 용 (additive)
+            own_more = any(t1 - t0 <= win and s1 == side for t1, _g, s1 in glist[i + 1:])
+            fk = "both" if own_more and opp_scored else "extra_only" if own_more else "conc_only" if opp_scored else "none"
+            st[scorer]["flow"][fk] += 1
             # 같은 장면을 상대(other) 시점에서 보면 '실점 후 반격'(other 가 창 안에 득점) — 관측은 같고 기대값(팀별 평소 득점률)만 다름
             reply = opp_scored
             st[other]["conceded"] += 1
@@ -9143,13 +9148,15 @@ def insights_goal_aftermath():
                       "scored": s["scored"], "conc_obs": s["conc_obs"], "conc_exp": round(s["conc_exp"], 1),
                       "conc_z": z_of(s["conc_obs"], s["conc_exp"]) if el else None,
                       "conceded": s["conceded"], "resp_obs": s["resp_obs"], "resp_exp": round(s["resp_exp"], 1),
-                      "resp_z": z_of(s["resp_obs"], s["resp_exp"]) if el else None})
+                      "resp_z": z_of(s["resp_obs"], s["resp_exp"]) if el else None,
+                      "flow": dict(s["flow"])})
     teams.sort(key=lambda t: (-(t["conc_z"] or -99) if t["eligible"] else 99, t["short"]))
 
-    tot = lambda k: sum(v[k] for v in st.values())   # noqa: E731
+    tot = lambda k: sum(v[k] for v in st.values() if k != "flow")   # noqa: E731
     lg = {"scored": tot("scored"), "conc_obs": tot("conc_obs"), "conc_exp": round(tot("conc_exp"), 1),
           "conceded": tot("conceded"), "resp_obs": tot("resp_obs"), "resp_exp": round(tot("resp_exp"), 1)}
     lg["conc_z"], lg["resp_z"] = z_of(lg["conc_obs"], tot("conc_exp")), z_of(lg["resp_obs"], tot("resp_exp"))
+    lg["flow"] = {k: sum(v["flow"][k] for v in st.values()) for k in ("extra_only", "conc_only", "both", "none")}
     flagged = [t for t in teams if t["eligible"] and ((t["conc_z"] or 0) >= 2 or (t["resp_z"] or 0) <= -2)]
     warnings = []
     if lg["scored"] < 100:
