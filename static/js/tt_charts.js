@@ -529,12 +529,22 @@
     return t + "…";
   }
 
-  // 칸 배치: 가용 폭에 n 칸, 칸이 8px 미만이면 최근 floor(가용/8) 칸만 (칸 최대 32px)
+  // 칸 배치: 가용 폭에 n 칸. 칸이 14px 미만이면 글자(W/D/L)를 못 넣어 색만 남으므로
+  // 최근 floor(가용/14) 칸만 그린다 (칸 최대 32px)
+  const CELL_MIN = 14;
   function _gridLayout(width, labelW, n) {
     const avail = Math.max(0, width - labelW);
     const raw = n ? avail / n : 0;
-    if (raw < 8) return { cell: 8, shown: Math.floor(avail / 8), clipped: true };
+    if (raw < CELL_MIN) return { cell: CELL_MIN, shown: Math.floor(avail / CELL_MIN), clipped: true };
     return { cell: Math.min(32, Math.floor(raw)), shown: n, clipped: false };
+  }
+
+  // 타임라인 칸 색: 교체 수가 많을수록 진하게(accent 섞기, 최대 55%) + 글자는 칸 배경 대비가 더 큰 쪽(4.5:1 보장)
+  const DARK_TEXT = "#0b1220";
+  function _cellStyle(v, vMax) {
+    const fill = mixHex("#1e293b", THEME.accent, Math.min(0.55, Math.max(0, v || 0) / (vMax || 11)));
+    const text = contrast(THEME.text, fill) >= contrast(DARK_TEXT, fill) ? THEME.text : DARK_TEXT;
+    return { fill, text };
   }
 
   // 로테이션 타임라인 그리드: 행 = 팀, 칸 = 경기(시간순), 진하기 = v/vMax, 글자/띠 = W·D·L
@@ -551,7 +561,6 @@
     const nMax = Math.max(...rows.map((r) => r.cells.length));
     const L = _gridLayout(w - 8, labelW, nMax);
     const top = 22, rowH = Math.max(16, Math.min(24, (h - top - 8) / rows.length));
-    const MARK = { W: THEME.pos, D: THEME.sub, L: THEME.neg };
     ctx.textBaseline = "middle";
     ctx.fillStyle = THEME.sub; ctx.textAlign = "left";
     ctx.fillText(legend, 0, 10);
@@ -560,31 +569,29 @@
       const y = top + i * rowH;
       ctx.textAlign = "right"; ctx.fillStyle = THEME.text;
       ctx.fillText(r.label, labelW - 8, y + rowH / 2);
-      const cells = r.cells.slice(-L.shown);
+      const cells = L.shown ? r.cells.slice(-L.shown) : [];
       cells.forEach((c, j) => {
         const x = labelW + j * L.cell, cw = L.cell - 2, ch = rowH - 3;
-        ctx.fillStyle = mixHex("#1e293b", THEME.accent, Math.min(1, (c.v || 0) / vMax));
-        ctx.fillRect(x, y, cw, ch);
-        if (L.cell >= 14) {
-          ctx.fillStyle = MARK[c.mark] || THEME.sub; ctx.textAlign = "center";
-          ctx.fillText(c.mark || "", x + cw / 2, y + ch / 2 + 1);
-        } else {
-          ctx.fillStyle = MARK[c.mark] || THEME.sub; ctx.fillRect(x, y + ch - 2, cw, 2);
-        }
+        const st = _cellStyle(c.v, vMax);
+        ctx.fillStyle = st.fill; ctx.fillRect(x, y, cw, ch);
+        ctx.fillStyle = st.text; ctx.textAlign = "center";       // 결과는 글자로(색 의존 없음)
+        ctx.fillText(c.mark || "", x + cw / 2, y + ch / 2 + 1);
       });
     });
   }
 
   // 실점 약점 지도: 하프 피치(골라인이 위) 위 구역 색칠 — 색 + ⚠/✓ 기호 + 비중 % 글자
   function pitchZones(o) {
-    const geom = (o && o.geom) || [], vals = (o && o.values) || {};
+    const geom = (o && o.geom) || [], vals = (o && o.values) || {}, names = (o && o.labels) || {};
     if (!geom.length) return EMPTY();
     const zones = geom.map((g, i) => {
       const v = vals[g.key];
       const z = v && v.z != null ? v.z : null;
-      return { ...g, prio: i, label: v ? v.label : "", share: v ? v.share : null, lg_share: v ? v.lg_share : null, z,
-        hatch: !v || z == null, alert: z != null && z >= 2, good: z != null && z <= -2,
-        fill: z == null ? "#1e293b" : z >= 2 ? THEME.neg : z <= -2 ? THEME.pos : "#334155" };
+      const fill = z == null ? "#1e293b" : z >= 2 ? THEME.neg : z <= -2 ? THEME.pos : "#334155";
+      const light = contrast(THEME.text, fill) >= 4.5;   // 강조 구역(밝은 빨강·초록)은 어두운 글자
+      return { ...g, prio: i, label: (v && v.label) || names[g.key] || "", share: v ? v.share : null, lg_share: v ? v.lg_share : null, z,
+        hatch: !v || z == null, alert: z != null && z >= 2, good: z != null && z <= -2, fill,
+        textColor: light ? THEME.text : DARK_TEXT, subColor: light ? (contrast(THEME.sub, fill) >= 4.5 ? THEME.sub : THEME.text) : DARK_TEXT };
     }).sort((a, b) => b.prio - a.prio);   // 넓은 구역 먼저, 우선순위 높은(goalmouth) 구역을 마지막에
     return { __renderer: "pitchZones", __zones: zones, __title: o.title || "",
       __aria: `실점 약점 지도${o.title ? " — " + o.title : ""}: ${zones.filter((z) => z.alert).map((z) => z.label).join(", ") || "두드러진 약점 없음"}` };
@@ -598,8 +605,8 @@
     if (spec.__title) { ctx.fillStyle = THEME.text; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(spec.__title, w / 2, 4); }
     spec.__zones.forEach((z) => {
       const x0 = X(z.y0), x1 = X(z.y1), y0 = Y(z.x0), y1 = Y(z.x1);
-      ctx.fillStyle = z.fill; ctx.globalAlpha = z.alert || z.good ? 0.85 : 0.6;
-      ctx.fillRect(x0, y0, x1 - x0, y1 - y0); ctx.globalAlpha = 1;
+      ctx.fillStyle = z.fill;                 // 불투명 — 글자 대비 계산이 칠한 색 그대로 맞도록
+      ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
       if (z.hatch) {
         ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
         ctx.strokeStyle = "rgba(148,163,184,0.35)"; ctx.lineWidth = 1;
@@ -611,18 +618,21 @@
     // 사각형마다 구역 이름 + 비중(같은 구역의 좌우 사각형 모두 표기). 골문 앞은 작아서 한 줄만.
     spec.__zones.forEach((z) => {
       if (!z.label) return;
-      const cx = (X(z.y0) + X(z.y1)) / 2, cy = (Y(z.x0) + Y(z.x1)) / 2, small = Y(z.x1) - Y(z.x0) < 44;
+      // 다른 구역(골문 앞)이 위쪽을 덮는 사각형은 그 아래 남은 영역의 중앙에 라벨을 둔다
+      const cover = spec.__zones.find((o) => o !== z && o.prio < z.prio && o.x0 <= z.x0 && o.y0 >= z.y0 && o.y1 <= z.y1);
+      const topM = cover ? Math.max(z.x0, cover.x1) : z.x0;
+      const cx = (X(z.y0) + X(z.y1)) / 2, cy = (Y(topM) + Y(z.x1)) / 2, small = Y(z.x1) - Y(z.x0) < 44;
       const mark = z.alert ? "⚠ " : z.good ? "✓ " : "";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       if (small) {
-        ctx.fillStyle = THEME.text;
+        ctx.fillStyle = z.textColor;
         ctx.fillText(z.share == null ? `${z.label} · 분류 불가` : `${mark}${z.label} ${z.share}%`, cx, cy);
         return;
       }
-      ctx.fillStyle = THEME.sub; ctx.fillText(z.label, cx, cy - 16);
-      ctx.fillStyle = THEME.text;
+      ctx.fillStyle = z.subColor; ctx.fillText(z.label, cx, cy - 16);
+      ctx.fillStyle = z.textColor;
       ctx.fillText(z.share == null ? "분류 불가" : `${mark}${z.share}%`, cx, cy);
-      if (z.share != null) { ctx.fillStyle = THEME.sub; ctx.fillText(`리그 ${z.lg_share}%`, cx, cy + 16); }
+      if (z.share != null) { ctx.fillStyle = z.subColor; ctx.fillText(`리그 ${z.lg_share}%`, cx, cy + 16); }
     });
     ctx.strokeStyle = "rgba(229,231,235,0.8)"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + pitchW, oy); ctx.stroke();   // 골라인
@@ -631,7 +641,7 @@
   const CUSTOM = { forest: (c, s, w, h) => drawForest(c, s, w, h), timelineGrid: drawTimelineGrid, pitchZones: drawPitchZones };
 
   const presets = { bump, _forestModel, forest, dumbbell, quadrant, heatMatrix, stacked100, barRef, sankey,
-    _gridLayout, _fitText, timelineGrid, pitchZones };
+    _gridLayout, _cellStyle, _fitText, timelineGrid, pitchZones };
 
   const TTChart = { THEME, util: { contrast, ensureVisible, lighten, merge }, withTheme, isEmpty, mount, destroyAll, presets };
   root.TTChart = TTChart;

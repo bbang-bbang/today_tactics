@@ -160,7 +160,7 @@
       const v = t.zones && t.zones[k];
       values[k] = v ? { label: label[k], share: v.share, lg_share: v.lg_share, z: v.z } : null;
     });
-    return P.pitchZones({ geom: d.zones_geom, values, title: `${t.short} — 허용 슈팅 지역 비중` });
+    return P.pitchZones({ geom: d.zones_geom, values, labels: label, title: `${t.short} — 허용 슈팅 지역 비중` });
   }
 
   function sdep(d) {
@@ -173,7 +173,7 @@
 
   function rot(d) {
     const ts = elig(d).filter((t) => (t.timeline || []).length).sort((a, b) => b.avg_changes - a.avg_changes);
-    return P.timelineGrid({ vMax: 11, legend: "칸 진하기 = 직전 경기 대비 선발 교체 수 · 글자 = 승(W)·무(D)·패(L)",
+    return P.timelineGrid({ vMax: 11, legend: "칸 진하기 = 선발 교체 수 · W 승 · D 무 · L 패",
       rows: ts.map((t) => ({ label: t.short, cells: t.timeline.map((c) => ({ v: c.changes, mark: c.pts === 3 ? "W" : c.pts === 1 ? "D" : "L" })) })) });
   }
 

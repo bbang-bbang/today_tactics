@@ -268,7 +268,8 @@ test("timelineGrid_empty", () => {
 });
 
 test("timelineGrid_clips_to_width", () => {
-  assert.deepEqual(P._gridLayout(300, 60, 40), { cell: 8, shown: 30, clipped: true });
+  // 칸 최소 14px — 그보다 좁으면 글자(W/D/L) 대신 색 띠가 돼 색만으로 정보 전달 → 최근 경기만 보여 준다
+  assert.deepEqual(P._gridLayout(300, 60, 40), { cell: 14, shown: 17, clipped: true });
   assert.deepEqual(P._gridLayout(300, 60, 10), { cell: 24, shown: 10, clipped: false });
 });
 
@@ -302,4 +303,29 @@ test("fitText_ellipsis", () => {
   const out = P._fitText(measure, "바람 · 강풍(25km/h 이상) (표본 부족)", 98);
   assert.ok(measure(out) <= 98, out);
   assert.ok(out.endsWith("…"), out);
+});
+
+
+// ── Phase 1b 리뷰: 대비 4.5:1 보장 ──
+test("cellStyle_contrast_all_levels", () => {
+  for (let v = 0; v <= 11; v++) {
+    const st = P._cellStyle(v, 11);
+    assert.ok(util.contrast(st.text, st.fill) >= 4.5, `v=${v} ${st.text} on ${st.fill}`);
+  }
+});
+
+test("pitchZones_text_contrast", () => {
+  const c = P.pitchZones({ geom: GEOM, values: {
+    goalmouth: { label: "골문 앞", share: 10, lg_share: 9, z: 2.5 },
+    box_center: { label: "박스 중앙", share: 40, lg_share: 50, z: -2.4 },
+    box_wide: { label: "박스 측면", share: 5, lg_share: 5, z: 0.1 } } });
+  for (const z of c.__zones.filter((x) => !x.hatch)) {
+    assert.ok(util.contrast(z.textColor, z.fill) >= 4.5, `${z.key} text ${z.textColor} on ${z.fill}`);
+    assert.ok(util.contrast(z.subColor, z.fill) >= 4.5, `${z.key} sub ${z.subColor} on ${z.fill}`);
+  }
+});
+
+test("pitchZones_unavailable_keeps_label", () => {
+  const c = P.pitchZones({ geom: GEOM, values: { out_wide: null }, labels: { out_wide: "중거리 측면" } });
+  assert.ok(c.__zones.filter((z) => z.key === "out_wide").every((z) => z.label === "중거리 측면" && z.hatch));
 });
