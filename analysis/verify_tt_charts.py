@@ -480,6 +480,48 @@ def check_adv_screenshots(pw):
         browser.close()
 
 
+def check_adv_visual_order_matches_dom(pw):
+    browser, page, errs = _open_adv(pw)
+    order = page.evaluate("""(() => { const cs = Array.from(document.querySelectorAll('#ins-adv-grid > .tt-card'));
+        const vis = cs.slice().sort((a, b) => { const A = a.getBoundingClientRect(), B = b.getBoundingClientRect();
+            return Math.abs(A.top - B.top) > 4 ? A.top - B.top : A.left - B.left; });
+        return cs.every((c, i) => c === vis[i]); })()""")
+    browser.close()
+    assert order is True, "visual order differs from DOM order"
+
+
+def check_adv_module_fail_no_hang(pw):
+    browser, page = _new_page(pw)
+    errs = collect_errors(page)
+    page.route("**/static/js/ins_charts.js**", lambda r: r.fulfill(status=404, body="nope"))
+    open_with_csp(page, "/")
+    page.evaluate("document.querySelector('.ws-tab[data-ws=player]').click()")
+    _wait(page, "typeof window.openPlayerDrawer === 'function'")
+    page.evaluate("(()=>{const b=document.getElementById('insights-toggle-btn'); if(b.getAttribute('aria-expanded')!=='true') b.click()})()")
+    _wait(page, "!!document.querySelector('[data-itab=adv]')")
+    page.evaluate("document.querySelector('[data-itab=adv]').click()")
+    _wait(page, "!!document.querySelector('#ins-adv-grid .ins-adv-error button')", timeout=15)
+    browser.close()
+    assert [e for e in errs if e.startswith("pageerror")] == []
+
+
+def check_league_toggle_failure_reverts(pw):
+    browser, page, errs = _open_adv(pw)
+    # glob 의 '?' 는 한 글자 와일드카드라 쿼리 문자열 매칭에 못 쓴다 → URL 검사로 분기
+    page.route("**/api/insights/xg-luck**",
+               lambda r: r.fulfill(status=500, body="{}") if "league=k2" in r.request.url else r.fallback())
+    page.evaluate("document.querySelector('#ins-c-xgluck .tt-lg-btn[data-league=K2]').click()")
+    # 다른 카드 요청이 브라우저 동시 연결 한도에 걸려 있으면 K2 요청이 늦게 나간다 → 되돌림을 폴링
+    try:
+        _wait(page, "document.querySelector('#ins-c-xgluck .tt-lg-btn[aria-selected=true]').dataset.league === 'K1'", timeout=15)
+    except AssertionError:
+        pass
+    sel = page.evaluate("document.querySelector('#ins-c-xgluck .tt-lg-btn[aria-selected=true]').dataset.league")
+    head = page.evaluate("document.querySelector('#ins-xgluck-body .ins-adv-sub-h').textContent")
+    browser.close()
+    assert sel == "K1" and "K1" in head, (sel, head)
+
+
 CHECKS = {name: fn for name, fn in globals().items() if name.startswith("check_")}
 
 

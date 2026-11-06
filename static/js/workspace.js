@@ -49,6 +49,7 @@
     async function lazyLoadSeq(names) { for (const n of names) await lazyLoad(n); }
     // 차트 개편 모듈 로더: TERA 번들이 실패해도 어댑터(tt_charts)·셸(tt_dash)은 반드시 로드해야
     // mount() 가 "차트를 불러오지 못했습니다" 폴백 + 근거 표 펼침으로 동작한다 (ReferenceError 방지)
+    window.ttLoadInsCharts = () => lazyLoad("ins_charts");
     window.ttLoadCharts = () => lazyLoad("tera")
         .catch((e) => console.warn("TERA load failed — charts fall back to evidence tables", e))
         .then(() => lazyLoadSeq(["tt_charts", "tt_dash"]));
@@ -151,7 +152,10 @@
         player() {
             // 차트 개편: 인사이트(랭킹 탭)는 바로 띄우고, 차트 모듈(TERA 1.2MB)은 병렬로 받아 둔다.
             // 심화 탭은 window.ttChartsReady 를 기다린 뒤 그린다 (insights.js loadAdvanced).
-            if (!window.ttChartsReady) window.ttChartsReady = window.ttLoadCharts().then(() => lazyLoad("ins_charts"));
+            if (!window.ttChartsReady) {
+                window.ttChartsReady = window.ttLoadCharts().then(() => lazyLoad("ins_charts"));
+                window.ttChartsReady.catch(() => { window.ttChartsReady = null; });   // 실패 시 다음 방문에 재시도
+            }
             lazyLoadSeq(["insights"]).then(() => {
                 requestAnimationFrame(() => resizeChartsIn(panels.player));
             }).catch(lazyFail);

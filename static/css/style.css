@@ -9943,5 +9943,5 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .tt-card-body { max-height: 420px; overflow: auto; margin-top: 8px; border-radius: 6px; }
 .tt-card-body:focus-visible { outline: 2px solid var(--tt-accent); outline-offset: 2px; }
 .tt-card .ins-top-scroll { max-height: none; }
-/* 큰 카드(L=8열) 옆 빈칸을 작은 카드(S=4열)가 채우도록 */
-.tt-grid { grid-auto-flow: row dense; }
+.ins-adv-error { grid-column: span 12; padding: 16px; border: 1px dashed var(--tt-line); border-radius: 10px; color: #fca5a5; font-size: 13px; }
+.ins-adv-error .tt-chip { margin-left: 8px; color: var(--tt-text); }

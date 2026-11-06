@@ -9,23 +9,24 @@
   const elig = (d) => ((d && d.teams) || []).filter((t) => t.eligible !== false);
 
   // ── 카드 정의 ── (index.html 심화 패널의 기존 body id·제목·설명을 그대로 옮김)
+  // 순서·크기: 테마 안에서 L+S / M+M 짝으로 12열을 채운다(dense 미사용 → DOM 순서 = 화면 순서 = Tab 순서)
   const CARDS = [
     { key: "trend", bodyId: "ins-trend-body", size: "L", theme: "flow", icon: "📈", title: "라운드별 순위 추이", question: "시즌 내내 순위가 어떻게 움직였나? 선두 교체·최근 상승/하락 팀", endpoint: "standings-trend", perLeague: true, render: "renderTrend", chart: true },
+    { key: "story", bodyId: "ins-story-body", size: "S", theme: "flow", icon: "📰", title: "리그 화제 포인트", question: "지금 흐름이 좋은 팀·나쁜 팀, 진행 중인 기록, 눈여겨볼 선수", endpoint: "storylines", perLeague: true, render: "renderStorylines", chart: false },
     { key: "xgluck", bodyId: "ins-xgluck-body", size: "M", theme: "flow", icon: "🍀", title: "xG 운 보정", question: "실력(xG)만큼 승점을 땄나? 실제 vs 기대 승점", endpoint: "xg-luck", perLeague: true, render: "renderXgLuck", chart: true },
-    { key: "opp", bodyId: "ins-opp-body", size: "L", theme: "flow", icon: "🧗", title: "상대 수준별 성적", question: "상위·중위·하위권 상대로 각각 얼마나 따나? 강팀 킬러·승점 흘리는 팀", endpoint: "opponent-strength", perLeague: true, render: "renderOppStrength", chart: true },
-    { key: "story", bodyId: "ins-story-body", size: "M", theme: "flow", icon: "📰", title: "리그 화제 포인트", question: "지금 흐름이 좋은 팀·나쁜 팀, 진행 중인 기록, 눈여겨볼 선수", endpoint: "storylines", perLeague: true, render: "renderStorylines", chart: false },
+    { key: "opp", bodyId: "ins-opp-body", size: "M", theme: "flow", icon: "🧗", title: "상대 수준별 성적", question: "상위·중위·하위권 상대로 각각 얼마나 따나? 강팀 킬러·승점 흘리는 팀", endpoint: "opponent-strength", perLeague: true, render: "renderOppStrength", chart: true },
     { key: "weather", bodyId: "ins-wx-body", size: "M", theme: "flow", icon: "🌦", title: "날씨 영향", question: "기온·비·바람이 득점과 홈 승률을 바꾸나? 통계적으로 확실할 때만 말함", endpoint: "weather-effect", perLeague: false, render: "renderWeather", chart: false, collapse: true },
     { key: "formation", bodyId: "ins-fm-body", size: "L", theme: "tactics", icon: "♟️", title: "포메이션 상성", question: "내 포메이션이 상대 포메이션을 만나면? 경기당 승점 (표본 부족 칸은 비움)", endpoint: "formation-matchup", perLeague: true, render: "renderFormation", chart: true },
+    { key: "hub", bodyId: "ins-hub-body", size: "S", theme: "tactics", icon: "🕸️", title: "패스 허브 의존도", question: "팀 패스가 한 선수에게 얼마나 몰리나?", endpoint: "pass-hub", perLeague: true, render: "renderPassHub", chart: false, collapse: true },
     { key: "gs", bodyId: "ins-gs-body", size: "M", theme: "tactics", icon: "🎢", title: "경기 상황별 성적", question: "앞서면 지켜내나, 뒤지면 따라가나?", endpoint: "game-state", perLeague: true, render: "renderGameState", chart: true },
     { key: "pv", bodyId: "ins-pv-body", size: "M", theme: "tactics", icon: "🔁", title: "패스량과 결과", question: "앞설 때 패스를 줄이고, 뒤질 때 늘리나? (평소 대비 %)", endpoint: "pass-volume", perLeague: true, render: "renderPassVolume", chart: true },
     { key: "aft", bodyId: "ins-aft-body", size: "M", theme: "tactics", icon: "⚡", title: "득점 직후 실점·반격", question: "골 넣은 직후 10분, 무너지나 몰아치나?", endpoint: "goal-aftermath", perLeague: true, render: "renderAftermath", chart: false, collapse: true },
-    { key: "hub", bodyId: "ins-hub-body", size: "M", theme: "tactics", icon: "🕸️", title: "패스 허브 의존도", question: "팀 패스가 한 선수에게 얼마나 몰리나?", endpoint: "pass-hub", perLeague: true, render: "renderPassHub", chart: false, collapse: true },
     { key: "subimp", bodyId: "ins-subimp-body", size: "M", theme: "squad", icon: "🔁", title: "팀별 교체 효과", question: "첫 전술 교체 뒤 15분 득실이 리그 평균보다 나아지나?", endpoint: "substitution-impact", perLeague: true, render: "renderSubImpact", chart: true },
     { key: "rest", bodyId: "ins-rest-body", size: "M", theme: "squad", icon: "😴", title: "휴식일·연전 영향", question: "짧은 휴식·밀집 일정이 정말 성적을 떨어뜨리나?", endpoint: "rest-effect", perLeague: true, render: "renderRestEffect", chart: true },
     { key: "rot", bodyId: "ins-rot-body", size: "M", theme: "squad", icon: "🔀", title: "선발 로테이션", question: "직전 경기와 선발이 얼마나 바뀌나, 성적과 관계는?", endpoint: "rotation", perLeague: true, render: "renderRotation", chart: false, collapse: true },
     { key: "sdep", bodyId: "ins-sdep-body", size: "M", theme: "squad", icon: "🎯", title: "득점 의존도", question: "득점의 몇 %를 1·2위 득점자가 만드나? 에이스가 빠지면?", endpoint: "scoring-dependence", perLeague: true, render: "renderScoringDep", chart: false, collapse: true },
     { key: "sub", bodyId: "ins-sub-body", size: "M", theme: "squad", icon: "🦸", title: "슈퍼서브·교체 시점", question: "누가 벤치에서 터지나? 언제 바꾸나?", endpoint: "substitution", perLeague: false, render: "renderSubstitution", chart: false },
-    { key: "clutch", bodyId: "ins-clutch-body", size: "S", theme: "squad", icon: "⏱️", title: "승부처 해결사", question: "막판·결정적 순간에 누가 넣나?", endpoint: "clutch", perLeague: false, render: "renderClutch", chart: false },
+    { key: "clutch", bodyId: "ins-clutch-body", size: "M", theme: "squad", icon: "⏱️", title: "승부처 해결사", question: "막판·결정적 순간에 누가 넣나?", endpoint: "clutch", perLeague: false, render: "renderClutch", chart: false },
     { key: "spp", bodyId: "ins-spp-body", size: "M", theme: "setpiece", icon: "⛳", title: "세트피스 공수 프로필", question: "코너·프리킥·스로인 (PK 제외) — 만든 것 vs 허용한 것", endpoint: "setpiece-profile", perLeague: true, render: "renderSetpieceProfile", chart: true },
     { key: "weak", bodyId: "ins-weak-body", size: "M", theme: "setpiece", icon: "🛡️", title: "실점 약점 지도", question: "허용 슈팅이 어느 지역·어떤 상황으로 쏠리나?", endpoint: "defensive-weakness", perLeague: true, render: "renderWeakness", chart: false, collapse: true },
     { key: "shooting", bodyId: "ins-shooting-body", size: "S", theme: "setpiece", icon: "🎯", title: "슈팅 인사이트", question: "어디서, 얼마나 정확하게 차나?", endpoint: "shooting", perLeague: false, render: "renderShooting", chart: false },

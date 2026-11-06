@@ -1823,16 +1823,16 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }).catch((e) => { console.warn("[insights] KPI 로드 실패", e); el.textContent = ""; });
   }
 
-  function loadAdvanced() {
+  function loadAdvanced(opts) {
     const gen = ++_advSeq;
     const grid = document.getElementById("ins-adv-grid");
-    // 차트 모듈이 아직 받는 중이면 기다렸다가 그린다(실패해도 셸·표는 그린다 — TTChart 가 오류 박스로 폴백)
-    if (grid && !window.InsCharts && window.ttChartsReady) {
+    // 차트 모듈이 아직 받는 중이면 한 번만 기다렸다가 다시 그린다(waited 플래그로 재대기 금지 — 무한 루프 방지)
+    if (grid && !window.InsCharts && window.ttChartsReady && !(opts && opts.waited)) {
       grid.innerHTML = '<div class="ins-adv-loading">차트 모듈 불러오는 중…</div>';
-      window.ttChartsReady.catch(() => {}).then(() => { if (gen === _advSeq) { _advSeq--; loadAdvanced(); } });
+      window.ttChartsReady.catch(() => {}).then(() => { if (gen === _advSeq) { _advSeq--; loadAdvanced({ waited: true }); } });
       return;
     }
-    if (!grid || !window.InsCharts || !window.TTDash || !window.TTChart) return loadAdvancedLegacy();
+    if (!grid || !window.InsCharts || !window.TTDash || !window.TTChart) return showAdvModuleError(grid);
     Object.keys(_advLeague).forEach((k) => delete _advLeague[k]);
     TTChart.destroyAll(grid);
     const both = currentLeague === "all";
@@ -1857,8 +1857,18 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     const jobs = InsCharts.CARDS.map((c) => {
       const el = document.getElementById("ins-c-" + c.key);
       TTDash.bindLeagueToggle(el, (lg) => {
+        const prev = _advLeague[c.key] || "k1";
         _advLeague[c.key] = lg.toLowerCase();
-        loadAdvCard(c, _advSeq).catch((e) => console.warn("[insights] 리그 전환 실패:", c.title, e));
+        loadAdvCard(c, _advSeq).catch((e) => {
+          // 실패하면 토글을 이전 리그로 되돌린다(토글과 내용이 다른 리그를 가리키는 오표시 방지)
+          console.warn("[insights] 리그 전환 실패:", c.title, e);
+          _advLeague[c.key] = prev;
+          el.querySelectorAll(".tt-lg-btn").forEach((b) => {
+            const on = b.dataset.league.toLowerCase() === prev;
+            b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1;
+          });
+          if (window.showToast) window.showToast(`${c.title}: ${lg} 데이터를 불러오지 못해 ${prev.toUpperCase()}로 되돌렸습니다.`);
+        });
       });
       return loadAdvCard(c, gen).catch((e) => { failed.push(c.title); console.warn("[insights] 로드 실패:", c.title, e); });
     });
@@ -1868,7 +1878,21 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     });
   }
 
-  // 차트 모듈을 못 불러온 경우의 대체 경로(기존 그대로) — 셸이 없으면 body id 가 없어 렌더러는 no-op
+  // 차트 모듈(tt_charts·tt_dash·ins_charts)을 못 불러온 경우 — 빈 화면 대신 안내 + 다시 시도
+  function showAdvModuleError(grid) {
+    if (!grid) return;
+    grid.innerHTML = '<div class="ins-adv-error" role="alert">심화 인사이트 화면 모듈을 불러오지 못했습니다. '
+      + '<button type="button" class="tt-chip">다시 시도</button></div>';
+    grid.querySelector("button").addEventListener("click", () => {
+      window.ttChartsReady = null;   // workspace.js 가 다음 로드 때 새로 받도록
+      if (window.ttLoadCharts) {
+        window.ttChartsReady = window.ttLoadCharts().then(() => window.ttLoadInsCharts && window.ttLoadInsCharts());
+      }
+      loadAdvanced();
+    });
+  }
+
+  // (구) 일괄 로더 — 대시보드 셸 이전 코드. 현재 템플릿에는 body id 가 셸에서만 생기므로 사용하지 않는다.
   function loadAdvancedLegacy() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     // 무음 실패 → 가시화: 실패한 인사이트명을 모아 1회 토스트 + console.warn (P5 견고성)

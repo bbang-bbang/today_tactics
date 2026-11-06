@@ -120,3 +120,16 @@ test("collapse_only_chartless_cards_with_takes", () => {
   assert.deepEqual(col, ["aft", "hub", "rot", "sdep", "weak", "weather"]);
   for (const c of InsCharts.CARDS.filter((c) => c.collapse)) assert.equal(c.chart, false, c.key);
 });
+
+test("cards_order_packs_rows_without_dense", () => {
+  // grid-auto-flow:dense 없이도 빈칸이 적도록 테마 안에서 L+S / M+M 짝으로 배치 (DOM 순서 = 화면 순서)
+  assert.deepEqual(InsCharts.CARDS.map((c) => c.key), [
+    "trend", "story", "xgluck", "opp", "weather",
+    "formation", "hub", "gs", "pv", "aft",
+    "subimp", "rest", "rot", "sdep", "sub", "clutch",
+    "spp", "weak", "shooting", "gk", "duel"]);
+  const W = { L: 8, M: 6, S: 4 };
+  let row = 0, gaps = 0;
+  for (const c of InsCharts.CARDS) { if (row + W[c.size] > 12) { gaps += 12 - row; row = 0; } row += W[c.size]; }
+  assert.ok(gaps <= 12, `total empty columns ${gaps}`);
+});
