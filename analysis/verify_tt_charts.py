@@ -73,6 +73,76 @@ def check_not_loaded_on_home(pw):
     assert errs == [], errs
 
 
+def _probe(pw, width=1440):
+    browser, page = _new_page(pw, width=width)
+    errs = collect_errors(page)
+    open_with_csp(page, "/static/dev/mount_probe.html")
+    return browser, page, errs
+
+
+def check_mount_renders_nonblank(pw):
+    browser, page, errs = _probe(pw)
+    page.evaluate("probe.line('slot-a')"); time.sleep(1.2)
+    n, ink = page.evaluate("probe.canvases('slot-a')"), page.evaluate("probe.inkRatio('slot-a')")
+    browser.close()
+    assert n == 1, f"canvases={n}"
+    assert ink > 0.01, f"ink={ink}"
+    assert errs == [], errs
+
+
+def check_mount_empty_shows_placeholder(pw):
+    browser, page, errs = _probe(pw)
+    page.evaluate("probe.empty('slot-b')")
+    n = page.evaluate("probe.canvases('slot-b')")
+    txt = page.evaluate("(document.querySelector('#slot-b .tt-chart-empty')||{}).textContent")
+    browser.close()
+    assert n == 0, n
+    assert txt == "표시할 데이터가 없습니다 (표본 부족)", txt
+    assert errs == [], errs
+
+
+def check_remount_same_slot_single_canvas(pw):
+    browser, page, errs = _probe(pw)
+    page.evaluate("probe.remount('slot-c', 5)"); time.sleep(0.8)
+    n = page.evaluate("probe.canvases('slot-c')")
+    browser.close()
+    assert n == 1, f"canvases={n}"
+    assert errs == [], errs
+
+
+def check_destroy_cleans_up(pw):
+    browser, page, errs = _probe(pw)
+    page.evaluate("probe.line('slot-a')"); time.sleep(0.5)
+    page.evaluate("probe.destroy()")
+    n = page.evaluate("probe.canvases('slot-a')")
+    browser.close()
+    assert n == 0, n
+    assert errs == [], errs
+
+
+def check_resize_rerenders(pw):
+    browser, page, errs = _probe(pw)
+    page.evaluate("probe.line('slot-a')"); time.sleep(0.8)
+    w1 = page.evaluate("probe.cssWidth('slot-a')")
+    page.set_viewport_size({"width": 900, "height": 900}); time.sleep(0.6)
+    w2 = page.evaluate("probe.cssWidth('slot-a')")
+    ink = page.evaluate("probe.inkRatio('slot-a')")
+    browser.close()
+    assert w2 < w1, f"w1={w1} w2={w2}"
+    assert ink > 0.01, f"ink after resize={ink}"
+    assert errs == [], errs
+
+
+def check_canvas_has_aria(pw):
+    browser, page, errs = _probe(pw)
+    page.evaluate("probe.line('slot-a')")
+    role, label = page.evaluate("probe.aria('slot-a')") or (None, None)
+    browser.close()
+    assert role == "img", role
+    assert label, label
+    assert errs == [], errs
+
+
 CHECKS = {name: fn for name, fn in globals().items() if name.startswith("check_")}
 
 
