@@ -679,6 +679,68 @@ def check_compare_trend_tera_fail(pw):
     assert [e for e in errs if e.startswith("pageerror")] == []
 
 
+# ── Phase 3: 선수 분석 모달 ───────────────────────────────────────
+def _open_player(pw, pid=106249, block_vendor=False, routes=()):
+    browser, page = _new_page(pw)
+    errs = collect_errors(page)
+    if block_vendor:
+        page.route("**/static/vendor/**", lambda r: r.fulfill(status=404, body="nope"))
+    for pat, fn in routes:
+        page.route(pat, fn)
+    open_with_csp(page, "/")
+    page.evaluate(f"document.dispatchEvent(new CustomEvent('playerSelected', {{detail: {{playerId: {pid}}}}}))")
+    _wait(page, "!!document.getElementById('pa-rating-slot')", timeout=40)
+    page.evaluate("document.getElementById('pa-rating-slot').scrollIntoView({block:'center'})")
+    _wait(page, "!!document.querySelector('#pa-rating-slot canvas, #pa-rating-slot .tt-chart-error')", timeout=60)
+    time.sleep(1.0)
+    return browser, page, errs
+
+
+def _slot_ink(page, sel):
+    return page.evaluate(f"""(()=>{{const c=document.querySelector('{sel} canvas'); if(!c) return 0;
+        const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data; let n=0;
+        for(let i=3;i<d.length;i+=4) if(d[i]>0) n++; return n/(d.length/4);}})()""")
+
+
+def check_player_trend_render(pw):
+    browser, page, errs = _open_player(pw)
+    page.evaluate("document.getElementById('pa-strip-slot').scrollIntoView({block:'center'})"); time.sleep(0.8)
+    inks = (_slot_ink(page, "#pa-rating-slot"), _slot_ink(page, "#pa-strip-slot"))
+    browser.close()
+    assert all(i > 0.01 for i in inks), inks
+    assert errs == [], errs
+
+
+def check_player_trend_tera_fail(pw):
+    browser, page, errs = _open_player(pw, block_vendor=True)
+    n = page.evaluate("document.querySelectorAll('#pa-rating-slot .tt-chart-error').length")
+    browser.close()
+    assert n == 1, n
+    assert [e for e in errs if e.startswith("pageerror")] == []
+
+
+def check_player_switch_stale(pw):
+    def slow(route):
+        if "playerId=106249" in route.request.url:
+            time.sleep(3)
+        route.fallback()
+    browser, page = _new_page(pw)
+    errs = collect_errors(page)
+    page.route("**/api/player-analytics**", slow)
+    open_with_csp(page, "/")
+    page.evaluate("document.dispatchEvent(new CustomEvent('playerSelected', {detail: {playerId: 106249}}))")
+    time.sleep(0.3)
+    page.evaluate("document.dispatchEvent(new CustomEvent('playerSelected', {detail: {playerId: 1115793}}))")
+    try:
+        _wait(page, "/가브리엘/.test(document.querySelector('#player-analytics-modal .pa-body-inner').textContent)", timeout=30)
+    except AssertionError:
+        pass
+    time.sleep(4)   # 지연된 첫 선수(3s) 응답이 도착한 뒤에도 덮이지 않아야 한다
+    txt = page.evaluate("document.querySelector('#player-analytics-modal .pa-body-inner').textContent")
+    browser.close()
+    assert "가브리엘" in txt and "석현준" not in txt, txt[:80]
+
+
 CHECKS = {name: fn for name, fn in globals().items() if name.startswith("check_")}
 
 

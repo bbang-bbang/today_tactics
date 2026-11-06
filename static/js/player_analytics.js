@@ -9,7 +9,6 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
     let radarChart = null;
     let monthChart = null;
-    let trendChart = null;
     let currentPlayerId = null;
 
     // ── 모달 열기/닫기 ──────────────────────────────────────────
@@ -30,7 +29,10 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }
 
     // ── 데이터 로딩 ──────────────────────────────────────────────
+    let _loadSeq = 0;   // 선수·연도 연타 전환 시 늦게 온 이전 응답 무시
     function loadData(playerId, year) {
+        const tok = ++_loadSeq;
+        if (window.ttPlayerReady) window.ttPlayerReady().catch(() => {});   // 차트 모듈은 데이터와 병렬로
         const url = `/api/player-analytics?playerId=${playerId}${year ? `&year=${year}` : ""}`;
         modal.querySelector(".pa-body-inner").innerHTML = `
             <div class="pa-loading-skeleton">
@@ -42,8 +44,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             </div>`;
         fetch(url)
             .then(r => r.json())
-            .then(data => render(data, playerId, year))
+            .then(data => { if (tok === _loadSeq) render(data, playerId, year); })
             .catch(() => {
+                if (tok !== _loadSeq) return;
                 modal.querySelector(".pa-body-inner").innerHTML = `<div class="pa-loading">데이터를 불러올 수 없습니다.</div>`;
             });
     }
@@ -141,9 +144,11 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         <!-- 경기별 트렌드 -->
         <div class="pa-trend-wrap">
             <div class="pa-section-title">경기별 트렌드 <span class="pa-sub">(${(trend||[]).length}경기 · 시간순)</span></div>
-            ${(trend||[]).length >= 3
-                ? `<div style="position:relative;height:230px"><canvas id="chart-pa-trend"></canvas></div>`
-                : `<div class="pa-empty">데이터 부족 (최소 3경기)</div>`}
+            ${(trend||[]).length >= 1
+                ? `<div class="tt-card-chart" data-chart-slot id="pa-rating-slot" style="height:220px"></div>
+                   <div class="tt-card-chart" data-chart-slot id="pa-strip-slot" style="height:64px"></div>
+                   <p class="pa-sub" id="pa-trend-note">굵은 선 = 경기별 평점 · 점선 = 시즌 평균 · 아래 띠 = 경기별 결과</p>`
+                : `<div class="pa-empty">경기 기록 없음</div>`}
         </div>
 
         <div class="pa-bottom-grid">
@@ -372,146 +377,24 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
     // ── 경기별 트렌드 차트 ──────────────────────────────────────
     function renderTrend(trend, position) {
-        const ctx = document.getElementById("chart-pa-trend");
-        if (!ctx || !trend || trend.length < 3) return;
-
-        const pos = ["G","D","M","F"].includes(position) ? position : "F";
-
-        // 포지션별 바 데이터 설정
-        const BAR_CFG = {
-            G: { label: "세이브",   data: trend.map(g => g.saves), color: "rgba(167,139,250,0.75)" },
-            D: { label: "수비액션", data: trend.map(g => g.def),   color: "rgba(78,164,248,0.70)" },
-            M: { label: "키패스",   data: trend.map(g => g.kp),    color: "rgba(52,211,153,0.70)" },
-            F: { label: "G+A",      data: trend.map(g => g.goals + g.assists), color: "rgba(251,191,36,0.75)" },
+        const rs = document.getElementById("pa-rating-slot"), ss = document.getElementById("pa-strip-slot");
+        if (!rs || !trend || !trend.length) return;
+        const tok = _loadSeq;
+        const pos = ["G", "D", "M", "F"].includes(position) ? position : "F";
+        const fail = () => {
+            [rs, ss].forEach((el) => { if (el) el.innerHTML = '<div class="tt-chart-error" role="alert">차트를 불러오지 못했습니다</div>'; });
         };
-        // FW는 골/도움 스택
-        const isFW = pos === "F";
-        const barCfg = BAR_CFG[pos];
-
-        const ratings = trend.map(g => g.rating);
-        const ptColors = trend.map(g =>
-            g.result === "W" ? "#22c55e" :
-            g.result === "L" ? "#ef4444" : "#9ca3af"
-        );
-
-        // X축 레이블: 연도 경계는 "'YY M/D", 나머지는 M/D, 경기 많으면 간격 조정
-        const step = trend.length > 20 ? Math.ceil(trend.length / 15) : 1;
-        const yearBoundaries = new Set();
-        const labels = trend.map((g, i) => {
-            const isNewYear = i === 0 || g.year !== trend[i - 1].year;
-            if (isNewYear && i > 0) yearBoundaries.add(i);
-            if (i % step !== 0) return "";
-            return isNewYear && i > 0 ? `'${String(g.year).slice(2)} ${g.date}` : g.date;
-        });
-
-        const datasets = [];
-        if (isFW) {
-            datasets.push({
-                type: "bar", label: "골",
-                data: trend.map(g => g.goals),
-                backgroundColor: "rgba(251,191,36,0.85)",
-                borderRadius: 3, yAxisID: "yBar", stack: "s", barPercentage: 0.6,
-            });
-            datasets.push({
-                type: "bar", label: "도움",
-                data: trend.map(g => g.assists),
-                backgroundColor: "rgba(78,164,248,0.65)",
-                borderRadius: 3, yAxisID: "yBar", stack: "s", barPercentage: 0.6,
-            });
-        } else {
-            datasets.push({
-                type: "bar", label: barCfg.label,
-                data: barCfg.data,
-                backgroundColor: barCfg.color,
-                borderRadius: 3, yAxisID: "yBar", barPercentage: 0.55,
-            });
-        }
-        datasets.push({
-            type: "line", label: "평점",
-            data: ratings,
-            borderColor: "rgba(251,191,36,0.95)",
-            backgroundColor: "transparent",
-            pointBackgroundColor: ptColors,
-            pointBorderColor: ptColors,
-            pointRadius: 5, pointHoverRadius: 7,
-            tension: 0.3, yAxisID: "yRating",
-            spanGaps: true, borderWidth: 2.5,
-        });
-
-        // yBar 최대값 (정수 상한, 최소 3)
-        const barMax = Math.max(3, ...datasets.filter(d => d.yAxisID === "yBar")
-            .flatMap(d => d.data).filter(v => v != null));
-
-        // 연도 경계 수직선 플러그인
-        const yearDividerPlugin = {
-            id: "yearDivider",
-            afterDraw(chart) {
-                if (!yearBoundaries.size) return;
-                const { ctx, scales: { x, yBar } } = chart;
-                const top    = yBar.top;
-                const bottom = yBar.bottom;
-                ctx.save();
-                ctx.strokeStyle = "rgba(255,255,255,0.25)";
-                ctx.lineWidth   = 1.5;
-                ctx.setLineDash([4, 3]);
-                yearBoundaries.forEach(idx => {
-                    const xPos = x.getPixelForValue(idx);
-                    ctx.beginPath();
-                    ctx.moveTo(xPos, top - 4);
-                    ctx.lineTo(xPos, bottom);
-                    ctx.stroke();
-                    // 연도 레이블
-                    ctx.fillStyle = "rgba(200,216,240,0.6)";
-                    ctx.font = "bold 10px sans-serif";
-                    ctx.textAlign = "center";
-                    ctx.fillText(`${trend[idx].year}`, xPos, top - 8);
-                });
-                ctx.restore();
-            }
-        };
-
-        trendChart = new Chart(ctx, {
-            data: { labels, datasets },
-            plugins: [yearDividerPlugin],
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                interaction: { mode: "index", intersect: false },
-                plugins: {
-                    legend: {
-                        labels: { color: "#aac", font: { size: 11 }, boxWidth: 12, padding: 12 }
-                    },
-                    tooltip: {
-                        backgroundColor: "rgba(10,15,30,0.92)",
-                        titleColor: "#c8d8f0", bodyColor: "#c8d8f0",
-                        padding: 10,
-                        callbacks: {
-                            title: (items) => {
-                                const g = trend[items[0].dataIndex];
-                                const badge = g.result === "W" ? "●" : g.result === "L" ? "●" : "●";
-                                return `${g.date} vs ${g.opp}  ${g.score}  ${g.result}`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: { color: "#778", font: { size: 10 }, maxRotation: 0, autoSkip: false },
-                        grid: { color: "rgba(255,255,255,0.04)" }
-                    },
-                    yBar: {
-                        position: "left", min: 0, max: barMax + 1,
-                        ticks: { color: "#aac", stepSize: 1, font: { size: 11 } },
-                        grid: { color: "rgba(255,255,255,0.05)" },
-                        title: { display: true, text: barCfg.label, color: "#aac", font: { size: 10 } }
-                    },
-                    yRating: {
-                        position: "right", min: 5, max: 10,
-                        ticks: { color: "#fbbf24", font: { size: 11 } },
-                        grid: { display: false },
-                        title: { display: true, text: "평점", color: "#fbbf24", font: { size: 10 } }
-                    },
-                }
-            }
+        const ready = window.ttPlayerReady ? window.ttPlayerReady() : Promise.reject(new Error("no loader"));
+        ready.catch(() => {}).then(() => {
+            if (tok !== _loadSeq || !document.body.contains(rs)) return;
+            if (!(window.TTChart && window.PlayerCharts)) return fail();
+            try {
+                const spec = PlayerCharts.ratingLine(trend);
+                const note = document.getElementById("pa-trend-note");
+                if (note && spec.__note) note.textContent = `${spec.__note} · ` + note.textContent;
+                TTChart.mount(rs, spec, { ariaLabel: "경기별 평점과 시즌 평균" });
+                TTChart.mount(ss, PlayerCharts.strip(trend, pos), { ariaLabel: "경기별 결과 띠" });
+            } catch (e) { console.warn("[player-analytics] trend chart failed", e); fail(); }
         });
     }
 
@@ -519,6 +402,6 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         if (radarChart)    { radarChart.destroy();    radarChart    = null; }
         if (activityChart) { activityChart.destroy(); activityChart = null; }
         if (monthChart)    { monthChart.destroy();    monthChart    = null; }
-        if (trendChart)    { trendChart.destroy();    trendChart    = null; }
+        if (window.TTChart) TTChart.destroyAll(modal);
     }
 })();

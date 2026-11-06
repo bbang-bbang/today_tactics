@@ -50,6 +50,14 @@
     // 차트 개편 모듈 로더: TERA 번들이 실패해도 어댑터(tt_charts)·셸(tt_dash)은 반드시 로드해야
     // mount() 가 "차트를 불러오지 못했습니다" 폴백 + 근거 표 펼침으로 동작한다 (ReferenceError 방지)
     window.ttLoadInsCharts = () => lazyLoad("ins_charts");
+    // 선수 분석 모달(어느 탭에서나 열림)용 차트 모듈 — 첫 호출 때 받기 시작
+    window.ttPlayerReady = () => {
+        if (!window._ttPlayerReady) {
+            window._ttPlayerReady = ensureChartsReady().then(() => lazyLoad("player_charts"));
+            window._ttPlayerReady.catch(() => { window._ttPlayerReady = null; });
+        }
+        return window._ttPlayerReady;
+    };
     // 차트 공통 모듈 1회 로드 약속 (인사이트·팀 탭 공용). 실패하면 비워 다음 방문에 재시도.
     function ensureChartsReady() {
         if (!window.ttChartsReady) {
