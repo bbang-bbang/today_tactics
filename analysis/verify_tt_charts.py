@@ -777,6 +777,23 @@ def check_player_year_switch_destroys_old_charts(pw):
 
 
 
+# ── Phase 4: 라운드 예측 인라인 확률 막대 ──────────────────────────
+def check_round_pred_bars(pw):
+    browser, page = _new_page(pw)
+    errs = collect_errors(page)
+    open_with_csp(page, "/")
+    _wait(page, "document.querySelectorAll('td.rpp-mu').length > 0", timeout=40)
+    rows = page.evaluate("document.querySelectorAll('td.rpp-mu').length")
+    bars = page.evaluate("""Array.from(document.querySelectorAll('.rpp-bar')).map(b =>
+        Array.from(b.children).reduce((s, i) => s + parseFloat(i.style.width), 0))""")
+    labelled = page.evaluate("Array.from(document.querySelectorAll('.rpp-bar')).every(b => /홈 \d+% 무 \d+% 원정 \d+%/.test(b.getAttribute('aria-label')))")
+    browser.close()
+    assert len(bars) == rows, (len(bars), rows)
+    assert all(abs(w - 100) < 0.6 for w in bars), bars[:4]
+    assert labelled is True
+    assert errs == [], errs
+
+
 CHECKS = {name: fn for name, fn in globals().items() if name.startswith("check_")}
 
 def main(argv):
