@@ -9,7 +9,7 @@
     <link rel="apple-touch-icon" href="/static/img/favicon.png">
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=123">
+    <link rel="stylesheet" href="/static/css/style.css?v=124">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/static/js/boot.js?v=1"></script>
 </head>
@@ -66,6 +66,7 @@
         <div class="flow-section-head">
             <span class="flow-step">①</span>
             <h2 class="flow-title">매치 선택</h2>
+            <span id="flow-selected" class="flow-selected" aria-live="polite"></span>
             <span class="flow-hint">라운드와 경기를 클릭하면 아래 흐름이 자동 갱신됩니다</span>
             <button id="match-strip-toggle" class="match-strip-toggle" type="button"
                     aria-expanded="true" aria-controls="league-schedule-wrap">▴ 접기</button>
@@ -1040,7 +1041,7 @@
     }</script>
 
     <!-- 작업공간 탭 컨트롤러 — 반드시 모든 모듈 스크립트 뒤에 로드 -->
-    <script src="/static/js/workspace.js?v=18"></script>
+    <script src="/static/js/workspace.js?v=19"></script>
 
     <!-- 온보딩 오버레이 -->
     <div id="onboarding-overlay" class="ob-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Today Tactics 소개">

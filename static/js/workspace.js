@@ -269,12 +269,14 @@
         const nm = (v) => (v || "").trim();
         const hasMatch = nm(a) && nm(a) !== "HOME" && nm(b) && nm(b) !== "AWAY";
         const showSummary = _current !== "tactics" && _current !== "predict" && hasMatch;
-        if (showSummary) {
-            const rb = document.querySelector(".league-tab-panel.active .ksb-round-btn.active");
-            const r = rb && /^\d+$/.test(rb.dataset.round || "") ? ` · R${rb.dataset.round}` : "";
-            ctxText.textContent = `${nm(a)} vs ${nm(b)}${r}`;
-        }
+        const rb = document.querySelector(".league-tab-panel.active .ksb-round-btn.active");
+        const r = rb && /^\d+$/.test(rb.dataset.round || "") ? ` · R${rb.dataset.round}` : "";
+        const label = hasMatch ? `${nm(a)} vs ${nm(b)}${r}` : "";
+        if (showSummary) ctxText.textContent = label;
         ctxBox.classList.toggle("hidden", !showSummary);
+        // 매치 선택 헤더에도 반영 — 영역이 접혔을 때 무엇을 골랐는지 바로 보이게 (CSS 가 접힘 상태에서만 노출)
+        const fs = $("flow-selected");
+        if (fs) fs.textContent = label;
     }
     ["fhud-name-a", "fhud-name-b"].forEach((id) => {
         const el = $(id);

@@ -10011,3 +10011,33 @@ body:not([data-ws="tactics"]):not([data-ws="predict"]) #banner-matchup {
 
 /* 팀 탭 심화 인사이트 컨테이너 — hidden 클래스가 display 를 끄도록 (모드 전환 시 단일 팀 분석과 겹치지 않게) */
 #ws-team-insights.hidden { display: none; }
+
+/* ═══════════════════════════════════════════════════════
+   매치 선택 헤더 — 흐릿한 보조 라벨 → 눈에 띄는 바 (2026-11-07)
+   (기존: opacity .65 + 힌트 rgba .32 / 11px 로 대비 부족)
+   ═══════════════════════════════════════════════════════ */
+.flow-section-head:not(.flow-section-head-mid) {
+    margin: 4px 0 8px;
+    padding: 9px 12px 9px 14px;
+    gap: 10px;
+    opacity: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+}
+.flow-section-head:not(.flow-section-head-mid) .flow-step { color: var(--accent); font-size: 0.9rem; font-weight: 700; }
+.flow-section-head:not(.flow-section-head-mid) .flow-title { color: #fff; font-size: 0.95rem; font-weight: 700; }
+.flow-section-head:not(.flow-section-head-mid) .flow-hint { color: var(--text-muted); font-size: 0.78rem; }
+.flow-section-head:not(.flow-section-head-mid) .match-strip-toggle {
+    color: var(--text-primary);
+    border-color: var(--accent);
+    background: transparent;
+}
+.flow-section-head:not(.flow-section-head-mid) .match-strip-toggle:hover { background: var(--accent); color: #fff; }
+
+/* 선택한 매치 — 접혔을 때만 헤더에 노출 */
+.flow-selected { display: none; color: #fff; font-size: 0.9rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--bg-elevated); }
+.flow-selected:empty { display: none !important; }
+body.match-strip-collapsed .flow-selected { display: inline-block; }
+body.match-strip-collapsed .flow-section-head .flow-hint { display: none; }
