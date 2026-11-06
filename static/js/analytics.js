@@ -412,6 +412,15 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         if (scope) scope.textContent = !ms.length ? "" : seasons.size > 1
             ? `${Math.max(...seasons)} 시즌만 표시 (연도를 고르면 그 시즌)` : `${ms.length}경기`;
         mountTeam("ta-trend-slot", () => TeamCharts.pace(trend, meta.primary || "#4ea4f8"), "누적 승점과 리그 평균 페이스");
+        // 근거(차트를 못 그려도 볼 수 있게): 최근 10경기
+        const tt = document.getElementById("ta-trend-table");
+        if (tt) {
+            const last = ms.slice(-10).reverse();
+            tt.innerHTML = last.length ? `<tr><th>날짜</th><th>상대</th><th>스코어</th><th>결과</th><th>시즌 누적</th><th>리그 평균</th></tr>` +
+                last.map(m => `<tr><td>${ttEsc(m.date)}</td><td>${m.is_home ? "vs" : "@"} ${ttEsc(m.opponent)}</td><td>${m.gf}:${m.ga}</td>`
+                    + `<td>${ttEsc(m.result)}</td><td>${m.season_cum_pts ?? "-"}</td><td>${m.league_avg_cum_pts ?? "-"}</td></tr>`).join("")
+                : "<tr><td class='chart-empty'>데이터 없음</td></tr>";
+        }
         mountTeam("ta-strip-slot", () => TeamCharts.strip(trend, meta.short || trend.short || "결과"), "경기별 결과 띠");
     }
     // ── 결과 ①-b 득실 마진 분포 (점수차별 경기 수) ───────────────
@@ -474,6 +483,11 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     // ── 결과 ② 월별 승률 ─────────────────────────────────────────
     function renderMonth(rows) {
         mountTeam("ta-month-slot", () => TeamCharts.month({ by_month: rows }), "월별 경기당 승점");
+        const tb = document.getElementById("ta-month-table");
+        if (tb) tb.innerHTML = rows.length ? `<tr><th>월</th><th>경기</th><th>승-무-패</th><th>득실</th><th>경기당 승점</th></tr>` +
+            rows.map(r => `<tr><td>${r.month}월</td><td>${r.games}</td><td>${r.w}-${r.d}-${r.l}</td><td>${r.gf}:${r.ga}</td>`
+                + `<td>${r.games ? ((3 * r.w + r.d) / r.games).toFixed(2) : "-"}</td></tr>`).join("")
+            : "<tr><td class='chart-empty'>데이터 없음</td></tr>";
     }
     // ── 결과 ③ 홈/원정 성적 (연도 합산) ───────────────────────────
     function renderHomeAway(byYearHa) {
@@ -584,6 +598,11 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     // ① 득점·실점 시간대 (15분 × 6버킷)
     function renderGoalTiming(gt, meta) {
         mountTeam("ta-timing-slot", () => TeamCharts.timing({ goal_timing: gt.total ? gt : {} }), "15분 구간별 실점과 득점");
+        const tb = document.getElementById("ta-timing-table");
+        const f = gt.for || [], a = gt.against || [];
+        if (tb) tb.innerHTML = gt.total ? `<tr><th>시간대</th><th>득점</th><th>실점</th></tr>` +
+            TIMING_LABELS.map((lb, i) => `<tr><td>${lb}분</td><td>${f[i] ?? 0}</td><td>${a[i] ?? 0}</td></tr>`).join("")
+            : "<tr><td class='chart-empty'>골 데이터 없음</td></tr>";
     }
     function renderFirstGoal(fg) {
         destroyChart("ta-firstgoal");

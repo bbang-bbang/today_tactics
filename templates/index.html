@@ -772,6 +772,8 @@
                         </div>
                         <div class="tt-card-chart" data-chart-slot id="ta-trend-slot" style="height:240px"></div>
                         <div class="tt-card-chart" data-chart-slot id="ta-strip-slot" style="height:64px"></div>
+                        <details class="tt-card-evidence"><summary>근거 보기 (최근 10경기)</summary>
+                            <table class="ins-table" id="ta-trend-table"></table></details>
                         <p class="tc-hint">굵은 선 = 이 팀 누적 승점 · 점선 = 같은 리그 팀 평균 누적 승점(그날까지) · 아래 띠 = 경기별 결과</p>
                     </div>
                     <div class="tc-panel" style="--tc-accent:#22d3ee">
@@ -786,6 +788,8 @@
                         <div class="tc-panel" style="--tc-accent:#34d399">
                             <p class="tc-panel-label">📅 월별 경기당 승점</p>
                             <div class="tt-card-chart" data-chart-slot id="ta-month-slot" style="height:220px"></div>
+                            <details class="tt-card-evidence"><summary>근거 보기</summary>
+                                <table class="ins-table" id="ta-month-table"></table></details>
                         </div>
                         <div class="tc-panel" style="--tc-accent:#60a5fa">
                             <p class="tc-panel-label">🏟 홈/원정 성적</p>
@@ -795,7 +799,7 @@
                         </div>
                     </div>
                     <div class="tc-panel" style="--tc-accent:#a78bfa">
-                        <p class="tc-panel-label">🤝 상대팀별 전적 <span class="tc-hint">(4경기 이상 상대 · 경기당 승점)</span></p>
+                        <p class="tc-panel-label">🤝 상대팀별 전적 <span class="tc-hint">(경기당 승점 · 4경기 미만은 라벨에 경기 수)</span></p>
                         <div class="tt-card-chart" data-chart-slot id="ta-vs-slot" style="height:260px"></div>
                         <details class="tt-card-evidence"><summary>근거 보기 (전체 상대 전적)</summary>
                             <table class="ins-table ta-vs-table" id="ta-vs-table"></table></details>
@@ -821,6 +825,8 @@
                         <div class="tc-panel" style="--tc-accent:#f59e0b">
                             <p class="tc-panel-label">⏱ 득점·실점 시간대</p>
                             <div class="tt-card-chart" data-chart-slot id="ta-timing-slot" style="height:230px"></div>
+                            <details class="tt-card-evidence"><summary>근거 보기</summary>
+                                <table class="ins-table" id="ta-timing-table"></table></details>
                             <p class="tc-hint">15분 구간별 실점(왼쪽)·득점(오른쪽) — 강한 시간대 / 무너지는 시간대</p>
                         </div>
                         <div class="tc-panel" style="--tc-accent:#22d3ee">
@@ -1007,8 +1013,8 @@
     <script type="application/json" id="tt-lazy">{
         "k2heatmap": "/static/js/k2heatmap.js?v=19",
         "team_compare": "/static/js/team_compare.js?v=16",
-        "analytics": "/static/js/analytics.js?v=22",
-        "team_charts": "/static/js/team_charts.js?v=2",
+        "analytics": "/static/js/analytics.js?v=23",
+        "team_charts": "/static/js/team_charts.js?v=3",
         "pass_network": "/static/js/pass_network.js?v=2",
         "match_report": "/static/js/match_report.js?v=3",
         "player_compare": "/static/js/player_compare.js?v=4",

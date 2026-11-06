@@ -615,10 +615,15 @@ def check_team_tera_fail(pw):
     _scroll_slots(page, TEAM_RESULT_SLOTS); time.sleep(0.6)
     n_err = page.evaluate("document.querySelectorAll('#ta-panel-results .tt-chart-error').length")
     n_tbl = page.evaluate("document.querySelectorAll('#ta-panel-results details.tt-card-evidence[open]').length")
-    browser.close()
     # 결과 탭 TERA 차트: pace·month·ha·vs (strip=timelineGrid, weather=forest 는 자체 Canvas)
+    page.evaluate("document.querySelector('.ta-tab-btn[data-tab=insights]').click()")
+    time.sleep(0.6); _scroll_slots(page, TEAM_INS_SLOTS); time.sleep(0.6)
+    n_ins = page.evaluate("document.querySelectorAll('#ta-panel-insights details.tt-card-evidence[open]').length")
+    browser.close()
     assert n_err == 4, n_err
-    assert n_tbl >= 2, n_tbl          # 표가 있는 패널(홈/원정·상대별)의 근거가 펼쳐짐
+    # TERA 차트 패널(트렌드·월별·홈원정·상대별)과 시간대 패널 모두 근거 표가 펼쳐져야 한다(리뷰 I2)
+    assert n_tbl >= 4, n_tbl
+    assert n_ins >= 1, n_ins
     assert [e for e in errs if e.startswith("pageerror")] == []
 
 

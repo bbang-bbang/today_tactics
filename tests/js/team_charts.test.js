@@ -55,11 +55,14 @@ test("homeAway_values", () => {
   assert.equal(c.series[0].data[1], Math.round(a.gf / a.games * 100) / 100);
 });
 
-test("vsOpp_min_games", () => {
+test("vsOpp_includes_small_samples_labelled", () => {
+  // 한 시즌은 대부분 상대와 3경기 → 4경기 미만도 그리되 라벨에 경기 수 표기, 4경기↑ 먼저
   const c = TeamCharts.vsOpp(A);
-  const ok = A.vs_opponents.filter((r) => r.games >= 4);
-  assert.equal(c.yAxis.categories.length, ok.length);
-  for (let i = 1; i < c.series[0].data.length; i++) assert.ok(c.series[0].data[i - 1] >= c.series[0].data[i]);
+  assert.equal(c.yAxis.categories.length, A.vs_opponents.length);
+  const small = A.vs_opponents.find((r) => r.games < 4);
+  if (small) assert.ok(c.yAxis.categories.includes(`${small.name} (${small.games}경기)`));
+  const firstSmall = c.yAxis.categories.findIndex((x) => /경기\)$/.test(x));
+  if (firstSmall >= 0) assert.ok(c.yAxis.categories.slice(firstSmall).every((x) => /경기\)$/.test(x)));
 });
 
 test("weather_small_sample", () => {

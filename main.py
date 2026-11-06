@@ -2550,14 +2550,24 @@ def get_team_trend():
         for ts_, h_, a_, hs_, as_ in lg_rows:
             by_season.setdefault(_loc_year(ts_), []).append((ts_, h_, a_, hs_, as_))
         for yr, evs in by_season.items():
-            teams_n = len({x[1] for x in evs} | {x[2] for x in evs})
-            cum, i = {}, 0
+            # 리그 구성원 = 그 시즌 최다 경기 수의 25% 이상 치른 팀 — 다른 리그 경기가 이 tournament 로
+            # 잘못 분류된 경우(개막전 오분류·PO)의 팀이 분모를 부풀려 평균을 낮추는 것을 막는다(리뷰 I1)
+            games = {}
+            for x in evs:
+                games[x[1]] = games.get(x[1], 0) + 1
+                games[x[2]] = games.get(x[2], 0) + 1
+            mx = max(games.values()) if games else 0
+            members = {t for t, n_ in games.items() if n_ >= 0.25 * mx}
+            teams_n = len(members)
+            cum = {t: 0 for t in members}
+            i = 0
             days = sorted({_loc_day(x[0]) for x in evs})
             for day in days:
                 while i < len(evs) and _loc_day(evs[i][0]) <= day:
                     _ts_, h_, a_, hs_, as_ = evs[i]
-                    cum[h_] = cum.get(h_, 0) + (3 if hs_ > as_ else 1 if hs_ == as_ else 0)
-                    cum[a_] = cum.get(a_, 0) + (3 if as_ > hs_ else 1 if hs_ == as_ else 0)
+                    if h_ in members and a_ in members:
+                        cum[h_] += 3 if hs_ > as_ else 1 if hs_ == as_ else 0
+                        cum[a_] += 3 if as_ > hs_ else 1 if hs_ == as_ else 0
                     i += 1
                 pace[(yr, day)] = round(sum(cum.values()) / teams_n, 2) if teams_n else None
     season_cum, cur_season = 0, None

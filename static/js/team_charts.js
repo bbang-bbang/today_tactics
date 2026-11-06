@@ -57,7 +57,10 @@
 
   function vsOpp(a) {
     const rows = ((a && a.vs_opponents) || []);
-    const ok = rows.filter((r) => r.games >= MIN_GAMES).map((r) => ({ name: r.name, v: r2(ppg(r)) })).sort((x, y) => y.v - x.v);
+    // 한 시즌은 대부분 상대와 3경기 → 4경기 미만도 그리되 라벨에 경기 수, 4경기↑ 먼저(각 그룹 안 PPG 내림차순)
+    const ok = rows.filter((r) => r.games > 0).map((r) => ({
+      name: r.games < MIN_GAMES ? `${r.name} (${r.games}경기)` : r.name, v: r2(ppg(r)), big: r.games >= MIN_GAMES }))
+      .sort((x, y) => (y.big - x.big) || (y.v - x.v));
     if (!ok.length) return { __empty: true };
     const tot = rows.reduce((s, r) => ({ w: s.w + r.w, d: s.d + r.d, games: s.games + r.games }), { w: 0, d: 0, games: 0 });
     return P.barRef({ categories: ok.map((r) => r.name), values: ok.map((r) => r.v), name: "상대별 경기당 승점",
