@@ -27,7 +27,6 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     const _trendInFlight = {};
     let _debounceTimer = null;
     // Chart.js 인스턴스 캐시 (destroy 대신 update)
-    let trendChart   = null;
     let balanceChart = null;
     const _sparkCharts = {}; // key: "A"|"B" → Chart instance
     // 골 타이밍 비교(두 팀 오버레이)
@@ -1019,119 +1018,38 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }
 
     // ─── A. 시즌 득/실 트렌드 라인차트 ──────────────────
-    function renderTrend(trendA, trendB, teamA, teamB) {
-        const el = document.getElementById("tc-trend");
+    // 차트 개편 Phase 2b: 두 팀 시즌 누적 승점 + (같은 리그면) 리그 평균 페이스 — TeamCharts.paceCompare
+    function renderTrend(trendA, trendB, teamA, teamB, tok) {
+        const slot = document.getElementById("tc-trend-slot");
         const scope = document.getElementById("tc-trend-scope");
-        if (!el) return;
-
-        // 두 팀 경기 날짜를 통합해 x축으로
-        const matchesA = (trendA && trendA.matches) || [];
-        const matchesB = (trendB && trendB.matches) || [];
-        scope.textContent = `${currentYear} · A ${matchesA.length}경기 · B ${matchesB.length}경기`;
-
-        // 경기 번호(시퀀스)를 x축으로 사용 (날짜 통합 대신 각 팀의 경기 순서)
-        const maxN = Math.max(matchesA.length, matchesB.length);
-        const labels = Array.from({ length: maxN }, (_, i) => i + 1);
-
-        const colorA = teamA.primary || "#4a82c7";
-        const colorB = teamB.primary || "#e06d4f";
-
-        const datasets = [
-            {
-                label: `${teamA.short} 득점`,
-                data: matchesA.map(m => m.gf),
-                borderColor: colorA,
-                backgroundColor: colorA + "22",
-                borderWidth: 2.5,
-                tension: 0.35,
-                pointRadius: 3,
-                pointHoverRadius: 5,
-            },
-            {
-                label: `${teamA.short} 실점`,
-                data: matchesA.map(m => m.ga),
-                borderColor: colorA,
-                backgroundColor: "transparent",
-                borderWidth: 1.5,
-                borderDash: [5, 4],
-                tension: 0.35,
-                pointRadius: 2,
-                pointHoverRadius: 4,
-            },
-            {
-                label: `${teamB.short} 득점`,
-                data: matchesB.map(m => m.gf),
-                borderColor: colorB,
-                backgroundColor: colorB + "22",
-                borderWidth: 2.5,
-                tension: 0.35,
-                pointRadius: 3,
-                pointHoverRadius: 5,
-            },
-            {
-                label: `${teamB.short} 실점`,
-                data: matchesB.map(m => m.ga),
-                borderColor: colorB,
-                backgroundColor: "transparent",
-                borderWidth: 1.5,
-                borderDash: [5, 4],
-                tension: 0.35,
-                pointRadius: 2,
-                pointHoverRadius: 4,
-            },
-        ];
-
-        if (trendChart) {
-            trendChart.data.labels = labels;
-            trendChart.data.datasets = datasets;
-            trendChart.options.scales.x.title.text = "경기 순서 →";
-            trendChart.update();
-            return;
-        }
-
-        trendChart = new Chart(el, {
-            type: "line",
-            data: { labels, datasets },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: { duration: 600 },
-                plugins: {
-                    legend: { labels: { color: "#cdd8e8", font: { weight: 600 }, usePointStyle: true, padding: 12 } },
-                    tooltip: {
-                        backgroundColor: "#ffffff",
-                        borderColor: "rgba(74,130,199,0.35)",
-                        borderWidth: 1,
-                        titleColor: "#cdd8e8",
-                        bodyColor: "#cdd8e8",
-                    }
-                },
-                scales: {
-                    x: {
-                        title: { display: true, text: "경기 순서 →", color: "#9fb0c8", font: { weight: 600 } },
-                        ticks: { color: "#8a9fb8", maxTicksLimit: 10, font: { weight: 600 } },
-                        grid: { color: "rgba(255,255,255,0.06)" },
-                    },
-                    y: {
-                        title: { display: true, text: "골", color: "#9fb0c8", font: { weight: 600 } },
-                        beginAtZero: true,
-                        ticks: { color: "#8a9fb8", stepSize: 1, font: { weight: 600 } },
-                        grid: { color: "rgba(255,255,255,0.07)" },
-                    },
-                }
+        if (!slot) return;
+        const sameLeague = !!teamA.league && teamA.league === teamB.league;
+        const go = () => {
+            if (tok !== _trendSeq) return;            // 그새 다른 팀 조합을 고름
+            if (!(window.TTChart && window.TeamCharts)) {
+                slot.innerHTML = '<div class="tt-chart-error" role="alert">차트를 불러오지 못했습니다</div>';
+                return;
             }
-        });
+            const spec = TeamCharts.paceCompare(trendA, trendB,
+                { colorA: teamA.primary || "#4a82c7", colorB: teamB.primary || "#e06d4f", sameLeague });
+            if (scope) scope.textContent = [currentYear, spec.__note].filter(Boolean).join(" · ");
+            TTChart.mount(slot, spec, { ariaLabel: `${teamA.short} vs ${teamB.short} 누적 승점` });
+        };
+        (window.ttTeamReady || Promise.resolve()).catch(() => {}).then(go);
     }
 
     // ─── 트렌드 데이터 병렬 로드 + 렌더 ─────────────────
+    let _trendSeq = 0;
     function loadTrendFor(teamA, teamB) {
+        const tok = ++_trendSeq;
         Promise.all([fetchTrend(teamA.id), fetchTrend(teamB.id)])
             .then(([trA, trB]) => {
-                renderTrend(trA, trB, teamA, teamB);
+                if (tok !== _trendSeq) return;
+                renderTrend(trA, trB, teamA, teamB, tok);
                 renderFormSparkline("A", trA, teamA);
                 renderFormSparkline("B", trB, teamB);
             })
-            .catch(() => {});
+            .catch((e) => console.warn("[team-compare] 트렌드 로드 실패", e));
     }
 
     function fetchTrend(teamId) {

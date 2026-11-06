@@ -637,6 +637,43 @@ def check_inline_height_preserved(pw):
     assert h == 64, h
 
 
+# ── Phase 2b: 팀 비교 ─────────────────────────────────────────────
+def _open_compare(pw, a="gangwon", b="ulsan", block_vendor=False):
+    browser, page = _new_page(pw)
+    errs = collect_errors(page)
+    if block_vendor:
+        page.route("**/static/vendor/**", lambda r: r.fulfill(status=404, body="nope"))
+    open_with_csp(page, "/")
+    page.evaluate("document.querySelector('.ws-tab[data-ws=team]').click()")
+    _wait(page, "!!document.querySelector('.ws-team-mode[data-tmode=compare]')")
+    page.evaluate("document.querySelector('.ws-team-mode[data-tmode=compare]').click()")
+    _wait(page, "document.querySelectorAll('#tc-team-a option').length > 5 && document.querySelectorAll('#tc-team-b option').length > 5", timeout=40)
+    page.select_option("#tc-team-a", a); page.select_option("#tc-team-b", b)
+    _wait(page, "typeof window.TeamCharts === 'object' || !!document.querySelector('#tc-trend-slot .tt-chart-error')", timeout=60)
+    page.evaluate("document.getElementById('tc-trend-slot').scrollIntoView({block:'center'})")
+    _wait(page, "!!document.querySelector('#tc-trend-slot canvas, #tc-trend-slot .tt-chart-error')", timeout=40)
+    time.sleep(1.0)
+    return browser, page, errs
+
+
+def check_compare_trend_render(pw):
+    browser, page, errs = _open_compare(pw)
+    ink = page.evaluate("""(()=>{const c=document.querySelector('#tc-trend-slot canvas'); if(!c) return 0;
+        const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data; let n=0;
+        for(let i=3;i<d.length;i+=4) if(d[i]>0) n++; return n/(d.length/4);})()""")
+    browser.close()
+    assert ink > 0.01, ink
+    assert errs == [], errs
+
+
+def check_compare_trend_tera_fail(pw):
+    browser, page, errs = _open_compare(pw, block_vendor=True)
+    n = page.evaluate("document.querySelectorAll('#tc-trend-slot .tt-chart-error').length")
+    browser.close()
+    assert n == 1, n
+    assert [e for e in errs if e.startswith("pageerror")] == []
+
+
 CHECKS = {name: fn for name, fn in globals().items() if name.startswith("check_")}
 
 

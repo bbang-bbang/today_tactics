@@ -666,11 +666,11 @@
                 <!-- 시즌 득/실 트렌드 라인 (A) -->
                 <div class="tc-panel" style="--tc-accent:#fbbf24">
                     <div class="tc-rank-header">
-                        <p class="tc-panel-label" style="margin:0">📈 시즌 득/실 트렌드</p>
+                        <p class="tc-panel-label" style="margin:0">📈 시즌 승점 페이스</p>
                         <span id="tc-trend-scope" class="tc-rank-scope"></span>
                     </div>
-                    <div class="chart-wrap" style="height:240px"><canvas id="tc-trend"></canvas></div>
-                    <p class="tc-hint">실선 = 경기별 득점 · 점선 = 경기별 실점 (팀 컬러 = 팀 A/B)</p>
+                    <div class="tt-card-chart" data-chart-slot id="tc-trend-slot" style="height:240px"></div>
+                    <p class="tc-hint">두 팀 시즌 누적 승점 (팀 컬러) · 점선 = 같은 리그 팀 평균 누적 승점(그날까지)</p>
                 </div>
 
                 <!-- 선제득점/실점 후 성적 (D) -->
@@ -1006,16 +1006,16 @@
     <!-- 지연 로딩 모듈 (탭/버튼 최초 사용 시 workspace.js 의 ttLazy 가 로드). 버전은 캐시 무효화용 -->
     <script type="application/json" id="tt-lazy">{
         "k2heatmap": "/static/js/k2heatmap.js?v=19",
-        "team_compare": "/static/js/team_compare.js?v=13",
+        "team_compare": "/static/js/team_compare.js?v=16",
         "analytics": "/static/js/analytics.js?v=22",
-        "team_charts": "/static/js/team_charts.js?v=1",
+        "team_charts": "/static/js/team_charts.js?v=2",
         "pass_network": "/static/js/pass_network.js?v=2",
         "match_report": "/static/js/match_report.js?v=3",
         "player_compare": "/static/js/player_compare.js?v=4",
         "insights": "/static/js/insights.js?v=59",
         "ins_charts": "/static/js/ins_charts.js?v=5",
         "tera": "/static/vendor/tera-chart-7.0.2.min.js?v=1",
-        "tt_charts": "/static/js/tt_charts.js?v=9",
+        "tt_charts": "/static/js/tt_charts.js?v=10",
         "tt_dash": "/static/js/tt_dash.js?v=2"
     }</script>
 
