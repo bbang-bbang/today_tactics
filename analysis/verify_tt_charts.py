@@ -315,7 +315,7 @@ def check_mount_null_safe(pw):
 
 
 # ── Phase 1a: 인사이트 심화 탭 실화면 ─────────────────────────────────
-ADV_CHART_KEYS = ["trend", "xgluck", "opp", "weather", "formation", "hub", "gs", "pv", "aft",
+ADV_CHART_KEYS = ["trend", "xgluck", "opp", "sim", "weather", "formation", "hub", "gs", "pv", "aft",
                   "subimp", "rest", "rot", "sdep", "spp", "weak"]
 
 
@@ -346,7 +346,7 @@ def _open_adv(pw, width=1440, block_vendor=False, browser_name="chromium", route
     page.evaluate("(()=>{const b=document.getElementById('insights-toggle-btn'); if(b.getAttribute('aria-expanded')!=='true') b.click()})()")
     _wait(page, "!!document.querySelector('[data-itab=adv]')")
     page.evaluate("document.querySelector('[data-itab=adv]').click()")
-    _wait(page, "document.querySelectorAll('#ins-adv-grid > .tt-card').length === 21")
+    _wait(page, "document.querySelectorAll('#ins-adv-grid > .tt-card').length === 22")
     _scroll_adv(page)
     _wait(page, _adv_ready_js())
     time.sleep(1.0)
@@ -375,7 +375,7 @@ def check_adv_cards_render(pw, browser_name="chromium"):
         .filter(c => ((c.querySelector('.tt-card-body')||{textContent:''}).textContent
                     + (c.querySelector('.tt-card-evidence')||{textContent:''}).textContent).trim().length === 0).map(c => c.id)""")
     browser.close()
-    assert n_cards == 21, n_cards
+    assert n_cards == 22, n_cards
     blank = {k: v for k, v in inks.items() if v <= 0.01}
     assert not blank, blank
     assert empty_bodies == [], empty_bodies
@@ -391,7 +391,7 @@ def check_adv_height_budget(pw):
     h = page.evaluate("document.getElementById('ins-panel-adv').scrollHeight")
     browser.close()
     # spec 목표 4,500px(5화면) 대비 실측 6,368px — 가독성 유지를 위해 6,500px 상한으로 완화, 사용자 체크포인트에서 확인
-    assert h <= 7000, f"adv panel height {h}px"   # 1b: 차트 6장 추가로 6,636px — 7,000 상한
+    assert h <= 7500, f"adv panel height {h}px"   # 4: 시즌 시뮬 카드 추가로 7,130px — 7,500 상한
 
 
 def check_adv_leads_hoisted(pw):
@@ -425,7 +425,7 @@ def check_chips_filter(pw):
     n_all = page.evaluate("Array.from(document.querySelectorAll('#ins-adv-grid > .tt-card')).filter(c=>!c.hidden).length")
     browser.close()
     assert shown and set(shown) == {"setpiece"}, shown
-    assert n_all == 21, n_all
+    assert n_all == 22, n_all
 
 
 def check_stale_response_ignored(pw):
@@ -454,7 +454,7 @@ def check_adv_tera_fail_shows_tables(pw):
     leads = page.evaluate("document.querySelectorAll('#ins-adv-grid .tt-card-lead .ins-take').length")
     browser.close()
     # 자체 Canvas 5장(forest: subimp·rest·weather, timelineGrid: rot, pitchZones: weak)은 TERA 없이도 그려진다
-    assert n_err == 10 and n_open == 10, (n_err, n_open)
+    assert n_err == 11 and n_open == 11, (n_err, n_open)
     assert leads >= 5, leads
     assert [e for e in errs if e.startswith("pageerror")] == []
 
@@ -462,7 +462,7 @@ def check_adv_tera_fail_shows_tables(pw):
 def check_k1_filter_no_toggle(pw):
     browser, page, errs = _open_adv(pw)
     page.evaluate("document.querySelector('#insights-year-filter .ld-league-btn[data-league=k1]').click()")
-    _wait(page, "document.querySelectorAll('#ins-adv-grid > .tt-card').length === 21")
+    _wait(page, "document.querySelectorAll('#ins-adv-grid > .tt-card').length === 22")
     _scroll_adv(page)
     _wait(page, _adv_ready_js())
     time.sleep(0.8)

@@ -1751,7 +1751,21 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
      카드 정의는 ins_charts.js(InsCharts.CARDS). 기존 렌더러는 근거 영역(bodyId)에 그대로 그리고,
      한 줄 해석·판정·경고는 카드 상단(.tt-card-lead)으로 옮겨 근거를 접어도 보이게 한다.
      리그 '전체'면 카드마다 K1|K2 토글로 한 리그씩 보여 준다(두 리그 연속 출력 제거). */
+  // 시즌 시뮬레이션 근거 표 (현재 시즌 기준 — 상단 시즌 필터와 무관)
+  function renderSim(list) {
+    const el = document.getElementById("ins-sim-body"); if (!el) return;
+    el.innerHTML = list.map((d) => {
+      if (!d || !d.ready) return `<div class="ins-adv-empty">시뮬레이션 데이터 부족</div>`;
+      const rows = d.teams.map((t) => `<tr><td class="ins-xl-team">${ttEsc(t.name)}</td><td>${t.current_pts}</td>`
+        + `<td>${t.win_pct}%</td><td>${t.afc_pct}%</td><td>${t.rel_pct}%</td><td>${t.avg_pos}</td></tr>`).join("");
+      return `<div class="ins-adv-sub-h">${ttEsc(d.league)} 현재 시즌 <span class="ins-clutch-hint">${d.n_simulations}회 시뮬레이션 · 남은 ${d.pending_games}경기</span></div>`
+        + `<div class="ins-top-scroll"><table class="ins-table ins-xl-table"><thead><tr><th>팀</th><th>현재 승점</th><th>우승</th>`
+        + `<th>${d.league === "K1" ? "AFC권" : "승격권"}</th><th>강등</th><th>평균 순위</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join("") + `<div class="ins-method">근거 — 남은 경기를 경기 예측 모델 확률로 무작위 진행해 최종 순위를 집계(시즌 필터와 무관하게 현재 시즌) · 칸 = 그 순위로 끝날 확률 % · 0%는 빈칸</div>`;
+  }
+
   const RENDER = {
+    renderSim,
     renderTrend, renderXgLuck, renderOppStrength, renderStorylines, renderWeather, renderFormation,
     renderGameState, renderPassVolume, renderAftermath, renderPassHub, renderSubImpact, renderRestEffect,
     renderRotation, renderScoringDep, renderSubstitution, renderClutch, renderSetpieceProfile, renderWeakness,
@@ -1761,10 +1775,10 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   let _advSeq = 0;                   // loadAdvanced 세대 — 필터가 바뀌면 이전 세대 응답은 버림
   const _advLeague = {};             // 카드 key → 현재 토글 리그 ("k1"|"k2")
   const _advTok = {};                // 카드 key → 요청 토큰 (토글 연타 시 늦게 온 응답 무시)
-  const advFetch = (ep, league, year) => {
+  const advFetch = (ep, league, year, url) => {
     const k = `${ep}|${league}|${year}`;
     if (!_advCache.has(k)) {
-      const p = fetch(`/api/insights/${ep}?year=${year}&league=${league}`).then((r) => {
+      const p = fetch(url || `/api/insights/${ep}?year=${year}&league=${league}`).then((r) => {
         if (!r.ok) throw new Error(`${ep} ${r.status}`);
         return r.json();
       });
@@ -1791,7 +1805,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     const league = card.perLeague ? (_advLeague[card.key] || (currentLeague === "all" ? "k1" : currentLeague)) : currentLeague;
     const tok = (_advTok[card.key] = (_advTok[card.key] || 0) + 1);
     const stale = () => gen !== _advSeq || year !== currentYear || tok !== _advTok[card.key];
-    return advFetch(card.endpoint, league, year).then((d) => {
+    return advFetch(card.endpoint, league, year, card.url ? card.url(league) : null).then((d) => {
       if (stale()) return;
       RENDER[card.render](card.perLeague || card.endpoint === "weather-effect" ? [d] : d);
       hoistLeads(cardEl, card.bodyId);

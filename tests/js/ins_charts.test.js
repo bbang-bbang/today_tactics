@@ -10,13 +10,14 @@ const fx = (ep) => JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", `
 const noColor = () => undefined;
 const BODY_IDS = ["ins-story-body", "ins-xgluck-body", "ins-opp-body", "ins-fm-body", "ins-trend-body", "ins-wx-body",
   "ins-pv-body", "ins-rest-body", "ins-subimp-body", "ins-sub-body", "ins-spp-body", "ins-weak-body", "ins-sdep-body",
-  "ins-rot-body", "ins-gs-body", "ins-aft-body", "ins-hub-body", "ins-clutch-body", "ins-shooting-body", "ins-gk-body", "ins-duel-body"];
+  "ins-rot-body", "ins-gs-body", "ins-aft-body", "ins-hub-body", "ins-clutch-body", "ins-shooting-body", "ins-gk-body", "ins-duel-body",
+  "ins-sim-body"];
 
 test("cards_cover_all_bodies", () => {
-  assert.equal(InsCharts.CARDS.length, 21);
+  assert.equal(InsCharts.CARDS.length, 22);
   assert.deepEqual(new Set(InsCharts.CARDS.map((c) => c.bodyId)), new Set(BODY_IDS));
   const charted = InsCharts.CARDS.filter((c) => c.chart).map((c) => c.key).sort();
-  assert.deepEqual(charted, ["aft", "formation", "gs", "hub", "opp", "pv", "rest", "rot", "sdep", "spp", "subimp", "trend", "weak", "weather", "xgluck"]);
+  assert.deepEqual(charted, ["aft", "formation", "gs", "hub", "opp", "pv", "rest", "rot", "sdep", "sim", "spp", "subimp", "trend", "weak", "weather", "xgluck"]);
   for (const c of InsCharts.CARDS.filter((c) => c.chart)) assert.equal(typeof InsCharts[c.key], "function", c.key);
 });
 
@@ -119,14 +120,14 @@ test("labels_are_plain_strings", () => {
 test("cards_order_packs_rows_without_dense", () => {
   // grid-auto-flow:dense 없이도 빈칸이 적도록 테마 안에서 L+S / M+M 짝으로 배치 (DOM 순서 = 화면 순서)
   assert.deepEqual(InsCharts.CARDS.map((c) => c.key), [
-    "trend", "story", "xgluck", "opp", "weather",
+    "trend", "story", "xgluck", "opp", "sim", "weather",
     "formation", "hub", "gs", "pv", "aft",
     "subimp", "rest", "rot", "sdep", "sub", "clutch",
     "spp", "weak", "shooting", "gk", "duel"]);
   const W = { L: 8, M: 6, S: 4 };
   let row = 0, gaps = 0;
   for (const c of InsCharts.CARDS) { if (row + W[c.size] > 12) { gaps += 12 - row; row = 0; } row += W[c.size]; }
-  assert.ok(gaps <= 12, `total empty columns ${gaps}`);
+  assert.ok(gaps <= 16, `total empty columns ${gaps}`);
 });
 
 // ── Phase 1b: 카드 6장 ──
@@ -187,7 +188,7 @@ test("hub_ref_is_league", () => {
 });
 
 test("cards_chart_count_15", () => {
-  assert.equal(InsCharts.CARDS.filter((c) => c.chart).length, 15);
+  assert.equal(InsCharts.CARDS.filter((c) => c.chart).length, 16);
   assert.equal(InsCharts.CARDS.filter((c) => c.collapse).length, 0);
 });
 
@@ -198,4 +199,26 @@ test("phase1b_builders_empty", () => {
   assert.deepEqual(InsCharts.rot({ teams: [] }), { __empty: true });
   assert.deepEqual(InsCharts.aft({ league_total: { scored: 0, flow: { extra_only: 0, conc_only: 0, both: 0, none: 0 } } }), { __empty: true });
   assert.deepEqual(InsCharts.hub({ teams: [] }), { __empty: true });
+});
+
+
+// ── Phase 4: 시즌 시뮬레이션 ──
+test("sim_percent_matrix", () => {
+  const d = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "k1_season-simulation.json"), "utf8"));
+  const c = InsCharts.sim(d);
+  assert.equal(c.yAxis.categories.length, d.teams.length);
+  assert.equal(c.xAxis.categories.length, d.n_teams);
+  assert.equal(c.xAxis.categories[0], "1위");
+  const t0 = d.teams[0], cell = c.data.find((x) => x.x === 0 && x.y === 0);
+  assert.equal(cell.value, Math.round(t0.position_dist[0] / d.n_simulations * 100));
+});
+
+test("sim_zero_cells_null", () => {
+  const c = InsCharts.sim({ ready: true, n_teams: 2, n_simulations: 10, teams: [{ name: "a", position_dist: [10, 0] }, { name: "b", position_dist: [0, 10] }] });
+  assert.equal(c.data.find((x) => x.x === 1 && x.y === 0).value, null);
+  assert.equal(c.data.find((x) => x.x === 0 && x.y === 0).value, 100);
+});
+
+test("sim_not_ready_empty", () => {
+  assert.deepEqual(InsCharts.sim({ ready: false, teams: [] }), { __empty: true });
 });

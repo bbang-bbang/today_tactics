@@ -15,6 +15,7 @@
     { key: "story", bodyId: "ins-story-body", size: "S", theme: "flow", icon: "📰", title: "리그 화제 포인트", question: "지금 흐름이 좋은 팀·나쁜 팀, 진행 중인 기록, 눈여겨볼 선수", endpoint: "storylines", perLeague: true, render: "renderStorylines", chart: false },
     { key: "xgluck", bodyId: "ins-xgluck-body", size: "M", theme: "flow", icon: "🍀", title: "xG 운 보정", question: "실력(xG)만큼 승점을 땄나? 실제 vs 기대 승점", endpoint: "xg-luck", perLeague: true, render: "renderXgLuck", chart: true },
     { key: "opp", bodyId: "ins-opp-body", size: "M", theme: "flow", icon: "🧗", title: "상대 수준별 성적", question: "상위·중위·하위권 상대로 각각 얼마나 따나? 강팀 킬러·승점 흘리는 팀", endpoint: "opponent-strength", perLeague: true, render: "renderOppStrength", chart: true },
+    { key: "sim", bodyId: "ins-sim-body", size: "L", theme: "flow", icon: "🎲", title: "시즌 시뮬레이션 — 최종 순위 확률", question: "남은 경기를 500번 시뮬레이션하면 몇 위로 끝나나? (칸 숫자 = 확률 %)", endpoint: "season-simulation", url: (lg) => `/api/season-simulation?league=${lg}&n=500`, perLeague: true, render: "renderSim", chart: true },
     { key: "weather", bodyId: "ins-wx-body", size: "M", theme: "flow", icon: "🌦", title: "날씨 영향", question: "기온·비·바람이 득점과 홈 승률을 바꾸나? 통계적으로 확실할 때만 말함", endpoint: "weather-effect", perLeague: false, render: "renderWeather", chart: true },
     { key: "formation", bodyId: "ins-fm-body", size: "L", theme: "tactics", icon: "♟️", title: "포메이션 상성", question: "내 포메이션이 상대 포메이션을 만나면? 경기당 승점 (표본 부족 칸은 비움)", endpoint: "formation-matchup", perLeague: true, render: "renderFormation", chart: true },
     { key: "hub", bodyId: "ins-hub-body", size: "S", theme: "tactics", icon: "🕸️", title: "패스 허브 의존도", question: "팀 패스가 한 선수에게 얼마나 몰리나?", endpoint: "pass-hub", perLeague: true, render: "renderPassHub", chart: true },
@@ -191,7 +192,21 @@
       ref: d.league_hub_share, refLabel: "리그 평균", unit: "%" });
   }
 
-  const InsCharts = { CARDS, THEMES, trend, xgluck, opp, formation, gs, pv, subimp, rest, spp, weather, weak, sdep, rot, aft, hub };
+  // 시즌 시뮬레이션: 팀 × 최종 순위 확률(%) — 0% 칸은 비워 노이즈를 줄인다
+  function sim(d) {
+    if (!d || !d.ready || !(d.teams || []).length) return { __empty: true };
+    const n = d.n_teams || d.teams.length, runs = d.n_simulations || 1;
+    return P.heatMatrix({
+      rows: d.teams.map((t) => t.name), cols: Array.from({ length: n }, (_, i) => `${i + 1}위`),
+      values: d.teams.map((t) => Array.from({ length: n }, (_, i) => {
+        const v = Math.round(((t.position_dist || [])[i] || 0) / runs * 100);
+        return v > 0 ? v : null;
+      })),
+      colorTitle: "%", decimals: 0,
+    });
+  }
+
+  const InsCharts = { CARDS, THEMES, sim, trend, xgluck, opp, formation, gs, pv, subimp, rest, spp, weather, weak, sdep, rot, aft, hub };
   root.InsCharts = InsCharts;
   if (typeof module !== "undefined" && module.exports) module.exports = InsCharts;
 })(typeof globalThis !== "undefined" ? globalThis : this);
