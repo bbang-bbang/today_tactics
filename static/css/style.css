@@ -849,9 +849,9 @@ body {
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
-    column-gap: clamp(10px, 1.4vw, 18px);
+    column-gap: clamp(10px, 0.8vw, 12px);
     row-gap: clamp(8px, 1.2vh, 14px);
-    padding: clamp(12px, 1.8vh, 22px) clamp(18px, 2.2vw, 30px);
+    padding: clamp(12px, 1.8vh, 22px) clamp(18px, 1.2vw, 24px);
     width: fit-content;
     max-width: min(100%, 760px);
     margin: 0 auto;
@@ -6052,8 +6052,8 @@ body {
 }
 
 #player-report-section {
-    flex: 0 0 clamp(420px, 36vw, 600px);
-    width: clamp(420px, 36vw, 600px);
+    flex: 0 0 clamp(360px, 24vw, 460px);   /* 페이지 최대 폭 1600 도입 후 경기장 컬럼 확보 (HUD 한 줄 유지) */
+    width: clamp(360px, 24vw, 460px);
     height: clamp(400px, 62vh, 820px);
     overflow-y: auto;
     background: linear-gradient(180deg, #0b1226 0%, #0d1530 100%);
