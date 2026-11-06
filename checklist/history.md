@@ -4438,3 +4438,5 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-11-06 차트 개편 Phase 0(TERA 게이트 통과)·1a(심화 탭 대시보드 셸, 23,407→6,368px, 차트 카드 9장) — 브랜치 feat/chart-dashboard-redesign, 미배포
 - 2026-11-06 차트 개편 Phase 1b(심화 카드 6장 차트화, API 필드 4종 additive, 차트 카드 15장) — 미배포
 - 2026-11-06 석현준 득점 누락 수정(포털 미공개 경기 goal_events 보정, 배포) · 차트 개편 Phase 2a(팀 분석) — 브랜치 feat/chart-phase2-team
+- 2026-11-06 차트 개편 Phase 2b(팀 비교 페이스)·2a/2b 리뷰 수정·Phase 3(선수 경기별 트렌드) — 브랜치 feat/chart-phase3-player
+- 2026-11-06 차트 개편 Phase 3 리뷰 수정·Phase 4(시즌 시뮬 히트맵, 라운드 예측 막대), style.css 캐시 버전 갱신

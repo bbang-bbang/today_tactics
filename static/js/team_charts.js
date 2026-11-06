@@ -85,7 +85,15 @@
   }
 
   // 팀 비교: 두 팀 시즌 누적 승점 (+ 같은 리그면 리그 평균 페이스). 각 팀 최근 시즌, 짧은 쪽은 null 패딩.
-  const ALT_B = "#f59e0b";
+  const hue = (hex) => {
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(String(hex).replace("#", "").slice(i, i + 2), 16) / 255);
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    if (!d) return 0;
+    const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return (h * 60 + 360) % 360;
+  };
+  const hueDiff = (a, b) => { const d = Math.abs(hue(a) - hue(b)); return Math.min(d, 360 - d); };
+  const ALT_B = ["#f59e0b", "#22d3ee"];   // 대체색 후보(주황·청록) — A 와 더 다른 쪽을 고른다
   function paceCompare(trA, trB, o) {
     o = o || {};
     const latest = (tr) => {
@@ -99,18 +107,28 @@
     if (!n) return { __empty: true };
     const pad = (ms, f) => Array.from({ length: n }, (_, i) => (i < ms.length ? f(ms[i]) : null));
     const longer = A.ms.length >= B.ms.length ? A.ms : B.ms;
-    let colorB = o.colorB || ALT_B;
-    if (o.colorA && TT.util.contrast(o.colorA, colorB) < 1.6) colorB = ALT_B;   // 두 팀 색이 비슷하면 B 를 대체색으로
+    // 실제로 그려지는 색(배경 대비 보정 후)의 '색상(hue)' 차이로 비교 — 60° 미만이면 A 와 가장 먼 대체색으로.
+    // (밝기 대비는 주황·청록처럼 다른 색도 비슷하다고 판정해 부적합 — 리뷰 I1). B 는 점선이라 색만으로 구분하지 않는다.
+    const drawn = (c) => TT.util.lighten(c, 3);
+    const colorA = o.colorA || "#4a82c7";
+    let colorB = o.colorB || ALT_B[0];
+    if (hueDiff(drawn(colorA), drawn(colorB)) < 60) {
+      colorB = ALT_B.slice().sort((x, y) => hueDiff(drawn(colorA), drawn(y)) - hueDiff(drawn(colorA), drawn(x)))[0];
+    }
     const spec = P.paceLine({
       labels: Array.from({ length: n }, (_, i) => "R" + (i + 1)),
-      team: { name: (trA && trA.short) || "A", color: o.colorA, data: pad(A.ms, (m) => m.season_cum_pts) },
-      extra: [{ name: (trB && trB.short) || "B", color: colorB, data: pad(B.ms, (m) => m.season_cum_pts) }],
-      ref: o.sameLeague ? { name: "리그 평균", data: pad(longer, (m) => m.league_avg_cum_pts) } : null,
+      team: { name: (trA && trA.short) || "A", color: colorA, data: pad(A.ms, (m) => m.season_cum_pts) },
+      extra: [{ name: (trB && trB.short) || "B", color: colorB, dashArray: "6,3", data: pad(B.ms, (m) => m.season_cum_pts) }],
+      // 리그 평균은 같은 리그·같은 시즌일 때만 의미가 있다(시즌이 다르면 어느 시즌 평균인지 모호)
+      ref: o.sameLeague && A.season === B.season ? { name: "리그 평균", data: pad(longer, (m) => m.league_avg_cum_pts) } : null,
     });
     const notes = [];
+    const nameA = (trA && trA.short) || "A", nameB = (trB && trB.short) || "B";
+    if (!A.ms.length) notes.push(`${nameA} 데이터 없음`);
+    else if (!B.ms.length) notes.push(`${nameB} 데이터 없음`);
+    else if (A.season !== B.season) notes.push(`시즌이 다름 (${A.season} vs ${B.season}) — 리그 평균선 생략`);
     if (!o.sameLeague) notes.push("두 팀 리그가 달라 리그 평균선은 생략");
-    if (A.season !== B.season) notes.push(`시즌이 다름 (${A.season} vs ${B.season})`);
-    else if (A.all > A.ms.length || (B.all || 0) > B.ms.length) notes.push(`${A.season} 시즌만 표시`);
+    if (A.ms.length && B.ms.length && A.season === B.season && (A.all > A.ms.length || (B.all || 0) > B.ms.length)) notes.push(`${A.season} 시즌만 표시`);
     if (notes.length) spec.__note = notes.join(" · ");
     return spec;
   }

@@ -105,9 +105,19 @@ test("paceCompare_cross_league_no_ref", () => {
   assert.match(c.__note, /리그가 달라/);
 });
 
+const hue = (hex) => {
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.replace("#", "").slice(i, i + 2), 16) / 255);
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (!d) return 0;
+  const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+};
+const hueDiff = (a, b) => { const d = Math.abs(hue(a) - hue(b)); return Math.min(d, 360 - d); };
+
 test("paceCompare_close_colors", () => {
+  // 서울(빨강) vs 김천(빨강) → B 를 A 와 색상이 먼 대체색으로
   const c = TeamCharts.paceCompare(mk(2026, [3], [1]), mk(2026, [1], [1]), { colorA: "#ef3744", colorB: "#df242b", sameLeague: true });
-  assert.equal(c.series[1].color, TTChart.util.lighten("#f59e0b", 3));
+  assert.ok(hueDiff(c.series[0].color, c.series[1].color) >= 60, c.series[1].color);
 });
 
 test("paceCompare_latest_season", () => {
@@ -118,4 +128,29 @@ test("paceCompare_latest_season", () => {
 
 test("paceCompare_empty", () => {
   assert.deepEqual(TeamCharts.paceCompare({ matches: [] }, { matches: [] }, {}), { __empty: true });
+});
+
+// ── Phase 2b 리뷰: 색만으로 구분 금지 · 대체색 · 시즌 불일치 시 기준선 생략 · 빈 팀 안내 ──
+test("paceCompare_b_dashed_not_color_only", () => {
+  const c = TeamCharts.paceCompare(mk(2026, [3], [1]), mk(2026, [1], [1]), { colorA: "#f55947", colorB: "#1d5fa5", sameLeague: true });
+  assert.equal(c.series[1].dashArray, "6,3");             // B 는 점선 — 색과 무관하게 구분
+  assert.equal(c.series[2].dashArray, "4,3"); assert.equal(c.series[2].lineWidth, 1.5);
+});
+
+test("paceCompare_alt_color_distinct_from_a", () => {
+  // 제주(주황) vs 광주(노랑) → 대체색이 주황이면 다시 비슷 → A 와 더 다른 대체색을 고른다
+  const c = TeamCharts.paceCompare(mk(2026, [3], [1]), mk(2026, [1], [1]), { colorA: "#f47920", colorB: "#f3ad02", sameLeague: true });
+  assert.ok(hueDiff(c.series[0].color, c.series[1].color) >= 60, `${c.series[0].color} vs ${c.series[1].color}`);
+});
+
+test("paceCompare_ref_only_same_season", () => {
+  const c = TeamCharts.paceCompare(mk(2025, [3], [1]), mk(2026, [1], [1]), { colorA: "#f55947", colorB: "#1d5fa5", sameLeague: true });
+  assert.equal(c.series.length, 2);
+  assert.match(c.__note, /시즌이 다름/);
+});
+
+test("paceCompare_empty_team_note", () => {
+  const c = TeamCharts.paceCompare({ short: "A팀", matches: [] }, mk(2026, [1], [1]), { colorA: "#f55947", colorB: "#1d5fa5", sameLeague: true });
+  assert.ok(!/null/.test(c.__note), c.__note);
+  assert.match(c.__note, /A팀 데이터 없음/);
 });

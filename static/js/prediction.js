@@ -223,11 +223,18 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             const actualCell = m.actual_score
                 ? `<td class="rpp-actual">${actual}</td>`
                 : `<td class="rpp-actual rpp-actual-tbd">예정</td>`;
+            // 차트 개편 Phase 4: 홈·무·원정 100% 누적 인라인 막대 (반올림 합이 100이 아니어도 넘치지 않게 합으로 정규화, 숫자 열 유지)
+            const tot = (p.home_pct + p.draw_pct + p.away_pct) || 1;
+            const w = v => (v / tot * 100).toFixed(2);
+            const barCell = `<td class="rpp-bar-cell"><span class="rpp-bar" role="img" aria-label="홈 ${p.home_pct}% 무 ${p.draw_pct}% 원정 ${p.away_pct}%">`
+                + `<i class="rpp-seg-h" style="width:${w(p.home_pct)}%"></i><i class="rpp-seg-d" style="width:${w(p.draw_pct)}%"></i>`
+                + `<i class="rpp-seg-a" style="width:${w(p.away_pct)}%"></i></span></td>`;
             return `<tr>
                 <td class="rpp-mu"><span class="rpp-h">${m.home_short}</span><span class="rpp-vs">vs</span><span class="rpp-a">${m.away_short}</span></td>
                 <td class="rpp-pct${cls(p.home_pct)}">${p.home_pct}</td>
                 <td class="rpp-pct${cls(p.draw_pct)}">${p.draw_pct}</td>
                 <td class="rpp-pct${cls(p.away_pct)}">${p.away_pct}</td>
+                ${barCell}
                 <td class="rpp-ts">${ts}</td>
                 ${actualCell}
                 ${hitCell}
@@ -241,7 +248,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             </div>
             <table class="rpp-table">
                 <thead><tr>
-                    <th>매치업</th><th>홈%</th><th>무%</th><th>원정%</th><th>예상</th><th>실제</th><th></th>
+                    <th>매치업</th><th>홈%</th><th>무%</th><th>원정%</th><th>확률</th><th>예상</th><th>실제</th><th></th>
                 </tr></thead>
                 <tbody>${rows}</tbody>
             </table>

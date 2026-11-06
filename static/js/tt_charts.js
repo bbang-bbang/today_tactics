@@ -516,7 +516,11 @@
     if (!labels.length || !o.team || !(o.team.data || []).length) return EMPTY();
     const pt = (v) => (v == null ? null : { y: v });
     const series = [{ name: o.team.name, color: lighten(o.team.color || THEME.accent, 3), lineWidth: 3, data: o.team.data.map(pt) }];
-    (o.extra || []).forEach((e) => series.push({ name: e.name, color: lighten(e.color || THEME.pos, 3), lineWidth: 3, data: e.data.map(pt) }));
+    (o.extra || []).forEach((e) => {
+      const ser = { name: e.name, color: lighten(e.color || THEME.pos, 3), lineWidth: 3, data: e.data.map(pt) };
+      if (e.dashArray) ser.dashArray = e.dashArray;          // 색만으로 구분하지 않도록 선 모양도 다르게
+      series.push(ser);
+    });
     if (o.ref && (o.ref.data || []).some((v) => v != null)) {
       series.push({ name: o.ref.name, color: THEME.sub, lineWidth: 1.5, dashArray: "4,3", data: o.ref.data.map(pt) });
     }

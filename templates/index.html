@@ -9,7 +9,7 @@
     <link rel="apple-touch-icon" href="/static/img/favicon.png">
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=116">
+    <link rel="stylesheet" href="/static/css/style.css?v=117">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/static/js/boot.js?v=1"></script>
 </head>
@@ -930,7 +930,7 @@
     <!-- 해외리그 일단 비활성화 (아직 이른 단계) — 복구 시 아래 스크립트 복원
     <script src="/static/js/global_league.js?v=2"></script> -->
     <script src="/static/js/banner_stats.js?v=3"></script>
-    <script src="/static/js/prediction.js?v=65"></script>
+    <script src="/static/js/prediction.js?v=66"></script>
 
     <!-- 선수 분석 모달 -->
     <div id="player-analytics-modal" class="pa-modal hidden">
@@ -1006,7 +1006,7 @@
         </div>
     </div>
 
-    <script src="/static/js/player_analytics.js?v=7"></script>
+    <script src="/static/js/player_analytics.js?v=9"></script>
     <script src="/static/js/player_report.js?v=15"></script>
 
     <!-- 지연 로딩 모듈 (탭/버튼 최초 사용 시 workspace.js 의 ttLazy 가 로드). 버전은 캐시 무효화용 -->
@@ -1014,19 +1014,20 @@
         "k2heatmap": "/static/js/k2heatmap.js?v=19",
         "team_compare": "/static/js/team_compare.js?v=16",
         "analytics": "/static/js/analytics.js?v=23",
-        "team_charts": "/static/js/team_charts.js?v=3",
+        "team_charts": "/static/js/team_charts.js?v=4",
+        "player_charts": "/static/js/player_charts.js?v=3",
         "pass_network": "/static/js/pass_network.js?v=2",
         "match_report": "/static/js/match_report.js?v=3",
         "player_compare": "/static/js/player_compare.js?v=4",
-        "insights": "/static/js/insights.js?v=59",
-        "ins_charts": "/static/js/ins_charts.js?v=5",
+        "insights": "/static/js/insights.js?v=60",
+        "ins_charts": "/static/js/ins_charts.js?v=6",
         "tera": "/static/vendor/tera-chart-7.0.2.min.js?v=1",
-        "tt_charts": "/static/js/tt_charts.js?v=10",
+        "tt_charts": "/static/js/tt_charts.js?v=11",
         "tt_dash": "/static/js/tt_dash.js?v=2"
     }</script>
 
     <!-- 작업공간 탭 컨트롤러 — 반드시 모든 모듈 스크립트 뒤에 로드 -->
-    <script src="/static/js/workspace.js?v=15"></script>
+    <script src="/static/js/workspace.js?v=16"></script>
 
     <!-- 온보딩 오버레이 -->
     <div id="onboarding-overlay" class="ob-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Today Tactics 소개">
