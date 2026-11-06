@@ -8325,10 +8325,12 @@ def insights_rotation():
                 p = None                  # 시즌 시작·긴 휴식기 뒤 첫 경기는 직전 경기와 비교하지 않는다
             in_range = y_lo is None or y_lo <= ts < y_hi
             if in_range:
-                per_team.setdefault(t, {"lineups": [], "chg": []})["lineups"].append(cur)
+                per_team.setdefault(t, {"lineups": [], "chg": [], "tl": []})["lineups"].append(cur)
             if p is not None and in_range:
                 chg = 11 - len(cur & p)
                 per_team[t]["chg"].append((chg, _ins_pts(gf, ga)))
+                # 차트 개편(2026-11-06): 팀별 경기 타임라인 — 로테이션 그리드용 (additive)
+                per_team[t]["tl"].append({"ts": ts, "changes": chg, "pts": _ins_pts(gf, ga)})
                 recs.append({"chg": chg, "pts": _ins_pts(gf, ga), "gf": gf, "ga": ga})
             prev[t] = (cur, ts)
 
@@ -8349,7 +8351,8 @@ def insights_rotation():
                       "eligible": len(chg) >= _INS_MIN_GAMES,
                       "avg_changes": round(sum(c for c, _ in chg) / len(chg), 2),
                       "core_size": sum(1 for v in starts.values() if v / n_l >= _ROT_CORE_PCT),
-                      "high_n": len(hi), "high_ppg": round(sum(hi) / len(hi), 2) if len(hi) >= 3 else None})
+                      "high_n": len(hi), "high_ppg": round(sum(hi) / len(hi), 2) if len(hi) >= 3 else None,
+                      "timeline": sorted(d["tl"], key=lambda c: c["ts"])})
     teams.sort(key=lambda t: (-(t.get("avg_changes") or -1) if t["eligible"] else 99, t["short"]))
 
     stable = _rest_stat([r for r in recs if r["chg"] <= _ROT_STABLE])

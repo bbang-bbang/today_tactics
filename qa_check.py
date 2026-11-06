@@ -459,6 +459,31 @@ def _official_no_year():
     assert_(d.get('official') is False and d.get('reason') in ('no_year', 'no_official_table', 'no_match', 'no_games'), str(d.get('reason')))
 qa('공식 리포트 없는 연도 안전 응답', _official_no_year)
 
+# ── 차트 개편 Phase 1b: 인사이트 API 필드 추가 (additive — 기존 키 불변) ──
+_ROT = None
+def _rot():
+    global _ROT
+    if _ROT is None:
+        _ROT = get('/api/insights/rotation?year=2026&league=k1')
+    return _ROT
+def _rot_timeline_len():
+    for t in _rot()['teams']:
+        if t.get('eligible'):
+            assert_(len(t.get('timeline') or []) == t['matches'], f"{t['short']} {len(t.get('timeline') or [])}/{t['matches']}")
+qa('rotation timeline 길이 = matches', _rot_timeline_len)
+def _rot_timeline_vals():
+    for t in _rot()['teams']:
+        tl = t.get('timeline')
+        if not t.get('eligible'):
+            continue
+        assert_(tl, f"{t['short']} timeline 없음")
+        assert_(all(0 <= c['changes'] <= 11 and c['pts'] in (0, 1, 3) for c in tl), t['short'])
+        assert_([c['ts'] for c in tl] == sorted(c['ts'] for c in tl), f"{t['short']} ts 순서")
+qa('rotation timeline changes 0~11·pts·ts 오름차순', _rot_timeline_vals)
+qa('rotation 기존 키 불변', lambda: assert_(
+    {'id', 'short', 'matches', 'eligible', 'avg_changes', 'core_size', 'high_n', 'high_ppg'}
+    <= set(next(t for t in _rot()['teams'] if t.get('eligible')))))
+
 # ── 결과 출력 ──
 passed = sum(1 for r in results if r[0] == 'PASS')
 failed = [r for r in results if r[0] == 'FAIL']
