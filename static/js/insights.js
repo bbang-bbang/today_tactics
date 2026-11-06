@@ -1747,7 +1747,155 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }).join("");
   }
 
-  function loadAdvanced() {
+  /* ── 심화 탭 대시보드 (차트 개편 Phase 1a) ──────────────────────────────
+     카드 정의는 ins_charts.js(InsCharts.CARDS). 기존 렌더러는 근거 영역(bodyId)에 그대로 그리고,
+     한 줄 해석·판정·경고는 카드 상단(.tt-card-lead)으로 옮겨 근거를 접어도 보이게 한다.
+     리그 '전체'면 카드마다 K1|K2 토글로 한 리그씩 보여 준다(두 리그 연속 출력 제거). */
+  const RENDER = {
+    renderTrend, renderXgLuck, renderOppStrength, renderStorylines, renderWeather, renderFormation,
+    renderGameState, renderPassVolume, renderAftermath, renderPassHub, renderSubImpact, renderRestEffect,
+    renderRotation, renderScoringDep, renderSubstitution, renderClutch, renderSetpieceProfile, renderWeakness,
+    renderShooting, renderGoalkeeper, renderDuels,
+  };
+  const _advCache = new Map();       // "ep|league|year" → Promise<json>
+  let _advSeq = 0;                   // loadAdvanced 세대 — 필터가 바뀌면 이전 세대 응답은 버림
+  const _advLeague = {};             // 카드 key → 현재 토글 리그 ("k1"|"k2")
+  const _advTok = {};                // 카드 key → 요청 토큰 (토글 연타 시 늦게 온 응답 무시)
+  const advFetch = (ep, league, year) => {
+    const k = `${ep}|${league}|${year}`;
+    if (!_advCache.has(k)) {
+      const p = fetch(`/api/insights/${ep}?year=${year}&league=${league}`).then((r) => {
+        if (!r.ok) throw new Error(`${ep} ${r.status}`);
+        return r.json();
+      });
+      p.catch(() => _advCache.delete(k));
+      _advCache.set(k, p);
+    }
+    return _advCache.get(k);
+  };
+  const advColorOf = (league, year) => advFetch("xg-luck", league, year)
+    .then((d) => { const m = {}; (d.teams || []).forEach((t) => { m[t.short] = t.primary; }); return (s) => m[s]; })
+    .catch(() => () => undefined);
+
+  function hoistLeads(cardEl, bodyId) {
+    const lead = cardEl.querySelector(".tt-card-lead"), body = document.getElementById(bodyId);
+    if (!lead || !body) return;
+    lead.textContent = "";
+    body.querySelectorAll(".ins-rs-verdict, .ins-take, .ins-xl-warn").forEach((n) => lead.appendChild(n));
+  }
+
+  function loadAdvCard(card, gen) {
+    const cardEl = document.getElementById("ins-c-" + card.key);
+    if (!cardEl || !window.InsCharts) return Promise.resolve();
+    const year = currentYear;
+    const league = card.perLeague ? (_advLeague[card.key] || (currentLeague === "all" ? "k1" : currentLeague)) : currentLeague;
+    const tok = (_advTok[card.key] = (_advTok[card.key] || 0) + 1);
+    const stale = () => gen !== _advSeq || year !== currentYear || tok !== _advTok[card.key];
+    return advFetch(card.endpoint, league, year).then((d) => {
+      if (stale()) return;
+      RENDER[card.render](card.perLeague || card.endpoint === "weather-effect" ? [d] : d);
+      hoistLeads(cardEl, card.bodyId);
+      if (!card.chart) return;
+      const slot = cardEl.querySelector("[data-chart-slot]");
+      // 팀 색은 리그별 xg-luck 에서 — 리그 단일이 아닌 카드(league=all)는 팀 색이 필요 없다(xg-luck 은 k1/k2 만 지원)
+      const colors = card.perLeague ? advColorOf(league, year) : Promise.resolve(() => undefined);
+      return colors.then((colorOf) => {
+        if (stale()) return;
+        TTChart.mount(slot, InsCharts[card.key](d, colorOf), { ariaLabel: card.title });
+      });
+    });
+  }
+
+  function renderAdvKpis(gen) {
+    const el = document.getElementById("ins-adv-kpis");
+    if (!el) return Promise.resolve();
+    const lg = currentLeague === "all" ? "k1" : currentLeague, year = currentYear;
+    return Promise.all([advFetch("standings-trend", lg, year), advFetch("xg-luck", lg, year)]).then(([st, xg]) => {
+      if (gen !== _advSeq) return;
+      const top = (st.teams || []).slice().sort((a, b) => a.rank - b.rank)[0] || {};
+      const ok = (xg.teams || []).filter((t) => t.eligible && isNum(t.luck_ppg));
+      const lucky = ok.length ? insMax(ok, (t) => t.luck_ppg) : null, unlucky = ok.length ? insMax(ok, (t) => -t.luck_ppg) : null;
+      const L = lg.toUpperCase();
+      el.innerHTML = TTDash.kpiStripHtml([
+        { label: `${L} 선두`, value: top.short ? `${top.short} ${top.points}점` : "-", delta: top.short && st.teams[1] ? `2위와 ${top.points - st.teams.slice().sort((a, b) => a.rank - b.rank)[1].points}점 차` : "", dir: "flat" },
+        { label: "가장 운 좋은 팀", value: lucky ? `${lucky.short} ${sgn2(lucky.luck_ppg)}` : "-", delta: "실제 − 기대 승점(경기당)", dir: "up" },
+        { label: "가장 억울한 팀", value: unlucky ? `${unlucky.short} ${sgn2(unlucky.luck_ppg)}` : "-", delta: "기대보다 승점 손해", dir: "down" },
+        { label: "선두 교체", value: st.leader_changes != null ? `${st.leader_changes}회` : "-", hint: `${year === "all" ? "전 시즌" : year} 라운드 기준` },
+      ]);
+    }).catch((e) => { console.warn("[insights] KPI 로드 실패", e); el.textContent = ""; });
+  }
+
+  function loadAdvanced(opts) {
+    const gen = ++_advSeq;
+    const grid = document.getElementById("ins-adv-grid");
+    // 차트 모듈이 아직 받는 중이면 한 번만 기다렸다가 다시 그린다(waited 플래그로 재대기 금지 — 무한 루프 방지)
+    if (grid && !window.InsCharts && window.ttChartsReady && !(opts && opts.waited)) {
+      grid.innerHTML = '<div class="ins-adv-loading">차트 모듈 불러오는 중…</div>';
+      window.ttChartsReady.catch(() => {}).then(() => { if (gen === _advSeq) { _advSeq--; loadAdvanced({ waited: true }); } });
+      return;
+    }
+    if (!grid || !window.InsCharts || !window.TTDash || !window.TTChart) return showAdvModuleError(grid);
+    Object.keys(_advLeague).forEach((k) => delete _advLeague[k]);
+    TTChart.destroyAll(grid);
+    const both = currentLeague === "all";
+    grid.innerHTML = InsCharts.CARDS.map((c) => TTDash.cardHtml({
+      id: "ins-c-" + c.key, size: c.size, icon: c.icon, title: c.title, question: c.question, theme: c.theme,
+      warnings: [], chart: c.chart,
+      leagues: c.perLeague && both ? ["K1", "K2"] : undefined, activeLeague: "K1",
+      ...(c.chart || c.collapse ? { evidenceHtml: `<div id="${c.bodyId}"><div class="ins-adv-loading">불러오는 중…</div></div>` }
+                  : { bodyHtml: `<div id="${c.bodyId}"><div class="ins-adv-loading">불러오는 중…</div></div>` }),
+    })).join("");
+    const chips = document.getElementById("ins-adv-chips");
+    if (chips && !chips.dataset.bound) {
+      chips.innerHTML = TTDash.chipsHtml(InsCharts.THEMES, "all");
+      TTDash.bindChips(chips, (key) => {
+        grid.querySelectorAll(":scope > .tt-card").forEach((c) => { c.hidden = key !== "all" && c.dataset.theme !== key; });
+      });
+      chips.dataset.bound = "1";
+    } else if (chips) {   // 필터 변경으로 그리드를 다시 그리면 칩도 '전체'로
+      chips.querySelectorAll(".tt-chip").forEach((b) => { const on = b.dataset.themeKey === "all"; b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1; });
+    }
+    const failed = [];
+    const jobs = InsCharts.CARDS.map((c) => {
+      const el = document.getElementById("ins-c-" + c.key);
+      TTDash.bindLeagueToggle(el, (lg) => {
+        const prev = _advLeague[c.key] || "k1";
+        _advLeague[c.key] = lg.toLowerCase();
+        loadAdvCard(c, _advSeq).catch((e) => {
+          // 실패하면 토글을 이전 리그로 되돌린다(토글과 내용이 다른 리그를 가리키는 오표시 방지)
+          console.warn("[insights] 리그 전환 실패:", c.title, e);
+          _advLeague[c.key] = prev;
+          el.querySelectorAll(".tt-lg-btn").forEach((b) => {
+            const on = b.dataset.league.toLowerCase() === prev;
+            b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1;
+          });
+          if (window.showToast) window.showToast(`${c.title}: ${lg} 데이터를 불러오지 못해 ${prev.toUpperCase()}로 되돌렸습니다.`);
+        });
+      });
+      return loadAdvCard(c, gen).catch((e) => { failed.push(c.title); console.warn("[insights] 로드 실패:", c.title, e); });
+    });
+    jobs.push(renderAdvKpis(gen));
+    Promise.all(jobs).then(() => {
+      if (gen === _advSeq && failed.length && window.showToast) window.showToast(`일부 인사이트를 불러오지 못했습니다: ${failed.join(", ")} (새로고침 해보세요)`);
+    });
+  }
+
+  // 차트 모듈(tt_charts·tt_dash·ins_charts)을 못 불러온 경우 — 빈 화면 대신 안내 + 다시 시도
+  function showAdvModuleError(grid) {
+    if (!grid) return;
+    grid.innerHTML = '<div class="ins-adv-error" role="alert">심화 인사이트 화면 모듈을 불러오지 못했습니다. '
+      + '<button type="button" class="tt-chip">다시 시도</button></div>';
+    grid.querySelector("button").addEventListener("click", () => {
+      window.ttChartsReady = null;   // workspace.js 가 다음 로드 때 새로 받도록
+      if (window.ttLoadCharts) {
+        window.ttChartsReady = window.ttLoadCharts().then(() => window.ttLoadInsCharts && window.ttLoadInsCharts());
+      }
+      loadAdvanced();
+    });
+  }
+
+  // (구) 일괄 로더 — 대시보드 셸 이전 코드. 현재 템플릿에는 body id 가 셸에서만 생기므로 사용하지 않는다.
+  function loadAdvancedLegacy() {
     const qs = `year=${currentYear}&league=${currentLeague}`;
     // 무음 실패 → 가시화: 실패한 인사이트명을 모아 1회 토스트 + console.warn (P5 견고성)
     const failed = [];

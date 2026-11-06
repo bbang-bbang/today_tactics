@@ -8325,10 +8325,12 @@ def insights_rotation():
                 p = None                  # 시즌 시작·긴 휴식기 뒤 첫 경기는 직전 경기와 비교하지 않는다
             in_range = y_lo is None or y_lo <= ts < y_hi
             if in_range:
-                per_team.setdefault(t, {"lineups": [], "chg": []})["lineups"].append(cur)
+                per_team.setdefault(t, {"lineups": [], "chg": [], "tl": []})["lineups"].append(cur)
             if p is not None and in_range:
                 chg = 11 - len(cur & p)
                 per_team[t]["chg"].append((chg, _ins_pts(gf, ga)))
+                # 차트 개편(2026-11-06): 팀별 경기 타임라인 — 로테이션 그리드용 (additive)
+                per_team[t]["tl"].append({"ts": ts, "changes": chg, "pts": _ins_pts(gf, ga)})
                 recs.append({"chg": chg, "pts": _ins_pts(gf, ga), "gf": gf, "ga": ga})
             prev[t] = (cur, ts)
 
@@ -8349,7 +8351,8 @@ def insights_rotation():
                       "eligible": len(chg) >= _INS_MIN_GAMES,
                       "avg_changes": round(sum(c for c, _ in chg) / len(chg), 2),
                       "core_size": sum(1 for v in starts.values() if v / n_l >= _ROT_CORE_PCT),
-                      "high_n": len(hi), "high_ppg": round(sum(hi) / len(hi), 2) if len(hi) >= 3 else None})
+                      "high_n": len(hi), "high_ppg": round(sum(hi) / len(hi), 2) if len(hi) >= 3 else None,
+                      "timeline": sorted(d["tl"], key=lambda c: c["ts"])})
     teams.sort(key=lambda t: (-(t.get("avg_changes") or -1) if t["eligible"] else 99, t["short"]))
 
     stable = _rest_stat([r for r in recs if r["chg"] <= _ROT_STABLE])
@@ -8386,14 +8389,31 @@ _WEAK_SITS = (("open", "오픈 플레이"), ("counter", "역습"), ("setpiece", 
 _WEAK_Z = 2.0                # 리그 평균 대비 허용 슈팅이 |z|≥2 일 때만 약점/강점으로 표시
 
 
+_WEAK_SIX_X, _WEAK_SIX_Y = 5.5, (36.5, 63.5)     # 6야드 박스 깊이(m)·폭(%)
+_WEAK_BOX_X = 16.5                              # 페널티 박스 깊이(m)
+_WEAK_MID_Y = (30, 70)                          # '중앙' 폭(%)
+_WEAK_DRAW_X = 40                               # 지도 표시 상한(m) — 판정과 무관, 그림용
+# 차트 개편(2026-11-06): 실점 약점 지도 구역 사각형 — _weak_zone 과 같은 상수에서 생성, 배열 앞쪽이 우선 (additive)
+_WEAK_GEOM = (
+    ("goalmouth", 0, _WEAK_SIX_X, _WEAK_SIX_Y[0], _WEAK_SIX_Y[1]),
+    ("box_center", 0, _WEAK_BOX_X, _WEAK_MID_Y[0], _WEAK_MID_Y[1]),
+    ("box_wide", 0, _WEAK_BOX_X, 0, _WEAK_MID_Y[0]),
+    ("box_wide", 0, _WEAK_BOX_X, _WEAK_MID_Y[1], 100),
+    ("out_center", _WEAK_BOX_X, _WEAK_DRAW_X, _WEAK_MID_Y[0], _WEAK_MID_Y[1]),
+    ("out_wide", _WEAK_BOX_X, _WEAK_DRAW_X, 0, _WEAK_MID_Y[0]),
+    ("out_wide", _WEAK_BOX_X, _WEAK_DRAW_X, _WEAK_MID_Y[1], 100),
+)
+_WEAK_GEOM_JSON = [{"key": k, "x0": x0, "x1": x1, "y0": y0, "y1": y1} for k, x0, x1, y0, y1 in _WEAK_GEOM]
+
+
 def _weak_zone(x, y):
     if x is None or y is None:
         return None
-    if x < 5.5 and 36.5 <= y <= 63.5:
+    if x < _WEAK_SIX_X and _WEAK_SIX_Y[0] <= y <= _WEAK_SIX_Y[1]:
         return "goalmouth"
-    if x < 16.5:
-        return "box_center" if 30 <= y <= 70 else "box_wide"
-    return "out_center" if 30 <= y <= 70 else "out_wide"
+    if x < _WEAK_BOX_X:
+        return "box_center" if _WEAK_MID_Y[0] <= y <= _WEAK_MID_Y[1] else "box_wide"
+    return "out_center" if _WEAK_MID_Y[0] <= y <= _WEAK_MID_Y[1] else "out_wide"
 
 
 def _weak_sit(sit):
@@ -8452,7 +8472,7 @@ def insights_defensive_weakness():
     games_total = sum(len(d["games"]) for d in per.values())
     if games_total < 40:
         return jsonify({"league": label, "year": year, "teams": [], "warnings": ["슈팅맵 표본이 부족해 계산할 수 없습니다."],
-                        "zones": [{"key": k, "label": l} for k, l in _WEAK_ZONES],
+                        "zones": [{"key": k, "label": l} for k, l in _WEAK_ZONES], "zones_geom": _WEAK_GEOM_JSON,
                         "situations": [{"key": k, "label": l} for k, l in _WEAK_SITS], "min_games": _INS_MIN_GAMES})
 
     def lg_rates(dim, keys):
@@ -8518,7 +8538,7 @@ def insights_defensive_weakness():
         warnings.append(f"이 리그 원본 슈팅맵에는 '{', '.join(missing)}' 분류가 거의 없어 해당 항목은 제외했습니다.")
     return jsonify({
         "league": label, "year": year, "teams": teams, "team_games": games_total,
-        "zones": [{"key": k, "label": l} for k, l in _WEAK_ZONES],
+        "zones": [{"key": k, "label": l} for k, l in _WEAK_ZONES], "zones_geom": _WEAK_GEOM_JSON,
         "situations": [{"key": k, "label": l} for k, l in _WEAK_SITS],
         "league_zones": clean(lg_z), "league_situations": clean(lg_s), "league_shots_pg": round(lg_total_rate, 2),
         "min_games": _INS_MIN_GAMES, "z_flag": _WEAK_Z, "warnings": warnings,
@@ -8849,7 +8869,7 @@ def insights_weather_effect():
 
     def stat(g):
         k = len(g)
-        out = {"n": k, "goals": None, "goals_resid": None, "goals_z": None, "home_win_pct": None, "home_win_exp": None,
+        out = {"n": k, "goals": None, "goals_resid": None, "goals_z": None, "goals_ci": None, "home_win_pct": None, "home_win_exp": None,
                "home_win_z": None, "draw_pct": None, "goals_diff": False, "home_diff": False}
         if not k:
             return out
@@ -8861,6 +8881,8 @@ def insights_weather_effect():
             mr = sum(r[4] for r in g) / k
             out["goals_resid"] = round(mr, 2)
             out["goals_z"] = round(mr / (sd_all / math.sqrt(k)), 1) if sd_all > 0 else None
+            # 차트 개편(2026-11-06): goals_z 와 같은 표준오차의 95% 구간 반폭 — forest plot 용 (additive)
+            out["goals_ci"] = round(1.96 * sd_all / math.sqrt(k), 2) if sd_all > 0 else None
             var = sum(r[6] * (1 - r[6]) for r in g)
             out["home_win_z"] = round((sum(r[5] for r in g) - sum(r[6] for r in g)) / math.sqrt(var), 1) if var > 0 else None
             out["goals_diff"] = out["goals_z"] is not None and abs(out["goals_z"]) >= _WX_Z
@@ -9109,7 +9131,8 @@ def insights_goal_aftermath():
     rate_f = {t: gf[t] / (n_games[t] * 90.0) for t in n_games}
     rate_a = {t: ga[t] / (n_games[t] * 90.0) for t in n_games}
 
-    st = {t: {"scored": 0, "conc_obs": 0, "conc_exp": 0.0, "conceded": 0, "resp_obs": 0, "resp_exp": 0.0} for t in n_games}
+    st = {t: {"scored": 0, "conc_obs": 0, "conc_exp": 0.0, "conceded": 0, "resp_obs": 0, "resp_exp": 0.0,
+              "flow": {"extra_only": 0, "conc_only": 0, "both": 0, "none": 0}} for t in n_games}
     for ev, glist in by_ev.items():
         _id, h, a, _ts, _hs, _as = evmap[ev]
         glist.sort()
@@ -9121,6 +9144,10 @@ def insights_goal_aftermath():
             st[scorer]["scored"] += 1
             st[scorer]["conc_obs"] += 1 if opp_scored else 0
             st[scorer]["conc_exp"] += 1 - math.exp(-rate_a[scorer] * win)
+            # 차트 개편(2026-11-06): 같은 창 안 '추가골 × 실점' 4분기 (상호배타, 합 = scored) — Sankey 용 (additive)
+            own_more = any(t1 - t0 <= win and s1 == side for t1, _g, s1 in glist[i + 1:])
+            fk = "both" if own_more and opp_scored else "extra_only" if own_more else "conc_only" if opp_scored else "none"
+            st[scorer]["flow"][fk] += 1
             # 같은 장면을 상대(other) 시점에서 보면 '실점 후 반격'(other 가 창 안에 득점) — 관측은 같고 기대값(팀별 평소 득점률)만 다름
             reply = opp_scored
             st[other]["conceded"] += 1
@@ -9140,13 +9167,15 @@ def insights_goal_aftermath():
                       "scored": s["scored"], "conc_obs": s["conc_obs"], "conc_exp": round(s["conc_exp"], 1),
                       "conc_z": z_of(s["conc_obs"], s["conc_exp"]) if el else None,
                       "conceded": s["conceded"], "resp_obs": s["resp_obs"], "resp_exp": round(s["resp_exp"], 1),
-                      "resp_z": z_of(s["resp_obs"], s["resp_exp"]) if el else None})
+                      "resp_z": z_of(s["resp_obs"], s["resp_exp"]) if el else None,
+                      "flow": dict(s["flow"])})
     teams.sort(key=lambda t: (-(t["conc_z"] or -99) if t["eligible"] else 99, t["short"]))
 
-    tot = lambda k: sum(v[k] for v in st.values())   # noqa: E731
+    tot = lambda k: sum(v[k] for v in st.values() if k != "flow")   # noqa: E731
     lg = {"scored": tot("scored"), "conc_obs": tot("conc_obs"), "conc_exp": round(tot("conc_exp"), 1),
           "conceded": tot("conceded"), "resp_obs": tot("resp_obs"), "resp_exp": round(tot("resp_exp"), 1)}
     lg["conc_z"], lg["resp_z"] = z_of(lg["conc_obs"], tot("conc_exp")), z_of(lg["resp_obs"], tot("resp_exp"))
+    lg["flow"] = {k: sum(v["flow"][k] for v in st.values()) for k in ("extra_only", "conc_only", "both", "none")}
     flagged = [t for t in teams if t["eligible"] and ((t["conc_z"] or 0) >= 2 or (t["resp_z"] or 0) <= -2)]
     warnings = []
     if lg["scored"] < 100:

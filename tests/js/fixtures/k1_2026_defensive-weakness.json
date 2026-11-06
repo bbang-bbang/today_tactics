@@ -1,0 +1,1453 @@
+{
+  "league": "K1",
+  "league_shots_pg": 12.52,
+  "league_situations": {
+    "counter": {
+      "available": true,
+      "goal_pct": 12.2,
+      "share": 7.8,
+      "shots_pg": 0.97
+    },
+    "open": {
+      "available": true,
+      "goal_pct": 9.5,
+      "share": 61.9,
+      "shots_pg": 7.75
+    },
+    "penalty": {
+      "available": true,
+      "goal_pct": 75.0,
+      "share": 1.1,
+      "shots_pg": 0.14
+    },
+    "setpiece": {
+      "available": true,
+      "goal_pct": 8.0,
+      "share": 29.2,
+      "shots_pg": 3.66
+    }
+  },
+  "league_zones": {
+    "box_center": {
+      "available": true,
+      "goal_pct": 10.6,
+      "share": 50.6,
+      "shots_pg": 6.26
+    },
+    "box_wide": {
+      "available": true,
+      "goal_pct": 3.2,
+      "share": 3.8,
+      "shots_pg": 0.47
+    },
+    "goalmouth": {
+      "available": true,
+      "goal_pct": 31.4,
+      "share": 7.2,
+      "shots_pg": 0.89
+    },
+    "out_center": {
+      "available": true,
+      "goal_pct": 4.1,
+      "share": 34.0,
+      "shots_pg": 4.2
+    },
+    "out_wide": {
+      "available": true,
+      "goal_pct": 3.2,
+      "share": 4.4,
+      "shots_pg": 0.55
+    }
+  },
+  "limits": "\uc288\ud305\ub9f5(SofaScore) \uae30\uc900 \ud5c8\uc6a9 \uc288\ud305 \u00b7 \uad6c\uc5ed=\uace8\ub77c\uc778 \uac70\ub9ac\u00b7\ud3ed \uc88c\ud45c(105\u00d768m \uaddc\uaca9 \ud658\uc0b0) \u00b7 z=(\ud5c8\uc6a9\u2212\ub9ac\uadf8 \ud3c9\uade0 \uae30\ub300)\u00f7\u221a\uae30\ub300, |z|\u22652\ub9cc \ud45c\uc2dc \u00b7 \uc88c\uc6b0 \uce21\uba74\uc740 \uad6c\ubd84\ud558\uc9c0 \uc54a\uc74c \u00b7 \uc288\ud305 \uc218\ub294 \uc0c1\ub300 \uc804\ub825\u00b7\uacbd\uae30 \uc0c1\ud669(\uc55e\uc11c\uba74 \uc288\ud305\uc744 \ub354 \ud5c8\uc6a9) \ubbf8\ubcf4\uc815",
+  "min_games": 8,
+  "situations": [
+    {
+      "key": "open",
+      "label": "\uc624\ud508 \ud50c\ub808\uc774"
+    },
+    {
+      "key": "counter",
+      "label": "\uc5ed\uc2b5"
+    },
+    {
+      "key": "setpiece",
+      "label": "\uc138\ud2b8\ud53c\uc2a4"
+    },
+    {
+      "key": "penalty",
+      "label": "PK"
+    }
+  ],
+  "team_games": 396,
+  "teams": [
+    {
+      "eligible": true,
+      "games": 33,
+      "goals": 69,
+      "id": 48912,
+      "rank_shots": 1,
+      "short": "\uad11\uc8fc",
+      "shots_pg": 16.36,
+      "shots_ratio": 1.31,
+      "situations": {
+        "counter": {
+          "goals": 8,
+          "lg_share": 7.8,
+          "ratio": 1.12,
+          "share": 6.7,
+          "shots": 36,
+          "shots_pg": 1.09,
+          "xg_pg": null,
+          "z": -1.0
+        },
+        "open": {
+          "goals": 38,
+          "lg_share": 61.9,
+          "ratio": 1.33,
+          "share": 63.1,
+          "shots": 341,
+          "shots_pg": 10.33,
+          "xg_pg": null,
+          "z": 0.6
+        },
+        "penalty": {
+          "goals": 8,
+          "lg_share": 1.1,
+          "ratio": 2.36,
+          "share": 2.0,
+          "shots": 11,
+          "shots_pg": 0.33,
+          "xg_pg": null,
+          "z": 2.0
+        },
+        "setpiece": {
+          "goals": 15,
+          "lg_share": 29.2,
+          "ratio": 1.26,
+          "share": 28.1,
+          "shots": 152,
+          "shots_pg": 4.61,
+          "xg_pg": null,
+          "z": -0.5
+        }
+      },
+      "strong": [],
+      "weak": [
+        "penalty"
+      ],
+      "zones": {
+        "box_center": {
+          "goals": 39,
+          "lg_share": 50.6,
+          "ratio": 1.29,
+          "share": 50.5,
+          "shots": 267,
+          "shots_pg": 8.09,
+          "xg_pg": null,
+          "z": -0.0
+        },
+        "box_wide": {
+          "goals": 2,
+          "lg_share": 3.8,
+          "ratio": 1.4,
+          "share": 4.2,
+          "shots": 22,
+          "shots_pg": 0.67,
+          "xg_pg": null,
+          "z": 0.4
+        },
+        "goalmouth": {
+          "goals": 12,
+          "lg_share": 7.2,
+          "ratio": 1.22,
+          "share": 6.8,
+          "shots": 36,
+          "shots_pg": 1.09,
+          "xg_pg": null,
+          "z": -0.4
+        },
+        "out_center": {
+          "goals": 8,
+          "lg_share": 34.0,
+          "ratio": 1.28,
+          "share": 33.6,
+          "shots": 178,
+          "shots_pg": 5.39,
+          "xg_pg": null,
+          "z": -0.2
+        },
+        "out_wide": {
+          "goals": 0,
+          "lg_share": 4.4,
+          "ratio": 1.44,
+          "share": 4.9,
+          "shots": 26,
+          "shots_pg": 0.79,
+          "xg_pg": null,
+          "z": 0.5
+        }
+      }
+    },
+    {
+      "eligible": true,
+      "games": 33,
+      "goals": 47,
+      "id": 92539,
+      "rank_shots": 2,
+      "short": "\ubd80\ucc9c",
+      "shots_pg": 15.27,
+      "shots_ratio": 1.22,
+      "situations": {
+        "counter": {
+          "goals": 5,
+          "lg_share": 7.8,
+          "ratio": 1.49,
+          "share": 9.5,
+          "shots": 48,
+          "shots_pg": 1.45,
+          "xg_pg": null,
+          "z": 1.5
+        },
+        "open": {
+          "goals": 23,
+          "lg_share": 61.9,
+          "ratio": 1.2,
+          "share": 61.1,
+          "shots": 308,
+          "shots_pg": 9.33,
+          "xg_pg": null,
+          "z": -0.4
+        },
+        "penalty": {
+          "goals": 4,
+          "lg_share": 1.1,
+          "ratio": 0.86,
+          "share": 0.8,
+          "shots": 4,
+          "shots_pg": 0.12,
+          "xg_pg": null,
+          "z": -0.7
+        },
+        "setpiece": {
+          "goals": 15,
+          "lg_share": 29.2,
+          "ratio": 1.19,
+          "share": 28.6,
+          "shots": 144,
+          "shots_pg": 4.36,
+          "xg_pg": null,
+          "z": -0.3
+        }
+      },
+      "strong": [],
+      "weak": [],
+      "zones": {
+        "box_center": {
+          "goals": 28,
+          "lg_share": 50.6,
+          "ratio": 1.17,
+          "share": 48.2,
+          "shots": 241,
+          "shots_pg": 7.3,
+          "xg_pg": null,
+          "z": -1.1
+        },
+        "box_wide": {
+          "goals": 1,
+          "lg_share": 3.8,
+          "ratio": 1.4,
+          "share": 4.4,
+          "shots": 22,
+          "shots_pg": 0.67,
+          "xg_pg": null,
+          "z": 0.7
+        },
+        "goalmouth": {
+          "goals": 8,
+          "lg_share": 7.2,
+          "ratio": 1.15,
+          "share": 6.8,
+          "shots": 34,
+          "shots_pg": 1.03,
+          "xg_pg": null,
+          "z": -0.4
+        },
+        "out_center": {
+          "goals": 5,
+          "lg_share": 34.0,
+          "ratio": 1.31,
+          "share": 36.4,
+          "shots": 182,
+          "shots_pg": 5.52,
+          "xg_pg": null,
+          "z": 1.2
+        },
+        "out_wide": {
+          "goals": 1,
+          "lg_share": 4.4,
+          "ratio": 1.16,
+          "share": 4.2,
+          "shots": 21,
+          "shots_pg": 0.64,
+          "xg_pg": null,
+          "z": -0.2
+        }
+      }
+    },
+    {
+      "eligible": true,
+      "games": 33,
+      "goals": 48,
+      "id": 32675,
+      "rank_shots": 3,
+      "short": "\uc548\uc591",
+      "shots_pg": 14.91,
+      "shots_ratio": 1.19,
+      "situations": {
+        "counter": {
+          "goals": 5,
+          "lg_share": 7.8,
+          "ratio": 1.09,
+          "share": 7.1,
+          "shots": 35,
+          "shots_pg": 1.06,
+          "xg_pg": null,
+          "z": -0.6
+        },
+        "open": {
+          "goals": 33,
+          "lg_share": 61.9,
+          "ratio": 1.26,
+          "share": 65.2,
+          "shots": 321,
+          "shots_pg": 9.73,
+          "xg_pg": null,
+          "z": 1.5
+        },
+        "penalty": {
+          "goals": 3,
+          "lg_share": 1.1,
+          "ratio": 1.07,
+          "share": 1.0,
+          "shots": 5,
+          "shots_pg": 0.15,
+          "xg_pg": null,
+          "z": -0.2
+        },
+        "setpiece": {
+          "goals": 7,
+          "lg_share": 29.2,
+          "ratio": 1.09,
+          "share": 26.6,
+          "shots": 131,
+          "shots_pg": 3.97,
+          "xg_pg": null,
+          "z": -1.3
+        }
+      },
+      "strong": [],
+      "weak": [
+        "out_wide"
+      ],
+      "zones": {
+        "box_center": {
+          "goals": 21,
+          "lg_share": 50.6,
+          "ratio": 1.2,
+          "share": 50.7,
+          "shots": 247,
+          "shots_pg": 7.48,
+          "xg_pg": null,
+          "z": 0.1
+        },
+        "box_wide": {
+          "goals": 1,
+          "lg_share": 3.8,
+          "ratio": 0.96,
+          "share": 3.1,
+          "shots": 15,
+          "shots_pg": 0.45,
+          "xg_pg": null,
+          "z": -0.9
+        },
+        "goalmouth": {
+          "goals": 15,
+          "lg_share": 7.2,
+          "ratio": 1.29,
+          "share": 7.8,
+          "shots": 38,
+          "shots_pg": 1.15,
+          "xg_pg": null,
+          "z": 0.5
+        },
+        "out_center": {
+          "goals": 8,
+          "lg_share": 34.0,
+          "ratio": 1.12,
+          "share": 32.0,
+          "shots": 156,
+          "shots_pg": 4.73,
+          "xg_pg": null,
+          "z": -0.9
+        },
+        "out_wide": {
+          "goals": 0,
+          "lg_share": 4.4,
+          "ratio": 1.71,
+          "share": 6.4,
+          "shots": 31,
+          "shots_pg": 0.94,
+          "xg_pg": null,
+          "z": 2.1
+        }
+      }
+    },
+    {
+      "eligible": true,
+      "games": 33,
+      "goals": 47,
+      "id": 7653,
+      "rank_shots": 4,
+      "short": "\uc6b8\uc0b0",
+      "shots_pg": 12.91,
+      "shots_ratio": 1.03,
+      "situations": {
+        "counter": {
+          "goals": 2,
+          "lg_share": 7.8,
+          "ratio": 0.96,
+          "share": 7.3,
+          "shots": 31,
+          "shots_pg": 0.94,
+          "xg_pg": null,
+          "z": -0.4
+        },
+        "open": {
+          "goals": 34,
+          "lg_share": 61.9,
+          "ratio": 1.14,
+          "share": 68.5,
+          "shots": 292,
+          "shots_pg": 8.85,
+          "xg_pg": null,
+          "z": 2.8
+        },
+        "penalty": {
+          "goals": 3,
+          "lg_share": 1.1,
+          "ratio": 1.07,
+          "share": 1.2,
+          "shots": 5,
+          "shots_pg": 0.15,
+          "xg_pg": null,
+          "z": null
+        },
+        "setpiece": {
+          "goals": 8,
+          "lg_share": 29.2,
+          "ratio": 0.81,
+          "share": 23.0,
+          "shots": 98,
+          "shots_pg": 2.97,
+          "xg_pg": null,
+          "z": -2.8
+        }
+      },
+      "strong": [
+        "setpiece"
+      ],
+      "weak": [
+        "open"
+      ],
+      "zones": {
+        "box_center": {
+          "goals": 22,
+          "lg_share": 50.6,
+          "ratio": 1.01,
+          "share": 49.4,
+          "shots": 208,
+          "shots_pg": 6.3,
+          "xg_pg": null,
+          "z": -0.5
+        },
+        "box_wide": {
+          "goals": 0,
+          "lg_share": 3.8,
+          "ratio": 1.4,
+          "share": 5.2,
+          "shots": 22,
+          "shots_pg": 0.67,
+          "xg_pg": null,
+          "z": 1.5
+        },
+        "goalmouth": {
+          "goals": 14,
+          "lg_share": 7.2,
+          "ratio": 0.95,
+          "share": 6.7,
+          "shots": 28,
+          "shots_pg": 0.85,
+          "xg_pg": null,
+          "z": -0.5
+        },
+        "out_center": {
+          "goals": 8,
+          "lg_share": 34.0,
+          "ratio": 1.01,
+          "share": 33.3,
+          "shots": 140,
+          "shots_pg": 4.24,
+          "xg_pg": null,
+          "z": -0.3
+        },
+        "out_wide": {
+          "goals": 0,
+          "lg_share": 4.4,
+          "ratio": 1.27,
+          "share": 5.5,
+          "shots": 23,
+          "shots_pg": 0.7,
+          "xg_pg": null,
+          "z": 1.0
+        }
+      }
+    },
+    {
+      "eligible": true,
+      "games": 33,
+      "goals": 33,
+      "id": 6908,
+      "rank_shots": 5,
+      "short": "\uc804\ubd81",
+      "shots_pg": 12.48,
+      "shots_ratio": 1.0,
+      "situations": {
+        "counter": {
+          "goals": 3,
+          "lg_share": 7.8,
+          "ratio": 0.81,
+          "share": 6.3,
+          "shots": 26,
+          "shots_pg": 0.79,
+          "xg_pg": null,
+          "z": -1.1
+        },
+        "open": {
+          "goals": 18,
+          "lg_share": 61.9,
+          "ratio": 0.99,
+          "share": 61.4,
+          "shots": 253,
+          "shots_pg": 7.67,
+          "xg_pg": null,
+          "z": -0.2
+        },
+        "penalty": {
+          "goals": 7,
+          "lg_share": 1.1,
+          "ratio": 1.5,
+          "share": 1.7,
+          "shots": 7,
+          "shots_pg": 0.21,
+          "xg_pg": null,
+          "z": null
+        },
+        "setpiece": {
+          "goals": 5,
+          "lg_share": 29.2,
+          "ratio": 1.04,
+          "share": 30.6,
+          "shots": 126,
+          "shots_pg": 3.82,
+          "xg_pg": null,
+          "z": 0.6
+        }
+      },
+      "strong": [],
+      "weak": [],
+      "zones": {
+        "box_center": {
+          "goals": 17,
+          "lg_share": 50.6,
+          "ratio": 1.01,
+          "share": 51.4,
+          "shots": 208,
+          "shots_pg": 6.3,
+          "xg_pg": null,
+          "z": 0.3
+        },
+        "box_wide": {
+          "goals": 0,
+          "lg_share": 3.8,
+          "ratio": 1.15,
+          "share": 4.4,
+          "shots": 18,
+          "shots_pg": 0.55,
+          "xg_pg": null,
+          "z": 0.6
+        },
+        "goalmouth": {
+          "goals": 5,
+          "lg_share": 7.2,
+          "ratio": 0.92,
+          "share": 6.7,
+          "shots": 27,
+          "shots_pg": 0.82,
+          "xg_pg": null,
+          "z": -0.4
+        },
+        "out_center": {
+          "goals": 4,
+          "lg_share": 34.0,
+          "ratio": 0.96,
+          "share": 32.8,
+          "shots": 133,
+          "shots_pg": 4.03,
+          "xg_pg": null,
+          "z": -0.5
+        },
+        "out_wide": {
+          "goals": 0,
+          "lg_share": 4.4,
+          "ratio": 1.05,
+          "share": 4.7,
+          "shots": 19,
+          "shots_pg": 0.58,
+          "xg_pg": null,
+          "z": 0.3
+        }
+      }
+    },
+    {
+      "eligible": true,
+      "games": 33,
+      "goals": 37,
+      "id": 7649,
+      "rank_shots": 6,
+      "short": "\uc81c\uc8fc",
+      "shots_pg": 12.45,
+      "shots_ratio": 0.99,
+      "situations": {
+        "counter": {
+          "goals": 3,
+          "lg_share": 7.8,
+          "ratio": 0.68,
+          "share": 5.4,
+          "shots": 22,
+          "shots_pg": 0.67,
+          "xg_pg": null,
+          "z": -1.8
+        },
+        "open": {
+          "goals": 20,
+          "lg_share": 61.9,
+          "ratio": 1.01,
+          "share": 62.8,
+          "shots": 258,
+          "shots_pg": 7.82,
+          "xg_pg": null,
+          "z": 0.4
+        },
+        "penalty": {
+          "goals": 1,
+          "lg_share": 1.1,
+          "ratio": 0.43,
+          "share": 0.5,
+          "shots": 2,
+          "shots_pg": 0.06,
+          "xg_pg": 0.05,
+          "z": null
+        },
+        "setpiece": {
+          "goals": 13,
+          "lg_share": 29.2,
+          "ratio": 1.07,
+          "share": 31.4,
+          "shots": 129,
+          "shots_pg": 3.91,
+          "xg_pg": null,
+          "z": 1.0
+        }
+      },
+      "strong": [],
+      "weak": [],
+      "zones": {
+        "box_center": {
+          "goals": 23,
+          "lg_share": 50.6,
+          "ratio": 1.07,
+          "share": 54.3,
+          "shots": 222,
+          "shots_pg": 6.73,
+          "xg_pg": null,
+          "z": 1.5
+        },
+        "box_wide": {
+          "goals": 0,
+          "lg_share": 3.8,
+          "ratio": 0.83,
+          "share": 3.2,
+          "shots": 13,
+          "shots_pg": 0.39,
+          "xg_pg": null,
+          "z": -0.7
+        },
+        "goalmouth": {
+          "goals": 7,
+          "lg_share": 7.2,
+          "ratio": 0.92,
+          "share": 6.6,
+          "shots": 27,
+          "shots_pg": 0.82,
+          "xg_pg": null,
+          "z": -0.5
+        },
+        "out_center": {
+          "goals": 4,
+          "lg_share": 34.0,
+          "ratio": 0.98,
+          "share": 33.3,
+          "shots": 136,
+          "shots_pg": 4.12,
+          "xg_pg": null,
+          "z": -0.3
+        },
+        "out_wide": {
+          "goals": 2,
+          "lg_share": 4.4,
+          "ratio": 0.61,
+          "share": 2.7,
+          "shots": 11,
+          "shots_pg": 0.33,
+          "xg_pg": null,
+          "z": -1.7
+        }
+      }
+    },
+    {
+      "eligible": true,
+      "games": 33,
+      "goals": 39,
+      "id": 7650,
+      "rank_shots": 7,
+      "short": "\ud3ec\ud56d",
+      "shots_pg": 12.39,
+      "shots_ratio": 0.99,
+      "situations": {
+        "counter": {
+          "goals": 3,
+          "lg_share": 7.8,
+          "ratio": 1.12,
+          "share": 8.8,
+          "shots": 36,
+          "shots_pg": 1.09,
+          "xg_pg": null,
+          "z": 0.8
+        },
+        "open": {
+          "goals": 24,
+          "lg_share": 61.9,
+          "ratio": 1.0,
+          "share": 62.8,
+          "shots": 257,
+          "shots_pg": 7.79,
+          "xg_pg": null,
+          "z": 0.4
+        },
+        "penalty": {
+          "goals": 1,
+          "lg_share": 1.1,
+          "ratio": 0.21,
+          "share": 0.2,
+          "shots": 1,
+          "shots_pg": 0.03,
+          "xg_pg": null,
+          "z": null
+        },
+        "setpiece": {
+          "goals": 11,
+          "lg_share": 29.2,
+          "ratio": 0.95,
+          "share": 28.1,
+          "shots": 115,
+          "shots_pg": 3.48,
+          "xg_pg": null,
+          "z": -0.5
+        }
+      },
+      "strong": [],
+      "weak": [],
+      "zones": {
+        "box_center": {
+          "goals": 27,
+          "lg_share": 50.6,
+          "ratio": 1.04,
+          "share": 52.7,
+          "shots": 215,
+          "shots_pg": 6.52,
+          "xg_pg": null,
+          "z": 0.9
+        },
+        "box_wide": {
+          "goals": 1,
+          "lg_share": 3.8,
+          "ratio": 0.7,
+          "share": 2.7,
+          "shots": 11,
+          "shots_pg": 0.33,
+          "xg_pg": null,
+          "z": -1.2
+        },
+        "goalmouth": {
+          "goals": 3,
+          "lg_share": 7.2,
+          "ratio": 0.78,
+          "share": 5.6,
+          "shots": 23,
+          "shots_pg": 0.7,
+          "xg_pg": null,
+          "z": -1.2
+        },
+        "out_center": {
+          "goals": 6,
+          "lg_share": 34.0,
+          "ratio": 0.99,
+          "share": 33.8,
+          "shots": 138,
+          "shots_pg": 4.18,
+          "xg_pg": null,
+          "z": -0.1
+        },
+        "out_wide": {
+          "goals": 1,
+          "lg_share": 4.4,
+          "ratio": 1.16,
+          "share": 5.1,
+          "shots": 21,
+          "shots_pg": 0.64,
+          "xg_pg": null,
+          "z": 0.7
+        }
+      }
+    },
+    {
+      "eligible": true,
+      "games": 33,
+      "goals": 41,
+      "id": 7645,
+      "rank_shots": 8,
+      "short": "\ub300\uc804",
+      "shots_pg": 11.91,
+      "shots_ratio": 0.95,
+      "situations": {
+        "counter": {
+          "goals": 6,
+          "lg_share": 7.8,
+          "ratio": 1.21,
+          "share": 9.9,
+          "shots": 39,
+          "shots_pg": 1.18,
+          "xg_pg": null,
+          "z": 1.6
+        },
+        "open": {
+          "goals": 22,
+          "lg_share": 61.9,
+          "ratio": 0.93,
+          "share": 60.8,
+          "shots": 239,
+          "shots_pg": 7.24,
+          "xg_pg": null,
+          "z": -0.4
+        },
+        "penalty": {
+          "goals": 4,
+          "lg_share": 1.1,
+          "ratio": 1.07,
+          "share": 1.3,
+          "shots": 5,
+          "shots_pg": 0.15,
+          "xg_pg": null,
+          "z": null
+        },
+        "setpiece": {
+          "goals": 9,
+          "lg_share": 29.2,
+          "ratio": 0.91,
+          "share": 28.0,
+          "shots": 110,
+          "shots_pg": 3.33,
+          "xg_pg": null,
+          "z": -0.5
+        }
+      },
+      "strong": [],
+      "weak": [],
+      "zones": {
+        "box_center": {
+          "goals": 20,
+          "lg_share": 50.6,
+          "ratio": 0.88,
+          "share": 46.9,
+          "shots": 182,
+          "shots_pg": 5.52,
+          "xg_pg": null,
+          "z": -1.4
+        },
+        "box_wide": {
+          "goals": 1,
+          "lg_share": 3.8,
+          "ratio": 0.83,
+          "share": 3.4,
+          "shots": 13,
+          "shots_pg": 0.39,
+          "xg_pg": null,
+          "z": -0.5
+        },
+        "goalmouth": {
+          "goals": 10,
+          "lg_share": 7.2,
+          "ratio": 1.15,
+          "share": 8.8,
+          "shots": 34,
+          "shots_pg": 1.03,
+          "xg_pg": null,
+          "z": 1.2
+        },
+        "out_center": {
+          "goals": 6,
+          "lg_share": 34.0,
+          "ratio": 1.01,
+          "share": 36.1,
+          "shots": 140,
+          "shots_pg": 4.24,
+          "xg_pg": null,
+          "z": 0.9
+        },
+        "out_wide": {
+          "goals": 0,
+          "lg_share": 4.4,
+          "ratio": 1.05,
+          "share": 4.9,
+          "shots": 19,
+          "shots_pg": 0.58,
+          "xg_pg": null,
+          "z": 0.5
+        }
+      }
+    },
+    {
+      "eligible": true,
+      "games": 33,
+      "goals": 41,
+      "id": 7647,
+      "rank_shots": 9,
+      "short": "\uae40\ucc9c",
+      "shots_pg": 11.55,
+      "shots_ratio": 0.92,
+      "situations": {
+        "counter": {
+          "goals": 2,
+          "lg_share": 7.8,
+          "ratio": 0.59,
+          "share": 5.0,
+          "shots": 19,
+          "shots_pg": 0.58,
+          "xg_pg": null,
+          "z": -2.0
+        },
+        "open": {
+          "goals": 23,
+          "lg_share": 61.9,
+          "ratio": 0.89,
+          "share": 59.6,
+          "shots": 227,
+          "shots_pg": 6.88,
+          "xg_pg": null,
+          "z": -0.9
+        },
+        "penalty": {
+          "goals": 4,
+          "lg_share": 1.1,
+          "ratio": 1.29,
+          "share": 1.6,
+          "shots": 6,
+          "shots_pg": 0.18,
+          "xg_pg": null,
+          "z": null
+        },
+        "setpiece": {
+          "goals": 12,
+          "lg_share": 29.2,
+          "ratio": 1.07,
+          "share": 33.9,
+          "shots": 129,
+          "shots_pg": 3.91,
+          "xg_pg": null,
+          "z": 2.0
+        }
+      },
+      "strong": [
+        "counter"
+      ],
+      "weak": [
+        "setpiece"
+      ],
+      "zones": {
+        "box_center": {
+          "goals": 19,
+          "lg_share": 50.6,
+          "ratio": 0.97,
+          "share": 53.3,
+          "shots": 200,
+          "shots_pg": 6.06,
+          "xg_pg": null,
+          "z": 1.1
+        },
+        "box_wide": {
+          "goals": 0,
+          "lg_share": 3.8,
+          "ratio": 0.96,
+          "share": 4.0,
+          "shots": 15,
+          "shots_pg": 0.45,
+          "xg_pg": null,
+          "z": 0.2
+        },
+        "goalmouth": {
+          "goals": 11,
+          "lg_share": 7.2,
+          "ratio": 0.98,
+          "share": 7.7,
+          "shots": 29,
+          "shots_pg": 0.88,
+          "xg_pg": null,
+          "z": 0.4
+        },
+        "out_center": {
+          "goals": 7,
+          "lg_share": 34.0,
+          "ratio": 0.87,
+          "share": 32.3,
+          "shots": 121,
+          "shots_pg": 3.67,
+          "xg_pg": null,
+          "z": -0.7
+        },
+        "out_wide": {
+          "goals": 0,
+          "lg_share": 4.4,
+          "ratio": 0.55,
+          "share": 2.7,
+          "shots": 10,
+          "shots_pg": 0.3,
+          "xg_pg": null,
+          "z": -1.7
+        }
+      }
+    },
+    {
+      "eligible": true,
+      "games": 33,
+      "goals": 29,
+      "id": 7646,
+      "rank_shots": 10,
+      "short": "\uc11c\uc6b8",
+      "shots_pg": 10.45,
+      "shots_ratio": 0.83,
+      "situations": {
+        "counter": {
+          "goals": 2,
+          "lg_share": 7.8,
+          "ratio": 1.24,
+          "share": 11.6,
+          "shots": 40,
+          "shots_pg": 1.21,
+          "xg_pg": null,
+          "z": 2.6
+        },
+        "open": {
+          "goals": 19,
+          "lg_share": 61.9,
+          "ratio": 0.77,
+          "share": 57.4,
+          "shots": 198,
+          "shots_pg": 6.0,
+          "xg_pg": null,
+          "z": -1.7
+        },
+        "penalty": {
+          "goals": 3,
+          "lg_share": 1.1,
+          "ratio": 0.86,
+          "share": 1.2,
+          "shots": 4,
+          "shots_pg": 0.12,
+          "xg_pg": null,
+          "z": null
+        },
+        "setpiece": {
+          "goals": 5,
+          "lg_share": 29.2,
+          "ratio": 0.85,
+          "share": 29.9,
+          "shots": 103,
+          "shots_pg": 3.12,
+          "xg_pg": null,
+          "z": 0.3
+        }
+      },
+      "strong": [],
+      "weak": [
+        "counter",
+        "out_center"
+      ],
+      "zones": {
+        "box_center": {
+          "goals": 13,
+          "lg_share": 50.6,
+          "ratio": 0.79,
+          "share": 48.1,
+          "shots": 164,
+          "shots_pg": 4.97,
+          "xg_pg": null,
+          "z": -0.9
+        },
+        "box_wide": {
+          "goals": 0,
+          "lg_share": 3.8,
+          "ratio": 0.57,
+          "share": 2.6,
+          "shots": 9,
+          "shots_pg": 0.27,
+          "xg_pg": null,
+          "z": -1.1
+        },
+        "goalmouth": {
+          "goals": 9,
+          "lg_share": 7.2,
+          "ratio": 0.78,
+          "share": 6.7,
+          "shots": 23,
+          "shots_pg": 0.7,
+          "xg_pg": null,
+          "z": -0.3
+        },
+        "out_center": {
+          "goals": 3,
+          "lg_share": 34.0,
+          "ratio": 0.97,
+          "share": 39.6,
+          "shots": 135,
+          "shots_pg": 4.09,
+          "xg_pg": null,
+          "z": 2.2
+        },
+        "out_wide": {
+          "goals": 1,
+          "lg_share": 4.4,
+          "ratio": 0.55,
+          "share": 2.9,
+          "shots": 10,
+          "shots_pg": 0.3,
+          "xg_pg": null,
+          "z": -1.3
+        }
+      }
+    },
+    {
+      "eligible": true,
+      "games": 33,
+      "goals": 35,
+      "id": 7648,
+      "rank_shots": 11,
+      "short": "\uc778\ucc9c",
+      "shots_pg": 10.09,
+      "shots_ratio": 0.81,
+      "situations": {
+        "counter": {
+          "goals": 4,
+          "lg_share": 7.8,
+          "ratio": 0.84,
+          "share": 8.1,
+          "shots": 27,
+          "shots_pg": 0.82,
+          "xg_pg": null,
+          "z": 0.2
+        },
+        "open": {
+          "goals": 21,
+          "lg_share": 61.9,
+          "ratio": 0.81,
+          "share": 62.5,
+          "shots": 208,
+          "shots_pg": 6.3,
+          "xg_pg": null,
+          "z": 0.2
+        },
+        "penalty": {
+          "goals": 2,
+          "lg_share": 1.1,
+          "ratio": 0.64,
+          "share": 0.9,
+          "shots": 3,
+          "shots_pg": 0.09,
+          "xg_pg": null,
+          "z": null
+        },
+        "setpiece": {
+          "goals": 8,
+          "lg_share": 29.2,
+          "ratio": 0.79,
+          "share": 28.5,
+          "shots": 95,
+          "shots_pg": 2.88,
+          "xg_pg": null,
+          "z": -0.3
+        }
+      },
+      "strong": [],
+      "weak": [],
+      "zones": {
+        "box_center": {
+          "goals": 20,
+          "lg_share": 50.6,
+          "ratio": 0.81,
+          "share": 50.6,
+          "shots": 167,
+          "shots_pg": 5.06,
+          "xg_pg": null,
+          "z": 0.0
+        },
+        "box_wide": {
+          "goals": 0,
+          "lg_share": 3.8,
+          "ratio": 1.02,
+          "share": 4.8,
+          "shots": 16,
+          "shots_pg": 0.48,
+          "xg_pg": null,
+          "z": 1.0
+        },
+        "goalmouth": {
+          "goals": 5,
+          "lg_share": 7.2,
+          "ratio": 0.75,
+          "share": 6.7,
+          "shots": 22,
+          "shots_pg": 0.67,
+          "xg_pg": null,
+          "z": -0.4
+        },
+        "out_center": {
+          "goals": 6,
+          "lg_share": 34.0,
+          "ratio": 0.79,
+          "share": 33.3,
+          "shots": 110,
+          "shots_pg": 3.33,
+          "xg_pg": null,
+          "z": -0.2
+        },
+        "out_wide": {
+          "goals": 2,
+          "lg_share": 4.4,
+          "ratio": 0.83,
+          "share": 4.5,
+          "shots": 15,
+          "shots_pg": 0.45,
+          "xg_pg": null,
+          "z": 0.1
+        }
+      }
+    },
+    {
+      "eligible": true,
+      "games": 33,
+      "goals": 30,
+      "id": 34220,
+      "rank_shots": 12,
+      "short": "\uac15\uc6d0",
+      "shots_pg": 9.48,
+      "shots_ratio": 0.76,
+      "situations": {
+        "counter": {
+          "goals": 4,
+          "lg_share": 7.8,
+          "ratio": 0.84,
+          "share": 8.6,
+          "shots": 27,
+          "shots_pg": 0.82,
+          "xg_pg": null,
+          "z": 0.6
+        },
+        "open": {
+          "goals": 16,
+          "lg_share": 61.9,
+          "ratio": 0.65,
+          "share": 53.4,
+          "shots": 167,
+          "shots_pg": 5.06,
+          "xg_pg": null,
+          "z": -3.1
+        },
+        "penalty": {
+          "goals": 2,
+          "lg_share": 1.1,
+          "ratio": 0.64,
+          "share": 1.0,
+          "shots": 3,
+          "shots_pg": 0.09,
+          "xg_pg": null,
+          "z": null
+        },
+        "setpiece": {
+          "goals": 8,
+          "lg_share": 29.2,
+          "ratio": 0.96,
+          "share": 37.1,
+          "shots": 116,
+          "shots_pg": 3.52,
+          "xg_pg": null,
+          "z": 3.1
+        }
+      },
+      "strong": [
+        "open"
+      ],
+      "weak": [
+        "setpiece",
+        "goalmouth"
+      ],
+      "zones": {
+        "box_center": {
+          "goals": 13,
+          "lg_share": 50.6,
+          "ratio": 0.76,
+          "share": 51.0,
+          "shots": 158,
+          "shots_pg": 4.79,
+          "xg_pg": null,
+          "z": 0.1
+        },
+        "box_wide": {
+          "goals": 0,
+          "lg_share": 3.8,
+          "ratio": 0.77,
+          "share": 3.9,
+          "shots": 12,
+          "shots_pg": 0.36,
+          "xg_pg": null,
+          "z": 0.0
+        },
+        "goalmouth": {
+          "goals": 12,
+          "lg_share": 7.2,
+          "ratio": 1.12,
+          "share": 10.6,
+          "shots": 33,
+          "shots_pg": 1.0,
+          "xg_pg": null,
+          "z": 2.3
+        },
+        "out_center": {
+          "goals": 3,
+          "lg_share": 34.0,
+          "ratio": 0.69,
+          "share": 31.0,
+          "shots": 96,
+          "shots_pg": 2.91,
+          "xg_pg": null,
+          "z": -1.1
+        },
+        "out_wide": {
+          "goals": 0,
+          "lg_share": 4.4,
+          "ratio": 0.61,
+          "share": 3.5,
+          "shots": 11,
+          "shots_pg": 0.33,
+          "xg_pg": null,
+          "z": -0.8
+        }
+      }
+    }
+  ],
+  "warnings": [],
+  "year": "2026",
+  "z_flag": 2.0,
+  "zones": [
+    {
+      "key": "goalmouth",
+      "label": "\uace8\ubb38 \uc55e"
+    },
+    {
+      "key": "box_center",
+      "label": "\ubc15\uc2a4 \uc911\uc559"
+    },
+    {
+      "key": "box_wide",
+      "label": "\ubc15\uc2a4 \uce21\uba74"
+    },
+    {
+      "key": "out_center",
+      "label": "\uc911\uac70\ub9ac \uc815\uba74"
+    },
+    {
+      "key": "out_wide",
+      "label": "\uc911\uac70\ub9ac \uce21\uba74"
+    }
+  ],
+  "zones_geom": [
+    {
+      "key": "goalmouth",
+      "x0": 0,
+      "x1": 5.5,
+      "y0": 36.5,
+      "y1": 63.5
+    },
+    {
+      "key": "box_center",
+      "x0": 0,
+      "x1": 16.5,
+      "y0": 30,
+      "y1": 70
+    },
+    {
+      "key": "box_wide",
+      "x0": 0,
+      "x1": 16.5,
+      "y0": 0,
+      "y1": 30
+    },
+    {
+      "key": "box_wide",
+      "x0": 0,
+      "x1": 16.5,
+      "y0": 70,
+      "y1": 100
+    },
+    {
+      "key": "out_center",
+      "x0": 16.5,
+      "x1": 40,
+      "y0": 30,
+      "y1": 70
+    },
+    {
+      "key": "out_wide",
+      "x0": 16.5,
+      "x1": 40,
+      "y0": 0,
+      "y1": 30
+    },
+    {
+      "key": "out_wide",
+      "x0": 16.5,
+      "x1": 40,
+      "y0": 70,
+      "y1": 100
+    }
+  ]
+}

@@ -4434,3 +4434,6 @@ _league_coefs(tid_filter)  # 조회 헬퍼
 - 2026-11-06 00:32:29 | SC="C:/Users/BANGEU~1/AppData/Local/Temp/claude/75c0a2dd30060cac/79a17661-d9b8-4bc5-aa21-e86f0d590e42/scratchpad"; ssh -i <SSH_KEY>.pem -o BatchMode=yes -o ConnectTimeout=20 rocky@<PROD_IP> "bash -s" < "$SC/preflight2.sh" 2>&1 | head -120
 - 2026-11-06 00:32:48 | SC="C:/Users/BANGEU~1/AppData/Local/Temp/claude/75c0a2dd30060cac/79a17661-d9b8-4bc5-aa21-e86f0d590e42/scratchpad"; ssh -i <SSH_KEY>.pem -o BatchMode=yes -o ConnectTimeout=20 rocky@<PROD_IP> "bash -s" < "$SC/preflight3.sh" 2>&1 | head -40
 - 2026-11-06 00:32:55 | ssh -i <SSH_KEY>.pem -o BatchMode=yes rocky@<PROD_IP> "cd /opt/today_tactics && grep -nE 'recover_lineups_kleague|collect_kleague_heatmap|collect_kleague_events|collect_kleague_passes|reclassify_playoffs|kleague_player_match|map_kleague_players|fill_kleague' update_data.py | cut -c1-150"
+
+- 2026-11-06 차트 개편 Phase 0(TERA 게이트 통과)·1a(심화 탭 대시보드 셸, 23,407→6,368px, 차트 카드 9장) — 브랜치 feat/chart-dashboard-redesign, 미배포
+- 2026-11-06 차트 개편 Phase 1b(심화 카드 6장 차트화, API 필드 4종 additive, 차트 카드 15장) — 미배포

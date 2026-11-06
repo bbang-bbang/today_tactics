@@ -1,0 +1,541 @@
+{
+  "high_vs_low": {
+    "diff": -0.06,
+    "significant": false,
+    "z": -0.2
+  },
+  "hub_high": {
+    "ci": 0.33,
+    "ga": 1.09,
+    "gf": 1.16,
+    "label": "\ud3c9\uc18c\ubcf4\ub2e4 \ud5c8\ube0c \uc9d1\uc911 (+2%p\u2191)",
+    "n": 57,
+    "ppg": 1.42,
+    "win_pct": 36.8
+  },
+  "hub_low": {
+    "ci": 0.33,
+    "ga": 1.43,
+    "gf": 1.45,
+    "label": "\ud3c9\uc18c\ubcf4\ub2e4 \ubd84\uc0b0 (\u22122%p\u2193)",
+    "n": 58,
+    "ppg": 1.48,
+    "win_pct": 39.7
+  },
+  "league": "K1",
+  "league_hub_share": 14.8,
+  "limits": "\ud5c8\ube0c \uc9c0\ubd84 = \ud55c \uc120\uc218\uc758 (\ubcf4\ub0b8+\ubc1b\uc740) \ud328\uc2a4 \uad00\uc5ec \u00f7 \ud300 \ucd1d \ud328\uc2a4 \uad00\uc5ec(\ud328\uc2a4 1\ud68c=2\uad00\uc5ec) \u00b7 \uacf5\uc2dd \ud328\uc2a4 \ud589\ub82c 2023~ \u00b7 \uc810\uc720\uc728\u00b7\uc0c1\ub300 \uc555\ubc15\u00b7\uacbd\uae30 \uc0c1\ud669\uc5d0 \ub530\ub77c \ub2ec\ub77c\uc838 \uc778\uacfc\uac00 \uc544\ub2d8",
+  "matches": 400,
+  "min_games": 8,
+  "teams": [
+    {
+      "eligible": true,
+      "hub_share": 15.8,
+      "hubs": 5,
+      "id": 7648,
+      "main_hub": {
+        "name": "\ud6c4\uc548 \uc774\ube44\uc790",
+        "pct": 52,
+        "pos": "DF",
+        "times": 17
+      },
+      "matches": 33,
+      "recent_hubs": [
+        {
+          "is_main": false,
+          "name": "\uae40\uac74\ud76c",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\uae40\uac74\ud76c",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\uae40\uac74\ud76c",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\uae40\uba85\uc21c",
+          "pos": "DF"
+        },
+        {
+          "is_main": true,
+          "name": "\ud6c4\uc548 \uc774\ube44\uc790",
+          "pos": "DF"
+        }
+      ],
+      "short": "\uc778\ucc9c",
+      "top2_share": 29.7
+    },
+    {
+      "eligible": true,
+      "hub_share": 15.7,
+      "hubs": 14,
+      "id": 48912,
+      "main_hub": {
+        "name": "\ubbfc\uc0c1\uae30",
+        "pct": 15,
+        "pos": "DF",
+        "times": 5
+      },
+      "matches": 34,
+      "recent_hubs": [
+        {
+          "is_main": true,
+          "name": "\ubbfc\uc0c1\uae30",
+          "pos": "DF"
+        },
+        {
+          "is_main": true,
+          "name": "\ubbfc\uc0c1\uae30",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\ucd5c\uacbd\ub85d",
+          "pos": "MF"
+        },
+        {
+          "is_main": false,
+          "name": "\ubc18 \ud750\ub8ec\uc2a4\ubca4",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\ucd5c\uacbd\ub85d",
+          "pos": "MF"
+        }
+      ],
+      "short": "\uad11\uc8fc",
+      "top2_share": 29.3
+    },
+    {
+      "eligible": true,
+      "hub_share": 15.6,
+      "hubs": 9,
+      "id": 7650,
+      "main_hub": {
+        "name": "\ubc15\ucc2c\uc6a9",
+        "pct": 42,
+        "pos": "DF",
+        "times": 14
+      },
+      "matches": 33,
+      "recent_hubs": [
+        {
+          "is_main": false,
+          "name": "\uc870\ub974\uc9c0",
+          "pos": "FW"
+        },
+        {
+          "is_main": true,
+          "name": "\ubc15\ucc2c\uc6a9",
+          "pos": "DF"
+        },
+        {
+          "is_main": true,
+          "name": "\ubc15\ucc2c\uc6a9",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\ud669\uc11c\uc6c5",
+          "pos": "MF"
+        },
+        {
+          "is_main": false,
+          "name": "\uae40\ub3d9\uc9c4",
+          "pos": "MF"
+        }
+      ],
+      "short": "\ud3ec\ud56d",
+      "top2_share": 29.5
+    },
+    {
+      "eligible": true,
+      "hub_share": 15.3,
+      "hubs": 6,
+      "id": 7646,
+      "main_hub": {
+        "name": "\ubc14\ubca0\uce20",
+        "pct": 33,
+        "pos": "MF",
+        "times": 11
+      },
+      "matches": 33,
+      "recent_hubs": [
+        {
+          "is_main": false,
+          "name": "\uc57c\uc794",
+          "pos": "DF"
+        },
+        {
+          "is_main": true,
+          "name": "\ubc14\ubca0\uce20",
+          "pos": "MF"
+        },
+        {
+          "is_main": false,
+          "name": "\ub85c\uc2a4",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\ub85c\uc2a4",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc57c\uc794",
+          "pos": "DF"
+        }
+      ],
+      "short": "\uc11c\uc6b8",
+      "top2_share": 28.9
+    },
+    {
+      "eligible": true,
+      "hub_share": 15.1,
+      "hubs": 12,
+      "id": 7647,
+      "main_hub": {
+        "name": "\ubcc0\uc900\uc218",
+        "pct": 26,
+        "pos": "DF",
+        "times": 9
+      },
+      "matches": 34,
+      "recent_hubs": [
+        {
+          "is_main": false,
+          "name": "\uc774\uac15\ud604",
+          "pos": "MF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc774\uac15\ud604",
+          "pos": "MF"
+        },
+        {
+          "is_main": false,
+          "name": "\ud64d\uc724\uc0c1",
+          "pos": "FW"
+        },
+        {
+          "is_main": false,
+          "name": "\uc774\uac15\ud604",
+          "pos": "MF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc774\uc815\ud0dd",
+          "pos": "DF"
+        }
+      ],
+      "short": "\uae40\ucc9c",
+      "top2_share": 28.5
+    },
+    {
+      "eligible": true,
+      "hub_share": 14.9,
+      "hubs": 9,
+      "id": 7653,
+      "main_hub": {
+        "name": "\uae40\uc601\uad8c",
+        "pct": 33,
+        "pos": "DF",
+        "times": 11
+      },
+      "matches": 33,
+      "recent_hubs": [
+        {
+          "is_main": true,
+          "name": "\uae40\uc601\uad8c",
+          "pos": "DF"
+        },
+        {
+          "is_main": true,
+          "name": "\uae40\uc601\uad8c",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc815\uc2b9\ud604",
+          "pos": "DF"
+        },
+        {
+          "is_main": true,
+          "name": "\uae40\uc601\uad8c",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\ubcf4\uc57c\ub2c8\uce58",
+          "pos": "MF"
+        }
+      ],
+      "short": "\uc6b8\uc0b0",
+      "top2_share": 27.9
+    },
+    {
+      "eligible": true,
+      "hub_share": 14.9,
+      "hubs": 8,
+      "id": 6908,
+      "main_hub": {
+        "name": "\uae40\uc601\ube48",
+        "pct": 32,
+        "pos": "DF",
+        "times": 11
+      },
+      "matches": 34,
+      "recent_hubs": [
+        {
+          "is_main": false,
+          "name": "\uc774\uc601\uc7ac",
+          "pos": "MF"
+        },
+        {
+          "is_main": true,
+          "name": "\uae40\uc601\ube48",
+          "pos": "DF"
+        },
+        {
+          "is_main": true,
+          "name": "\uae40\uc601\ube48",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc774\uc601\uc7ac",
+          "pos": "MF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc870\uc704\uc81c",
+          "pos": "DF"
+        }
+      ],
+      "short": "\uc804\ubd81",
+      "top2_share": 27.7
+    },
+    {
+      "eligible": true,
+      "hub_share": 14.5,
+      "hubs": 8,
+      "id": 32675,
+      "main_hub": {
+        "name": "\uad8c\uacbd\uc6d0",
+        "pct": 33,
+        "pos": "DF",
+        "times": 11
+      },
+      "matches": 33,
+      "recent_hubs": [
+        {
+          "is_main": false,
+          "name": "\ub9c8\ud14c\uc6b0\uc2a4",
+          "pos": "MF"
+        },
+        {
+          "is_main": true,
+          "name": "\uad8c\uacbd\uc6d0",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\ub300\ub2c8 \ubc14\ucee4",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\ub300\ub2c8 \ubc14\ucee4",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\ub300\ub2c8 \ubc14\ucee4",
+          "pos": "DF"
+        }
+      ],
+      "short": "\uc548\uc591",
+      "top2_share": 26.8
+    },
+    {
+      "eligible": true,
+      "hub_share": 14.2,
+      "hubs": 10,
+      "id": 7645,
+      "main_hub": {
+        "name": "\uae40\ubd09\uc218",
+        "pct": 35,
+        "pos": "MF",
+        "times": 12
+      },
+      "matches": 34,
+      "recent_hubs": [
+        {
+          "is_main": true,
+          "name": "\uae40\ubd09\uc218",
+          "pos": "MF"
+        },
+        {
+          "is_main": true,
+          "name": "\uae40\ubd09\uc218",
+          "pos": "MF"
+        },
+        {
+          "is_main": false,
+          "name": "\uae40\ubb38\ud658",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc870\uc131\uad8c",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc548\ud1a4",
+          "pos": "DF"
+        }
+      ],
+      "short": "\ub300\uc804",
+      "top2_share": 27.0
+    },
+    {
+      "eligible": true,
+      "hub_share": 13.9,
+      "hubs": 9,
+      "id": 34220,
+      "main_hub": {
+        "name": "\uc774\uae30\ud601",
+        "pct": 39,
+        "pos": "DF",
+        "times": 13
+      },
+      "matches": 33,
+      "recent_hubs": [
+        {
+          "is_main": false,
+          "name": "\uc774\uc720\ud604",
+          "pos": "MF"
+        },
+        {
+          "is_main": true,
+          "name": "\uc774\uae30\ud601",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc11c\ubbfc\uc6b0",
+          "pos": "MF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc11c\ubbfc\uc6b0",
+          "pos": "MF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc11c\ubbfc\uc6b0",
+          "pos": "MF"
+        }
+      ],
+      "short": "\uac15\uc6d0",
+      "top2_share": 26.0
+    },
+    {
+      "eligible": true,
+      "hub_share": 13.9,
+      "hubs": 10,
+      "id": 92539,
+      "main_hub": {
+        "name": "\ud328\ud2b8\ub9ad",
+        "pct": 21,
+        "pos": "DF",
+        "times": 7
+      },
+      "matches": 33,
+      "recent_hubs": [
+        {
+          "is_main": false,
+          "name": "\ubc31\ub3d9\uaddc",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc131\uc608\uac74",
+          "pos": "MF"
+        },
+        {
+          "is_main": true,
+          "name": "\ud328\ud2b8\ub9ad",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\uae40\uc0c1\uc900",
+          "pos": "MF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc724\ube5b\uac00\ub78c",
+          "pos": "MF"
+        }
+      ],
+      "short": "\ubd80\ucc9c",
+      "top2_share": 26.0
+    },
+    {
+      "eligible": true,
+      "hub_share": 13.7,
+      "hubs": 14,
+      "id": 7649,
+      "main_hub": {
+        "name": "\ud1a0\ube44\uc544\uc2a4",
+        "pct": 27,
+        "pos": "DF",
+        "times": 9
+      },
+      "matches": 33,
+      "recent_hubs": [
+        {
+          "is_main": true,
+          "name": "\ud1a0\ube44\uc544\uc2a4",
+          "pos": "DF"
+        },
+        {
+          "is_main": true,
+          "name": "\ud1a0\ube44\uc544\uc2a4",
+          "pos": "DF"
+        },
+        {
+          "is_main": true,
+          "name": "\ud1a0\ube44\uc544\uc2a4",
+          "pos": "DF"
+        },
+        {
+          "is_main": true,
+          "name": "\ud1a0\ube44\uc544\uc2a4",
+          "pos": "DF"
+        },
+        {
+          "is_main": false,
+          "name": "\uc720\uc778\uc218",
+          "pos": "DF"
+        }
+      ],
+      "short": "\uc81c\uc8fc",
+      "top2_share": 25.9
+    }
+  ],
+  "verdict": {
+    "level": "none",
+    "text": "\ud5c8\ube0c \uc9c0\ubd84\uc774 \ud3c9\uc18c\ubcf4\ub2e4 \ub192\uac70\ub098 \ub0ae\uc558\ub358 \uacbd\uae30 \uc0ac\uc774\uc5d0 \uc131\uc801 \ucc28\uc774\uac00 \uc788\ub2e4\ub294 \ud1b5\uacc4\uc801 \uadfc\uac70\ub294 \ud655\uc778\ub418\uc9c0 \uc54a\uc558\uc2b5\ub2c8\ub2e4."
+  },
+  "year": "2026"
+}

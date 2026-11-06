@@ -459,6 +459,89 @@ def _official_no_year():
     assert_(d.get('official') is False and d.get('reason') in ('no_year', 'no_official_table', 'no_match', 'no_games'), str(d.get('reason')))
 qa('공식 리포트 없는 연도 안전 응답', _official_no_year)
 
+# ── 차트 개편 Phase 1b: 인사이트 API 필드 추가 (additive — 기존 키 불변) ──
+_ROT = None
+def _rot():
+    global _ROT
+    if _ROT is None:
+        _ROT = get('/api/insights/rotation?year=2026&league=k1')
+    return _ROT
+def _rot_timeline_len():
+    for t in _rot()['teams']:
+        if t.get('eligible'):
+            assert_(len(t.get('timeline') or []) == t['matches'], f"{t['short']} {len(t.get('timeline') or [])}/{t['matches']}")
+qa('rotation timeline 길이 = matches', _rot_timeline_len)
+def _rot_timeline_vals():
+    for t in _rot()['teams']:
+        tl = t.get('timeline')
+        if not t.get('eligible'):
+            continue
+        assert_(tl, f"{t['short']} timeline 없음")
+        assert_(all(0 <= c['changes'] <= 11 and c['pts'] in (0, 1, 3) for c in tl), t['short'])
+        assert_([c['ts'] for c in tl] == sorted(c['ts'] for c in tl), f"{t['short']} ts 순서")
+qa('rotation timeline changes 0~11·pts·ts 오름차순', _rot_timeline_vals)
+qa('rotation 기존 키 불변', lambda: assert_(
+    {'id', 'short', 'matches', 'eligible', 'avg_changes', 'core_size', 'high_n', 'high_ppg'}
+    <= set(next(t for t in _rot()['teams'] if t.get('eligible')))))
+
+_AFT = None
+def _aft():
+    global _AFT
+    if _AFT is None:
+        _AFT = get('/api/insights/goal-aftermath?year=2026&league=k1')
+    return _AFT
+_FLOW_KEYS = ('extra_only', 'conc_only', 'both', 'none')
+def _aft_flow_sum():
+    d = _aft()
+    for t in [x for x in d['teams'] if x.get('eligible')] + [dict(d['league_total'], short='리그')]:
+        f = t.get('flow')
+        assert_(f and set(f) == set(_FLOW_KEYS), f"{t['short']} flow={f}")
+        assert_(sum(f[k] for k in _FLOW_KEYS) == t['scored'], f"{t['short']} {sum(f.values())}!={t['scored']}")
+qa('aftermath flow 합 = scored', _aft_flow_sum)
+def _aft_flow_conc():
+    d = _aft()
+    for t in [x for x in d['teams'] if x.get('eligible')] + [dict(d['league_total'], short='리그')]:
+        f = t['flow']
+        assert_(f['conc_only'] + f['both'] == t['conc_obs'], f"{t['short']} {f} conc_obs={t['conc_obs']}")
+qa('aftermath flow conc_only+both = conc_obs', _aft_flow_conc)
+qa('aftermath 기존 키 불변', lambda: assert_(
+    {'id', 'short', 'scored', 'conc_obs', 'conc_exp', 'conc_z', 'conceded', 'resp_obs', 'resp_exp', 'resp_z', 'eligible'}
+    <= set(next(t for t in _aft()['teams'] if t.get('eligible')))))
+
+def _wx_ci():
+    d = get('/api/insights/weather-effect?year=2026&league=k1')
+    rows = [r for g in (d.get('groups') or {}).values() for r in g]
+    assert_(rows, 'weather groups 비어 있음')
+    for r in rows:
+        assert_('goals_ci' in r, f"{r.get('label')} goals_ci 없음")
+        if r.get('goals_resid') is not None and r.get('goals_z') is not None:
+            assert_(r['goals_ci'] is not None and r['goals_ci'] > 0, f"{r.get('label')} ci={r['goals_ci']}")
+qa('weather goals_ci 양수 또는 null', _wx_ci)
+qa('weather 기존 키 불변', lambda: assert_({'n', 'goals', 'goals_resid', 'goals_z', 'home_win_pct', 'label', 'key'}
+    <= set(get('/api/insights/weather-effect?year=2026&league=k1')['groups']['temp'][0])))
+_WK = None
+def _wk():
+    global _WK
+    if _WK is None:
+        _WK = get('/api/insights/defensive-weakness?year=2026&league=k1')
+    return _WK
+def _wk_geom():
+    g = _wk().get('zones_geom') or []
+    assert_(len(g) == 7, f'{len(g)}개')
+    assert_({z['key'] for z in g} == {'goalmouth', 'box_center', 'box_wide', 'out_center', 'out_wide'}, str({z['key'] for z in g}))
+qa('weakness zones_geom 7개 사각형·키 5종', _wk_geom)
+def _wk_geom_match():
+    g = _wk()['zones_geom']
+    def zone_at(x, y):   # 우선순위 = 배열 순서 (앞쪽이 우선)
+        for z in g:
+            if z['x0'] <= x < z['x1'] and z['y0'] <= y <= z['y1']:
+                return z['key']
+    for (x, y), want in {(3, 50): 'goalmouth', (10, 50): 'box_center', (10, 10): 'box_wide', (25, 50): 'out_center',
+                         (25, 90): 'out_wide', (5.4, 36.4): 'box_center'}.items():
+        assert_(zone_at(x, y) == want, f'({x},{y}) {zone_at(x, y)} != {want}')
+qa('weakness zones_geom 경계 = _weak_zone', _wk_geom_match)
+qa('weakness 기존 키 불변', lambda: assert_({'teams', 'zones', 'situations', 'min_games'} <= set(_wk())))
+
 # ── 결과 출력 ──
 passed = sum(1 for r in results if r[0] == 'PASS')
 failed = [r for r in results if r[0] == 'FAIL']
