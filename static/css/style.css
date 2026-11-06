@@ -9952,3 +9952,62 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .rpp-seg-h { background: var(--tt-accent); }
 .rpp-seg-d { background: var(--tt-neutral); }
 .rpp-seg-a { background: #22d3ee; }
+
+/* ═══════════════════════════════════════════════════════
+   페이지 최대 폭 — 와이드 모니터에서 과도하게 늘어나지 않게 가운데 정렬 (2026-11-07)
+   ═══════════════════════════════════════════════════════ */
+#app {
+    width: 100%;
+    max-width: 1440px;
+    margin: 0 auto;
+}
+
+/* ═══════════════════════════════════════════════════════
+   매치 선택 영역 — 전술판·경기예측 탭에서만 노출, 그 외(팀·선수·히트맵)는 숨기고 한 줄 요약만 (2026-11-07)
+   body[data-ws] 는 workspace.js 의 switchWorkspace 가 갱신
+   ═══════════════════════════════════════════════════════ */
+body:not([data-ws="tactics"]):not([data-ws="predict"]) .flow-section-head,
+body:not([data-ws="tactics"]):not([data-ws="predict"]) #league-schedule-wrap,
+body:not([data-ws="tactics"]):not([data-ws="predict"]) #banner-matchup {
+    display: none !important;
+}
+.flow-section-head { scroll-margin-top: 72px; }
+
+.match-ctx {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 12px;
+    padding: 8px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+.match-ctx.hidden { display: none; }
+.mc-label {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+.mc-text { color: var(--text-primary); font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-change {
+    margin-left: auto;
+    padding: 4px 12px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.mc-change:hover { background: var(--bg-elevated); color: var(--text-primary); border-color: var(--accent); }
+.mc-change:active { transform: translateY(1px); }
+.mc-change:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 팀 탭 심화 인사이트 컨테이너 — hidden 클래스가 display 를 끄도록 (모드 전환 시 단일 팀 분석과 겹치지 않게) */
+#ws-team-insights.hidden { display: none; }

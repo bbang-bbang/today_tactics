@@ -9,11 +9,11 @@
     <link rel="apple-touch-icon" href="/static/img/favicon.png">
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=117">
+    <link rel="stylesheet" href="/static/css/style.css?v=120">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/static/js/boot.js?v=1"></script>
 </head>
-<body>
+<body data-ws="tactics">
     <div id="app">
         <header id="toolbar">
             <h1>Today Tactics</h1>
@@ -34,6 +34,34 @@
             </div>
             {% endif %}
         </header>
+        <!-- 작업공간 탭 (전술판 / 경기예측 / 팀 / 선수) — 항상 최상단(헤더 바로 아래, sticky). 선택한 매치가 전 탭 공통 맥락 -->
+        <nav id="workspace-tabs" role="tablist" aria-label="작업공간">
+            <button class="ws-tab active" data-ws="tactics" role="tab" aria-selected="true" tabindex="0">
+                <span class="ws-tab-icon" aria-hidden="true">🎯</span><span class="ws-tab-label">전술판</span>
+            </button>
+            <button class="ws-tab" data-ws="predict" role="tab" aria-selected="false" tabindex="-1">
+                <span class="ws-tab-icon" aria-hidden="true">📊</span><span class="ws-tab-label">경기예측</span>
+            </button>
+            <button class="ws-tab" data-ws="team" role="tab" aria-selected="false" tabindex="-1">
+                <span class="ws-tab-icon" aria-hidden="true">🛡️</span><span class="ws-tab-label">팀</span>
+            </button>
+            <button class="ws-tab" data-ws="player" role="tab" aria-selected="false" tabindex="-1">
+                <span class="ws-tab-icon" aria-hidden="true">👤</span><span class="ws-tab-label">선수</span>
+            </button>
+            <button class="ws-tab" data-ws="heatmap" role="tab" aria-selected="false" tabindex="-1">
+                <span class="ws-tab-icon" aria-hidden="true">🔥</span><span class="ws-tab-label">히트맵</span>
+            </button>
+            <!-- 해외리그 탭 일단 비활성화 (아직 이른 단계) — 복구 시 아래 버튼 복원
+            <button class="ws-tab" data-ws="global" role="tab" aria-selected="false" tabindex="-1">
+                <span class="ws-tab-icon" aria-hidden="true">🌍</span><span class="ws-tab-label">해외리그</span>
+            </button> -->
+        </nav>
+        <!-- 선택 매치 요약 — 매치 선택 영역이 숨겨지는 탭(팀·선수·히트맵)에서만 노출. workspace.js 가 채움 -->
+        <div id="match-ctx" class="match-ctx hidden" role="status" aria-live="polite">
+            <span class="mc-label">선택 매치</span>
+            <span id="mc-text" class="mc-text"></span>
+            <button id="mc-change" class="mc-change" type="button" title="전술판으로 이동해 매치 다시 선택">변경</button>
+        </div>
         <!-- ① 매치 선택 — 리그 일정 배너 (K1 / K2 탭) -->
         <div class="flow-section-head">
             <span class="flow-step">①</span>
@@ -62,37 +90,36 @@
             </div>
         </div>
 
-        <!-- 작업공간 탭 (전술판 / 경기예측 / 팀 / 선수) — 선택한 매치가 전 탭 공통 맥락 -->
-        <nav id="workspace-tabs" role="tablist" aria-label="작업공간">
-            <button class="ws-tab active" data-ws="tactics" role="tab" aria-selected="true" tabindex="0">
-                <span class="ws-tab-icon" aria-hidden="true">🎯</span><span class="ws-tab-label">전술판</span>
-            </button>
-            <button class="ws-tab" data-ws="predict" role="tab" aria-selected="false" tabindex="-1">
-                <span class="ws-tab-icon" aria-hidden="true">📊</span><span class="ws-tab-label">경기예측</span>
-            </button>
-            <button class="ws-tab" data-ws="team" role="tab" aria-selected="false" tabindex="-1">
-                <span class="ws-tab-icon" aria-hidden="true">🛡️</span><span class="ws-tab-label">팀</span>
-            </button>
-            <button class="ws-tab" data-ws="player" role="tab" aria-selected="false" tabindex="-1">
-                <span class="ws-tab-icon" aria-hidden="true">👤</span><span class="ws-tab-label">선수</span>
-            </button>
-            <button class="ws-tab" data-ws="heatmap" role="tab" aria-selected="false" tabindex="-1">
-                <span class="ws-tab-icon" aria-hidden="true">🔥</span><span class="ws-tab-label">히트맵</span>
-            </button>
-            <!-- 해외리그 탭 일단 비활성화 (아직 이른 단계) — 복구 시 아래 버튼 복원
-            <button class="ws-tab" data-ws="global" role="tab" aria-selected="false" tabindex="-1">
-                <span class="ws-tab-icon" aria-hidden="true">🌍</span><span class="ws-tab-label">해외리그</span>
-            </button> -->
-        </nav>
         <div id="workspace-panels">
             <section class="ws-panel" id="ws-tactics" data-ws="tactics" role="tabpanel" aria-label="전술판"></section>
-            <section class="ws-panel hidden" id="ws-predict" data-ws="predict" role="tabpanel" aria-label="경기예측"></section>
+            <section class="ws-panel hidden" id="ws-predict" data-ws="predict" role="tabpanel" aria-label="경기예측">
+                <!-- 시즌 시뮬레이션 (선수 탭 인사이트에서 이동) — prediction.js 가 채움 -->
+                <div id="season-sim-bar" class="season-sim-bar"></div>
+            </section>
             <section class="ws-panel hidden" id="ws-team" data-ws="team" role="tabpanel" aria-label="팀 분석·비교">
                 <div class="ws-team-modebar" role="tablist" aria-label="팀 분석 모드">
                     <button class="ws-team-mode active" data-tmode="analysis" role="tab" aria-selected="true">📊 단일 팀 분석</button>
                     <button class="ws-team-mode" data-tmode="compare" role="tab" aria-selected="false">⚖️ 팀 비교</button>
+                    <button class="ws-team-mode" data-tmode="insights" role="tab" aria-selected="false">🔬 심화 인사이트</button>
                 </div>
                 <!-- #team-analysis-modal · #team-compare-modal 이 workspace.js 에 의해 여기로 재배치됨 -->
+                <!-- 심화 인사이트 (팀·경기 단위 차트) — 선수 탭에 있던 것을 팀 탭으로 이동. 리그/시즌 필터는 선수 탭 인사이트와 공유 -->
+                <div id="ws-team-insights" class="hidden">
+                    <div class="ld-header">
+                        <h2 class="ld-title">🔬 심화 인사이트</h2>
+                        <div class="ld-header-right">
+                            <div class="ld-year-filter" data-ins-filter></div>
+                        </div>
+                    </div>
+                    <div class="ins-block" id="ins-panel-adv">
+                        <div class="ins-block-title">
+                            <span class="ins-block-hint">경기 흐름·교체·승부처·슈팅·수문장·듀얼 — 상단 리그/시즌 필터 적용</span>
+                        </div>
+                        <div id="ins-adv-kpis"></div>
+                        <div id="ins-adv-chips"></div>
+                        <div id="ins-adv-grid" class="tt-grid"></div>
+                    </div>
+                </div>
             </section>
             <section class="ws-panel hidden" id="ws-player" data-ws="player" role="tabpanel" aria-label="선수"></section>
             <section class="ws-panel hidden" id="ws-heatmap" data-ws="heatmap" role="tabpanel" aria-label="선수 히트맵 분석">
@@ -306,20 +333,17 @@
             <span class="insights-toggle-label">K리그 통계 인사이트 (TOP 퍼포머·카드 순위)</span>
             <span class="insights-toggle-arrow">▼</span>
         </button>
-        <!-- 시즌 시뮬레이션 — 인사이트 탭과 묶음 -->
-        <div id="season-sim-bar" class="season-sim-bar"></div>
         <div class="ld-header">
             <h2 class="ld-title">🎯 포지션별 인사이트</h2>
             <div class="ld-header-right">
                 <button id="btn-player-compare" class="pc-launch-btn" type="button"
                         title="두 선수를 나란히 비교 (K리그1·2)">⚖️ 선수 비교</button>
-                <div class="ld-year-filter" id="insights-year-filter"></div>
+                <div class="ld-year-filter" id="insights-year-filter" data-ins-filter></div>
             </div>
         </div>
         <!-- 인사이트 탭 (랭킹 / 심화 / 규율) — 한 번에 하나만 노출 -->
         <nav class="ins-tabs" role="tablist">
             <button class="ins-tab active" data-itab="rank" role="tab">🏆 랭킹·부문</button>
-            <button class="ins-tab" data-itab="adv" role="tab">🔬 심화 인사이트</button>
             <button class="ins-tab" data-itab="discipline" role="tab">🟨 규율·카드</button>
         </nav>
 
@@ -341,17 +365,6 @@
             </div>
             <div id="ins-top-cats" class="ins-cat-grid"></div>
             <div id="ins-top-body"></div>
-        </div>
-
-        <!-- 심화 인사이트 (경기 흐름·교체·슈팅·수문장·듀얼 등) -->
-        <div class="ins-block hidden" id="ins-panel-adv" data-itab-panel="adv">
-            <div class="ins-block-title">🔬 심화 인사이트
-                <span class="ins-block-hint">경기 흐름·교체·승부처·슈팅·수문장·듀얼 — 상단 리그/시즌 필터 적용</span>
-            </div>
-            <div id="ins-adv-kpis"></div>
-            <div id="ins-adv-chips"></div>
-            <div id="ins-adv-grid" class="tt-grid"></div>
-
         </div>
 
         <!-- 카드 수령 순위 -->
@@ -1019,7 +1032,7 @@
         "pass_network": "/static/js/pass_network.js?v=2",
         "match_report": "/static/js/match_report.js?v=3",
         "player_compare": "/static/js/player_compare.js?v=4",
-        "insights": "/static/js/insights.js?v=60",
+        "insights": "/static/js/insights.js?v=61",
         "ins_charts": "/static/js/ins_charts.js?v=6",
         "tera": "/static/vendor/tera-chart-7.0.2.min.js?v=1",
         "tt_charts": "/static/js/tt_charts.js?v=11",
@@ -1027,7 +1040,7 @@
     }</script>
 
     <!-- 작업공간 탭 컨트롤러 — 반드시 모든 모듈 스크립트 뒤에 로드 -->
-    <script src="/static/js/workspace.js?v=16"></script>
+    <script src="/static/js/workspace.js?v=18"></script>
 
     <!-- 온보딩 오버레이 -->
     <div id="onboarding-overlay" class="ob-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Today Tactics 소개">

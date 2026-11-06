@@ -130,8 +130,17 @@
             b.classList.toggle("active", on);
             b.setAttribute("aria-selected", on ? "true" : "false");
         });
-        const ana = $("team-analysis-modal"), cmp = $("team-compare-modal");
-        if (mode === "compare") {
+        const ana = $("team-analysis-modal"), cmp = $("team-compare-modal"), ins = $("ws-team-insights");
+        if (ins) ins.classList.toggle("hidden", mode !== "insights");
+        if (mode === "insights") {
+            // 심화 인사이트(팀·경기 단위 차트): 모듈·차트 번들 로드 후 표시 시점에 그린다 (탭 이탈 시 늦은 완료는 무시)
+            if (ana) ana.classList.add("hidden");
+            if (cmp) cmp.classList.add("hidden");
+            ensureChartsReady();
+            lazyLoadSeq(["insights"]).then(() => {
+                if (_current === "team" && _teamMode === "insights" && window.ttInsights) window.ttInsights.showAdv();
+            }).catch(lazyFail);
+        } else if (mode === "compare") {
             if (ana) ana.classList.add("hidden");
             if (cmp) {
                 if (!_compareInit) { _compareInit = true; const c = $("btn-team-compare"); if (c) c.click(); }
@@ -204,6 +213,8 @@
             b.setAttribute("aria-selected", on ? "true" : "false");
             b.tabIndex = on ? 0 : -1;
         });
+        document.body.dataset.ws = name;   // CSS: 팀·선수·히트맵에서는 매치 선택 영역 숨김
+        updateMatchCtx();
         if (onShow[name]) onShow[name]();
     }
     window.switchWorkspace = switchWorkspace;
@@ -247,6 +258,41 @@
         });
     }
     try { if (localStorage.getItem(COLLAPSE_KEY) === "1") setStripCollapsed(true); } catch (e) { /* noop */ }
+
+    // ── 6b) 선택 매치 요약 줄 (매치 선택 영역이 숨겨지는 탭에서만 노출) ──
+    // 선택 매치의 출처는 전술판 HUD 팀명(#fhud-name-a/b, prediction.js 가 매치 클릭 시 갱신).
+    // 둘 다 기본값(HOME/AWAY)이 아닐 때만 표시. 텍스트는 textContent 로만 넣는다(XSS 무관).
+    const ctxBox = $("match-ctx"), ctxText = $("mc-text");
+    function updateMatchCtx() {
+        if (!ctxBox || !ctxText) return;
+        const a = ($("fhud-name-a") || {}).textContent, b = ($("fhud-name-b") || {}).textContent;
+        const nm = (v) => (v || "").trim();
+        const hasMatch = nm(a) && nm(a) !== "HOME" && nm(b) && nm(b) !== "AWAY";
+        const showSummary = _current !== "tactics" && _current !== "predict" && hasMatch;
+        if (showSummary) {
+            const rb = document.querySelector(".league-tab-panel.active .ksb-round-btn.active");
+            const r = rb && /^\d+$/.test(rb.dataset.round || "") ? ` · R${rb.dataset.round}` : "";
+            ctxText.textContent = `${nm(a)} vs ${nm(b)}${r}`;
+        }
+        ctxBox.classList.toggle("hidden", !showSummary);
+    }
+    ["fhud-name-a", "fhud-name-b"].forEach((id) => {
+        const el = $(id);
+        if (el && window.MutationObserver) {
+            new MutationObserver(updateMatchCtx).observe(el, { childList: true, characterData: true, subtree: true });
+        }
+    });
+    const ctxChange = $("mc-change");
+    if (ctxChange) {
+        ctxChange.addEventListener("click", () => {
+            switchWorkspace("tactics");
+            setStripCollapsed(false);   // 접혀 있었다면 다시 펼쳐 바로 고를 수 있게
+            requestAnimationFrame(() => {
+                const h = document.querySelector(".flow-section-head");
+                if (h) h.scrollIntoView({ block: "start", behavior: "smooth" });
+            });
+        });
+    }
 
     // ── 7) 안전망: 캔버스 컨테이너 크기 변화 시 재계산 ────────────────
     const cc = $("canvas-container");

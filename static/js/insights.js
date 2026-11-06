@@ -152,15 +152,16 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
   /* ── 연도 + 리그 필터 ── */
   function initYearFilter() {
-    const wrap = document.getElementById("insights-year-filter");
-    if (!wrap) return;
+    // 필터는 선수 탭(랭킹·카드)과 팀 탭(심화 인사이트)에 각각 있고, 상태(currentYear/League)는 공유한다
+    const wraps = [...document.querySelectorAll("[data-ins-filter]")];
+    if (!wraps.length) return;
     const years = ["2026", "2025", "2024", "all"];
     const leagues = [
       { v: "all", label: "전체" },
       { v: "k1",  label: "K1" },
       { v: "k2",  label: "K2" },
     ];
-    wrap.innerHTML =
+    const html =
       `<div class="ld-filter-row">
          <span class="ld-filter-label">리그</span>
          ${leagues.map(l =>
@@ -173,19 +174,22 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
            `<button class="ld-year-btn${y === currentYear ? " active" : ""}" data-year="${y}">${y === "all" ? "전체" : y}</button>`
          ).join("")}
        </div>`;
+    const syncActive = () => wraps.forEach(w => {
+      w.querySelectorAll(".ld-year-btn").forEach(b => b.classList.toggle("active", b.dataset.year === currentYear));
+      w.querySelectorAll(".ld-league-btn").forEach(b => b.classList.toggle("active", b.dataset.league === currentLeague));
+    });
 
-    wrap.addEventListener("click", e => {
-      const yBtn = e.target.closest(".ld-year-btn");
-      const lBtn = e.target.closest(".ld-league-btn");
-      if (yBtn) {
-        currentYear = yBtn.dataset.year;
-        wrap.querySelectorAll(".ld-year-btn").forEach(b => b.classList.toggle("active", b === yBtn));
+    wraps.forEach(wrap => {
+      wrap.innerHTML = html;
+      wrap.addEventListener("click", e => {
+        const yBtn = e.target.closest(".ld-year-btn");
+        const lBtn = e.target.closest(".ld-league-btn");
+        if (yBtn) currentYear = yBtn.dataset.year;
+        else if (lBtn) currentLeague = lBtn.dataset.league;
+        else return;
+        syncActive();
         loadAll();
-      } else if (lBtn) {
-        currentLeague = lBtn.dataset.league;
-        wrap.querySelectorAll(".ld-league-btn").forEach(b => b.classList.toggle("active", b === lBtn));
-        loadAll();
-      }
+      });
     });
   }
 
@@ -2005,39 +2009,55 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   }
 
   /* ── 전체 로드 ── (필터 변경/최초) — 활성 탭만 로드, 나머지는 재방문 시 재로드 */
+  let _rankOpened = false;   // 선수 탭 인사이트 섹션을 펼친 적이 있나 (랭킹·카드 로드 허용)
   function loadAll() {
     _itabLoaded = { rank: false, adv: false, discipline: false };
-    loadInsTab(_activeItab);
+    if (_rankOpened) loadInsTab(_activeItab);
+    // 심화 인사이트는 팀 탭에서 보이는 동안만 다시 그린다 (숨겨진 상태에선 다음 showAdv 때 로드)
+    const advEl = document.getElementById("ins-panel-adv");
+    if (advEl && advEl.offsetParent !== null) { _itabLoaded.adv = true; loadAdvanced(); }
     applyFreshBadges();   // 카드 머리말은 정적 HTML이라 탭 로드와 무관하게 바로 붙일 수 있다
   }
+
+  // 필터·탭 핸들러는 한 번만 연결 (선수 탭 펼침 / 팀 탭 심화 모드 중 먼저 오는 쪽이 호출)
+  let _inited = false;
+  function ensureInit() {
+    if (_inited) return;
+    _inited = true;
+    initYearFilter();
+    initInsTabs();
+    initPosTab();
+    initCardModeTab();
+    initCardTabs();
+  }
+
+  // 팀 탭 "심화 인사이트" 모드 진입 — workspace.js 가 모듈 로드 후 호출
+  window.ttInsights = {
+    showAdv() {
+      ensureInit();
+      if (!_itabLoaded.adv) { _itabLoaded.adv = true; loadAdvanced(); }
+    },
+  };
 
   function init() {
     // 토글 이벤트 — 인사이트 섹션 접기/펼치기 (첫 진입 friction 감소)
     const toggleBtn = document.getElementById("insights-toggle-btn");
     const section = document.getElementById("insights-section");
-    let loaded = false;
     if (toggleBtn && section) {
       toggleBtn.addEventListener("click", () => {
         const collapsed = section.classList.toggle("insights-collapsed");
         toggleBtn.setAttribute("aria-expanded", String(!collapsed));
-        if (!collapsed && !loaded) {
+        if (!collapsed && !_rankOpened) {
           // lazy load: 첫 펼침 시에만 API 호출
-          initYearFilter();
-          initInsTabs();
-          initPosTab();
-          initCardModeTab();
-          initCardTabs();
+          ensureInit();
+          _rankOpened = true;
           loadAll();
-          loaded = true;
         }
       });
     } else {
       // 접기 UI 없으면 즉시 로드 (안전 fallback)
-      initYearFilter();
-      initInsTabs();
-      initPosTab();
-      initCardModeTab();
-      initCardTabs();
+      ensureInit();
+      _rankOpened = true;
       loadAll();
     }
     document.getElementById("drawer-close")?.addEventListener("click", closeDrawer);
