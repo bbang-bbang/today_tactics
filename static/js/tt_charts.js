@@ -180,7 +180,163 @@
     return handle;
   }
 
-  const TTChart = { THEME, util: { contrast, ensureVisible, merge }, withTheme, isEmpty, mount, presets: {} };
+  // ── 프리셋 (순수: 도메인 데이터 → TERA config) ──────────────────────
+  // 반환 config 의 __* 키는 테스트·접근성용 메타이며 finalConfig 가 TERA 에 넘기기 전에 제거한다.
+  const EMPTY = () => ({ __empty: true });
+  const r2 = (v) => Math.round(v * 100) / 100;
+
+  // 순위 추이: y = nTeams+1-rank 로 뒤집어 1위가 위로 가게 그린다.
+  function bump(o) {
+    const teams = (o && o.teams) || [];
+    if (!teams.length || !(o.rounds || []).length) return EMPTY();
+    const n = o.nTeams;
+    const hl = Array.isArray(o.highlight) && o.highlight.length ? new Set(o.highlight) : null;
+    const series = teams.map((t) => {
+      const on = !hl || hl.has(t.id);
+      return {
+        name: t.short,
+        color: on ? t.color : THEME.neutral,
+        lineWidth: hl ? (on ? 3 : 1.5) : 2,
+        opacity: on ? 1 : 0.5,
+        data: t.ranks.map((r) => (r == null ? null : { y: n + 1 - r })),
+      };
+    });
+    const last = o.rounds.length - 1;
+    const labels = teams.filter((t) => !hl || hl.has(t.id)).map((t) => {
+      const r = t.ranks[last];
+      return r == null ? null : { type: "text", x: last, y: n + 1 - r, text: t.short, style: { color: THEME.text, fontSize: 12 } };
+    }).filter(Boolean);
+    return {
+      type: "line", smooth: true, showMarkers: false,
+      xAxis: { categories: o.rounds.map((r) => "R" + r) },
+      yAxis: { min: 1, max: n, tickInterval: 1, __rankLabels: true }, // SPIKE: 눈금을 'N위'로 — TERA 라벨 포매터 확인
+      legend: { enabled: false },
+      annotations: labels,
+      series,
+      __nTeams: n,
+      __aria: `라운드별 순위 추이, ${teams.length}개 팀, ${o.rounds.length}라운드`,
+    };
+  }
+
+  // forest plot 중간 표현: 행 순서 유지, 표본 부족은 구간·점 생략.
+  function _forestModel(rows, zero) {
+    const z = zero || 0;
+    return {
+      categories: rows.map((r) => (r.insufficient ? `${r.label} (표본 부족)` : r.label)),
+      ranges: rows.map((r) => (r.insufficient ? null : { low: r.lo, high: r.hi })),
+      points: rows.map((r) => (r.insufficient ? null : {
+        y: r.est,
+        color: r.significant ? (r.est > z ? THEME.pos : THEME.neg) : THEME.text,
+      })),
+    };
+  }
+  function forest(o) {
+    const rows = (o && o.rows) || [];
+    if (!rows.some((r) => !r.insufficient)) return EMPTY();
+    const zero = o.zero || 0;
+    const m = _forestModel(rows, zero);
+    return {
+      type: "range-bar",
+      barWidth: "18%", borderRadius: 2,
+      series: [{
+        name: "95% 신뢰구간", color: "rgba(148,163,184,0.55)",
+        data: m.categories.map((name, i) => (m.ranges[i] ? { name, low: m.ranges[i].low, high: m.ranges[i].high } : { name, low: null, high: null })),
+      }],
+      xAxis: { plotLines: [{ value: zero, color: "rgba(229,231,235,0.45)", width: 1.5, dashArray: "4,3" }] },
+      __points: m.points, // SPIKE: 추정치 점을 range-bar 위에 겹치는 방법(annotations/mixed) 확인
+      __zero: zero,
+      __aria: `효과 추정치와 95% 신뢰구간, ${rows.length}개 구간${o.unit ? ` (${o.unit})` : ""}`,
+    };
+  }
+
+  function dumbbell(o) {
+    const cats = (o && o.categories) || [];
+    if (!cats.length) return EMPTY();
+    if (o.a.data.length !== cats.length || o.b.data.length !== cats.length) throw new RangeError("dumbbell: data length mismatch");
+    const d = o.decimals == null ? 2 : o.decimals;
+    const fix = (v) => (v == null ? null : Number(v.toFixed(d)));
+    return {
+      type: "dumbbell", orientation: "horizontal",
+      categories: cats,
+      series: [
+        { name: o.a.name, color: o.a.color || THEME.neg, data: o.a.data.map(fix) },
+        { name: o.b.name, color: o.b.color || THEME.pos, data: o.b.data.map(fix) },
+      ],
+      connectorWidth: 3, markerRadius: 7, showValueLabels: true, showDelta: true,
+      legend: { enabled: true, position: "bottom" },
+      __aria: `${o.a.name}와 ${o.b.name} 비교, ${cats.length}개 항목`,
+    };
+  }
+
+  function quadrant(o) {
+    const pts = (o && o.points) || [];
+    if (!pts.length) return EMPTY();
+    const hl = Array.isArray(o.highlight) && o.highlight.length ? new Set(o.highlight) : null;
+    const data = pts.map((p) => {
+      const v = ensureVisible(p.color || THEME.neutral);
+      const on = !hl || hl.has(p.id);
+      return {
+        x: p.x, y: p.y, name: p.label,
+        color: on ? v.fill : THEME.neutral,
+        borderColor: v.stroke || v.fill, borderWidth: v.stroke ? 1.5 : 0,
+        dataLabel: on ? p.label : "",
+      };
+    });
+    const plotX = o.xMid != null ? [{ value: o.xMid, color: "rgba(148,163,184,0.5)", width: 1, dashArray: "4,3" }] : [];
+    const plotY = o.yMid != null ? [{ value: o.yMid, color: "rgba(148,163,184,0.5)", width: 1, dashArray: "4,3" }] : [];
+    const out = {
+      type: "scatter",
+      xAxis: { type: "linear", autoScale: true, title: o.xTitle, plotLines: plotX },
+      yAxis: { type: "linear", autoScale: true, title: o.yTitle, plotLines: plotY },
+      legend: { enabled: false },
+      series: [{ name: "teams", marker: { size: 9, symbol: "circle" }, data }],
+      __quadrantLabels: o.quadrantLabels || null, // SPIKE: 모서리 라벨 annotation 좌표계 확인
+      __aria: `${o.xTitle} 대비 ${o.yTitle} 산점도, ${pts.length}개`,
+    };
+    if (o.diagonal) {
+      const all = pts.flatMap((p) => [p.x, p.y]);
+      const lo = Math.min(...all), hi = Math.max(...all);
+      out.__diagonal = [{ x: lo, y: lo }, { x: hi, y: hi }]; // SPIKE: y=x 점선 그리는 방법 확인
+    }
+    return out;
+  }
+
+  function heatMatrix(o) {
+    const rows = (o && o.rows) || [], cols = (o && o.cols) || [];
+    if (!rows.length || !cols.length) return EMPTY();
+    const data = [];
+    rows.forEach((_, y) => cols.forEach((__, x) => {
+      const v = o.values[y] ? o.values[y][x] : null;
+      data.push({ x, y, value: v == null ? null : v });
+    }));
+    const nums = data.map((d) => d.value).filter((v) => v != null);
+    if (!nums.length) return EMPTY();
+    let scale, stops;
+    if (o.center != null) {
+      const span = Math.max(...nums.map((v) => Math.abs(v - o.center)));
+      scale = { min: r2(o.center - span), max: r2(o.center + span) };
+      stops = [THEME.neg, THEME.neutral, THEME.pos];
+    } else {
+      scale = { min: r2(Math.min(...nums)), max: r2(Math.max(...nums)) };
+      stops = [THEME.neutral, THEME.pos];
+    }
+    return {
+      type: "heatmap",
+      xAxis: { categories: cols }, yAxis: { categories: rows },
+      colorStops: stops.map((c, i) => ({ offset: i / (stops.length - 1), color: c })),
+      min: scale.min, max: scale.max,
+      nullColor: "#1e293b", cellRadius: 3, cellPadding: 2, showColorBar: true, showValues: true,
+      valueTextStyle: { fontSize: 12, decimals: o.decimals == null ? 2 : o.decimals, color: "#f8fafc" },
+      colorBarStyle: { title: o.colorTitle || "" },
+      series: [{ name: o.colorTitle || "value", data }],
+      __scale: scale,
+      __aria: `${rows.length}×${cols.length} 히트맵 행렬`,
+    };
+  }
+
+  const presets = { bump, _forestModel, forest, dumbbell, quadrant, heatMatrix };
+
+  const TTChart = { THEME, util: { contrast, ensureVisible, merge }, withTheme, isEmpty, mount, presets };
   root.TTChart = TTChart;
   if (typeof module !== "undefined" && module.exports) module.exports = TTChart;
 })(typeof globalThis !== "undefined" ? globalThis : this);
