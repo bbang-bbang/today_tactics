@@ -33,7 +33,10 @@
       + `<h3 class="tt-card-title"><span class="tt-card-icon" aria-hidden="true">${esc(o.icon || "")}</span>${esc(o.title)}</h3>`
       + `<p class="tt-card-q">${esc(o.question)}</p></div>`
       + leagueToggleHtml(o.leagues, o.activeLeague)
-      + `</header>${take}${warns}<div class="tt-card-chart" data-chart-slot></div>${ev}</section>`;
+      + `</header>${take}${warns}<div class="tt-card-lead"></div>`
+      + (o.chart === false ? "" : `<div class="tt-card-chart" data-chart-slot></div>`)
+      + (o.bodyHtml ? `<div class="tt-card-body" tabindex="0">${o.bodyHtml}</div>` : "")
+      + `${ev}</section>`;
   }
 
   function kpiStripHtml(items) {

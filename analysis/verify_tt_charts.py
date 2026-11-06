@@ -273,6 +273,47 @@ def check_lazy_loader_tera_fail(pw):
     assert perr == [], perr
 
 
+def check_hidden_slot_draws_when_shown(pw):
+    browser, page, errs = _probe(pw)
+    page.evaluate("probe.line('slot-h')"); time.sleep(0.5)
+    before = page.evaluate("probe.inkRatio('slot-h')")
+    page.evaluate("probe.show('hidden-wrap')"); time.sleep(1.0)
+    after = page.evaluate("probe.inkRatio('slot-h')")
+    n = page.evaluate("probe.canvases('slot-h')")
+    browser.close()
+    assert before == 0, f"drew while hidden ink={before}"
+    assert n == 1 and after > 0.01, (n, after)
+    assert errs == [], errs
+
+
+def check_auto_height_rows(pw):
+    browser, page, errs = _probe(pw)
+    h = page.evaluate("probe.rows('slot-a', 12)")
+    browser.close()
+    assert h >= 12 * 26 + 56, h
+    assert errs == [], errs
+
+
+def check_destroy_all(pw):
+    browser, page, errs = _probe(pw)
+    for s in ("slot-a", "slot-b", "slot-c"):
+        page.evaluate(f"probe.line('{s}')")
+    time.sleep(0.5)
+    n = page.evaluate("probe.destroyAll()")
+    left = page.evaluate("document.querySelectorAll('#grid canvas').length")
+    browser.close()
+    assert n == 3 and left == 0, (n, left)
+    assert errs == [], errs
+
+
+def check_mount_null_safe(pw):
+    browser, page, errs = _probe(pw)
+    page.evaluate("probe.nullSafe()")
+    browser.close()
+    perr = [e for e in errs if e.startswith("pageerror")]
+    assert perr == [], perr
+
+
 CHECKS = {name: fn for name, fn in globals().items() if name.startswith("check_")}
 
 

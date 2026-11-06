@@ -190,3 +190,20 @@ test("dumbbell_dark_color_lightened", () => {
   const c = P.dumbbell({ categories: ["a"], a: { name: "x", color: "#0a4436", data: [1] }, b: { name: "y", color: "#8e272b", data: [2] } });
   for (const s of c.series) assert.ok(util.contrast(s.color, THEME.bg) >= 3, s.color);
 });
+
+// ── Phase 1a: 행 수 메타 ──
+test("dumbbell_rows_meta", () => {
+  const cats = Array.from({ length: 12 }, (_, i) => "t" + i);
+  const c = P.dumbbell({ categories: cats, a: { name: "a", data: cats.map(() => 1) }, b: { name: "b", data: cats.map(() => 2) } });
+  assert.equal(c.__rows, 12);
+});
+
+test("heatMatrix_rows_meta", () => {
+  const c = P.heatMatrix({ rows: ["a", "b", "c"], cols: ["x"], values: [[1], [2], [3]] });
+  assert.equal(c.__rows, 3);
+});
+
+test("forest_rows_meta", () => {
+  const c = P.forest({ rows: [{ label: "a", est: 1, lo: 0, hi: 2, n: 30 }, { label: "b", est: 1, lo: 0, hi: 2, n: 30 }] });
+  assert.equal(c.__rows, 2);
+});

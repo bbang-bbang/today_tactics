@@ -61,3 +61,17 @@ test("chipsHtml_active", () => {
   assert.match(h, /data-theme-key="flow"[^>]*aria-selected="true"/);
   assert.match(h, /data-theme-key="all"[^>]*aria-selected="false"/);
 });
+
+// ── Phase 1a ──
+test("cardHtml_chart_false_no_slot", () => {
+  assert.ok(!TTDash.cardHtml({ ...base(), chart: false }).includes("data-chart-slot"));
+});
+
+test("cardHtml_body_html_raw", () => {
+  const h = TTDash.cardHtml({ ...base(), chart: false, bodyHtml: '<table id="t"></table>' });
+  assert.match(h, /<div class="tt-card-body"[^>]*><table id="t"><\/table><\/div>/);
+});
+
+test("cardHtml_has_lead_slot", () => {
+  assert.equal(TTDash.cardHtml(base()).split("tt-card-lead").length - 1, 1);
+});

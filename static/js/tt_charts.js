@@ -113,7 +113,7 @@
   }
   function showError(slot, err) {
     if (err) console.warn("[TTChart] render failed:", err);
-    slot.querySelectorAll("canvas").forEach((c) => c.remove());
+    slot.querySelectorAll("canvas, .tt-chart-error").forEach((c) => c.remove());
     placeholder(slot, "tt-chart-error", ERROR_TXT, "alert");
     const card = slot.closest && slot.closest(".tt-card");
     const ev = card && card.querySelector("details.tt-card-evidence");
@@ -128,8 +128,15 @@
     return target;
   }
 
+  const NOOP_HANDLE = () => ({ canvas: null, update: () => {}, destroy: () => {} });
+  const ROW_PX = 26, ROW_PAD = 56;
+
   function mount(slot, spec, opts) {
     opts = opts || {};
+    if (!slot || !spec || typeof spec !== "object") {
+      console.warn("[TTChart] mount: slot/spec 없음 — 무시", slot, spec);
+      return NOOP_HANDLE();
+    }
     const prev = handles && handles.get(slot);
     if (prev) prev.destroy();
     slot.querySelectorAll(".tt-chart-empty, .tt-chart-error").forEach((n) => n.remove());
@@ -143,12 +150,21 @@
       return handle;
     }
 
+    // 행이 많은 차트(dumbbell·heatMatrix·forest)는 행 수에 비례해 슬롯을 키운다
+    slot.style.height = "";
+    if (spec.__rows > 0) {
+      const base = parseFloat(getComputedStyle(slot).height) || 0;
+      slot.style.height = Math.max(base, spec.__rows * (opts.rowPx || ROW_PX) + ROW_PAD) + "px";
+    }
+
     let current = spec, canvas = null, io = null, ro = null, timer = null, dead = false, drawn = false;
+    let failed = false;   // 오류 표시 후에는 리사이즈로 다시 그리지 않는다(update 로만 재시도)
+    const dropCanvas = () => { canvas = null; handle.canvas = null; failed = true; };
     function size() { return [Math.max(1, Math.floor(slot.clientWidth)), Math.max(1, Math.floor(slot.clientHeight))]; }
     function draw(mode) {
-      if (dead) return;
+      if (dead || failed) return;
       const T = lib();
-      if (!T && current.__renderer !== "forest") { showError(slot, new Error("TeraChart not loaded")); return; }
+      if (!T && current.__renderer !== "forest") { showError(slot, new Error("TeraChart not loaded")); dropCanvas(); return; }
       try {
         const [w, h] = size();
         if (!canvas) {
@@ -166,13 +182,15 @@
         else if (mode === "animate" && !reduce) T.animate(canvas, cfg);
         else T.render(canvas, cfg);
         drawn = true;
-      } catch (e) { showError(slot, e); }
+      } catch (e) { showError(slot, e); dropCanvas(); }
     }
     function start() {
-      draw("animate");
+      // 숨겨진 패널(폭 0)에서는 그리지 않고, 처음 폭이 생길 때 그린다
+      if (slot.clientWidth > 0) draw("animate");
       if (typeof ResizeObserver === "function") {
         let last = size().join("x");
         ro = new ResizeObserver(() => {
+          if (!drawn && slot.clientWidth > 0) { last = size().join("x"); draw("animate"); return; }
           const now = size().join("x");
           if (now === last) return;
           last = now;
@@ -209,6 +227,17 @@
     };
     handles && handles.set(slot, handle);
     return handle;
+  }
+
+  // container 안 모든 차트 슬롯의 핸들을 해제한다(innerHTML 교체 전 호출). 해제 개수 반환.
+  function destroyAll(container) {
+    if (!container || !handles) return 0;
+    let n = 0;
+    container.querySelectorAll("[data-chart-slot]").forEach((sl) => {
+      const h = handles.get(sl);
+      if (h) { h.destroy(); n++; }
+    });
+    return n;
   }
 
   // ── 프리셋 (순수: 도메인 데이터 → TERA config) ──────────────────────
@@ -258,7 +287,7 @@
       categories: rows.map((r) => (r.insufficient ? `${r.label} (표본 부족)` : r.label)),
       ranges: rows.map((r) => (r.insufficient ? null : { low: r.lo, high: r.hi })),
       points: rows.map((r) => (r.insufficient ? null : {
-        y: r.est,
+        y: r.est, n: r.n,
         color: r.significant ? (r.est > z ? THEME.pos : THEME.neg) : THEME.text,
       })),
     };
@@ -272,6 +301,7 @@
     // 이 프리셋만 어댑터 자체 Canvas 렌더러(drawForest)로 그린다. spec §4.6 대체 규칙.
     return {
       __renderer: "forest",
+      __rows: rows.length,
       __model: m,
       __zero: zero,
       __zeroLabel: o.zeroLabel || "기준",
@@ -295,7 +325,7 @@
     const font = `${THEME.fontSize}px ${THEME.font}`;
     ctx.font = font;
     const labelW = Math.min(w * 0.38, Math.max(...m.categories.map((c) => ctx.measureText(c).width)) + 12);
-    const valW = 64, top = 8, bottom = 28;
+    const valW = 104, top = 8, bottom = 28;
     const x0 = labelW, x1 = w - valW;
     const X = (v) => x0 + (v - lo) / (hi - lo) * (x1 - x0);
     const rowH = (h - top - bottom) / Math.max(1, m.categories.length);
@@ -325,7 +355,7 @@
       ctx.fillStyle = p.color; ctx.strokeStyle = THEME.bg; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.rect(X(p.y) - 5, cy - 5, 10, 10); ctx.fill(); ctx.stroke();
       ctx.textAlign = "left"; ctx.fillStyle = THEME.text;
-      ctx.fillText(p.y.toFixed(2), x1 + 8, cy);
+      ctx.fillText(p.n != null ? `${p.y.toFixed(2)} · n=${p.n}` : p.y.toFixed(2), x1 + 8, cy);
     });
   }
 
@@ -344,6 +374,7 @@
       ],
       connectorWidth: 3, markerRadius: 7, showValueLabels: true, showDelta: true,
       legend: { enabled: true, position: "bottom" },
+      __rows: cats.length,
       __aria: `${o.a.name}와 ${o.b.name} 비교, ${cats.length}개 항목`,
     };
   }
@@ -420,13 +451,14 @@
       colorBarStyle: { title: o.colorTitle || "" },
       data, // TERA heatmap 은 최상위 data 를 읽는다(series 안은 무시 — 스파이크)
       __scale: scale,
+      __rows: rows.length,
       __aria: `${rows.length}×${cols.length} 히트맵 행렬`,
     };
   }
 
   const presets = { bump, _forestModel, forest, dumbbell, quadrant, heatMatrix };
 
-  const TTChart = { THEME, util: { contrast, ensureVisible, lighten, merge }, withTheme, isEmpty, mount, presets };
+  const TTChart = { THEME, util: { contrast, ensureVisible, lighten, merge }, withTheme, isEmpty, mount, destroyAll, presets };
   root.TTChart = TTChart;
   if (typeof module !== "undefined" && module.exports) module.exports = TTChart;
 })(typeof globalThis !== "undefined" ? globalThis : this);

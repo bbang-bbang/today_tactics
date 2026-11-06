@@ -9937,3 +9937,9 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
     .tt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (prefers-reduced-motion: reduce) { .tt-lg-btn, .tt-chip, .tt-card-evidence > summary { transition: none; } }
+/* tt-dash Phase 1a — 리드(한 줄 해석·판정·경고를 카드 상단으로 올림) · 차트 없는 카드 본문 */
+.tt-card-lead:empty { display: none; }
+.tt-card-lead .ins-take, .tt-card-lead .ins-rs-verdict, .tt-card-lead .ins-xl-warn { margin: 6px 0; }
+.tt-card-body { max-height: 420px; overflow: auto; margin-top: 8px; border-radius: 6px; }
+.tt-card-body:focus-visible { outline: 2px solid var(--tt-accent); outline-offset: 2px; }
+.tt-card .ins-top-scroll { max-height: none; }
