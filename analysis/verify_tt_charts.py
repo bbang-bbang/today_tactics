@@ -315,7 +315,8 @@ def check_mount_null_safe(pw):
 
 
 # ── Phase 1a: 인사이트 심화 탭 실화면 ─────────────────────────────────
-ADV_CHART_KEYS = ["trend", "xgluck", "opp", "formation", "gs", "pv", "subimp", "rest", "spp"]
+ADV_CHART_KEYS = ["trend", "xgluck", "opp", "weather", "formation", "hub", "gs", "pv", "aft",
+                  "subimp", "rest", "rot", "sdep", "spp", "weak"]
 
 
 def _wait(page, js, timeout=30):
@@ -390,7 +391,7 @@ def check_adv_height_budget(pw):
     h = page.evaluate("document.getElementById('ins-panel-adv').scrollHeight")
     browser.close()
     # spec 목표 4,500px(5화면) 대비 실측 6,368px — 가독성 유지를 위해 6,500px 상한으로 완화, 사용자 체크포인트에서 확인
-    assert h <= 6500, f"adv panel height {h}px"
+    assert h <= 7000, f"adv panel height {h}px"   # 1b: 차트 6장 추가로 6,636px — 7,000 상한
 
 
 def check_adv_leads_hoisted(pw):
@@ -452,8 +453,8 @@ def check_adv_tera_fail_shows_tables(pw):
     n_open = page.evaluate("document.querySelectorAll('#ins-adv-grid details.tt-card-evidence[open]').length")
     leads = page.evaluate("document.querySelectorAll('#ins-adv-grid .tt-card-lead .ins-take').length")
     browser.close()
-    # forest 2장(subimp·rest)은 자체 Canvas 라 TERA 없이도 그려진다
-    assert n_err == 7 and n_open == 7, (n_err, n_open)
+    # 자체 Canvas 5장(forest: subimp·rest·weather, timelineGrid: rot, pitchZones: weak)은 TERA 없이도 그려진다
+    assert n_err == 10 and n_open == 10, (n_err, n_open)
     assert leads >= 5, leads
     assert [e for e in errs if e.startswith("pageerror")] == []
 

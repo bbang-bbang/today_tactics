@@ -295,3 +295,11 @@ test("pitchZones_alert_mark", () => {
   const z = c.__zones.find((x) => x.key === "box_center");
   assert.equal(z.alert, true); assert.equal(z.fill, THEME.neg);
 });
+
+test("fitText_ellipsis", () => {
+  const measure = (t) => t.length * 7;   // 글자당 7px 가정
+  assert.equal(P._fitText(measure, "기온 · 10℃ 미만", 200), "기온 · 10℃ 미만");
+  const out = P._fitText(measure, "바람 · 강풍(25km/h 이상) (표본 부족)", 98);
+  assert.ok(measure(out) <= 98, out);
+  assert.ok(out.endsWith("…"), out);
+});

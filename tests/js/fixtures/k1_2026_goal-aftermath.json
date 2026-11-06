@@ -1,0 +1,269 @@
+{
+  "flagged": [
+    "\ub300\uc804"
+  ],
+  "league": "K1",
+  "league_total": {
+    "conc_exp": 57.7,
+    "conc_obs": 48,
+    "conc_z": -1.3,
+    "conceded": 507,
+    "flow": {
+      "both": 4,
+      "conc_only": 44,
+      "extra_only": 64,
+      "none": 395
+    },
+    "resp_exp": 57.3,
+    "resp_obs": 48,
+    "resp_z": -1.2,
+    "scored": 507
+  },
+  "limits": "\uae30\ub300\uac12\uc740 \ud300\uc758 \uc2dc\uc98c \ud3c9\uade0 \ub4dd\uc2e4\uc810\ub960 \uae30\uc900(\uc0c1\ub300\u00b7\uc2dc\uac04\ub300 \uac15\ub3c4 \ubbf8\ubcf4\uc815) \u00b7 \ud300\ub2f9 \ud45c\ubcf8\uc774 \uc791\uc544 z\ub294 \ucc38\uace0\uc6a9\uc774\uba70 \uc5ec\ub7ec \ud300\uc744 \ub3d9\uc2dc\uc5d0 \ubcf4\uba74 \uc6b0\uc5f0\ud788 \ud070 \uac12\uc774 \ub098\uc62c \uc218 \uc788\uc74c \u00b7 \uacbd\uae30 \uc885\ub8cc\ub294 95\ubd84(\ub9c8\uc9c0\ub9c9 \uace8\uc774 \ub354 \ub2a6\uc73c\uba74 \uadf8 \uc9c1\ud6c4)\uc73c\ub85c \uadfc\uc0ac",
+  "min_games": 8,
+  "teams": [
+    {
+      "conc_exp": 4.1,
+      "conc_obs": 8,
+      "conc_z": 1.9,
+      "conceded": 38,
+      "eligible": true,
+      "flow": {
+        "both": 0,
+        "conc_only": 8,
+        "extra_only": 5,
+        "none": 27
+      },
+      "games": 34,
+      "id": 7649,
+      "resp_exp": 4.1,
+      "resp_obs": 4,
+      "resp_z": -0.1,
+      "scored": 40,
+      "short": "\uc81c\uc8fc"
+    },
+    {
+      "conc_exp": 4.0,
+      "conc_obs": 5,
+      "conc_z": 0.5,
+      "conceded": 42,
+      "eligible": true,
+      "flow": {
+        "both": 0,
+        "conc_only": 5,
+        "extra_only": 4,
+        "none": 25
+      },
+      "games": 34,
+      "id": 7647,
+      "resp_exp": 4.0,
+      "resp_obs": 3,
+      "resp_z": -0.5,
+      "scored": 34,
+      "short": "\uae40\ucc9c"
+    },
+    {
+      "conc_exp": 4.2,
+      "conc_obs": 5,
+      "conc_z": 0.4,
+      "conceded": 35,
+      "eligible": true,
+      "flow": {
+        "both": 0,
+        "conc_only": 5,
+        "extra_only": 7,
+        "none": 32
+      },
+      "games": 34,
+      "id": 7648,
+      "resp_exp": 4.3,
+      "resp_obs": 5,
+      "resp_z": 0.3,
+      "scored": 44,
+      "short": "\uc778\ucc9c"
+    },
+    {
+      "conc_exp": 6.1,
+      "conc_obs": 6,
+      "conc_z": -0.1,
+      "conceded": 70,
+      "eligible": true,
+      "flow": {
+        "both": 1,
+        "conc_only": 5,
+        "extra_only": 2,
+        "none": 23
+      },
+      "games": 34,
+      "id": 48912,
+      "resp_exp": 5.7,
+      "resp_obs": 5,
+      "resp_z": -0.3,
+      "scored": 31,
+      "short": "\uad11\uc8fc"
+    },
+    {
+      "conc_exp": 5.9,
+      "conc_obs": 5,
+      "conc_z": -0.4,
+      "conceded": 49,
+      "eligible": true,
+      "flow": {
+        "both": 1,
+        "conc_only": 4,
+        "extra_only": 2,
+        "none": 35
+      },
+      "games": 34,
+      "id": 32675,
+      "resp_exp": 5.8,
+      "resp_obs": 7,
+      "resp_z": 0.5,
+      "scored": 42,
+      "short": "\uc548\uc591"
+    },
+    {
+      "conc_exp": 3.7,
+      "conc_obs": 3,
+      "conc_z": -0.4,
+      "conceded": 33,
+      "eligible": true,
+      "flow": {
+        "both": 0,
+        "conc_only": 3,
+        "extra_only": 2,
+        "none": 38
+      },
+      "games": 34,
+      "id": 6908,
+      "resp_exp": 3.6,
+      "resp_obs": 3,
+      "resp_z": -0.3,
+      "scored": 43,
+      "short": "\uc804\ubd81"
+    },
+    {
+      "conc_exp": 5.8,
+      "conc_obs": 4,
+      "conc_z": -0.7,
+      "conceded": 41,
+      "eligible": true,
+      "flow": {
+        "both": 0,
+        "conc_only": 4,
+        "extra_only": 13,
+        "none": 36
+      },
+      "games": 34,
+      "id": 7645,
+      "resp_exp": 5.7,
+      "resp_obs": 0,
+      "resp_z": -2.4,
+      "scored": 53,
+      "short": "\ub300\uc804"
+    },
+    {
+      "conc_exp": 4.7,
+      "conc_obs": 3,
+      "conc_z": -0.8,
+      "conceded": 49,
+      "eligible": true,
+      "flow": {
+        "both": 0,
+        "conc_only": 3,
+        "extra_only": 3,
+        "none": 27
+      },
+      "games": 34,
+      "id": 92539,
+      "resp_exp": 4.8,
+      "resp_obs": 4,
+      "resp_z": -0.4,
+      "scored": 33,
+      "short": "\ubd80\ucc9c"
+    },
+    {
+      "conc_exp": 7.1,
+      "conc_obs": 5,
+      "conc_z": -0.8,
+      "conceded": 48,
+      "eligible": true,
+      "flow": {
+        "both": 1,
+        "conc_only": 4,
+        "extra_only": 7,
+        "none": 42
+      },
+      "games": 34,
+      "id": 7653,
+      "resp_exp": 6.9,
+      "resp_obs": 5,
+      "resp_z": -0.7,
+      "scored": 54,
+      "short": "\uc6b8\uc0b0"
+    },
+    {
+      "conc_exp": 3.5,
+      "conc_obs": 2,
+      "conc_z": -0.8,
+      "conceded": 40,
+      "eligible": true,
+      "flow": {
+        "both": 1,
+        "conc_only": 1,
+        "extra_only": 1,
+        "none": 28
+      },
+      "games": 34,
+      "id": 7650,
+      "resp_exp": 3.5,
+      "resp_obs": 2,
+      "resp_z": -0.8,
+      "scored": 31,
+      "short": "\ud3ec\ud56d"
+    },
+    {
+      "conc_exp": 5.2,
+      "conc_obs": 2,
+      "conc_z": -1.4,
+      "conceded": 30,
+      "eligible": true,
+      "flow": {
+        "both": 0,
+        "conc_only": 2,
+        "extra_only": 12,
+        "none": 47
+      },
+      "games": 34,
+      "id": 7646,
+      "resp_exp": 4.8,
+      "resp_obs": 7,
+      "resp_z": 1.0,
+      "scored": 61,
+      "short": "\uc11c\uc6b8"
+    },
+    {
+      "conc_exp": 3.4,
+      "conc_obs": 0,
+      "conc_z": -1.9,
+      "conceded": 32,
+      "eligible": true,
+      "flow": {
+        "both": 0,
+        "conc_only": 0,
+        "extra_only": 6,
+        "none": 35
+      },
+      "games": 34,
+      "id": 34220,
+      "resp_exp": 4.0,
+      "resp_obs": 3,
+      "resp_z": -0.5,
+      "scored": 41,
+      "short": "\uac15\uc6d0"
+    }
+  ],
+  "warnings": [],
+  "window": 10,
+  "year": "2026"
+}

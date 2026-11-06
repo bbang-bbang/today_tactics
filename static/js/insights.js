@@ -1797,7 +1797,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       hoistLeads(cardEl, card.bodyId);
       if (!card.chart) return;
       const slot = cardEl.querySelector("[data-chart-slot]");
-      return advColorOf(league, year).then((colorOf) => {
+      // 팀 색은 리그별 xg-luck 에서 — 리그 단일이 아닌 카드(league=all)는 팀 색이 필요 없다(xg-luck 은 k1/k2 만 지원)
+      const colors = card.perLeague ? advColorOf(league, year) : Promise.resolve(() => undefined);
+      return colors.then((colorOf) => {
         if (stale()) return;
         TTChart.mount(slot, InsCharts[card.key](d, colorOf), { ariaLabel: card.title });
       });

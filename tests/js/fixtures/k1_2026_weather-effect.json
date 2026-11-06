@@ -1,0 +1,159 @@
+{
+  "groups": {
+    "precip": [
+      {
+        "draw_pct": 30.4,
+        "goals": 2.51,
+        "goals_ci": 0.25,
+        "goals_diff": false,
+        "goals_resid": 0.02,
+        "goals_z": 0.2,
+        "home_diff": false,
+        "home_win_exp": 31.9,
+        "home_win_pct": 32.9,
+        "home_win_z": 0.3,
+        "key": "dry",
+        "label": "\uac15\uc218 \uc5c6\uc74c",
+        "n": 158
+      },
+      {
+        "draw_pct": 47.8,
+        "goals": 2.41,
+        "goals_ci": 0.46,
+        "goals_diff": false,
+        "goals_resid": -0.07,
+        "goals_z": -0.3,
+        "home_diff": false,
+        "home_win_exp": 31.9,
+        "home_win_pct": 28.3,
+        "home_win_z": -0.5,
+        "key": "wet",
+        "label": "\ube44\u00b7\ub208(\uac15\uc218)",
+        "n": 46
+      }
+    ],
+    "temp": [
+      {
+        "draw_pct": 33.3,
+        "goals": 2.47,
+        "goals_ci": null,
+        "goals_diff": false,
+        "goals_resid": null,
+        "goals_z": null,
+        "home_diff": false,
+        "home_win_exp": 31.9,
+        "home_win_pct": 33.3,
+        "home_win_z": null,
+        "key": "cold",
+        "label": "10\u2103 \ubbf8\ub9cc",
+        "n": 15
+      },
+      {
+        "draw_pct": 42.1,
+        "goals": 2.05,
+        "goals_ci": 0.42,
+        "goals_diff": false,
+        "goals_resid": -0.43,
+        "goals_z": -2.0,
+        "home_diff": false,
+        "home_win_exp": 31.9,
+        "home_win_pct": 22.8,
+        "home_win_z": -1.5,
+        "key": "cool",
+        "label": "10~20\u2103",
+        "n": 57
+      },
+      {
+        "draw_pct": 31.8,
+        "goals": 2.68,
+        "goals_ci": 0.3,
+        "goals_diff": false,
+        "goals_resid": 0.2,
+        "goals_z": 1.3,
+        "home_diff": false,
+        "home_win_exp": 31.9,
+        "home_win_pct": 38.3,
+        "home_win_z": 1.4,
+        "key": "warm",
+        "label": "20~28\u2103",
+        "n": 107
+      },
+      {
+        "draw_pct": 28.0,
+        "goals": 2.64,
+        "goals_ci": null,
+        "goals_diff": false,
+        "goals_resid": null,
+        "goals_z": null,
+        "home_diff": false,
+        "home_win_exp": 31.9,
+        "home_win_pct": 24.0,
+        "home_win_z": null,
+        "key": "hot",
+        "label": "28\u2103 \uc774\uc0c1",
+        "n": 25
+      }
+    ],
+    "wind": [
+      {
+        "draw_pct": 32.9,
+        "goals": 2.56,
+        "goals_ci": 0.24,
+        "goals_diff": false,
+        "goals_resid": 0.08,
+        "goals_z": 0.6,
+        "home_diff": false,
+        "home_win_exp": 31.9,
+        "home_win_pct": 30.6,
+        "home_win_z": -0.3,
+        "key": "calm",
+        "label": "\ubc14\ub78c \uc57d\ud568(15km/h \ubbf8\ub9cc)",
+        "n": 173
+      },
+      {
+        "draw_pct": 41.4,
+        "goals": 1.97,
+        "goals_ci": null,
+        "goals_diff": false,
+        "goals_resid": null,
+        "goals_z": null,
+        "home_diff": false,
+        "home_win_exp": 31.9,
+        "home_win_pct": 37.9,
+        "home_win_z": null,
+        "key": "breeze",
+        "label": "\ubcf4\ud1b5(15~25)",
+        "n": 29
+      },
+      {
+        "draw_pct": 50.0,
+        "goals": 3.5,
+        "goals_ci": null,
+        "goals_diff": false,
+        "goals_resid": null,
+        "goals_z": null,
+        "home_diff": false,
+        "home_win_exp": 31.9,
+        "home_win_pct": 50.0,
+        "home_win_z": null,
+        "key": "strong",
+        "label": "\uac15\ud48d(25km/h \uc774\uc0c1)",
+        "n": 2
+      }
+    ]
+  },
+  "league": "K1",
+  "limits": "\uacbd\uae30 \uc2dc\uc791 \uc2dc\uac01 \uae30\uc0c1(Open-Meteo\u00b7\uacbd\uae30\uc7a5 \uc88c\ud45c) \u00b7 \ub4dd\uc810=\uac19\uc740 \ub9ac\uadf8\u00b7\uc2dc\uc98c \ud3c9\uade0 \ub300\ube44, \ud648 \uc2b9\ub960=\uac19\uc740 \ub9ac\uadf8\u00b7\uc2dc\uc98c \ud648 \uc2b9\ub960 \ub300\ube44\ub85c \ubcf4\uc815 \u00b7 \uad6c\uac04\u00b7\uc9c0\ud45c\ub97c 18\uac1c \uc548\ud30e \ub3d9\uc2dc\uc5d0 \ube44\uad50\ud558\ubbc0\ub85c |z|\u22652.5\u00b730\uacbd\uae30\u2191\uc77c \ub54c\ub9cc '\ucc28\uc774 \uc788\uc74c' \u00b7 \uae30\uc628\uc740 \uc2dc\uc98c \uc2dc\uae30\u00b7\ud0a5\uc624\ud504 \uc2dc\uac04(\uc800\ub141 \uacbd\uae30 \ub4f1)\uacfc \uc5bd\ud600 \uc788\uc5b4 \uc0c1\uad00\uc77c \ubfd0 \uc778\uacfc\uac00 \uc544\ub2d8",
+  "matches": 204,
+  "matches_with_weather": 204,
+  "min_n": 30,
+  "overall": {
+    "draw_pct": 34.3,
+    "goals": 2.49,
+    "home_win_pct": 31.9,
+    "n": 204
+  },
+  "warnings": [],
+  "year": "2026",
+  "z_flag": 2.5
+}

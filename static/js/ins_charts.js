@@ -15,25 +15,24 @@
     { key: "story", bodyId: "ins-story-body", size: "S", theme: "flow", icon: "📰", title: "리그 화제 포인트", question: "지금 흐름이 좋은 팀·나쁜 팀, 진행 중인 기록, 눈여겨볼 선수", endpoint: "storylines", perLeague: true, render: "renderStorylines", chart: false },
     { key: "xgluck", bodyId: "ins-xgluck-body", size: "M", theme: "flow", icon: "🍀", title: "xG 운 보정", question: "실력(xG)만큼 승점을 땄나? 실제 vs 기대 승점", endpoint: "xg-luck", perLeague: true, render: "renderXgLuck", chart: true },
     { key: "opp", bodyId: "ins-opp-body", size: "M", theme: "flow", icon: "🧗", title: "상대 수준별 성적", question: "상위·중위·하위권 상대로 각각 얼마나 따나? 강팀 킬러·승점 흘리는 팀", endpoint: "opponent-strength", perLeague: true, render: "renderOppStrength", chart: true },
-    { key: "weather", bodyId: "ins-wx-body", size: "M", theme: "flow", icon: "🌦", title: "날씨 영향", question: "기온·비·바람이 득점과 홈 승률을 바꾸나? 통계적으로 확실할 때만 말함", endpoint: "weather-effect", perLeague: false, render: "renderWeather", chart: false, collapse: true },
+    { key: "weather", bodyId: "ins-wx-body", size: "M", theme: "flow", icon: "🌦", title: "날씨 영향", question: "기온·비·바람이 득점과 홈 승률을 바꾸나? 통계적으로 확실할 때만 말함", endpoint: "weather-effect", perLeague: false, render: "renderWeather", chart: true },
     { key: "formation", bodyId: "ins-fm-body", size: "L", theme: "tactics", icon: "♟️", title: "포메이션 상성", question: "내 포메이션이 상대 포메이션을 만나면? 경기당 승점 (표본 부족 칸은 비움)", endpoint: "formation-matchup", perLeague: true, render: "renderFormation", chart: true },
-    { key: "hub", bodyId: "ins-hub-body", size: "S", theme: "tactics", icon: "🕸️", title: "패스 허브 의존도", question: "팀 패스가 한 선수에게 얼마나 몰리나?", endpoint: "pass-hub", perLeague: true, render: "renderPassHub", chart: false, collapse: true },
+    { key: "hub", bodyId: "ins-hub-body", size: "S", theme: "tactics", icon: "🕸️", title: "패스 허브 의존도", question: "팀 패스가 한 선수에게 얼마나 몰리나?", endpoint: "pass-hub", perLeague: true, render: "renderPassHub", chart: true },
     { key: "gs", bodyId: "ins-gs-body", size: "M", theme: "tactics", icon: "🎢", title: "경기 상황별 성적", question: "앞서면 지켜내나, 뒤지면 따라가나?", endpoint: "game-state", perLeague: true, render: "renderGameState", chart: true },
     { key: "pv", bodyId: "ins-pv-body", size: "M", theme: "tactics", icon: "🔁", title: "패스량과 결과", question: "앞설 때 패스를 줄이고, 뒤질 때 늘리나? (평소 대비 %)", endpoint: "pass-volume", perLeague: true, render: "renderPassVolume", chart: true },
-    { key: "aft", bodyId: "ins-aft-body", size: "M", theme: "tactics", icon: "⚡", title: "득점 직후 실점·반격", question: "골 넣은 직후 10분, 무너지나 몰아치나?", endpoint: "goal-aftermath", perLeague: true, render: "renderAftermath", chart: false, collapse: true },
+    { key: "aft", bodyId: "ins-aft-body", size: "M", theme: "tactics", icon: "⚡", title: "득점 직후 실점·반격", question: "골 넣은 직후 10분, 무너지나 몰아치나?", endpoint: "goal-aftermath", perLeague: true, render: "renderAftermath", chart: true },
     { key: "subimp", bodyId: "ins-subimp-body", size: "M", theme: "squad", icon: "🔁", title: "팀별 교체 효과", question: "첫 전술 교체 뒤 15분 득실이 리그 평균보다 나아지나?", endpoint: "substitution-impact", perLeague: true, render: "renderSubImpact", chart: true },
     { key: "rest", bodyId: "ins-rest-body", size: "M", theme: "squad", icon: "😴", title: "휴식일·연전 영향", question: "짧은 휴식·밀집 일정이 정말 성적을 떨어뜨리나?", endpoint: "rest-effect", perLeague: true, render: "renderRestEffect", chart: true },
-    { key: "rot", bodyId: "ins-rot-body", size: "M", theme: "squad", icon: "🔀", title: "선발 로테이션", question: "직전 경기와 선발이 얼마나 바뀌나, 성적과 관계는?", endpoint: "rotation", perLeague: true, render: "renderRotation", chart: false, collapse: true },
-    { key: "sdep", bodyId: "ins-sdep-body", size: "M", theme: "squad", icon: "🎯", title: "득점 의존도", question: "득점의 몇 %를 1·2위 득점자가 만드나? 에이스가 빠지면?", endpoint: "scoring-dependence", perLeague: true, render: "renderScoringDep", chart: false, collapse: true },
+    { key: "rot", bodyId: "ins-rot-body", size: "M", theme: "squad", icon: "🔀", title: "선발 로테이션", question: "직전 경기와 선발이 얼마나 바뀌나, 성적과 관계는?", endpoint: "rotation", perLeague: true, render: "renderRotation", chart: true },
+    { key: "sdep", bodyId: "ins-sdep-body", size: "M", theme: "squad", icon: "🎯", title: "득점 의존도", question: "득점의 몇 %를 1·2위 득점자가 만드나? 에이스가 빠지면?", endpoint: "scoring-dependence", perLeague: true, render: "renderScoringDep", chart: true },
     { key: "sub", bodyId: "ins-sub-body", size: "M", theme: "squad", icon: "🦸", title: "슈퍼서브·교체 시점", question: "누가 벤치에서 터지나? 언제 바꾸나?", endpoint: "substitution", perLeague: false, render: "renderSubstitution", chart: false },
     { key: "clutch", bodyId: "ins-clutch-body", size: "M", theme: "squad", icon: "⏱️", title: "승부처 해결사", question: "막판·결정적 순간에 누가 넣나?", endpoint: "clutch", perLeague: false, render: "renderClutch", chart: false },
     { key: "spp", bodyId: "ins-spp-body", size: "M", theme: "setpiece", icon: "⛳", title: "세트피스 공수 프로필", question: "코너·프리킥·스로인 (PK 제외) — 만든 것 vs 허용한 것", endpoint: "setpiece-profile", perLeague: true, render: "renderSetpieceProfile", chart: true },
-    { key: "weak", bodyId: "ins-weak-body", size: "M", theme: "setpiece", icon: "🛡️", title: "실점 약점 지도", question: "허용 슈팅이 어느 지역·어떤 상황으로 쏠리나?", endpoint: "defensive-weakness", perLeague: true, render: "renderWeakness", chart: false, collapse: true },
+    { key: "weak", bodyId: "ins-weak-body", size: "M", theme: "setpiece", icon: "🛡️", title: "실점 약점 지도", question: "허용 슈팅이 어느 지역·어떤 상황으로 쏠리나?", endpoint: "defensive-weakness", perLeague: true, render: "renderWeakness", chart: true },
     { key: "shooting", bodyId: "ins-shooting-body", size: "S", theme: "setpiece", icon: "🎯", title: "슈팅 인사이트", question: "어디서, 얼마나 정확하게 차나?", endpoint: "shooting", perLeague: false, render: "renderShooting", chart: false },
     { key: "gk", bodyId: "ins-gk-body", size: "S", theme: "setpiece", icon: "🧤", title: "수문장 (골키퍼)", question: "누가 가장 많이 막아 내나?", endpoint: "goalkeeper", perLeague: false, render: "renderGoalkeeper", chart: false },
     { key: "duel", bodyId: "ins-duel-body", size: "S", theme: "setpiece", icon: "⚔️", title: "듀얼 지배", question: "경합에서 누가 이기나?", endpoint: "duels", perLeague: false, render: "renderDuels", chart: false },
   ];
-  // collapse: 차트는 없지만 한 줄 해석이 있는 카드 — 표는 '근거 보기'로 접는다(해석이 요약 역할)
   const THEMES = [
     { key: "all", label: "전체" }, { key: "flow", label: "흐름·운" }, { key: "tactics", label: "전술" },
     { key: "squad", label: "스쿼드 운용" }, { key: "setpiece", label: "세트피스·수비" },
@@ -138,7 +137,61 @@
     });
   }
 
-  const InsCharts = { CARDS, THEMES, trend, xgluck, opp, formation, gs, pv, subimp, rest, spp };
+  // ── Phase 1b ──
+  function weather(d) {
+    const G = (d && d.groups) || {};
+    const PFX = { temp: "기온", precip: "강수", wind: "바람" };
+    const rows = ["temp", "precip", "wind"].flatMap((k) => (G[k] || []).map((r) => {
+      const ins = r.goals_resid == null || r.goals_ci == null;
+      return { label: `${PFX[k]} · ${r.label}`, est: r.goals_resid, lo: ins ? null : r.goals_resid - r.goals_ci,
+        hi: ins ? null : r.goals_resid + r.goals_ci, n: r.n, significant: !!r.goals_diff, insufficient: ins };
+    }));
+    return P.forest({ rows, zero: 0, zeroLabel: "리그 평균", unit: "경기당 골(평균 대비)" });
+  }
+
+  // 실점 약점 지도 — 팀 1개: 약점 구역이 있는 첫 팀(없으면 첫 eligible 팀)
+  function weak(d) {
+    const ts = elig(d);
+    const t = ts.find((x) => (x.weak || []).length) || ts[0];
+    if (!t || !(d.zones_geom || []).length) return P.pitchZones({ geom: [] });
+    const label = {}; (d.zones || []).forEach((z) => { label[z.key] = z.label; });
+    const values = {};
+    Object.keys(label).forEach((k) => {
+      const v = t.zones && t.zones[k];
+      values[k] = v ? { label: label[k], share: v.share, lg_share: v.lg_share, z: v.z } : null;
+    });
+    return P.pitchZones({ geom: d.zones_geom, values, title: `${t.short} — 허용 슈팅 지역 비중` });
+  }
+
+  function sdep(d) {
+    const ts = elig(d).filter((t) => t.top1_share != null && t.top2_share != null).sort((a, b) => b.top1_share - a.top1_share);
+    return P.stacked100({ categories: ts.map((t) => t.short), parts: [
+      { name: "1위 득점자", color: THEME.accent, data: ts.map((t) => t.top1_share) },
+      { name: "2위 득점자", color: "#f59e0b", data: ts.map((t) => r2(t.top2_share - t.top1_share)) },
+      { name: "나머지", color: THEME.neutral, data: ts.map((t) => r2(100 - t.top2_share)) }] });
+  }
+
+  function rot(d) {
+    const ts = elig(d).filter((t) => (t.timeline || []).length).sort((a, b) => b.avg_changes - a.avg_changes);
+    return P.timelineGrid({ vMax: 11, legend: "칸 진하기 = 직전 경기 대비 선발 교체 수 · 글자 = 승(W)·무(D)·패(L)",
+      rows: ts.map((t) => ({ label: t.short, cells: t.timeline.map((c) => ({ v: c.changes, mark: c.pts === 3 ? "W" : c.pts === 1 ? "D" : "L" })) })) });
+  }
+
+  function aft(d) {
+    const f = (d && d.league_total && d.league_total.flow) || {};
+    return P.sankey({ nodes: ["득점", "추가골만", "실점만", "둘 다", "변화 없음"],
+      colors: { "득점": THEME.accent, "추가골만": THEME.pos, "실점만": THEME.neg, "둘 다": "#f59e0b", "변화 없음": THEME.neutral },
+      links: [["추가골만", "extra_only"], ["실점만", "conc_only"], ["둘 다", "both"], ["변화 없음", "none"]]
+        .map(([tgt, k]) => ({ source: "득점", target: tgt, value: f[k] || 0 })) });
+  }
+
+  function hub(d) {
+    const ts = elig(d).filter((t) => t.hub_share != null).sort((a, b) => b.hub_share - a.hub_share);
+    return P.barRef({ categories: ts.map((t) => t.short), values: ts.map((t) => t.hub_share), name: "허브 1인 패스 지분",
+      ref: d.league_hub_share, refLabel: "리그 평균", unit: "%" });
+  }
+
+  const InsCharts = { CARDS, THEMES, trend, xgluck, opp, formation, gs, pv, subimp, rest, spp, weather, weak, sdep, rot, aft, hub };
   root.InsCharts = InsCharts;
   if (typeof module !== "undefined" && module.exports) module.exports = InsCharts;
 })(typeof globalThis !== "undefined" ? globalThis : this);

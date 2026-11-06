@@ -348,7 +348,7 @@
       const r = m.ranges[i], p = m.points[i];
       ctx.textBaseline = "middle"; ctx.textAlign = "right";
       ctx.fillStyle = r ? THEME.text : THEME.sub;
-      ctx.fillText(label, x0 - 10, cy);
+      ctx.fillText(_fitText((t) => ctx.measureText(t).width, label, x0 - 12), x0 - 10, cy);
       if (!r) return;
       ctx.strokeStyle = "rgba(148,163,184,0.85)"; ctx.lineWidth = 3; ctx.lineCap = "round";
       ctx.beginPath(); ctx.moveTo(X(r.low), cy); ctx.lineTo(X(r.high), cy); ctx.stroke();
@@ -521,6 +521,14 @@
     return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, "0")).join("");
   };
 
+  // 폭을 넘는 라벨은 말줄임(…) — 전체 문구는 근거 표에 있다
+  function _fitText(measure, text, maxW) {
+    if (measure(text) <= maxW) return text;
+    let t = text;
+    while (t.length > 1 && measure(t + "…") > maxW) t = t.slice(0, -1);
+    return t + "…";
+  }
+
   // 칸 배치: 가용 폭에 n 칸, 칸이 8px 미만이면 최근 floor(가용/8) 칸만 (칸 최대 32px)
   function _gridLayout(width, labelW, n) {
     const avail = Math.max(0, width - labelW);
@@ -600,16 +608,21 @@
       }
       ctx.strokeStyle = "rgba(229,231,235,0.55)"; ctx.lineWidth = 1; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
     });
-    // 라벨은 구역별 첫 사각형 중앙에 한 번만
-    const seen = new Set();
-    spec.__zones.slice().reverse().forEach((z) => {
-      if (seen.has(z.key) || !z.label) return; seen.add(z.key);
-      const cx = (X(z.y0) + X(z.y1)) / 2, cy = (Y(z.x0) + Y(z.x1)) / 2;
-      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = THEME.text;
+    // 사각형마다 구역 이름 + 비중(같은 구역의 좌우 사각형 모두 표기). 골문 앞은 작아서 한 줄만.
+    spec.__zones.forEach((z) => {
+      if (!z.label) return;
+      const cx = (X(z.y0) + X(z.y1)) / 2, cy = (Y(z.x0) + Y(z.x1)) / 2, small = Y(z.x1) - Y(z.x0) < 44;
       const mark = z.alert ? "⚠ " : z.good ? "✓ " : "";
-      ctx.fillText(z.share == null ? `${z.label} · 분류 불가` : `${mark}${z.share}%`, cx, cy - 7);
-      ctx.fillStyle = THEME.sub;
-      if (z.share != null) ctx.fillText(`리그 ${z.lg_share}%`, cx, cy + 8);
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      if (small) {
+        ctx.fillStyle = THEME.text;
+        ctx.fillText(z.share == null ? `${z.label} · 분류 불가` : `${mark}${z.label} ${z.share}%`, cx, cy);
+        return;
+      }
+      ctx.fillStyle = THEME.sub; ctx.fillText(z.label, cx, cy - 16);
+      ctx.fillStyle = THEME.text;
+      ctx.fillText(z.share == null ? "분류 불가" : `${mark}${z.share}%`, cx, cy);
+      if (z.share != null) { ctx.fillStyle = THEME.sub; ctx.fillText(`리그 ${z.lg_share}%`, cx, cy + 16); }
     });
     ctx.strokeStyle = "rgba(229,231,235,0.8)"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + pitchW, oy); ctx.stroke();   // 골라인
@@ -618,7 +631,7 @@
   const CUSTOM = { forest: (c, s, w, h) => drawForest(c, s, w, h), timelineGrid: drawTimelineGrid, pitchZones: drawPitchZones };
 
   const presets = { bump, _forestModel, forest, dumbbell, quadrant, heatMatrix, stacked100, barRef, sankey,
-    _gridLayout, timelineGrid, pitchZones };
+    _gridLayout, _fitText, timelineGrid, pitchZones };
 
   const TTChart = { THEME, util: { contrast, ensureVisible, lighten, merge }, withTheme, isEmpty, mount, destroyAll, presets };
   root.TTChart = TTChart;

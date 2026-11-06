@@ -16,7 +16,7 @@ test("cards_cover_all_bodies", () => {
   assert.equal(InsCharts.CARDS.length, 21);
   assert.deepEqual(new Set(InsCharts.CARDS.map((c) => c.bodyId)), new Set(BODY_IDS));
   const charted = InsCharts.CARDS.filter((c) => c.chart).map((c) => c.key).sort();
-  assert.deepEqual(charted, ["formation", "gs", "opp", "pv", "rest", "spp", "subimp", "trend", "xgluck"]);
+  assert.deepEqual(charted, ["aft", "formation", "gs", "hub", "opp", "pv", "rest", "rot", "sdep", "spp", "subimp", "trend", "weak", "weather", "xgluck"]);
   for (const c of InsCharts.CARDS.filter((c) => c.chart)) assert.equal(typeof InsCharts[c.key], "function", c.key);
 });
 
@@ -115,11 +115,6 @@ test("labels_are_plain_strings", () => {
   assert.ok(!JSON.stringify(c).includes("__html"));
 });
 
-test("collapse_only_chartless_cards_with_takes", () => {
-  const col = InsCharts.CARDS.filter((c) => c.collapse).map((c) => c.key).sort();
-  assert.deepEqual(col, ["aft", "hub", "rot", "sdep", "weak", "weather"]);
-  for (const c of InsCharts.CARDS.filter((c) => c.collapse)) assert.equal(c.chart, false, c.key);
-});
 
 test("cards_order_packs_rows_without_dense", () => {
   // grid-auto-flow:dense 없이도 빈칸이 적도록 테마 안에서 L+S / M+M 짝으로 배치 (DOM 순서 = 화면 순서)
@@ -132,4 +127,75 @@ test("cards_order_packs_rows_without_dense", () => {
   let row = 0, gaps = 0;
   for (const c of InsCharts.CARDS) { if (row + W[c.size] > 12) { gaps += 12 - row; row = 0; } row += W[c.size]; }
   assert.ok(gaps <= 12, `total empty columns ${gaps}`);
+});
+
+// ── Phase 1b: 카드 6장 ──
+test("weather_rows_from_groups", () => {
+  const d = fx("weather-effect");
+  const c = InsCharts.weather(d);
+  const n = ["temp", "precip", "wind"].reduce((s, k) => s + d.groups[k].length, 0);
+  assert.equal(c.__model.categories.length, n);
+  const r = ["temp", "precip", "wind"].flatMap((k) => d.groups[k]).find((x) => x.goals_resid != null && x.goals_ci != null);
+  const i = c.__model.categories.findIndex((cat) => cat.endsWith(r.label));
+  assert.deepEqual(c.__model.ranges[i], { low: r.goals_resid - r.goals_ci, high: r.goals_resid + r.goals_ci });
+  assert.equal(c.__zero, 0);
+});
+
+test("weak_default_team_has_weak_zone", () => {
+  const d = fx("defensive-weakness");
+  const c = InsCharts.weak(d);
+  const want = d.teams.find((t) => t.eligible && (t.weak || []).length) || d.teams.find((t) => t.eligible);
+  assert.equal(c.__title, `${want.short} — 허용 슈팅 지역 비중`);
+  assert.equal(c.__renderer, "pitchZones");
+});
+
+test("weak_unavailable_zone_hatched", () => {
+  const d = fx("defensive-weakness");
+  const t = JSON.parse(JSON.stringify(d.teams.find((x) => x.eligible)));
+  t.zones.out_wide = null; t.weak = ["x"];
+  const c = InsCharts.weak({ ...d, teams: [t] });
+  assert.ok(c.__zones.filter((z) => z.key === "out_wide").every((z) => z.hatch));
+});
+
+test("sdep_parts_sum_100", () => {
+  const c = InsCharts.sdep(fx("scoring-dependence"));
+  for (let i = 0; i < c.yAxis.categories.length; i++) {
+    const sum = c.series.reduce((s, p) => s + p.data[i], 0);
+    assert.ok(Math.abs(sum - 100) <= 0.1, `${c.yAxis.categories[i]} ${sum}`);
+  }
+});
+
+test("rot_marks", () => {
+  const d = fx("rotation");
+  const c = InsCharts.rot(d);
+  const t = d.teams.find((x) => x.eligible);
+  const row = c.__model.rows.find((r) => r.label === t.short);
+  assert.deepEqual(row.cells.map((x) => x.mark), t.timeline.map((x) => (x.pts === 3 ? "W" : x.pts === 1 ? "D" : "L")));
+  assert.equal(c.__model.vMax, 11);
+});
+
+test("aft_flow_links_sum", () => {
+  const d = fx("goal-aftermath");
+  const c = InsCharts.aft(d);
+  assert.equal(c.links.reduce((s, l) => s + l.value, 0), d.league_total.scored);
+});
+
+test("hub_ref_is_league", () => {
+  const d = fx("pass-hub");
+  const c = InsCharts.hub(d);
+  assert.equal(c.xAxis.plotLines[0].value, d.league_hub_share);
+});
+
+test("cards_chart_count_15", () => {
+  assert.equal(InsCharts.CARDS.filter((c) => c.chart).length, 15);
+  assert.equal(InsCharts.CARDS.filter((c) => c.collapse).length, 0);
+});
+
+test("phase1b_builders_empty", () => {
+  assert.deepEqual(InsCharts.weather({ groups: {} }), { __empty: true });
+  assert.deepEqual(InsCharts.weak({ teams: [], zones_geom: [], zones: [] }), { __empty: true });
+  assert.deepEqual(InsCharts.sdep({ teams: [] }), { __empty: true });
+  assert.deepEqual(InsCharts.rot({ teams: [] }), { __empty: true });
+  assert.deepEqual(InsCharts.aft({ league_total: { scored: 0, flow: { extra_only: 0, conc_only: 0, both: 0, none: 0 } } }), { __empty: true });
+  assert.deepEqual(InsCharts.hub({ teams: [] }), { __empty: true });
 });
