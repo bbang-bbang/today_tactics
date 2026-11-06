@@ -45,3 +45,5 @@ qa_results.txt
 
 # Understand-Anything 지식 그래프 (로컬 개발 산출물 — 운영 배포 제외)
 .understand-anything/
+
+.superpowers/
