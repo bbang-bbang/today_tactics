@@ -522,6 +522,21 @@ def check_league_toggle_failure_reverts(pw):
     assert sel == "K1" and "K1" in head, (sel, head)
 
 
+def check_custom_renderers_draw(pw):
+    for block in (False, True):
+        browser, page = _new_page(pw)
+        errs = collect_errors(page)
+        if block:
+            page.route("**/static/vendor/**", lambda r: r.fulfill(status=404, body="nope"))
+        open_with_csp(page, "/static/dev/mount_probe.html")
+        page.evaluate("probe.custom('slot-a', 'grid')"); page.evaluate("probe.custom('slot-b', 'pitch')")
+        time.sleep(0.6)
+        inks = (page.evaluate("probe.inkRatio('slot-a')"), page.evaluate("probe.inkRatio('slot-b')"))
+        browser.close()
+        assert all(i > 0.01 for i in inks), (block, inks)
+        assert [e for e in errs if e.startswith("pageerror")] == [], errs
+
+
 CHECKS = {name: fn for name, fn in globals().items() if name.startswith("check_")}
 
 

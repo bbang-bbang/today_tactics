@@ -251,3 +251,47 @@ test("sankey_links", () => {
 test("sankey_empty", () => {
   assert.deepEqual(P.sankey({ nodes: ["a"], links: [] }), { __empty: true });
 });
+
+// ── Phase 1b: 자체 Canvas — timelineGrid · pitchZones ──
+test("timelineGrid_model", () => {
+  const c = P.timelineGrid({ rows: [
+    { label: "서울", cells: [{ v: 2, mark: "W" }, { v: 5, mark: "L" }, { v: 0, mark: "D" }] },
+    { label: "광주", cells: [{ v: 1, mark: "D" }] }], vMax: 11, legend: "범례" });
+  assert.equal(c.__renderer, "timelineGrid");
+  assert.equal(c.__rows, 2);
+  assert.deepEqual(c.__model.rows[0].cells[1], { v: 5, mark: "L" });
+  assert.equal(c.__model.vMax, 11);
+});
+
+test("timelineGrid_empty", () => {
+  assert.deepEqual(P.timelineGrid({ rows: [], vMax: 11 }), { __empty: true });
+});
+
+test("timelineGrid_clips_to_width", () => {
+  assert.deepEqual(P._gridLayout(300, 60, 40), { cell: 8, shown: 30, clipped: true });
+  assert.deepEqual(P._gridLayout(300, 60, 10), { cell: 24, shown: 10, clipped: false });
+});
+
+const GEOM = [
+  { key: "goalmouth", x0: 0, x1: 5.5, y0: 36.5, y1: 63.5 }, { key: "box_center", x0: 0, x1: 16.5, y0: 30, y1: 70 },
+  { key: "box_wide", x0: 0, x1: 16.5, y0: 0, y1: 30 }, { key: "box_wide", x0: 0, x1: 16.5, y0: 70, y1: 100 },
+  { key: "out_center", x0: 16.5, x1: 40, y0: 30, y1: 70 }, { key: "out_wide", x0: 16.5, x1: 40, y0: 0, y1: 30 },
+  { key: "out_wide", x0: 16.5, x1: 40, y0: 70, y1: 100 }];
+
+test("pitchZones_order", () => {
+  const c = P.pitchZones({ geom: GEOM, values: { goalmouth: { label: "골문 앞", share: 10, lg_share: 9, z: 0.5 } } });
+  assert.equal(c.__renderer, "pitchZones");
+  assert.equal(c.__zones[c.__zones.length - 1].key, "goalmouth");   // 우선순위 높은 구역을 마지막에 덮어 그림
+});
+
+test("pitchZones_null_cells", () => {
+  const c = P.pitchZones({ geom: GEOM, values: { box_center: null, out_wide: { label: "중거리 측면", share: 5, lg_share: 6, z: null } } });
+  const bc = c.__zones.find((z) => z.key === "box_center"), ow = c.__zones.find((z) => z.key === "out_wide");
+  assert.equal(bc.hatch, true); assert.equal(ow.hatch, true);
+});
+
+test("pitchZones_alert_mark", () => {
+  const c = P.pitchZones({ geom: GEOM, values: { box_center: { label: "박스 중앙", share: 40, lg_share: 30, z: 2.4 } } });
+  const z = c.__zones.find((x) => x.key === "box_center");
+  assert.equal(z.alert, true); assert.equal(z.fill, THEME.neg);
+});

@@ -164,7 +164,7 @@
     function draw(mode) {
       if (dead || failed) return;
       const T = lib();
-      if (!T && current.__renderer !== "forest") { showError(slot, new Error("TeraChart not loaded")); dropCanvas(); return; }
+      if (!T && !CUSTOM[current.__renderer]) { showError(slot, new Error("TeraChart not loaded")); dropCanvas(); return; }
       try {
         const [w, h] = size();
         if (!canvas) {
@@ -175,7 +175,7 @@
           handle.canvas = canvas;
         }
         canvas.style.width = w + "px"; canvas.style.height = h + "px";
-        if (current.__renderer === "forest") { drawForest(canvas, current, w, h); drawn = true; return; }
+        if (CUSTOM[current.__renderer]) { CUSTOM[current.__renderer](canvas, current, w, h); drawn = true; return; }
         const cfg = finalConfig(current, w, h);
         const reduce = reducedMotion();
         if (mode === "update" && !reduce) T.update(canvas, cfg, { duration: UPDATE_MS });
@@ -221,7 +221,7 @@
       if (io) io.disconnect();
       if (ro) ro.disconnect();
       const T = lib();
-      if (canvas && T && typeof T.stop === "function" && current.__renderer !== "forest") { try { T.stop(canvas); } catch (_) { /* noop */ } }
+      if (canvas && T && typeof T.stop === "function" && !CUSTOM[current.__renderer]) { try { T.stop(canvas); } catch (_) { /* noop */ } }
       if (canvas) canvas.remove();
       handles && handles.delete(slot);
     };
@@ -505,7 +505,120 @@
     };
   }
 
-  const presets = { bump, _forestModel, forest, dumbbell, quadrant, heatMatrix, stacked100, barRef, sankey };
+  // ── 자체 Canvas 렌더러 공통 ──
+  function prepCanvas(canvas, w, h) {
+    const dpr = root.devicePixelRatio || 1;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.font = `${THEME.fontSize}px ${THEME.font}`;
+    return ctx;
+  }
+  const mixHex = (a, b, t) => {
+    const p = (h) => [0, 2, 4].map((i) => parseInt(String(h).replace("#", "").slice(i, i + 2), 16));
+    const A = p(a), B = p(b);
+    return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, "0")).join("");
+  };
+
+  // 칸 배치: 가용 폭에 n 칸, 칸이 8px 미만이면 최근 floor(가용/8) 칸만 (칸 최대 32px)
+  function _gridLayout(width, labelW, n) {
+    const avail = Math.max(0, width - labelW);
+    const raw = n ? avail / n : 0;
+    if (raw < 8) return { cell: 8, shown: Math.floor(avail / 8), clipped: true };
+    return { cell: Math.min(32, Math.floor(raw)), shown: n, clipped: false };
+  }
+
+  // 로테이션 타임라인 그리드: 행 = 팀, 칸 = 경기(시간순), 진하기 = v/vMax, 글자/띠 = W·D·L
+  function timelineGrid(o) {
+    const rows = ((o && o.rows) || []).filter((r) => r.cells && r.cells.length);
+    if (!rows.length) return EMPTY();
+    return { __renderer: "timelineGrid", __model: { rows, vMax: o.vMax || 11, legend: o.legend || "" },
+      __rows: rows.length, __aria: `${rows.length}개 팀 경기별 타임라인. ${o.legend || ""}` };
+  }
+  function drawTimelineGrid(canvas, spec, w, h) {
+    const ctx = prepCanvas(canvas, w, h);
+    const { rows, vMax, legend } = spec.__model;
+    const labelW = Math.min(80, Math.max(...rows.map((r) => ctx.measureText(r.label).width)) + 12);
+    const nMax = Math.max(...rows.map((r) => r.cells.length));
+    const L = _gridLayout(w - 8, labelW, nMax);
+    const top = 22, rowH = Math.max(16, Math.min(24, (h - top - 8) / rows.length));
+    const MARK = { W: THEME.pos, D: THEME.sub, L: THEME.neg };
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = THEME.sub; ctx.textAlign = "left";
+    ctx.fillText(legend, 0, 10);
+    if (L.clipped) { ctx.textAlign = "right"; ctx.fillText(`최근 ${L.shown}경기`, w - 4, 10); }
+    rows.forEach((r, i) => {
+      const y = top + i * rowH;
+      ctx.textAlign = "right"; ctx.fillStyle = THEME.text;
+      ctx.fillText(r.label, labelW - 8, y + rowH / 2);
+      const cells = r.cells.slice(-L.shown);
+      cells.forEach((c, j) => {
+        const x = labelW + j * L.cell, cw = L.cell - 2, ch = rowH - 3;
+        ctx.fillStyle = mixHex("#1e293b", THEME.accent, Math.min(1, (c.v || 0) / vMax));
+        ctx.fillRect(x, y, cw, ch);
+        if (L.cell >= 14) {
+          ctx.fillStyle = MARK[c.mark] || THEME.sub; ctx.textAlign = "center";
+          ctx.fillText(c.mark || "", x + cw / 2, y + ch / 2 + 1);
+        } else {
+          ctx.fillStyle = MARK[c.mark] || THEME.sub; ctx.fillRect(x, y + ch - 2, cw, 2);
+        }
+      });
+    });
+  }
+
+  // 실점 약점 지도: 하프 피치(골라인이 위) 위 구역 색칠 — 색 + ⚠/✓ 기호 + 비중 % 글자
+  function pitchZones(o) {
+    const geom = (o && o.geom) || [], vals = (o && o.values) || {};
+    if (!geom.length) return EMPTY();
+    const zones = geom.map((g, i) => {
+      const v = vals[g.key];
+      const z = v && v.z != null ? v.z : null;
+      return { ...g, prio: i, label: v ? v.label : "", share: v ? v.share : null, lg_share: v ? v.lg_share : null, z,
+        hatch: !v || z == null, alert: z != null && z >= 2, good: z != null && z <= -2,
+        fill: z == null ? "#1e293b" : z >= 2 ? THEME.neg : z <= -2 ? THEME.pos : "#334155" };
+    }).sort((a, b) => b.prio - a.prio);   // 넓은 구역 먼저, 우선순위 높은(goalmouth) 구역을 마지막에
+    return { __renderer: "pitchZones", __zones: zones, __title: o.title || "",
+      __aria: `실점 약점 지도${o.title ? " — " + o.title : ""}: ${zones.filter((z) => z.alert).map((z) => z.label).join(", ") || "두드러진 약점 없음"}` };
+  }
+  function drawPitchZones(canvas, spec, w, h) {
+    const ctx = prepCanvas(canvas, w, h);
+    const top = spec.__title ? 22 : 6, pad = 8;
+    const pitchH = h - top - pad, pitchW = Math.min(w - pad * 2, pitchH * 68 / 40 * 1.0);
+    const ox = (w - pitchW) / 2, oy = top;
+    const X = (yPct) => ox + yPct / 100 * pitchW, Y = (m) => oy + m / 40 * pitchH;
+    if (spec.__title) { ctx.fillStyle = THEME.text; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(spec.__title, w / 2, 4); }
+    spec.__zones.forEach((z) => {
+      const x0 = X(z.y0), x1 = X(z.y1), y0 = Y(z.x0), y1 = Y(z.x1);
+      ctx.fillStyle = z.fill; ctx.globalAlpha = z.alert || z.good ? 0.85 : 0.6;
+      ctx.fillRect(x0, y0, x1 - x0, y1 - y0); ctx.globalAlpha = 1;
+      if (z.hatch) {
+        ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+        ctx.strokeStyle = "rgba(148,163,184,0.35)"; ctx.lineWidth = 1;
+        for (let k = -pitchH; k < pitchW; k += 8) { ctx.beginPath(); ctx.moveTo(x0 + k, y0); ctx.lineTo(x0 + k + (y1 - y0), y1); ctx.stroke(); }
+        ctx.restore();
+      }
+      ctx.strokeStyle = "rgba(229,231,235,0.55)"; ctx.lineWidth = 1; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    });
+    // 라벨은 구역별 첫 사각형 중앙에 한 번만
+    const seen = new Set();
+    spec.__zones.slice().reverse().forEach((z) => {
+      if (seen.has(z.key) || !z.label) return; seen.add(z.key);
+      const cx = (X(z.y0) + X(z.y1)) / 2, cy = (Y(z.x0) + Y(z.x1)) / 2;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = THEME.text;
+      const mark = z.alert ? "⚠ " : z.good ? "✓ " : "";
+      ctx.fillText(z.share == null ? `${z.label} · 분류 불가` : `${mark}${z.share}%`, cx, cy - 7);
+      ctx.fillStyle = THEME.sub;
+      if (z.share != null) ctx.fillText(`리그 ${z.lg_share}%`, cx, cy + 8);
+    });
+    ctx.strokeStyle = "rgba(229,231,235,0.8)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + pitchW, oy); ctx.stroke();   // 골라인
+  }
+
+  const CUSTOM = { forest: (c, s, w, h) => drawForest(c, s, w, h), timelineGrid: drawTimelineGrid, pitchZones: drawPitchZones };
+
+  const presets = { bump, _forestModel, forest, dumbbell, quadrant, heatMatrix, stacked100, barRef, sankey,
+    _gridLayout, timelineGrid, pitchZones };
 
   const TTChart = { THEME, util: { contrast, ensureVisible, lighten, merge }, withTheme, isEmpty, mount, destroyAll, presets };
   root.TTChart = TTChart;
