@@ -5373,10 +5373,17 @@ def _kpm_goal_adjust(cur, where_sql, params):
       · 부족분이 없으면 보정 없음(공식·경기 기록이 득점자를 다르게 적은 경기에서 이중 집계 방지)
       · 경기 기록이 공식보다 많이 적은 선수들의 차이 합이 부족분 이하일 때만 그 차이를 보정
         (부족분보다 크면 누가 넣었는지 모호 → 건드리지 않는다)
+    (2026-11-06) 포털이 선수 상세 기록을 통째로 공개하지 않은 경기(매핑은 있는데 공식 행 0개)는
+      그 경기의 공식 골이 0이므로 경기 기록 득점자 골을 그대로 더한다(이중 집계 불가).
     where_sql 은 호출부의 고정 문자열(events 별칭 e 사용), 값은 params 로 바인딩."""
     base = " FROM kleague_player_match k JOIN events e ON e.id = k.event_id WHERE " + where_sql
     rows = cur.execute("SELECT k.event_id, k.is_home, k.player_kid, COALESCE(k.goals, 0)" + base, params).fetchall()
-    if not rows:
+    # 공식 기록이 통째로 없는 종료 경기 — 포털 매핑은 있으나 선수 상세 미공개
+    unpublished = {r[0] for r in cur.execute(
+        "SELECT e.id FROM events e WHERE " + where_sql + " AND e.home_score IS NOT NULL "
+        "AND EXISTS (SELECT 1 FROM kleague_event_map x WHERE x.sofa_event_id = e.id) "
+        "AND NOT EXISTS (SELECT 1 FROM kleague_player_match k2 WHERE k2.event_id = e.id)", params)}
+    if not rows and not unpublished:
         return {}
     ge = {}
     for eid, kid, n in cur.execute(
@@ -5405,6 +5412,9 @@ def _kpm_goal_adjust(cur, where_sql, params):
         if 0 < sum(t["gaps"].values()) <= deficit:
             for kid, gap in t["gaps"].items():
                 out[(eid, kid)] = gap
+    for (eid, kid), n in ge.items():
+        if eid in unpublished:
+            out[(eid, kid)] = n
     return out
 
 

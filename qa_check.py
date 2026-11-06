@@ -542,6 +542,36 @@ def _wk_geom_match():
 qa('weakness zones_geom 경계 = _weak_zone', _wk_geom_match)
 qa('weakness 기존 키 불변', lambda: assert_({'teams', 'zones', 'situations', 'min_games'} <= set(_wk())))
 
+# ── 데이터 무결성: 공식 기록이 통째로 없는 경기의 득점 (2026-11-06 석현준 6골→4골 표시 원인) ──
+# 포털이 일부 경기(2026 15경기)의 선수 상세 기록을 공개하지 않아 공식 골이 빠진다 → 경기 득점 기록(goal_events)으로 보정돼야 한다.
+def _tp_goals_ge_events():
+    rows = get('/api/insights/top-performers?year=2026&league=all')['all']
+    c3 = sqlite3.connect('players.db')
+    try:
+        ge = dict(c3.execute(
+            "SELECT g.player_id, COUNT(*) FROM goal_events g JOIN events e ON e.id = g.event_id "
+            "WHERE g.is_own_goal = 0 AND e.tournament_id IN (410, 777) "
+            "AND e.date_ts >= strftime('%s','2026-01-01') AND e.date_ts < strftime('%s','2027-01-01') "
+            "GROUP BY g.player_id").fetchall())
+        # 공식 기록이 통째로 없는(포털 미공개) 경기에서 넣은 골 — 이번 보정 대상
+        unpub = dict(c3.execute(
+            "SELECT g.player_id, COUNT(*) FROM goal_events g JOIN events e ON e.id = g.event_id "
+            "WHERE g.is_own_goal = 0 AND e.tournament_id IN (410, 777) AND e.home_score IS NOT NULL "
+            "AND e.date_ts >= strftime('%s','2026-01-01') AND e.date_ts < strftime('%s','2027-01-01') "
+            "AND EXISTS (SELECT 1 FROM kleague_event_map x WHERE x.sofa_event_id = e.id) "
+            "AND NOT EXISTS (SELECT 1 FROM kleague_player_match k WHERE k.event_id = e.id) "
+            "GROUP BY g.player_id").fetchall())
+    finally:
+        c3.close()
+    # 공식 기록이 있는 경기에서 두 출처가 득점자를 다르게 적은 경우(모호 → 기존 규칙상 보정 안 함)는 제외하고,
+    # 미공개 경기 골이 있는 선수는 반드시 경기 득점 기록 이상이어야 한다
+    bad = [(r['name'], r['goals'], ge[r['player_id']]) for r in rows
+           if r.get('src') == 'official' and unpub.get(r['player_id']) and r['goals'] < ge[r['player_id']]]
+    seok = next((r for r in rows if r['player_id'] == 106249), None)
+    assert_(seok is not None and seok['goals'] == 6, f"석현준 {seok and seok['goals']}골 (기대 6)")
+    assert_(not bad, f"{len(bad)}명 미공개 경기 골 누락: {bad[:4]}")
+qa('TOP 퍼포머 공식 골 ≥ 경기 득점 기록 (2026)', _tp_goals_ge_events)
+
 # ── 결과 출력 ──
 passed = sum(1 for r in results if r[0] == 'PASS')
 failed = [r for r in results if r[0] == 'FAIL']
