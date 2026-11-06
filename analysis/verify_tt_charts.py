@@ -549,8 +549,8 @@ def _team_ink(page, key):
         for(let i=3;i<d.length;i+=4) if(d[i]>0) n++; return n/(d.length/4);}})()""")
 
 
-def _open_team(pw, team="gangwon", width=1440, block_vendor=False, routes=()):
-    browser, page = _new_page(pw, width=width)
+def _open_team(pw, team="gangwon", width=1440, block_vendor=False, routes=(), browser_name="chromium"):
+    browser, page = _new_page(pw, browser_name=browser_name, width=width)
     errs = collect_errors(page)
     if block_vendor:
         page.route("**/static/vendor/**", lambda r: r.fulfill(status=404, body="nope"))
@@ -574,8 +574,8 @@ def _scroll_slots(page, keys):
         time.sleep(0.4)
 
 
-def check_team_charts_render(pw):
-    browser, page, errs = _open_team(pw)
+def check_team_charts_render(pw, browser_name="chromium"):
+    browser, page, errs = _open_team(pw, browser_name=browser_name)
     _scroll_slots(page, TEAM_RESULT_SLOTS); time.sleep(0.8)
     inks = {k: _team_ink(page, k) for k in TEAM_RESULT_SLOTS}
     page.evaluate("document.querySelector('.ta-tab-btn[data-tab=insights]').click()"); time.sleep(0.6)
@@ -585,6 +585,10 @@ def check_team_charts_render(pw):
     blank = {k: v for k, v in inks.items() if v <= 0.01}
     assert not blank, blank
     assert errs == [], errs
+
+
+def check_team_charts_render_firefox(pw):
+    check_team_charts_render(pw, "firefox")
 
 
 def check_team_switch_stale(pw):
