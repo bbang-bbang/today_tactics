@@ -745,10 +745,20 @@ def check_player_close_before_ready_no_render(pw):
     """열자마자 닫으면 닫힌 모달에 뒤늦게 렌더·차트 마운트하지 않아야 한다(리뷰 I2)."""
     browser, page = _new_page(pw)
     errs = collect_errors(page)
+    # 응답이 닫기 전에 도착하면(로컬 캐시 히트 시 <150ms) 정상 렌더라서 시간차 경합이 재현되지 않는다 →
+    # API 응답을 붙잡아 두고 → 닫고 → 풀어준다(늦게 도착한 응답이 닫힌 모달에 그려지지 않아야 함).
+    held = []
+    page.route("**/api/player-analytics**", lambda r: held.append(r))
     open_with_csp(page, "/")
     page.evaluate("document.dispatchEvent(new CustomEvent('playerSelected', {detail: {playerId: 106249}}))")
-    time.sleep(0.15)
+    for _ in range(50):
+        if held:
+            break
+        time.sleep(0.1)
+    assert held, "player-analytics request was never made"
     page.evaluate("document.querySelector('#player-analytics-modal .pa-close').click()")
+    for r in held:
+        r.continue_()
     time.sleep(8)
     has = page.evaluate("!!document.getElementById('pa-rating-slot')")
     browser.close()
