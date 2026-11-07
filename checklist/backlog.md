@@ -150,7 +150,7 @@ sudo systemctl daemon-reload && sudo systemctl restart today_tactics
 - 모바일(390px) 가로 넘침 제거: 예측 표 가로 스크롤, 팀 모드 버튼 줄바꿈, HUD 줄바꿈. Chromium·Firefox 390/700/1366 전 탭 overflow 0 (Edge 는 Chromium 엔진 동일).
 - 요약 줄: 매치 클릭 시점 팀 쌍을 `window.__ttPickedMatch` 로 저장 → 일치하면 "선택 매치 · R31", 수동 변경이면 "전술판 팀".
 - `static/dev/__lab.html` 추적 해제(.gitignore), 운영 nginx 에 `/static/dev/` 404 추가(**운영 서버 nginx 재로드 필요 — CI 배포에 포함 안 됨**).
-- 알려진 잔여: ① ~~`check_player_close_before_ready_no_render` FAIL~~ — 11/8 해결: 앱 버그가 아니라 테스트 타이밍 문제(로컬 API <150ms 라 닫기 전에 정상 렌더). 응답을 붙잡았다 닫은 뒤 푸는 방식으로 수정, 가드 제거 시 FAIL 확인(49/49). ② 선수 패널 최근 5경기 표는 360px 에서 가로 스크롤.
+- 알려진 잔여: ① ~~`check_player_close_before_ready_no_render` FAIL~~ — 11/8 해결: 앱 버그가 아니라 테스트 타이밍 문제(로컬 API <150ms 라 닫기 전에 정상 렌더). 응답을 붙잡았다 닫은 뒤 푸는 방식으로 수정, 가드 제거 시 FAIL 확인(49/49). ② ~~선수 패널 최근 5경기 표 가로 스크롤~~ — 11/8 해결: 날짜 `26/10/31` 축약(title 에 전체)·홈/원정 태그 사이드 패널에서 숨김·여백 축소로 360px 에서 스크롤 없음(포지션별 열이 많은 DF 는 스크롤 폴백).
 
 ### [x] ~~선수 상세 스탯·비교 K1(tid=410) 지원~~ — 2026-06-15 완료
 `player-stat-report`의 tid=777 하드코딩 8곳을 선수 리그 자동 판정(최근 경기 기준, 검색 배지와 일치)으로 일반화. 피어/백분위/세부포지션/활동량/신체랭크 모두 해당 리그 내 계산. 응답에 `league` 추가. ⚖️ 선수 비교는 K1+K2 검색 허용 + 교차 리그 백분위 주석. 검증: K1 선수(146 K1 피어)·K2 회귀(일류첸코 91경기 동일)·K1↔K2 비교 PASS.

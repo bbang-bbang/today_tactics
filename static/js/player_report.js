@@ -1,5 +1,7 @@
 // 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
 function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+// 최근 경기 표 날짜: "2026/10/31" → "26/10/31" (좁은 패널용, 전체 날짜는 title 로 보존)
+function prShortDate(d) { return String(d == null ? "" : d).replace(/^\d{2}(\d{2})/, "$1"); }
 // player_report.js — 선수 개별 분석 보고서 (전술판 아래 섹션)
 
 (function () {
@@ -137,8 +139,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             const ha = g.is_home ? "홈" : "원정";
             const cells = formCols.map(c => `<td>${g[c.key] ?? "-"}</td>`).join("");
             return `<tr>
-                <td>${g.date}</td>
-                <td>${ttEsc(g.opponent)} <span class="pr-ha">${ha}</span></td>
+                <td class="pr-td-date" title="${ttEsc(g.date)}">${ttEsc(prShortDate(g.date))}</td>
+                <td class="pr-td-opp">${ttEsc(g.opponent)} <span class="pr-ha">${ha}</span></td>
                 <td>${g.score}</td>
                 <td class="${resCls}">${g.result}</td>
                 ${cells}
@@ -293,8 +295,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             const resCls = g.result === "W" ? "pr-res-w" : g.result === "D" ? "pr-res-d" : "pr-res-l";
             const cells = formCols.map(c => `<td>${g[c.key] ?? "-"}</td>`).join("");
             return `<tr>
-                <td>${ttEsc(g.date)}</td>
-                <td>${ttEsc(g.opponent)} <span class="pr-ha">${g.is_home ? "홈" : "원정"}</span></td>
+                <td class="pr-td-date" title="${ttEsc(g.date)}">${ttEsc(prShortDate(g.date))}</td>
+                <td class="pr-td-opp">${ttEsc(g.opponent)} <span class="pr-ha">${g.is_home ? "홈" : "원정"}</span></td>
                 <td>${ttEsc(g.score)}</td>
                 <td class="${resCls}">${ttEsc(g.result)}</td>
                 ${cells}
@@ -349,7 +351,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <div class="pr-section-title">최근 5경기 <span class="pr-pos-tag">공식 기록</span></div>
             <div class="pr-table-wrap">
                 <table class="pr-table">
-                    <thead><tr><th>날짜</th><th>상대</th><th>스코어</th><th>결과</th>${formHead}<th>공식평점</th></tr></thead>
+                    <thead><tr><th>날짜</th><th>상대</th><th>스코어</th><th>결과</th>${formHead}<th title="공식 평점">평점</th></tr></thead>
                     <tbody>${formRows || `<tr><td colspan="10" style="text-align:center;color:#8aa0b8;padding:16px">데이터 없음</td></tr>`}</tbody>
                 </table>
             </div>

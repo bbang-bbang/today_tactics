@@ -6288,7 +6288,9 @@ body.pr-expanded-lock {
     #player-report-section:not(.pr-expanded) #pr-radar-canvas { display: block; margin: 0 auto; max-width: 280px; max-height: 280px; }
     /* 최근 경기 표: 좁은 패널에서 마지막 열(평점)이 잘리지 않게 셀 여백 축소 */
     #player-report-section:not(.pr-expanded) .pr-table th,
-    #player-report-section:not(.pr-expanded) .pr-table td { padding: 6px 5px; font-size: 0.74rem; }
+    #player-report-section:not(.pr-expanded) .pr-table td { padding: 6px 3px; font-size: 0.72rem; }
+    #player-report-section:not(.pr-expanded) .pr-table .pr-td-opp { white-space: normal; min-width: 54px; }
+    #player-report-section:not(.pr-expanded) .pr-table .pr-ha { display: none; }   /* 홈/원정 태그는 확장 보기에서 */
 }
 /* 모바일: 레이더와 지표 목록을 세로로 쌓는다(2열 고정이면 지표 열이 74px로 좁아져 글자가 세로로 깨짐). 터치 영역 확대. */
 @media (max-width: 600px) {
