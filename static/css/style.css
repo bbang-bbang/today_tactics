@@ -848,7 +848,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;   /* 노트북 폭(≤1440)에서도 한 줄 유지 — 팀 칩 이름이 말줄임으로 줄어든다 */
     column-gap: clamp(10px, 0.8vw, 12px);
     row-gap: clamp(8px, 1.2vh, 14px);
     padding: clamp(12px, 1.8vh, 22px) clamp(18px, 1.2vw, 24px);
@@ -870,6 +870,8 @@ body {
     align-items: center;
     gap: clamp(6px, 0.7vw, 10px);
     flex-wrap: nowrap;
+    min-width: 0;
+    flex: 0 1 auto;
 }
 
 .fhud-block-a { padding-right: clamp(4px, 0.5vw, 8px); border-right: 1px solid rgba(255,255,255,0.08); }
@@ -935,6 +937,7 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
 }
 
 /* 킷 토글 (H/A 세그먼트 버튼) */
@@ -1042,7 +1045,11 @@ body {
 }
 
 @media (max-width: 720px) {
-    #formation-hud { gap: 8px; padding: 6px 12px; }
+    #formation-hud { gap: 8px; padding: 6px 12px; flex-wrap: wrap; max-width: 100%; box-sizing: border-box; }   /* 폰 폭: 두 팀 블록이 한 줄에 안 들어가므로 줄바꿈 허용 */
+    /* 폰: 홈/원정 블록을 각각 한 줄로 쌓고 vs·구분선은 숨겨 두 번째 줄이 어색하게 꺾이지 않게 */
+    .fhud-block { flex: 1 1 100%; justify-content: center; padding: 0; border: 0; }
+    .fhud-block-a, .fhud-block-b { padding: 0; border: 0; }
+    .fhud-vs { display: none; }
     .fhud-chip-name { display: none; }
     .fhud-team-chip,
     .fhud-block-b .fhud-team-chip { padding: 4px; }
@@ -4083,6 +4090,7 @@ body {
 /* ── 라운드 사전 예측 패널 (look-ahead bias 차단된 R(N-1)까지의 데이터) ── */
 .ksb-pred-panel:empty { display: none; }
 .ksb-pred-panel {
+    overflow-x: auto;   /* 모바일(≤420px)에서 예측 표(406px)가 패널 밖으로 잘리지 않게 가로 스크롤 */
     margin: 6px 0 10px;
     padding: 10px 12px 8px;
     background: rgba(20,30,50,0.5);
@@ -6273,6 +6281,15 @@ body.pr-expanded-lock {
 .pr-radar-canvas-wrap { flex-shrink: 0; }
 #pr-radar-canvas { width: 100%; max-width: 300px; max-height: 300px; }
 .pr-stats-card { min-width: 0; }
+/* 오른쪽 사이드 패널(폭 360~460, >1280px 레이아웃)에서는 2열이 안 들어가 지표 열이 세로로 깨진다 → 세로 스택.
+   확장 모달(pr-expanded)이나 ≤1280px(패널이 전술판 아래 전체 폭)에서는 2열 유지. (2026-11-08) */
+@media (min-width: 1281px) {
+    #player-report-section:not(.pr-expanded) .pr-radar-card { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+    #player-report-section:not(.pr-expanded) #pr-radar-canvas { display: block; margin: 0 auto; max-width: 280px; max-height: 280px; }
+    /* 최근 경기 표: 좁은 패널에서 마지막 열(평점)이 잘리지 않게 셀 여백 축소 */
+    #player-report-section:not(.pr-expanded) .pr-table th,
+    #player-report-section:not(.pr-expanded) .pr-table td { padding: 6px 5px; font-size: 0.74rem; }
+}
 /* 모바일: 레이더와 지표 목록을 세로로 쌓는다(2열 고정이면 지표 열이 74px로 좁아져 글자가 세로로 깨짐). 터치 영역 확대. */
 @media (max-width: 600px) {
     .pr-radar-card { grid-template-columns: minmax(0, 1fr); gap: 14px; }
@@ -9603,6 +9620,11 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 
 /* ── '🛡 팀' 탭 모드 토글 (단일 팀 분석 ↔ 팀 비교) ── */
 .ws-team-modebar { display: flex; gap: 8px; margin-bottom: 14px; }
+@media (max-width: 600px) {
+    /* 3개 모드 버튼이 폰 폭을 넘지 않게 줄바꿈 허용 + 여백 축소 */
+    .ws-team-modebar { flex-wrap: wrap; gap: 6px; }
+    .ws-team-mode { padding: 8px 12px; font-size: 0.85rem; }
+}
 .ws-team-mode {
     flex: 0 0 auto;
     background: var(--bg-surface);

@@ -333,6 +333,14 @@ def _adv_ready_js():
         return s && (s.querySelector('canvas') || s.querySelector('.tt-chart-error, .tt-chart-empty')); }})"""
 
 
+def _goto_adv_tab(page):
+    """심화 인사이트는 팀 탭의 3번째 모드(.ws-team-mode[data-tmode=insights])로 이동했다(11/7).
+    모드 클릭 → lazy 로드 → ttInsights.showAdv() 가 #ins-adv-grid 를 채운다."""
+    page.evaluate("document.querySelector('.ws-tab[data-ws=team]').click()")
+    _wait(page, "!!document.querySelector('.ws-team-mode[data-tmode=insights]')")
+    page.evaluate("document.querySelector('.ws-team-mode[data-tmode=insights]').click()")
+
+
 def _open_adv(pw, width=1440, block_vendor=False, browser_name="chromium", route=None):
     browser, page = _new_page(pw, browser_name=browser_name, width=width)
     errs = collect_errors(page)
@@ -341,11 +349,7 @@ def _open_adv(pw, width=1440, block_vendor=False, browser_name="chromium", route
     if route:
         page.route(*route)
     open_with_csp(page, "/")
-    page.evaluate("document.querySelector('.ws-tab[data-ws=player]').click()")
-    _wait(page, "typeof window.openPlayerDrawer === 'function'")   # insights.js 로드 완료
-    page.evaluate("(()=>{const b=document.getElementById('insights-toggle-btn'); if(b.getAttribute('aria-expanded')!=='true') b.click()})()")
-    _wait(page, "!!document.querySelector('[data-itab=adv]')")
-    page.evaluate("document.querySelector('[data-itab=adv]').click()")
+    _goto_adv_tab(page)
     _wait(page, "document.querySelectorAll('#ins-adv-grid > .tt-card').length === 22")
     _scroll_adv(page)
     _wait(page, _adv_ready_js())
@@ -496,11 +500,7 @@ def check_adv_module_fail_no_hang(pw):
     errs = collect_errors(page)
     page.route("**/static/js/ins_charts.js**", lambda r: r.fulfill(status=404, body="nope"))
     open_with_csp(page, "/")
-    page.evaluate("document.querySelector('.ws-tab[data-ws=player]').click()")
-    _wait(page, "typeof window.openPlayerDrawer === 'function'")
-    page.evaluate("(()=>{const b=document.getElementById('insights-toggle-btn'); if(b.getAttribute('aria-expanded')!=='true') b.click()})()")
-    _wait(page, "!!document.querySelector('[data-itab=adv]')")
-    page.evaluate("document.querySelector('[data-itab=adv]').click()")
+    _goto_adv_tab(page)
     _wait(page, "!!document.querySelector('#ins-adv-grid .ins-adv-error button')", timeout=15)
     browser.close()
     assert [e for e in errs if e.startswith("pageerror")] == []

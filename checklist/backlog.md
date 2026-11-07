@@ -143,12 +143,14 @@ sudo systemctl daemon-reload && sudo systemctl restart today_tactics
 
 ## 🟡 P2 — 시간 날 때 처리
 
-### [ ] 🖥 11/7 레이아웃 개편 후속 (상세 `checklist/work-log-2026-11-07.md`)
-- 전술판 HUD가 1440px 이하에서 두 줄로 꺾임(두 번째 줄 좌우 반전·`vs` 매달림) — 노트북 폭용 재설계. Canvas 코어 무관(HTML/CSS).
-- `analysis/verify_tt_charts.py`: 심화 인사이트가 팀 탭으로 이동 → 선수 탭 기준 경로 수정 필요.
-- 선수 개별분석 패널 600→460px 축소 후 레이더·스탯 바·확대 모달 점검, Firefox·Edge·모바일(≤720px) 확인.
-- 운영 `static/dev/`(probe 페이지) 공개 노출 — 참조처(`tests/js`·verify 스크립트) 확인 후 정리.
-- 요약 줄이 전술판 수동 변경 팀도 '선택 매치'로 표기 — 필요 시 매치 클릭 id를 별도 저장.
+### [x] 🖥 11/7 레이아웃 개편 후속 — 2026-11-08 처리
+- HUD 1440 이하 두 줄 꺾임 → `#formation-hud` nowrap(팀명 말줄임), ≤720px 은 블록 세로 쌓기+`vs` 숨김. 1280~1920 전부 한 줄(72px) 확인.
+- `verify_tt_charts.py` 심화 인사이트 진입 경로를 팀 탭 `.ws-team-mode[data-tmode=insights]` 로 교체(`_goto_adv_tab`). 49개 중 48 PASS.
+- 선수 개별분석 사이드 패널(360~460px): 레이더 2열이 지표 열을 세로로 깨뜨려 42px 가로 넘침 → >1281px 사이드 패널에서 세로 스택. 공식 레이더 라벨 `aer_w` 원문 노출 → "공중볼". 확장 모달은 2열 유지.
+- 모바일(390px) 가로 넘침 제거: 예측 표 가로 스크롤, 팀 모드 버튼 줄바꿈, HUD 줄바꿈. Chromium·Firefox 390/700/1366 전 탭 overflow 0 (Edge 는 Chromium 엔진 동일).
+- 요약 줄: 매치 클릭 시점 팀 쌍을 `window.__ttPickedMatch` 로 저장 → 일치하면 "선택 매치 · R31", 수동 변경이면 "전술판 팀".
+- `static/dev/__lab.html` 추적 해제(.gitignore), 운영 nginx 에 `/static/dev/` 404 추가(**운영 서버 nginx 재로드 필요 — CI 배포에 포함 안 됨**).
+- 알려진 잔여: ①`check_player_close_before_ready_no_render` 기존 FAIL(변경 전에도 실패 — 모달을 열기 전에 닫으면 렌더되는 경합, 별도 조사). ② 선수 패널 최근 5경기 표는 360px 에서 가로 스크롤.
 
 ### [x] ~~선수 상세 스탯·비교 K1(tid=410) 지원~~ — 2026-06-15 완료
 `player-stat-report`의 tid=777 하드코딩 8곳을 선수 리그 자동 판정(최근 경기 기준, 검색 배지와 일치)으로 일반화. 피어/백분위/세부포지션/활동량/신체랭크 모두 해당 리그 내 계산. 응답에 `league` 추가. ⚖️ 선수 비교는 K1+K2 검색 허용 + 교차 리그 백분위 주석. 검증: K1 선수(146 K1 피어)·K2 회귀(일류첸코 91경기 동일)·K1↔K2 비교 PASS.

@@ -5341,7 +5341,7 @@ def get_player_stat_report():
         "goals":"득점","assists":"도움","shots":"슈팅","sot":"유효슈팅",
         "pass_pct":"패스%","key_passes":"키패스","drib_s":"드리블",
         "tackles":"태클","ints":"인터셉트","aer_pct":"공중볼%",
-        "blocked":"슈팅차단","saves":"선방","touches":"터치","duel_pct":"듀얼승률%",
+        "blocked":"슈팅차단","saves":"선방","touches":"터치","duel_pct":"듀얼승률%","aer_w":"공중볼",
     }
     radar = [{"label": RADAR_LABELS.get(k, k), "pctile": pctile.get(k, 50)} for k in radar_keys]
 
@@ -5512,7 +5512,7 @@ _KPM_RADAR_KEYS = {
 _KPM_RADAR_LABELS = {
     "goals": "득점", "assists": "도움", "shots": "슈팅", "sot": "유효슈팅", "pass_pct": "패스%", "passes": "패스",
     "key_passes": "키패스", "drib_s": "드리블", "tackles": "태클", "ints": "인터셉트", "aer_pct": "공중볼%",
-    "blocked": "슈팅차단", "saves": "선방", "duel_pct": "듀얼승률%",
+    "blocked": "슈팅차단", "saves": "선방", "duel_pct": "듀얼승률%", "aer_w": "공중볼",
 }
 
 

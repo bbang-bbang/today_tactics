@@ -380,6 +380,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                 if (hTeam && aTeam) {
                     const nameA = document.getElementById("fhud-name-a");
                     const nameB = document.getElementById("fhud-name-b");
+                    // 매치 클릭 시점의 이름 기록 — 요약 줄(workspace.js)이 '선택 매치'와 '수동으로 바꾼 팀'을 구분하는 기준
+                    window.__ttPickedMatch = { a: hTeam.short || hTeam.name, b: aTeam.short || aTeam.name };
                     if (nameA) nameA.textContent = hTeam.short || hTeam.name;
                     if (nameB) nameB.textContent = aTeam.short || aTeam.name;
                 }

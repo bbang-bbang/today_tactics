@@ -270,8 +270,13 @@
         const hasMatch = nm(a) && nm(a) !== "HOME" && nm(b) && nm(b) !== "AWAY";
         const showSummary = _current !== "tactics" && _current !== "predict" && hasMatch;
         const rb = document.querySelector(".league-tab-panel.active .ksb-round-btn.active");
-        const r = rb && /^\d+$/.test(rb.dataset.round || "") ? ` · R${rb.dataset.round}` : "";
+        // 매치 카드를 클릭해 정해진 팀 쌍이면 '선택 매치 + 라운드', 전술판에서 팀을 수동으로 바꾼 경우는 '전술판 팀'(라운드 없음)
+        const pm = window.__ttPickedMatch;
+        const isPicked = !!(pm && nm(a) === pm.a && nm(b) === pm.b);
+        const r = isPicked && rb && /^\d+$/.test(rb.dataset.round || "") ? ` · R${rb.dataset.round}` : "";
         const label = hasMatch ? `${nm(a)} vs ${nm(b)}${r}` : "";
+        const lbl = ctxBox.querySelector(".mc-label");
+        if (lbl) lbl.textContent = isPicked ? "선택 매치" : "전술판 팀";
         if (showSummary) ctxText.textContent = label;
         ctxBox.classList.toggle("hidden", !showSummary);
         // 매치 선택 헤더에도 반영 — 영역이 접혔을 때 무엇을 골랐는지 바로 보이게 (CSS 가 접힘 상태에서만 노출)

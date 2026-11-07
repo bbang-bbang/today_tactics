@@ -68,6 +68,11 @@ server {
     # 요청 본문 크기 제한 (saves/squads JSON, DoS 완화)
     client_max_body_size 1m;
 
+    # 개발용 probe 페이지(static/dev/*)는 운영에 공개하지 않는다 — 로컬 검증(analysis/verify_tt_charts.py)에서만 사용
+    location ^~ /static/dev/ {
+        return 404;
+    }
+
     # 정적 파일은 Nginx가 직접 서빙 (Flask 우회 → 빠름)
     location /static/ {
         alias /opt/today_tactics/static/;
