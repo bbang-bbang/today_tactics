@@ -15,13 +15,13 @@
     { key: "story", bodyId: "ins-story-body", size: "S", theme: "flow", icon: "📰", title: "리그 화제 포인트", question: "지금 흐름이 좋은 팀·나쁜 팀, 진행 중인 기록, 눈여겨볼 선수", endpoint: "storylines", perLeague: true, render: "renderStorylines", chart: false },
     { key: "xgluck", bodyId: "ins-xgluck-body", size: "M", theme: "flow", icon: "🍀", title: "xG 운 보정", question: "실력(xG)만큼 승점을 땄나? 실제 vs 기대 승점", endpoint: "xg-luck", perLeague: true, render: "renderXgLuck", chart: true },
     { key: "opp", bodyId: "ins-opp-body", size: "M", theme: "flow", icon: "🧗", title: "상대 수준별 성적", question: "상위·중위·하위권 상대로 각각 얼마나 따나? 강팀 킬러·승점 흘리는 팀", endpoint: "opponent-strength", perLeague: true, render: "renderOppStrength", chart: true },
-    { key: "sim", bodyId: "ins-sim-body", size: "L", theme: "flow", icon: "🎲", title: "시즌 시뮬레이션 — 최종 순위 확률", question: "남은 경기를 500번 시뮬레이션하면 몇 위로 끝나나? (칸 숫자 = 확률 %)", endpoint: "season-simulation", url: (lg) => `/api/season-simulation?league=${lg}&n=500`, perLeague: true, render: "renderSim", chart: true },
+    { key: "sim", bodyId: "ins-sim-body", size: "M", theme: "flow", icon: "🎲", title: "시즌 시뮬레이션 — 최종 순위 확률", question: "남은 경기를 500번 시뮬레이션하면 몇 위로 끝나나? (칸 숫자 = 확률 %)", endpoint: "season-simulation", url: (lg) => `/api/season-simulation?league=${lg}&n=500`, perLeague: true, render: "renderSim", chart: true },
     { key: "weather", bodyId: "ins-wx-body", size: "M", theme: "flow", icon: "🌦", title: "날씨 영향", question: "기온·비·바람이 득점과 홈 승률을 바꾸나? 통계적으로 확실할 때만 말함", endpoint: "weather-effect", perLeague: false, render: "renderWeather", chart: true },
     { key: "formation", bodyId: "ins-fm-body", size: "L", theme: "tactics", icon: "♟️", title: "포메이션 상성", question: "내 포메이션이 상대 포메이션을 만나면? 경기당 승점 (표본 부족 칸은 비움)", endpoint: "formation-matchup", perLeague: true, render: "renderFormation", chart: true },
     { key: "hub", bodyId: "ins-hub-body", size: "S", theme: "tactics", icon: "🕸️", title: "패스 허브 의존도", question: "팀 패스가 한 선수에게 얼마나 몰리나?", endpoint: "pass-hub", perLeague: true, render: "renderPassHub", chart: true },
     { key: "gs", bodyId: "ins-gs-body", size: "M", theme: "tactics", icon: "🎢", title: "경기 상황별 성적", question: "앞서면 지켜내나, 뒤지면 따라가나?", endpoint: "game-state", perLeague: true, render: "renderGameState", chart: true },
     { key: "pv", bodyId: "ins-pv-body", size: "M", theme: "tactics", icon: "🔁", title: "패스량과 결과", question: "앞설 때 패스를 줄이고, 뒤질 때 늘리나? (평소 대비 %)", endpoint: "pass-volume", perLeague: true, render: "renderPassVolume", chart: true },
-    { key: "aft", bodyId: "ins-aft-body", size: "M", theme: "tactics", icon: "⚡", title: "득점 직후 실점·반격", question: "골 넣은 직후 10분, 무너지나 몰아치나?", endpoint: "goal-aftermath", perLeague: true, render: "renderAftermath", chart: true },
+    { key: "aft", bodyId: "ins-aft-body", size: "F", theme: "tactics", icon: "⚡", title: "득점 직후 실점·반격", question: "골 넣은 직후 10분, 무너지나 몰아치나?", endpoint: "goal-aftermath", perLeague: true, render: "renderAftermath", chart: true },
     { key: "subimp", bodyId: "ins-subimp-body", size: "M", theme: "squad", icon: "🔁", title: "팀별 교체 효과", question: "첫 전술 교체 뒤 15분 득실이 리그 평균보다 나아지나?", endpoint: "substitution-impact", perLeague: true, render: "renderSubImpact", chart: true },
     { key: "rest", bodyId: "ins-rest-body", size: "M", theme: "squad", icon: "😴", title: "휴식일·연전 영향", question: "짧은 휴식·밀집 일정이 정말 성적을 떨어뜨리나?", endpoint: "rest-effect", perLeague: true, render: "renderRestEffect", chart: true },
     { key: "rot", bodyId: "ins-rot-body", size: "M", theme: "squad", icon: "🔀", title: "선발 로테이션", question: "직전 경기와 선발이 얼마나 바뀌나, 성적과 관계는?", endpoint: "rotation", perLeague: true, render: "renderRotation", chart: true },
@@ -35,8 +35,11 @@
     { key: "duel", bodyId: "ins-duel-body", size: "S", theme: "setpiece", icon: "⚔️", title: "듀얼 지배", question: "경합에서 누가 이기나?", endpoint: "duels", perLeague: false, render: "renderDuels", chart: false },
   ];
   const THEMES = [
-    { key: "all", label: "전체" }, { key: "flow", label: "흐름·운" }, { key: "tactics", label: "전술" },
-    { key: "squad", label: "스쿼드 운용" }, { key: "setpiece", label: "세트피스·수비" },
+    { key: "all", label: "전체" },
+    { key: "flow", label: "흐름·운", desc: "시즌 순위 흐름과 행운·환경 요인" },
+    { key: "tactics", label: "전술", desc: "포메이션·패스·경기 상황별 운영" },
+    { key: "squad", label: "스쿼드 운용", desc: "교체·로테이션·득점 의존도·승부처" },
+    { key: "setpiece", label: "세트피스·수비", desc: "세트피스·슈팅·실점 약점·골키퍼·듀얼" },
   ];
 
   // ── 빌더 ──

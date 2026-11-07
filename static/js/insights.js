@@ -1856,18 +1856,29 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     Object.keys(_advLeague).forEach((k) => delete _advLeague[k]);
     TTChart.destroyAll(grid);
     const both = currentLeague === "all";
-    grid.innerHTML = InsCharts.CARDS.map((c) => TTDash.cardHtml({
+    // 테마가 바뀌는 지점마다 섹션 제목을 넣어 '전체' 보기에서도 묶음이 보이게 한다(제목은 12칸 전체 폭 → 새 행에서 시작).
+    const themeOf = {}; InsCharts.THEMES.forEach((t) => { themeOf[t.key] = t; });
+    let _prevTheme = null;
+    grid.innerHTML = InsCharts.CARDS.map((c) => {
+      const t = themeOf[c.theme];
+      const head = (t && c.theme !== _prevTheme)
+        ? `<h3 class="tt-theme-head" data-theme="${ttEsc(c.theme)}"><span class="tt-theme-name">${ttEsc(t.label)}</span>${t.desc ? `<span class="tt-theme-desc">${ttEsc(t.desc)}</span>` : ""}</h3>` : "";
+      _prevTheme = c.theme;
+      return head + TTDash.cardHtml({
       id: "ins-c-" + c.key, size: c.size, icon: c.icon, title: c.title, question: c.question, theme: c.theme,
       warnings: [], chart: c.chart,
       leagues: c.perLeague && both ? ["K1", "K2"] : undefined, activeLeague: "K1",
       ...(c.chart || c.collapse ? { evidenceHtml: `<div id="${c.bodyId}"><div class="ins-adv-loading">불러오는 중…</div></div>` }
                   : { bodyHtml: `<div id="${c.bodyId}"><div class="ins-adv-loading">불러오는 중…</div></div>` }),
-    })).join("");
+      });
+    }).join("");
     const chips = document.getElementById("ins-adv-chips");
     if (chips && !chips.dataset.bound) {
       chips.innerHTML = TTDash.chipsHtml(InsCharts.THEMES, "all");
       TTDash.bindChips(chips, (key) => {
         grid.querySelectorAll(":scope > .tt-card").forEach((c) => { c.hidden = key !== "all" && c.dataset.theme !== key; });
+        // 섹션 제목은 '전체' 보기에서만(테마 하나만 볼 땐 선택한 칩이 곧 제목)
+        grid.querySelectorAll(":scope > .tt-theme-head").forEach((h) => { h.hidden = key !== "all"; });
       });
       chips.dataset.bound = "1";
     } else if (chips) {   // 필터 변경으로 그리드를 다시 그리면 칩도 '전체'로

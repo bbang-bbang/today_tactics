@@ -7,7 +7,7 @@
   const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
   function esc(s) { return s == null ? "" : String(s).replace(/[&<>"']/g, (c) => ESC[c]); }
 
-  const SIZES = { L: 1, M: 1, S: 1 };
+  const SIZES = { F: 1, L: 1, M: 1, S: 1 };   // F=전체 폭(12), L=8, M=6, S=4 (12칼럼 그리드)
   const DIR = { up: "▲", down: "▼", flat: "–" };
 
   function leagueToggleHtml(leagues, active) {

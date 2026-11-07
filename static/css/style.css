@@ -9913,6 +9913,15 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .tt-card--L { grid-column: span 8; }
 .tt-card--M { grid-column: span 6; }
 .tt-card--S { grid-column: span 4; }
+.tt-card--F { grid-column: span 12; }
+/* 테마 섹션 제목 — '전체' 보기에서 카드 묶음을 구분(12칸 전체 폭, 새 행에서 시작) */
+.tt-theme-head { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 10px; margin: 10px 0 0; padding: 0 2px 6px;
+    border-bottom: 1px solid var(--tt-line); font-size: 15px; font-weight: 800; color: #f1f5f9; }
+.tt-theme-head:first-child { margin-top: 0; }
+.tt-theme-head[hidden] { display: none; }
+.tt-theme-name::before { content: ""; display: inline-block; width: 4px; height: 14px; margin-right: 8px; border-radius: 2px;
+    background: var(--tt-accent); vertical-align: -1px; }
+.tt-theme-desc { font-size: 12px; font-weight: 400; color: var(--tt-sub); }
 .tt-card-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
 .tt-card-title { margin: 0; font-size: 15px; font-weight: 700; color: #f1f5f9; }
 .tt-card-icon { margin-right: 6px; }
@@ -9934,6 +9943,10 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 /* 리그 토글 · 테마 칩 */
 .tt-lg-toggle, .tt-chips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 .tt-chips { margin: 0 0 12px; gap: 6px; }
+/* 심화 인사이트 테마 칩: 스크롤해도 상단에 붙어 다른 테마로 바로 이동(작업공간 탭 바 z-index 40 아래) */
+#ins-adv-chips { position: sticky; top: 64px; z-index: 30; padding: 8px 0 4px; margin-bottom: 6px;
+    background: linear-gradient(180deg, var(--tt-bg) 78%, rgba(11,18,32,0)); }
+#ins-adv-chips .tt-chips { margin: 0; }
 .tt-lg-btn, .tt-chip { font: inherit; font-size: 12px; cursor: pointer; color: #cbd5e1; background: transparent;
     border: 1px solid #334155; border-radius: 999px; padding: 3px 10px;
     transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out, border-color 0.15s ease-in-out; }
@@ -9953,11 +9966,11 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .tt-kpi-d--down { color: var(--tt-neg); }
 .tt-kpi-hint { font-size: 12px; color: var(--tt-sub); }
 @media (max-width: 1279px) {
-    .tt-card--L { grid-column: span 12; }
+    .tt-card--L, .tt-card--F { grid-column: span 12; }
     .tt-card--M, .tt-card--S { grid-column: span 6; }
 }
 @media (max-width: 899px) {
-    .tt-card, .tt-card--L, .tt-card--M, .tt-card--S { grid-column: span 12; }
+    .tt-card, .tt-card--L, .tt-card--M, .tt-card--S, .tt-card--F { grid-column: span 12; }
     .tt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (prefers-reduced-motion: reduce) { .tt-lg-btn, .tt-chip, .tt-card-evidence > summary { transition: none; } }

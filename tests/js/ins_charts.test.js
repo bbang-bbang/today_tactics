@@ -124,10 +124,16 @@ test("cards_order_packs_rows_without_dense", () => {
     "formation", "hub", "gs", "pv", "aft",
     "subimp", "rest", "rot", "sdep", "sub", "clutch",
     "spp", "weak", "shooting", "gk", "duel"]);
-  const W = { L: 8, M: 6, S: 4 };
-  let row = 0, gaps = 0;
-  for (const c of InsCharts.CARDS) { if (row + W[c.size] > 12) { gaps += 12 - row; row = 0; } row += W[c.size]; }
-  assert.ok(gaps <= 16, `total empty columns ${gaps}`);
+  // 테마가 바뀌면 섹션 제목(12칸) 때문에 새 행에서 시작한다 → 테마 안에서 행이 정확히 12칸으로 닫혀야 한다
+  const W = { F: 12, L: 8, M: 6, S: 4 };
+  let row = 0, gaps = 0, prev = null;
+  for (const c of InsCharts.CARDS) {
+    if (c.theme !== prev) { gaps += row ? 12 - row : 0; row = 0; prev = c.theme; }
+    if (row + W[c.size] > 12) { gaps += 12 - row; row = 0; }
+    row += W[c.size];
+  }
+  gaps += row ? 12 - row : 0;
+  assert.equal(gaps, 0, `빈 칸 ${gaps}칸 — 테마별로 행이 12칸으로 닫혀야 함`);
 });
 
 // ── Phase 1b: 카드 6장 ──
