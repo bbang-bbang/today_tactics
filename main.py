@@ -4502,6 +4502,18 @@ def _pn_assemble(conn, ss_id, event_ids, min_passes):
             "share": round(inv / (2 * total), 4) if total else 0.0,
             "made_pg": round(made.get(kid, 0) / n_matches, 1)})
     nodes.sort(key=lambda n: -n["involvement"])
+    # 공식 선수 ID → SofaScore 선수 ID (STEP 28 kleague_player_map, 확정 매핑만) — 선수 분석 모달 연결용
+    sofa = {}
+    if nodes:
+        kids = [n["kid"] for n in nodes]
+        try:
+            sofa = dict(conn.execute(
+                f"SELECT player_kid, sofa_player_id FROM kleague_player_map "
+                f"WHERE sofa_player_id IS NOT NULL AND player_kid IN ({','.join('?' * len(kids))})", kids).fetchall())
+        except sqlite3.OperationalError:
+            sofa = {}   # 매핑 테이블 미생성(구 DB)
+    for n in nodes:
+        n["sofa_id"] = sofa.get(n["kid"])
     by_kid = {n["kid"]: n for n in nodes}
 
     edges = [{"from": a, "to": b, "passes": n, "per_match": round(n / n_matches, 2)}
@@ -4599,7 +4611,7 @@ def get_pass_network():
                 "패스 횟수는 성공한 패스만 포함합니다 (실패 패스·길이·방향 정보 없음)."]
     if out["scope"] == "season":
         if out["matches"] < out["team_matches"]:
-            warnings.insert(0, f"패스 데이터가 {out['matches']}/{out['team_matches']}경기에 있습니다 (경기 다음 날 공개 · 미수집 경기 제외).")
+            warnings.insert(0, f"패스 데이터가 {out['matches']}/{out['team_matches']}경기에 있습니다 (공식 데이터는 경기 1~2일 뒤 공개 · 매주 월·화 05:00 반영).")
         if out["matches"] < 5:
             warnings.insert(0, f"표본이 {out['matches']}경기뿐이라 해석에 주의가 필요합니다.")
     out.update({"ready": True, "team": team_out, "min_passes": min_passes, "warnings": warnings})
@@ -12519,9 +12531,52 @@ def match_retrospective():
     })
 
 
+# 운영 crontab 일정 (weekday 0=월, hour KST) — 서버 `crontab -l` 과 맞춰 둘 것.
+#   월 05:00 update_data.py --days 14 (전체) / 화 05:00 update_data.py --official-only (공식 API 미공개분)
+_CRON_UPDATE_SLOTS = ((0, 5, "full"), (1, 5, "official"))
+_UPDATE_STATUS_FILE = os.path.join(BASE_DIR, ".update_status.json")
+# update_data.py STEP 번호 → 배지 툴팁용 이름 (사용자에게 STEP 번호 대신 노출)
+_STEP_LABELS = {3: "라인업", 4: "K1 선수 경기 스탯", 5: "K2 선수 경기 스탯", 6: "히트맵", 7: "K1 득점·카드", 8: "K2 득점·카드",
+                9: "경기장", 10: "날씨", 11: "선수 정보", 12: "포털 선수 명단", 13: "선수 신체정보", 14: "평균 위치·슈팅맵",
+                15: "포메이션", 16: "포털 라인업", 17: "라운드", 18: "세부 포지션", 19: "선수 소속 정규화", 20: "수집 감사",
+                21: "공식 득점·카드·교체", 22: "패스 네트워크", 23: "라인업 복원", 24: "공식 히트맵", 25: "PK 보정",
+                26: "PO 분리", 27: "공식 선수 기록", 28: "선수 ID 매핑"}
+
+
+def _next_cron_run(now=None):
+    now = now or datetime.now(_KST)
+    best = None
+    for wd, hr, _mode in _CRON_UPDATE_SLOTS:
+        t = (now + timedelta(days=(wd - now.weekday()) % 7)).replace(hour=hr, minute=0, second=0, microsecond=0)
+        if t <= now:
+            t += timedelta(days=7)
+        best = t if best is None or t < best else best
+    return best.strftime("%Y-%m-%d %H:%M KST")
+
+
 @app.route("/api/update-status")
 def get_update_status():
-    return jsonify(_UPDATE_STATUS)
+    """헤더 신선도 배지용. 내장 스케줄러가 돌았으면 그 상태를, 아니면(운영 = crontab 구동)
+    update_data.py 가 남긴 상태 파일과 crontab 일정으로 응답한다."""
+    if _UPDATE_STATUS["last_run"] or _UPDATE_STATUS["running"]:
+        return jsonify(_UPDATE_STATUS)
+    out = {"added": 0, "last_msg": "", "last_result": None, "last_run": None, "running": False,
+           "next_run": _next_cron_run(), "source": "cron"}
+    try:
+        with open(_UPDATE_STATUS_FILE, encoding="utf-8") as f:
+            st = json.load(f)
+        if isinstance(st, dict) and isinstance(st.get("last_run"), str):
+            out["last_run"] = st["last_run"][:32]
+            res = st.get("last_result")
+            out["last_result"] = res if res in ("success", "partial", "error") else None
+            unc = [int(n) for n in (st.get("uncovered") or []) if isinstance(n, int)]
+            if out["last_result"] == "partial" and unc:
+                out["last_msg"] = "·".join(_STEP_LABELS.get(n, f"STEP {n}") for n in unc) + " 수집 실패"
+            elif out["last_result"] == "error":
+                out["last_msg"] = "기본 경기 결과 갱신 실패"
+    except (OSError, ValueError):
+        pass
+    return jsonify(out)
 
 
 @app.route("/api/cache-invalidate")

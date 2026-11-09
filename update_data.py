@@ -56,6 +56,35 @@ EXIT_PARTIAL = 2             # main.py 스케줄러가 'partial'로 기록 (캐�
 # --official-only 에서 실행할 STEP (K리그 공식 API 수집 + 공백 감사). 순서는 전체 목록 순서를 따른다.
 OFFICIAL_STEPS = (21, 22, 25, 27, 28, 24, 20)
 
+# SofaScore STEP이 실패해도 같은 데이터를 공식/포털 소스로 채우는 대체 STEP.
+# 대체 STEP이 같은 실행에서 성공했으면 화면 배지에서는 '미수집'으로 보지 않는다(로그·종료 코드는 그대로 부분 실패).
+RECOVERED_BY = {3: 23, 6: 24, 7: 21, 8: 21}
+
+# 실행 결과 상태 파일 — 운영은 crontab으로 돌아 main.py 메모리 상태(_UPDATE_STATUS)가 비므로
+# /api/update-status 가 이 파일을 읽어 헤더 신선도 배지에 쓴다. (gitignored)
+STATUS_FILE = BASE / ".update_status.json"
+
+
+def write_status(mode, failures, uncovered, critical_failed, started):
+    import json
+    from datetime import datetime, timedelta, timezone
+    kst = timezone(timedelta(hours=9))
+    data = {
+        "last_run": datetime.fromtimestamp(started, kst).strftime("%Y-%m-%d %H:%M KST"),
+        "finished": datetime.now(kst).strftime("%Y-%m-%d %H:%M KST"),
+        "mode": mode,
+        "last_result": "error" if critical_failed else ("partial" if uncovered else "success"),
+        "failures": failures,
+        "uncovered": uncovered,
+    }
+    try:
+        tmp = STATUS_FILE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, STATUS_FILE)
+        print(f"  ✓ 상태 파일 기록 ({data['last_result']})")
+    except OSError as e:
+        print(f"  (상태 파일 기록 실패: {e})")
+
 
 def run_step(step_no, label, cmd, fail_ok=False):
     """STEP 1개 실행. 반환값은 항상 '실제 성공 여부'다 (fail_ok와 무관).
@@ -101,6 +130,7 @@ def main():
 
     t_total = time.time()
     failures = []
+    succeeded = set()
 
     steps = [
         (0, "K리그 공식 API → JSON",
@@ -199,13 +229,20 @@ def main():
             break
         if not ok:
             failures.append(no)
+        else:
+            succeeded.add(no)
 
     print(f"\n#### 완료 — {time.time()-t_total:.1f}s ####")
     critical_failed = any(n in CRITICAL_STEPS for n in failures)
+    uncovered = [n for n in failures if RECOVERED_BY.get(n) not in succeeded]
     if failures:
         print(f"  실패 STEP: {failures}")
+        recovered = [n for n in failures if n not in uncovered]
+        if recovered:
+            print(f"  대체 STEP으로 보완됨: {recovered}")
     else:
         print("  모든 STEP 정상")
+    write_status("official" if args.official_only else "full", failures, uncovered, critical_failed, t_total)
 
     # API 캐시 무효화 — 신규 매치 반영을 위해 실행 중인 Flask 서버에 hit.
     # prediction-backtest, round-predictions, schedule, rounds 캐시 리셋.

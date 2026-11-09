@@ -4746,6 +4746,14 @@ body {
 .pn-box { padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); min-width: 0; }
 .pn-box h4 { margin: 0 0 6px; font-size: 0.8rem; font-weight: 700; color: var(--pn-accent); }
 .pn-sel { border-color: rgba(253,230,138,0.45); }
+.pn-sel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.pn-sel-head h4 { margin-bottom: 6px; }
+.pn-open-player { flex: none; font: inherit; font-size: 0.75rem; font-weight: 700; color: #1a1030; background: #fde68a;
+    border: 1px solid #fde68a; border-radius: 6px; padding: 3px 9px; cursor: pointer; transition: background 0.15s ease-in-out, transform 0.15s ease-in-out; }
+.pn-open-player:hover { background: #fef3c7; }
+.pn-open-player:active { transform: translateY(1px); }
+.pn-open-player:focus-visible { outline: 2px solid #fde68a; outline-offset: 2px; }
+.pn-open-na { flex: none; font-size: 0.72rem; }
 .pn-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .pn-note { padding: 7px 9px; border-radius: 6px; background: rgba(167,139,250,0.08); border-left: 3px solid var(--pn-accent); }
 .pn-note-dependence { border-left-color: #fbbf77; background: rgba(251,191,119,0.08); }

@@ -52,7 +52,7 @@
 
   function renderEmpty(d) {
     const msg = d && d.reason === "no_pass_data"
-      ? "이 팀·시즌의 패스 데이터가 아직 없습니다. 패스 데이터는 경기 다음 날 공개되며, 수집 전일 수도 있습니다."
+      ? "이 팀·시즌의 패스 데이터가 아직 없습니다. K리그 공식 패스 데이터는 경기 1~2일 뒤 공개되며, 매주 월·화 05:00에 반영됩니다."
       : "패스 네트워크 데이터를 표시할 수 없습니다.";
     root.innerHTML = `<div class="pn-empty" role="status">${esc(msg)}</div>`;
   }
@@ -195,7 +195,10 @@
       const out = d.edges.filter((e) => e.from === s.kid).sort((a, b) => b.passes - a.passes).slice(0, 4);
       const inn = d.edges.filter((e) => e.to === s.kid).sort((a, b) => b.passes - a.passes).slice(0, 4);
       const li = (arr, key) => arr.map((e) => `<li>${nm(e[key])} <span class="pn-val">${e.passes}회</span></li>`).join("") || `<li class="pn-muted">없음</li>`;
-      selHtml = `<section class="pn-box pn-sel"><h4>선택: ${esc(s.name)} <span class="pn-muted">${esc(POS_KO[s.pos] || "")} · ${s.matches}경기 출전</span></h4>
+      const open = s.sofa_id
+        ? `<button type="button" class="pn-open-player" data-pn-player="${Number(s.sofa_id)}" aria-label="${esc(s.name)} 선수 분석 열기">선수 분석 열기 →</button>`
+        : `<span class="pn-muted pn-open-na" title="공식 선수 ID와 선수 분석 데이터의 매핑이 아직 확정되지 않았습니다">선수 분석 연결 없음</span>`;
+      selHtml = `<section class="pn-box pn-sel"><div class="pn-sel-head"><h4>선택: ${esc(s.name)} <span class="pn-muted">${esc(POS_KO[s.pos] || "")} · ${s.matches}경기 출전</span></h4>${open}</div>
         <div class="pn-cols"><div><div class="pn-sub">가장 많이 패스한 대상</div><ul class="pn-list">${li(out, "to")}</ul></div>
         <div><div class="pn-sub">가장 많이 받은 상대</div><ul class="pn-list">${li(inn, "from")}</ul></div></div></section>`;
     }
@@ -223,6 +226,11 @@
         if (!state.eventId) { state.mode = "season"; return; }
       }
       load();
+      return;
+    }
+    const op = e.target.closest("[data-pn-player]");
+    if (op) {   // player_analytics.js 모달(z-index가 팀 분석 모달 위)을 연다
+      document.dispatchEvent(new CustomEvent("playerSelected", { detail: { playerId: +op.dataset.pnPlayer } }));
       return;
     }
     const node = e.target.closest("[data-pn-node]");

@@ -340,6 +340,10 @@ qa('pass-network 노드 share 합 ≈ 1', lambda: assert_(abs(sum(n['share'] for
 qa('pass-network 잘못된 입력 400/404', lambda: assert_(_brief_status('/api/pass-network?teamId=zzz') == 400 and _brief_status('/api/pass-network?teamId=ulsan&year=abc') == 400
     and _brief_status("/api/pass-network?teamId=ulsan&eventId=x'+OR+1=1--") == 400 and _brief_status('/api/pass-network?teamId=ulsan&eventId=1') == 404))
 qa('pass-network/matches 구조', lambda: assert_(get(f"/api/pass-network/matches?teamId=ulsan&year={d_pn['year']}")['matches'] and _brief_status('/api/pass-network/matches?teamId=ulsan') == 400))
+qa('pass-network 노드 sofa_id 매핑 ≥ 80%', lambda: assert_(all('sofa_id' in n for n in d_pn['nodes'])
+    and sum(1 for n in d_pn['nodes'] if n['sofa_id']) >= 0.8 * len(d_pn['nodes']), f"{sum(1 for n in d_pn['nodes'] if n['sofa_id'])}/{len(d_pn['nodes'])}"))
+_us = get('/api/update-status')
+qa('update-status next_run 존재 (crontab 구동 시 상태 파일·일정 기반)', lambda: assert_(_us.get('next_run') or _us.get('running'), str(_us)))
 
 cur.execute('SELECT COUNT(*) FROM match_player_stats WHERE expected_goals IS NOT NULL')
 xg = cur.fetchone()[0]

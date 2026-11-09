@@ -9,6 +9,7 @@
 **상세는 `checklist/work-log-2026-11-09.md`.** 요약:
 - ✅ 11/9 05:00 크론 정상 — 실패 STEP [3](SofaScore 라인업 403, 예상됨·STEP 23이 13경기 복원)만. STEP 23~28 OK, STEP 26 PO 신규 0·K1 잔류 0(QA 실패 1건 해소 조건 충족), 03:00 백업 OK, `/health` 200.
 - ✅ 주말 경기 공식 데이터 미공개분(히트맵 10·패스 네트워크 7·PK 28) → **화 05:00 크론 `update_data.py --official-only` 추가**(backlog P1 '공식 API 미공개분 주중 재수집 크론'). 11/10(화) 첫 실행이 주말분을 채움 → 11/10 `update.log`에서 STEP 22·24 미공개 감소 확인.
+- ✅ 보완: **헤더 신선도 배지 복구**(운영에서 항상 '데이터 기준 미확인'이던 버그 — `update_data.py`가 `.update_status.json` 기록, `/api/update-status`가 읽음, 일정은 main.py `_CRON_UPDATE_SLOTS` = 서버 crontab과 동기 유지) · **패스 네트워크 선택 선수 → 선수 분석 모달 버튼**(매핑 97.7%). QA 180/180.
 - ⏳ 11/8 커밋 nginx `/static/dev/` 404 → **운영 nginx 재로드 필요(root 콘솔)**.
 
 ## 0-0. 🖥 2026-11-07 레이아웃 개편 마감
