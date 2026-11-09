@@ -239,6 +239,10 @@ d_bt2 = get('/api/prediction-backtest?league=k2&year=2026')
 qa('backtest K2 n_total>0',   lambda: assert_(d_bt2['n_total'] > 0))
 qa('backtest K2 hit>33%',     lambda: assert_(d_bt2['hit_1x2_pct'] > 33.3, f"{d_bt2['hit_1x2_pct']}%"))
 qa('backtest K2 brier<0.35',  lambda: assert_(d_bt2['brier_score'] < 0.35, f"{d_bt2['brier_score']}"))
+qa('backtest 기준선 3종 + edge 일관', lambda: assert_(
+    set(d_bt2.get('baselines', {})) == {'home', 'ppg', 'rate'}
+    and abs(d_bt2['edge_vs_best_pct'] - (d_bt2['hit_1x2_pct'] - max(b['hit_pct'] for b in d_bt2['baselines'].values()))) <= 0.2,
+    f"{d_bt2.get('edge_vs_best_pct')}"))
 
 d_bt1 = get('/api/prediction-backtest?league=k1&year=2026')
 qa('backtest K1 n_total>0',   lambda: assert_(d_bt1['n_total'] > 0))

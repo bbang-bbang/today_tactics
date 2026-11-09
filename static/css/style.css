@@ -4240,6 +4240,29 @@ body {
     font-size: 0.62rem;
 }
 
+/* 기준선 비교 줄 */
+.pbt-baseline {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+.pbt-bl-head { color: #cbd5e1; font-weight: 600; }
+.pbt-bl-head b { font-variant-numeric: tabular-nums; }
+.pbt-up   { color: #7bed9f; }
+.pbt-down { color: #f87171; }
+.pbt-bl-verdict { color: #94a3b8; }
+.pbt-bl {
+    cursor: help;
+    border-bottom: 1px dotted rgba(148,163,184,0.5);
+}
+.pbt-bl b { color: #e3eaff; font-variant-numeric: tabular-nums; }
+
 /* 라운드별 적중률 차트 */
 .pred-backtest-chart {
     width: 100%;

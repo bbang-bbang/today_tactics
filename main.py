@@ -10532,16 +10532,72 @@ def prediction_backtest():
     per_round_agg = {}  # {round: {"hit": n, "total": n}}
     match_records = []  # 잔차 분석용 — 매치별 (brier, pred, actual, conf) 누적
 
+    # ── 기준선 (같은 경기 집합·같은 시점 정보만 사용 — 모델이 이걸 못 이기면 예측 확률은 참고용) ──
+    #   home : 항상 홈 승
+    #   ppg  : 경기 전 시즌 승점률(같은 대회) 높은 팀 승, 같으면 홈
+    #   rate : 경기 전 리그 승/무/패 분포를 그대로 확률로 (이전 시즌 분포를 30경기 가중 사전값으로)
+    _outs = ("home", "draw", "away")
+    first_ts = games[0][1] if games else None
+    prior = {"home": 1.0, "draw": 1.0, "away": 1.0}
+    if first_ts is not None:
+        cur.execute("""
+            SELECT SUM(home_score > away_score), SUM(home_score = away_score), SUM(home_score < away_score)
+            FROM events
+            WHERE tournament_id=? AND date_ts < ?
+              AND home_score IS NOT NULL AND away_score IS NOT NULL
+        """, (tid, first_ts))
+        _ph, _pd, _pa = cur.fetchone()
+        _pn = (_ph or 0) + (_pd or 0) + (_pa or 0)
+        if _pn:
+            prior = {"home": (_ph or 0) / _pn, "draw": (_pd or 0) / _pn, "away": (_pa or 0) / _pn}
+    _PRIOR_W = 30.0
+    rate_cnt = {k: 0 for k in _outs}
+    ppg_tbl = {}  # team_id -> [points, games]
+    bl_hit = {"home": 0, "ppg": 0, "rate": 0}
+    bl_brier = {"home": 0.0, "ppg": 0.0, "rate": 0.0}
+    bl_logloss = {"rate": 0.0}
+    sum_logloss = 0.0
+
+    def _brier3(p, actual):
+        return sum((p[k] - (1.0 if k == actual else 0.0)) ** 2 for k in _outs) / 3
+
     for g in games:
         gid, ts, hid, aid, hs, as_, rnd = g
+        actual = "home" if hs > as_ else "away" if hs < as_ else "draw"
+
+        # 기준선 예측은 이 경기 결과를 반영하기 전에 계산
+        def _ppg(t):
+            pts, n = ppg_tbl.get(t, (0, 0))
+            return pts / n if n else 0.0
+        ppg_pick = "away" if _ppg(aid) > _ppg(hid) else "home"
+        _rn = sum(rate_cnt.values()) + _PRIOR_W
+        rate_p = {k: (rate_cnt[k] + _PRIOR_W * prior[k]) / _rn for k in _outs}
+        rate_pick = max(rate_p, key=rate_p.get)
+
+        # 결과 반영 (예측 스킵 경기도 순위·분포에는 포함 — 실제로 그 시점에 알려진 정보)
+        rate_cnt[actual] += 1
+        for t, pts in ((hid, 3 if actual == "home" else 1 if actual == "draw" else 0),
+                       (aid, 3 if actual == "away" else 1 if actual == "draw" else 0)):
+            row = ppg_tbl.setdefault(t, [0, 0])
+            row[0] += pts
+            row[1] += 1
+
         pred = _predict_core(cur, hid, aid, tid, ts, year)
         if not pred:
             n_skipped += 1
             continue
         n_total += 1
 
-        actual = "home" if hs > as_ else "away" if hs < as_ else "draw"
+        bl_hit["home"] += actual == "home"
+        bl_hit["ppg"]  += actual == ppg_pick
+        bl_hit["rate"] += actual == rate_pick
+        bl_brier["home"] += _brier3({k: 1.0 if k == "home" else 0.0 for k in _outs}, actual)
+        bl_brier["ppg"]  += _brier3({k: 1.0 if k == ppg_pick else 0.0 for k in _outs}, actual)
+        bl_brier["rate"] += _brier3(rate_p, actual)
+        bl_logloss["rate"] += -math.log(max(rate_p[actual], 1e-6))
+
         outcome_p = {"home": pred["pred_home"], "draw": pred["pred_draw"], "away": pred["pred_away"]}
+        sum_logloss += -math.log(max(outcome_p[actual] / 100.0, 1e-6))
         pred_outcome = max(outcome_p, key=outcome_p.get)
 
         if pred_outcome == actual:
@@ -10698,6 +10754,25 @@ def prediction_backtest():
             "mae_lambda_home":   round(sum_mae_h / n_total, 2),
             "mae_lambda_away":   round(sum_mae_a / n_total, 2),
             "baseline_random":   33.3,
+            "log_loss":          round(sum_logloss / n_total, 3),
+            # 같은 n_total 경기에서의 기준선 — 모델 지표와 직접 비교 가능
+            "baselines": {
+                "home": {"label": "항상 홈 승",
+                         "hit_pct": round(bl_hit["home"] / n_total * 100, 1),
+                         "brier": round(bl_brier["home"] / n_total, 3)},
+                "ppg":  {"label": "승점률 높은 팀 승",
+                         "hit_pct": round(bl_hit["ppg"] / n_total * 100, 1),
+                         "brier": round(bl_brier["ppg"] / n_total, 3)},
+                "rate": {"label": "리그 승·무·패 분포",
+                         "hit_pct": round(bl_hit["rate"] / n_total * 100, 1),
+                         "brier": round(bl_brier["rate"] / n_total, 3),
+                         "log_loss": round(bl_logloss["rate"] / n_total, 3)},
+            },
+            # Brier skill score: 1 - 모델/분포 기준선. >0 이면 확률이 기준선보다 정보가 있음
+            "brier_skill":       round(1 - (sum_brier / n_total) / (bl_brier["rate"] / n_total), 3)
+                                 if bl_brier["rate"] else None,
+            "edge_vs_best_pct":  round(n_hit_1x2 / n_total * 100
+                                       - max(bl_hit.values()) / n_total * 100, 1),
             "predicted_outcomes":  {"home": n_pred_home_wins, "draw": n_pred_draws, "away": n_pred_away_wins},
             "actual_outcomes":     {"home": n_actual_home_wins, "draw": n_actual_draws, "away": n_actual_away_wins},
             "by_confidence":     {

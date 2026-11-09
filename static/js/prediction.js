@@ -499,8 +499,37 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <span class="pbt-stat"><span class="pbt-v">${d.top3_score_pct}%</span><span class="pbt-k">TOP3</span></span>
             <span class="pbt-stat"><span class="pbt-v">${d.brier_score}</span><span class="pbt-k">Brier</span></span>
             <span class="pbt-sub">${d.n_total}경기 rolling · 무작위 ${d.baseline_random}%</span>
+            ${backtestBaselineHtml(d)}
             ${backtestChartHtml(d.per_round)}
             ${backtestWorstHtml(d.worst_residuals)}
+        </div>`;
+    }
+
+    // 기준선 비교 — 같은 경기·같은 시점 정보로 만든 단순 규칙과 나란히 (모델이 정말 정보를 더하는지)
+    function backtestBaselineHtml(d) {
+        const b = d.baselines;
+        if (!b || typeof d.edge_vs_best_pct !== "number") return "";
+        const edge = d.edge_vs_best_pct;
+        const up = edge > 0;
+        const edgeTxt = `${up ? "▲ +" : edge < 0 ? "▼ " : ""}${edge}%p`;
+        const verdict = edge >= 3 ? "단순 규칙보다 낫습니다"
+                      : edge > -3 ? "단순 규칙과 비슷 — 확률은 참고용"
+                      : "단순 규칙보다 못함 — 확률은 참고용";
+        const tips = {
+            home: "모든 경기를 홈 승으로 찍었을 때",
+            ppg:  "경기 직전 시즌 승점률이 높은 팀 승으로 찍었을 때 (같으면 홈)",
+            rate: "경기 직전까지의 리그 승·무·패 비율을 그대로 확률로 썼을 때 (이전 시즌 분포로 시작)",
+        };
+        const chips = ["home", "ppg", "rate"].filter(k => b[k]).map(k =>
+            `<span class="pbt-bl" title="${ttEsc(tips[k])} · Brier ${b[k].brier}">${ttEsc(b[k].label)} <b>${b[k].hit_pct}%</b></span>`
+        ).join("");
+        const bss = typeof d.brier_skill === "number"
+            ? `<span class="pbt-bl" title="Brier skill score = 1 − 모델 Brier ÷ 리그 분포 Brier. 0보다 크면 확률 자체가 기준선보다 정보가 있음">확률 개선 <b>${d.brier_skill > 0 ? "+" : ""}${Math.round(d.brier_skill * 1000) / 10}%</b></span>`
+            : "";
+        return `<div class="pbt-baseline">
+            <span class="pbt-bl-head">기준선 대비 <b class="${up ? "pbt-up" : "pbt-down"}">${edgeTxt}</b></span>
+            <span class="pbt-bl-verdict">${verdict}</span>
+            ${chips}${bss}
         </div>`;
     }
 
