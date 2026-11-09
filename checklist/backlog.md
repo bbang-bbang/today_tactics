@@ -21,7 +21,11 @@
 - 11/3에 저장형 XSS 경로(saves·squads·player-status 서버 검증 + 화면 125곳 이스케이프)는 막았지만, nginx CSP가 `script-src 'unsafe-inline'`이라 이스케이프 누락이 한 곳이라도 생기면 다시 실행된다. 인라인 이벤트 핸들러(`onerror=` 등)와 인라인 `<script>`를 걷어내고 CSP를 `'self'`로 좁히는 것이 근본 대책.
 - 공개 모드라 누구나 스쿼드·저장을 무제한 생성 가능(요청당 512KB 제한만) — 필요하면 IP당 빈도 제한 또는 파일 개수 상한.
 
-### [ ] ⏱ 공식 API 미공개분 주중 재수집 크론 (2026-11-09 등록)
+### [x] ⏱ 공식 API 미공개분 주중 재수집 크론 (2026-11-09 등록 → 같은 날 구현)
+- ✅ **구현**: `update_data.py --official-only` — STEP 21·22·25·27·28·24 + 감사 20만 실행(`OFFICIAL_STEPS`), 캐시 세대 마커·무효화·종료 코드(0/2)는 전체 실행과 동일. `--skip-heatmap`과 조합 가능(24 제외). 실제 크롤러 없이 STEP 선택만 dry-run 검증.
+- ✅ **운영은 선택지 ②(crontab)** — 확인 결과 운영은 내장 스케줄러가 아니라 crontab으로 돈다(서비스 `FLASK_DEBUG=0`이 문자열이라 `_scheduler_loop` 미기동). 추가할 줄: `0 5 * * 2 cd /opt/today_tactics && venv/bin/python update_data.py --official-only >> /var/log/today_tactics/update.log 2>&1` (화 05:00 — 토·일 경기는 월요일 중 공개).
+- 수요일 경기는 다음 월요일 정기 실행이 채움(공백 ≤4일)이라 주 1회 추가로 충분.
+- 아래는 등록 당시 기록.
 - **문제**: 정기 크론이 주 1회(월 05:00)인데, K리그 공식 API의 히트맵·패스 네트워크·PK 슈팅·선수 경기 기록은 경기 1~2일 뒤 공개된다. 그래서 토·일 경기는 월요일 실행 때 '미공개'로 남고 **다음 주 월요일까지 화면에 비어 있다**(11/9 실행: 히트맵 미공개 10·패스 네트워크 7·PK 28).
 - **안**: 화(또는 수) 새벽에 공식 API STEP만 도는 가벼운 실행 추가 — STEP 21·22·24·25·27(+28 매핑) + 캐시 무효화. SofaScore STEP은 제외(차단 중이라 시간만 소모).
 - **구현 선택지**: ① `update_data.py`에 `--official-only` 플래그 + `main.py` `_scheduler_loop`에 화요일 슬롯 ② 운영 crontab에 별도 한 줄. ①이 캐시 무효화·`last_result` 기록을 재사용해 일관적.
@@ -73,7 +77,7 @@
 3. **하지 않음**: 안티봇 챌린지 우회(스텔스/프록시 등) — ToS·차단 심화 위험, 정책상 부적절.
 **✅ 운영 서버 확인 완료 (2026-11-02, SSH 읽기 전용 + 사용자가 실행한 `update_data.py --days 14` 로그)**:
 - **운영의 SofaScore 차단은 부분적**: STEP 20 감사(운영 기준) — 득점·카드·교체·슈팅맵·평균 위치는 정상(공백 0~8일), 선수 스탯은 K1 10/24·K2 10/31까지, **라인업·히트맵만 9/20 이후 막힘(41일)**. 로컬은 8월부터 전부 중단이라 환경별로 차단 범위가 다르다(앞서 '운영도 로컬처럼 전부 막힘'이라 한 것은 부분적으로만 맞았다). 직전 정기 실행(10/26)은 `라인업 없음 {'_status': 403}` 30경기가 전부 `→ OK`로 끝나던 조용한 실패가 확인됨(가시화 적용 후 STEP 3은 `FAIL (exit 3)`로 정직하게 표시).
-- **운영 크론**(서버 `crontab`): 월 05:00 `update_data.py --days 14`(로그 `/var/log/today_tactics/update.log`, 일 단위 로테이션 → 로테이션 파일에서 확인), 월 02:00 `fetch_next_round.py`, 매일 03:00 `deploy/backup.sh`, 04:00 certbot. 내장 스케줄러는 꺼져 있음(`next_run: null`). 서비스: gunicorn 3 workers, 사용자 `rocky`, 앱 경로 `/opt/today_tactics`, **정식 도메인 `suwon.today-tactics.co.kr`**(루트 도메인은 A 레코드 없음).
+- **운영 크론**(서버 `crontab`): 월 05:00 `update_data.py --days 14`(로그 `/var/log/today_tactics/update.log`, 일 단위 로테이션 → 로테이션 파일에서 확인), 화 05:00 `update_data.py --official-only`(2026-11-09 추가, 공식 API 미공개분 재수집·같은 로그), 월 02:00 `fetch_next_round.py`, 매일 03:00 `deploy/backup.sh`, 04:00 certbot. 내장 스케줄러는 꺼져 있음(`next_run: null`). 서비스: gunicorn 3 workers, 사용자 `rocky`, 앱 경로 `/opt/today_tactics`, **정식 도메인 `suwon.today-tactics.co.kr`**(루트 도메인은 A 레코드 없음).
 - **첫 동기화 결과**(약 40분): STEP 15(포털 formation)가 17분, STEP 22(패스 1,636경기)가 16분. 득점·카드·교체 복구 +41/+49/+141(15경기), 패스 엣지 376,308행(로컬과 동일), 종료 코드 부분 실패(STEP 3·20). 10/31·11/1 14경기 반영.
 - **🔎 라인업·히트맵 복구 조사 (2026-11-02, 읽기 전용 · 운영 DB 스냅샷 기준)**:
   - **히트맵 = 공식 `getHeatmapData.do`로 복구 가능**. multipart `MEET_YEAR/MEET_SEQ/GAME_ID/PLAYER_LIST(K-ID, 콤마)/H_GK_PLAYER`(+선택 `PERIOD_ID`) → `data.coordinates[{START_POINT_X, START_POINT_Y, PERIOD_ID, PASS_YN_CD}]`. 좌표는 **경기장 절대좌표(0~100)** → 팀·피리어드별 공격 방향(그 피리어드 GK 평균 x<50 ⇒ 오른쪽 공격)으로 변환: 오른쪽 공격 `(x, 100−y)`, 왼쪽 공격 `(100−x, y)` = SofaScore 좌표계. 방향은 경기마다 다름(4경기 중 1경기 반대) → 경기별 판별 필수. **SofaScore 대조 45명(K1·K2, 2025~26)**: 점 개수 비율 중앙값 0.96, 평균 위치 차 |x| 1.0·|y| 1.5, 분산 비율 1.03/1.05 → 사실상 동일 원천. 공백 기간(9/20~) 표본 12경기 중 11경기 존재(10/31 1경기 0건 — 다음 날 공개 지연 추정).

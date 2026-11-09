@@ -22,6 +22,10 @@ STEP 28 공식 선수 ID ↔ SofaScore 선수 ID 매핑 → kleague_player_map
 STEP 26 K2 PO·승강 PO를 K1(410)에서 분리 (tournament_id 9410, 멱등)
 STEP 20 수집 공백 감사 (마지막에 실행; 종료 코드 0 정상 / 1 치명 / 2 부분 실패)
 
+--official-only: K리그 공식 API STEP(21·22·25·27·28·24)과 공백 감사(20)만 실행.
+  공식 데이터는 경기 1~2일 뒤 공개돼 월요일 정기 실행 때 주말 경기분이 '미공개'로 남는다 →
+  주중(화) 크론에서 이 모드로 미공개분만 다시 채운다. 모든 STEP이 '데이터 없는 경기만' 처리해 멱등.
+
 레거시는 update_data.py.legacy_*.bak에 백업.
 """
 
@@ -48,6 +52,9 @@ DEFAULT_DAYS = 14  # 매주 cron이라 14일이면 충분 + 재시도 여유
 CRITICAL_STEPS = (0, 1, 2)   # 실패 시 후속 STEP이 의미 없어 중단
 EXIT_CRITICAL = 1
 EXIT_PARTIAL = 2             # main.py 스케줄러가 'partial'로 기록 (캐시는 정상 갱신)
+
+# --official-only 에서 실행할 STEP (K리그 공식 API 수집 + 공백 감사). 순서는 전체 목록 순서를 따른다.
+OFFICIAL_STEPS = (21, 22, 25, 27, 28, 24, 20)
 
 
 def run_step(step_no, label, cmd, fail_ok=False):
@@ -84,10 +91,13 @@ def main():
                     help="mps 백필 스킵 (이미 채워졌고 빠른 점검만 필요할 때)")
     ap.add_argument("--skip-heatmap", action="store_true",
                     help="히트맵 스킵")
+    ap.add_argument("--official-only", action="store_true",
+                    help="K리그 공식 API STEP(21·22·25·27·28·24)+감사(20)만 — 주중 미공개분 재수집용")
     args = ap.parse_args()
 
     print("\n#### update_data.py — K1+K2 통합 증분 ####")
-    print(f"  days={args.days}  skip_mps={args.skip_mps}  skip_heatmap={args.skip_heatmap}")
+    print(f"  days={args.days}  skip_mps={args.skip_mps}  skip_heatmap={args.skip_heatmap}"
+          f"  official_only={args.official_only}")
 
     t_total = time.time()
     failures = []
@@ -175,6 +185,8 @@ def main():
         (20, "수집 공백 감사 (소스별 마지막 정상 수집일 — 차단/중단 조기 발견)",
             [PYTHON, str(BASE/"analysis"/"audit_collection_gaps.py"), "--summary-only"]),
     ]
+    if args.official_only:
+        steps = [s for s in steps if s[0] in OFFICIAL_STEPS]
 
     # STEP 0~2 실패 시 후속 의미 없음 → fail_ok=False (기본).
     # STEP 3~8 부분 실패는 다음 주 재시도로 자가복구되므로 fail_ok=True로 진행.
