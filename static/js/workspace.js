@@ -131,10 +131,19 @@
             b.setAttribute("aria-selected", on ? "true" : "false");
         });
         const ana = $("team-analysis-modal"), cmp = $("team-compare-modal"), ins = $("ws-team-insights");
-        const rec = $("ws-team-recruit");
+        const rec = $("ws-team-recruit"), rev = $("ws-team-review");
         if (ins) ins.classList.toggle("hidden", mode !== "insights");
         if (rec) rec.classList.toggle("hidden", mode !== "recruit");
-        if (mode === "recruit") {
+        if (rev) rev.classList.toggle("hidden", mode !== "review");
+        if (mode === "review") {
+            // 시즌 리뷰: 단일 팀 분석에서 고른 팀 기본 (season_review.js)
+            if (ana) ana.classList.add("hidden");
+            if (cmp) cmp.classList.add("hidden");
+            const sel = $("ta-team-select");
+            lazyLoadSeq(["season_review"]).then(() => {
+                if (_current === "team" && _teamMode === "review" && window.ttSeasonReview) window.ttSeasonReview.show(sel && sel.value);
+            }).catch(lazyFail);
+        } else if (mode === "recruit") {
             // 영입 추천: 단일 팀 분석에서 고른 팀을 기본값으로 (recruit.js)
             if (ana) ana.classList.add("hidden");
             if (cmp) cmp.classList.add("hidden");

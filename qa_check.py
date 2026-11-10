@@ -247,6 +247,14 @@ qa('영입 추천 후보는 다른 팀·조건 충족·점수 0~100', lambda: as
 qa('영입 추천 나이 필터·잘못된 입력', lambda: assert_(
     all((c['age'] or 99) <= 25 for n in get('/api/team-recruit?team=gwangju&max_age=25')['needs'] for c in n['candidates'])
     and _brief_status('/api/team-recruit?team=nope') == 404 and _brief_status('/api/team-recruit?team=suwon&scope=x') == 400))
+d_sr = get('/api/season-review?team=suwon')
+qa('시즌 리뷰 기록 합 일관 (승무패=경기, 순위 흐름 = 경기 수)', lambda: assert_(
+    d_sr['final']['w'] + d_sr['final']['d'] + d_sr['final']['l'] == d_sr['final']['played']
+    and len(d_sr['trajectory']) == d_sr['final']['played']
+    and 1 <= d_sr['final']['rank'] <= d_sr['final']['n_teams']
+    and sum(m['games'] for m in d_sr['monthly']) == d_sr['final']['played']))
+qa('시즌 리뷰 잘못된 입력 404/400', lambda: assert_(
+    _brief_status('/api/season-review?team=nope') == 404 and _brief_status('/api/season-review?team=suwon&year=20x6') == 400))
 d_po = get('/api/promotion-playoff')
 qa('승강 PO 대진 확률 합 = 100 - 미개최', lambda: assert_(
     not d_po.get('ready') or abs(sum(m['prob'] for m in d_po['matchups']) + d_po['no_po_pct'] - 100) <= 1.5,

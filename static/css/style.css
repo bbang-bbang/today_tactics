@@ -8657,6 +8657,62 @@ body.pr-expanded-lock {
 .rc-notes ul { margin: 6px 0 0 16px; padding: 0; }
 @media (max-width: 1100px) { .rc-ctls { margin-left: 0; } .rc-table .rc-sub { display: none; } }
 
+/* ── 시즌 리뷰 (팀 탭) ── */
+.sr-wrap { padding: 4px 8px 16px; color: #e3eaff; font-size: 12px; line-height: 1.5; }
+.sr-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 20px; margin-bottom: 10px; }
+.sr-title { font-size: 16px; font-weight: 700; margin: 0; }
+.sr-ctls { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-left: auto; }
+.sr-muted { color: #94a3b8; font-weight: 400; }
+.sr-warn { padding: 8px 12px; margin-bottom: 10px; border-radius: 6px; background: rgba(250, 204, 21, 0.10);
+    border: 1px solid rgba(250, 204, 21, 0.45); color: #fde68a; }
+.sr-hero { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; margin-bottom: 12px; }
+.sr-tile { min-width: 130px; padding: 10px 14px; border-radius: 8px; background: rgba(15, 25, 45, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.07); }
+.sr-tile-k { color: #94a3b8; font-size: 12px; }
+.sr-tile-v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.sr-unit { font-size: 13px; color: #94a3b8; font-weight: 500; margin-left: 2px; }
+.sr-tile-s { color: #cbd5e1; font-size: 12px; }
+.sr-status { display: flex; align-items: center; margin-left: auto; }
+.sr-badge { padding: 4px 10px; border-radius: 999px; background: rgba(96, 165, 250, 0.14); color: #bfdbfe; border: 1px solid rgba(96, 165, 250, 0.35); }
+.sr-badge-done { background: rgba(123, 237, 159, 0.12); color: #bbf7d0; border-color: rgba(123, 237, 159, 0.35); }
+.sr-card { background: rgba(15, 25, 45, 0.45); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 12px; }
+.sr-card h3 { margin: 0 0 8px; font-size: 13px; color: #e3eaff; }
+.sr-sub { margin: 10px 0 4px; font-size: 12px; color: #cbd5e1; }
+.sr-summary { margin: 0; padding-left: 18px; }
+.sr-summary li { padding: 2px 0; }
+.sr-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sr-grid2 > .sr-card { margin-bottom: 0; }
+.sr-grid2 { margin-bottom: 12px; }
+@media (max-width: 1100px) { .sr-grid2 { grid-template-columns: 1fr; } .sr-status { margin-left: 0; } }
+.sr-svg { width: 100%; height: auto; max-height: 240px; display: block; }
+.sr-grid { stroke: rgba(255, 255, 255, 0.08); stroke-width: 1; }
+.sr-axis { fill: #94a3b8; font-size: 11px; }
+.sr-lbl { fill: #cbd5e1; font-size: 11px; font-weight: 600; }
+.sr-dot { fill: #60a5fa; stroke: #0f1a2e; stroke-width: 2; }
+.sr-hit { fill: transparent; }
+.sr-pt { cursor: default; outline: none; }
+.sr-pt:hover .sr-dot, .sr-pt:focus-visible .sr-dot { r: 6; fill: #bfdbfe; }
+.sr-table-view { margin-top: 6px; color: #94a3b8; }
+.sr-table-view summary { cursor: pointer; color: #cbd5e1; }
+.sr-table-view summary:hover { color: #fff; }
+.sr-table-view summary:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.sr-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.sr-tbl th, .sr-tbl td { padding: 5px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); text-align: left; }
+.sr-tbl thead th { color: #94a3b8; font-weight: 600; }
+.sr-tbl tbody th { color: #cbd5e1; font-weight: 600; }
+.sr-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sr-bar { display: inline-block; width: 54px; height: 6px; margin-right: 6px; vertical-align: middle;
+    background: rgba(255, 255, 255, 0.08); border-radius: 3px; overflow: hidden; }
+.sr-bar i { display: block; height: 100%; background: #60a5fa; }
+.sr-players { list-style: none; margin: 0; padding: 0; }
+.sr-players li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.sr-rank { color: #94a3b8; width: 14px; }
+.sr-score { margin-left: auto; font-weight: 700; color: #7bed9f; font-variant-numeric: tabular-nums; }
+.sr-top { margin: 8px 0 0; }
+.sr-list { list-style: none; margin: 0; padding: 0; }
+.sr-list li { padding: 3px 0; }
+
 /* ── 승강 PO 시나리오 ── */
 .po-scenario { margin: 0 0 10px; }
 .po-card {

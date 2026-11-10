@@ -10537,7 +10537,7 @@ def season_simulation():
     position_counts = {t: [0] * len(team_list) for t in team_list}  # 1위~N위 횟수
 
     for _ in range(n_sim):
-        ranked = _simulate_final_ranking(standings, team_list, pending_probs, _rand)
+        ranked = _simulate_final_ranking(standings, team_list, pending_probs, _rand, st.get("split_set"))
         for pos, t in enumerate(ranked):
             position_counts[t][pos] += 1
 
@@ -10581,8 +10581,44 @@ def season_simulation():
     })
 
 
-def _simulate_final_ranking(standings, team_list, pending_probs, rng):
-    """남은 매치 1회 추첨 → 최종 순위(slug 리스트). 승점 → 득실(λ 누적 근사) → 득점 순."""
+# K리그1 파이널 라운드: 33라운드 뒤 상위 6(파이널 A)·하위 6(파이널 B)으로 나뉘고, 이후 승점과 무관하게
+# A팀이 항상 1~6위, B팀이 7~12위. 메인 순위표는 공식 API라 이미 반영 — 자체 계산(시뮬·승강 PO·시즌 리뷰)용.
+_K1_SPLIT_GAMES = 33
+_K1_SPLIT_TOP = 6
+
+
+def _k1_split_set(games, teams):
+    """games = [(home, away, hs, as_), ...] 날짜순. 모든 팀이 33경기를 넘겼으면 '각 팀 첫 33경기' 기준 상위 6팀 set,
+    아직이면 None. round 정보가 없는 과거 시즌에도 동작(팀별 경기 순서로 판정)."""
+    cnt = {t: 0 for t in teams}
+    for h, a, *_ in games:
+        if h in cnt: cnt[h] += 1
+        if a in cnt: cnt[a] += 1
+    if not cnt or min(cnt.values()) < _K1_SPLIT_GAMES or max(cnt.values()) <= _K1_SPLIT_GAMES:
+        return None
+    seen = {t: 0 for t in teams}
+    tb = {t: [0, 0, 0] for t in teams}
+    for h, a, hs, as_ in games:
+        for t, gf, ga in ((h, hs, as_), (a, as_, hs)):
+            if t not in seen or seen[t] >= _K1_SPLIT_GAMES:
+                continue
+            seen[t] += 1
+            tb[t][0] += 3 if gf > ga else 1 if gf == ga else 0
+            tb[t][1] += gf; tb[t][2] += ga
+    order = sorted(teams, key=lambda t: (-tb[t][0], -(tb[t][1] - tb[t][2]), -tb[t][1]))
+    return set(order[:_K1_SPLIT_TOP])
+
+
+def _apply_split(order, split_set):
+    """승점순 order 를 파이널 A(split_set) 우선으로 재배열. split_set 이 None 이면 그대로."""
+    if not split_set:
+        return order
+    return [t for t in order if t in split_set] + [t for t in order if t not in split_set]
+
+
+def _simulate_final_ranking(standings, team_list, pending_probs, rng, split_set=None):
+    """남은 매치 1회 추첨 → 최종 순위(slug 리스트). 승점 → 득실(λ 누적 근사) → 득점 순.
+    split_set(K1 파이널 A 팀)이 있으면 A팀을 항상 위에 둔다."""
     sim_pts = {t: standings[t]["pts"] for t in team_list}
     sim_gf  = {t: standings[t]["gf"]  for t in team_list}
     sim_ga  = {t: standings[t]["ga"]  for t in team_list}
@@ -10597,7 +10633,7 @@ def _simulate_final_ranking(standings, team_list, pending_probs, rng):
         # 골차는 lam 기반 단순 누적 (정확 골 시뮬은 비용 큼 — tiebreaker용 근사)
         sim_gf[pp["home"]] += pp["lam_home"]; sim_ga[pp["home"]] += pp["lam_away"]
         sim_gf[pp["away"]] += pp["lam_away"]; sim_ga[pp["away"]] += pp["lam_home"]
-    return sorted(team_list, key=lambda t: (-sim_pts[t], -(sim_gf[t] - sim_ga[t]), -sim_gf[t]))
+    return _apply_split(sorted(team_list, key=lambda t: (-sim_pts[t], -(sim_gf[t] - sim_ga[t]), -sim_gf[t])), split_set)
 
 
 def _season_sim_inputs(league):
@@ -10667,9 +10703,14 @@ def _season_sim_inputs(league):
         })
     conn.close()
 
+    split_set = None
+    if league == "k1":   # 파이널 A/B 분리 (33라운드 이후) — 일정은 날짜순
+        split_set = _k1_split_set([(g["home_id"], g["away_id"], g["home_score"], g["away_score"]) for g in finished_games],
+                                  sorted(teams_in_season))
     return {
         "ready": True, "standings": standings, "team_list": sorted(teams_in_season),
         "pending_probs": pending_probs, "finished_games": finished_games, "pending_games": pending_games,
+        "split_set": split_set,
     }
 
 
@@ -10822,7 +10863,7 @@ def promotion_playoff():
         pair_cnt, t12_cnt, x_cnt, promo_cnt = {}, {}, {}, {}
         no_po = 0
         for _ in range(n_sim):
-            r1 = _simulate_final_ranking(k1["standings"], k1["team_list"], k1["pending_probs"], rng)
+            r1 = _simulate_final_ranking(k1["standings"], k1["team_list"], k1["pending_probs"], rng, k1.get("split_set"))
             t12 = r1[11]
             t12_cnt[t12] = t12_cnt.get(t12, 0) + 1
             if t12 == _PO_NO_PO_TEAM:
@@ -10962,6 +11003,221 @@ def promotion_playoff():
                     "k1_avg_goals": round(avg1, 2)},
         "rules": _PO_RULES,
         "pending": {"k1": len(k1["pending_probs"]), "k2": len(k2["pending_probs"])},
+    })
+
+
+# ── 시즌 리뷰 (2026-11-10) ───────────────────────────────────────────────────
+# 팀 한 시즌 결산: 순위 흐름 · 홈/원정·전/후반기 · 월별 · 연속 기록 · 상대별 · 핵심 선수 · 예측 적중.
+# 새 계산은 최소화 — 순위는 경기 결과만으로, 선수는 TOP 퍼포머 종합 점수, 예측은 _predict_core(백테스트와 같은 시점 규칙).
+@app.route("/api/season-review")
+@cached_response(ttl=1800)
+def season_review():
+    slug = (request.args.get("team") or "").strip().lower()
+    info = next((t for t in TEAMS if t["id"] == slug), None)
+    if not info or not info.get("sofascore_id"):
+        return jsonify({"error": "unknown team"}), 404
+    year = request.args.get("year") or _current_season()
+    if not (year.isdigit() and len(year) == 4):
+        return jsonify({"error": "invalid year"}), 400
+    ss = info["sofascore_id"]
+    SS_INFO = {t["sofascore_id"]: t for t in TEAMS if t.get("sofascore_id")}
+    def tname(tid):
+        t = SS_INFO.get(tid, {})
+        return t.get("short") or t.get("name") or str(tid)
+
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    try:
+        ys, ye = _year_range(year)
+        # 팀이 그 시즌 뛴 리그(410/777) — 경기 수가 많은 쪽
+        lg = cur.execute("""SELECT tournament_id, COUNT(*) FROM events WHERE tournament_id IN (410, 777)
+                            AND (home_team_id=? OR away_team_id=?) AND date_ts >= ? AND date_ts < ?
+                            GROUP BY 1 ORDER BY 2 DESC LIMIT 1""", (ss, ss, ys, ye)).fetchone()
+        if not lg:
+            return jsonify({"error": "no games", "year": year}), 404
+        tid = lg[0]
+        games = cur.execute("""SELECT id, date_ts, round, home_team_id, away_team_id, home_score, away_score FROM events
+                               WHERE tournament_id=? AND date_ts >= ? AND date_ts < ? AND home_score IS NOT NULL AND away_score IS NOT NULL
+                               ORDER BY date_ts""", (tid, ys, ye)).fetchall()
+        pending = cur.execute("""SELECT COUNT(*) FROM events WHERE tournament_id=? AND date_ts >= ? AND date_ts < ?
+                                 AND home_score IS NULL AND (home_team_id=? OR away_team_id=?)""", (tid, ys, ye, ss, ss)).fetchone()[0]
+        # 데이터 완결성: 공식 일정(kleague_schedule)의 종료 경기 수와 비교 — 과거 K1 시즌은 events 누락이 있다(2026-11-10 점검)
+        try:
+            official_n = cur.execute("SELECT COUNT(*) FROM kleague_schedule WHERE year=? AND league_id=? AND end_yn='Y'",
+                                     (int(year), 1 if tid == 410 else 2)).fetchone()[0]
+        except sqlite3.Error:
+            official_n = None
+        teams_in = sorted({g[3] for g in games} | {g[4] for g in games})
+        split_set = _k1_split_set([(g[3], g[4], g[5], g[6]) for g in games], teams_in) if tid == 410 else None
+
+        def table(upto_ts=None):
+            tb = {t: [0, 0, 0, 0] for t in teams_in}   # pts, gf, ga, played
+            for g in games:
+                if upto_ts is not None and g[1] > upto_ts:
+                    continue
+                for t, gf, ga in ((g[3], g[5], g[6]), (g[4], g[6], g[5])):
+                    tb[t][0] += 3 if gf > ga else 1 if gf == ga else 0
+                    tb[t][1] += gf; tb[t][2] += ga; tb[t][3] += 1
+            order = sorted(teams_in, key=lambda t: (-tb[t][0], -(tb[t][1] - tb[t][2]), -tb[t][1]))
+            if split_set and max(v[3] for v in tb.values()) > _K1_SPLIT_GAMES:   # 파이널 라운드 진입 후
+                order = _apply_split(order, split_set)
+            return tb, order
+
+        tb, order = table()
+        rank = order.index(ss) + 1 if ss in order else None
+        # 순위 흐름: 팀의 매 경기 직후(그날까지의 전체 결과) — round 가 없는 과거 시즌도 경기 순서로 그린다
+        traj = []
+        for i, g in enumerate(x for x in games if ss in (x[3], x[4])):
+            tbr, ordr = table(g[1])
+            traj.append({"n": i + 1, "round": g[2], "date": datetime.fromtimestamp(g[1]).strftime("%m-%d"),
+                         "rank": ordr.index(ss) + 1, "pts": tbr[ss][0], "played": tbr[ss][3]})
+
+        # 팀 경기 목록 (팀 관점)
+        mine = []
+        for gid, ts, rd, h, a, hs, as_ in games:
+            if ss not in (h, a):
+                continue
+            home = h == ss
+            gf, ga = (hs, as_) if home else (as_, hs)
+            mine.append({"id": gid, "ts": ts, "round": rd, "home": home, "opp": a if home else h, "gf": gf, "ga": ga,
+                         "res": "W" if gf > ga else "D" if gf == ga else "L"})
+        if not mine:
+            return jsonify({"error": "no games", "year": year}), 404
+        pts_of = {"W": 3, "D": 1, "L": 0}
+
+        def split(rows):
+            n = len(rows)
+            if not n:
+                return None
+            w = sum(r["res"] == "W" for r in rows); d = sum(r["res"] == "D" for r in rows)
+            return {"games": n, "w": w, "d": d, "l": n - w - d, "ppg": round(sum(pts_of[r["res"]] for r in rows) / n, 2),
+                    "gf_pg": round(sum(r["gf"] for r in rows) / n, 2), "ga_pg": round(sum(r["ga"] for r in rows) / n, 2)}
+
+        half = len(mine) // 2
+        splits = {"home": split([r for r in mine if r["home"]]), "away": split([r for r in mine if not r["home"]]),
+                  "first": split(mine[:half]), "second": split(mine[half:]), "all": split(mine)}
+
+        # 월별 (xG는 SofaScore mps 수집 경기만)
+        xg = {}
+        ids = [r["id"] for r in mine]
+        ph = ",".join("?" * len(ids))   # 자리표시자만 조립 — 값은 바인딩
+        for eid, xf, xa in cur.execute(
+                "SELECT event_id, SUM(CASE WHEN team_id=? THEN expected_goals END), "
+                "SUM(CASE WHEN team_id IS NOT NULL AND team_id!=? THEN expected_goals END) "
+                "FROM match_player_stats WHERE event_id IN (" + ph + ") GROUP BY event_id", (ss, ss, *ids)):
+            if xf is not None and xa is not None:
+                xg[eid] = (xf, xa)
+        months = {}
+        for r in mine:
+            m = datetime.fromtimestamp(r["ts"]).strftime("%m")
+            b = months.setdefault(m, {"games": 0, "pts": 0, "gf": 0, "ga": 0, "xf": 0.0, "xa": 0.0, "xn": 0})
+            b["games"] += 1; b["pts"] += pts_of[r["res"]]; b["gf"] += r["gf"]; b["ga"] += r["ga"]
+            if r["id"] in xg:
+                b["xf"] += xg[r["id"]][0]; b["xa"] += xg[r["id"]][1]; b["xn"] += 1
+        monthly = [{"month": int(m), "games": b["games"], "ppg": round(b["pts"] / b["games"], 2),
+                    "gf": b["gf"], "ga": b["ga"],
+                    "xg_f": round(b["xf"] / b["xn"], 2) if b["xn"] else None,
+                    "xg_a": round(b["xa"] / b["xn"], 2) if b["xn"] else None} for m, b in sorted(months.items())]
+
+        # 연속 기록·최다 점수차
+        def longest(pred):
+            best = run = 0
+            for r in mine:
+                run = run + 1 if pred(r) else 0
+                best = max(best, run)
+            return best
+        streaks = {"win": longest(lambda r: r["res"] == "W"), "unbeaten": longest(lambda r: r["res"] != "L"),
+                   "winless": longest(lambda r: r["res"] != "W"), "loss": longest(lambda r: r["res"] == "L")}
+        def gfmt(r):
+            return {"date": datetime.fromtimestamp(r["ts"]).strftime("%Y-%m-%d"), "opp": tname(r["opp"]),
+                    "home": r["home"], "score": f"{r['gf']}-{r['ga']}"}
+        big_win = max((r for r in mine if r["res"] == "W"), key=lambda r: (r["gf"] - r["ga"], r["gf"]), default=None)
+        big_loss = max((r for r in mine if r["res"] == "L"), key=lambda r: (r["ga"] - r["gf"], r["ga"]), default=None)
+
+        # 상대별 (2경기 이상)
+        vs = {}
+        for r in mine:
+            v = vs.setdefault(r["opp"], [0, 0, 0, 0])
+            v[0] += pts_of[r["res"]]; v[1] += 1; v[2] += r["gf"]; v[3] += r["ga"]
+        vs_list = [{"opp": tname(o), "games": v[1], "ppg": round(v[0] / v[1], 2), "gf": v[2], "ga": v[3]}
+                   for o, v in vs.items() if v[1] >= 2]
+        vs_list.sort(key=lambda x: (-x["ppg"], -(x["gf"] - x["ga"])))
+
+        # 예측 적중 (경기 직전 데이터만 — 백테스트와 같은 규칙)
+        pred_rows = []
+        for r in mine:
+            h, a = (ss, r["opp"]) if r["home"] else (r["opp"], ss)
+            pr = _predict_core(cur, h, a, tid, r["ts"], year)
+            if not pr:
+                continue
+            P = {"home": pr["pred_home"], "draw": pr["pred_draw"], "away": pr["pred_away"]}
+            act = "draw" if r["res"] == "D" else ("home" if (r["res"] == "W") == r["home"] else "away")
+            pick = max(P, key=P.get)
+            my_p = P["home"] if r["home"] else P["away"]
+            pred_rows.append({**gfmt(r), "res": r["res"], "hit": pick == act, "p_actual": round(P[act], 1), "p_win": round(my_p, 1)})
+        upsets = sorted(pred_rows, key=lambda x: x["p_actual"])[:3]
+    finally:
+        conn.close()
+
+    # 핵심 선수 (TOP 퍼포머 종합 점수 · 공식 골·도움)
+    ck = f"tp_rows:{year}"
+    rows = _pcache_get(ck)
+    if rows is None:
+        rows, _n = _top_performer_rows(year, "all")
+        _pcache_set(ck, rows)
+    squad = [r for r in rows if r.get("team_id") == ss]
+    key_players = sorted([r for r in squad if r.get("score") is not None and (r["mins"] or 0) >= 900],
+                         key=lambda r: -r["score"])[:5]
+    pl = lambda r: {"player_id": r["player_id"], "name": r["name"], "pos": r.get("detail_label") or r.get("pos"),
+                    "mins": r["mins"], "score": r.get("score"), "goals": r.get("goals"), "assists": r.get("assists"),
+                    "rating": r.get("rating")}
+    top_scorer = max(squad, key=lambda r: (r.get("goals") or 0, -(r["mins"] or 0)), default=None)
+    top_assist = max(squad, key=lambda r: (r.get("assists") or 0, -(r["mins"] or 0)), default=None)
+
+    # 규칙 기반 요약 문장 (근거 수치 병기)
+    summary = []
+    if traj:
+        best = min(traj, key=lambda t: (t["rank"], t["n"])); worst = max(traj, key=lambda t: (t["rank"], -t["n"]))
+        summary.append(f"최고 {best['rank']}위({best['n']}경기째) · 최저 {worst['rank']}위({worst['n']}경기째) → "
+                       f"{'현재' if pending else '최종'} {rank}위")
+    if split_set:
+        summary.append(f"파이널 {'A' if ss in split_set else 'B'} — 33라운드 뒤 {'상위' if ss in split_set else '하위'} 6팀 그룹")
+    f, s = splits["first"], splits["second"]
+    if f and s and abs(s["ppg"] - f["ppg"]) >= 0.3:
+        summary.append(f"후반기 {'상승' if s['ppg'] > f['ppg'] else '하락'} — 경기당 승점 {f['ppg']} → {s['ppg']}")
+    hm, aw = splits["home"], splits["away"]
+    if hm and aw and abs(hm["ppg"] - aw["ppg"]) >= 0.4:
+        summary.append(f"{'홈 강세' if hm['ppg'] > aw['ppg'] else '원정 강세'} — 홈 {hm['ppg']} vs 원정 {aw['ppg']} (경기당 승점)")
+    if streaks["unbeaten"] >= 5:
+        summary.append(f"최장 무패 {streaks['unbeaten']}경기")
+    if streaks["winless"] >= 5:
+        summary.append(f"최장 무승 {streaks['winless']}경기")
+    if key_players:
+        k = key_players[0]
+        summary.append(f"핵심 선수 {k['name']} — 종합 점수 {k['score']} (리그 같은 포지션 백분위 기준)")
+    if pred_rows:
+        hr = sum(x["hit"] for x in pred_rows) / len(pred_rows) * 100
+        summary.append(f"예측 모델 적중 {hr:.0f}% ({len(pred_rows)}경기) — 이 팀 경기는 {'읽기 쉬운' if hr >= 50 else '예측이 어려운'} 편")
+
+    stat = tb.get(ss, [0, 0, 0, 0])
+    return jsonify({
+        "team": {"slug": slug, "name": info.get("short") or info.get("name"), "primary": info.get("primary"),
+                 "emblem": info.get("emblem")},
+        "year": year, "league": "K1" if tid == 410 else "K2", "in_progress": pending > 0, "remaining": pending,
+        "final_group": ("A" if ss in split_set else "B") if split_set else None,
+        "coverage": {"db_games": len(games), "official_games": official_n,
+                     "complete": official_n is None or len(games) >= official_n - 2},
+        "final": {"rank": rank, "n_teams": len(teams_in), "pts": stat[0], "gf": stat[1], "ga": stat[2], "played": stat[3],
+                  **{k: splits["all"][k] for k in ("w", "d", "l")}},
+        "trajectory": traj, "splits": splits, "monthly": monthly, "streaks": streaks,
+        "big_win": gfmt(big_win) if big_win else None, "big_loss": gfmt(big_loss) if big_loss else None,
+        "best_opps": vs_list[:3], "worst_opps": list(reversed(vs_list[-3:])) if len(vs_list) > 3 else [],
+        "key_players": [pl(r) for r in key_players],
+        "top_scorer": pl(top_scorer) if top_scorer and (top_scorer.get("goals") or 0) > 0 else None,
+        "top_assist": pl(top_assist) if top_assist and (top_assist.get("assists") or 0) > 0 else None,
+        "prediction": {"games": len(pred_rows), "hit_pct": round(sum(x["hit"] for x in pred_rows) / len(pred_rows) * 100, 1) if pred_rows else None,
+                       "upsets": upsets},
+        "summary": summary,
     })
 
 
