@@ -50,7 +50,9 @@
 - **구현 선택지**: ① `update_data.py`에 `--official-only` 플래그 + `main.py` `_scheduler_loop`에 화요일 슬롯 ② 운영 crontab에 별도 한 줄. ①이 캐시 무효화·`last_result` 기록을 재사용해 일관적.
 - 리스크: 스케줄러·수집 파이프라인 변경 = **Yellow~Red**(사용자 확인 후 구현). 공식 API 호출량 증가(STEP 27이 회당 ~500 호출) — 빈도 주 2회면 무리 없음.
 
-### [ ] 2027 시즌 연도 전환 준비 (2027 개막 전, 2026-11-03 점검)
+### [ ] 2027 시즌 연도 전환 준비 (2027 개막 전, 2026-11-03 점검) — 코드 하드코딩은 2026-11-10 처리
+- ✅ **2026-11-10**: `main.py` `_current_season()`(DB 마지막 종료 K1/K2 경기 연도, 10분 캐시 — 1~2월 비시즌엔 2026 유지, 2027 첫 경기 종료 시 전환) + `_season_window(n)`. 엔드포인트 기본 `year` 12곳·`CURRENT_YEAR`(import 시점 고정) 제거·모델 학습 창(K1 3시즌·K2 2시즌, SQL은 `?` 바인딩으로)·워밍업 URL 5곳·공식 기록 판정(`>= 2025`). JS는 `<body data-season>` → `ttSeason()`(app·insights·prediction, 시즌 칩 = 현재·-1·-2·전체). 승강 PO 카드는 `_PO_RULES_SEASON="2026"` 이외 시즌엔 비활성(규정 재확인 전 잘못된 대진 방지).
+- **남은 것(시즌 종료 후)**: ①파이프라인 파일명 `update_results_2026.py`·`kleague_results_2026.json`·`kleague_players_2026.json`·`fetch_next_round.py`의 `2026-01-01`·STEP 16 `--years 2026` ②승강 결과로 `TEAMS` league 변경(마스터 데이터 = Red) ③2027 승강 규정 확인 후 `_PO_*` 갱신 ④`_fetch_k1/k2_all_games` 기본 연도는 달력 연도(1월부터 2027 일정 조회) — 2027 일정 공개 시점 동작 확인.
 - 하드코딩 '2026': `main.py` 41곳(엔드포인트 기본 `year="2026"` 다수, `_warm_cache` URL, 다년도 IN 목록 `('2024','2025','2026')`), JS 18곳(`app.js` 8·`insights.js` 5·`prediction.js` 4·`k2heatmap.js` 1), 파이프라인 `update_results_2026.py`(→ `kleague_results_2026.json`)·STEP 16 `--years 2026`·`fetch_next_round.py`의 `2026-01-01`.
 - 승강 결과로 `TEAMS`의 league 필드·스쿼드 파일 변경 필요(마스터 데이터 = Red).
 - 비시즌 자체는 안전: `audit_collection_gaps.py`는 공백을 '마지막 종료 경기' 기준으로 재므로 경기가 없어도 오탐하지 않음. 크롤러들도 경기 0건일 때 명시적 실패 코드를 내지 않음(예외 발생 시는 별개 — 첫 비시즌 크론 로그 확인 권장).

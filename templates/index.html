@@ -13,7 +13,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/static/js/boot.js?v=1"></script>
 </head>
-<body data-ws="tactics">
+<body data-ws="tactics" data-season="{{ season }}">
     <div id="app">
         <header id="toolbar">
             <h1>Today Tactics</h1>
@@ -939,13 +939,13 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=20"></script>
+    <script src="/static/js/app.js?v=21"></script>
 
     <script src="/static/js/info.js?v=8"></script>
     <!-- 해외리그 일단 비활성화 (아직 이른 단계) — 복구 시 아래 스크립트 복원
     <script src="/static/js/global_league.js?v=2"></script> -->
     <script src="/static/js/banner_stats.js?v=3"></script>
-    <script src="/static/js/prediction.js?v=68"></script>
+    <script src="/static/js/prediction.js?v=69"></script>
 
     <!-- 선수 분석 모달 -->
     <div id="player-analytics-modal" class="pa-modal hidden">
@@ -1034,7 +1034,7 @@
         "pass_network": "/static/js/pass_network.js?v=3",
         "match_report": "/static/js/match_report.js?v=3",
         "player_compare": "/static/js/player_compare.js?v=4",
-        "insights": "/static/js/insights.js?v=61",
+        "insights": "/static/js/insights.js?v=62",
         "ins_charts": "/static/js/ins_charts.js?v=6",
         "tera": "/static/vendor/tera-chart-7.0.2.min.js?v=1",
         "tt_charts": "/static/js/tt_charts.js?v=11",

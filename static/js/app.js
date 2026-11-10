@@ -1,3 +1,5 @@
+// 현재 시즌 — 서버가 <body data-season>에 넣는 값(마지막 종료 경기 연도). 여러 파일에 같은 정의(ttEsc와 같은 방식).
+function ttSeason() { return (document.body && document.body.dataset.season) || String(new Date().getFullYear()); }
 (function () {
     "use strict";
 
@@ -536,14 +538,14 @@
         el.classList.remove("hidden");
 
         try {
-            const res = await fetch(`/api/player-matches?name=${encodeURIComponent(playerName)}&year=2026`);
+            const res = await fetch(`/api/player-matches?name=${encodeURIComponent(playerName)}&year=${ttSeason()}`);
             const data = await res.json();
             list.innerHTML = "";
 
             // 전체 누적 항목 (기본 미선택)
             const allLi = document.createElement("li");
             allLi.className = "mp-item mp-item-all";
-            allLi.innerHTML = `<span class="mp-check">☐</span><span>2026 전체 (누적)</span>`;
+            allLi.innerHTML = `<span class="mp-check">☐</span><span>${ttSeason()} 전체 (누적)</span>`;
             allLi.dataset.all = "1";
             allLi.addEventListener("click", async () => {
                 const isActive = allLi.classList.contains("active");
@@ -565,7 +567,7 @@
                     });
                     _selectedMatches.clear();
                     try {
-                        const r2 = await fetch(`/api/heatmap?name=${encodeURIComponent(playerName)}&year=2026`);
+                        const r2 = await fetch(`/api/heatmap?name=${encodeURIComponent(playerName)}&year=${ttSeason()}`);
                         const d2 = await r2.json();
                         _allMatchPoints = (d2.found && d2.points.length > 0) ? d2.points : [];
                     } catch { _allMatchPoints = []; }
@@ -579,7 +581,7 @@
             list.appendChild(allLi);
 
             if (!data.found || data.matches.length === 0) {
-                list.appendChild(Object.assign(document.createElement("li"), { className: "mp-empty", textContent: "2026 경기 데이터 없음" }));
+                list.appendChild(Object.assign(document.createElement("li"), { className: "mp-empty", textContent: `${ttSeason()} 경기 데이터 없음` }));
                 return;
             }
 

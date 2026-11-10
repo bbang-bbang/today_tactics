@@ -711,6 +711,39 @@ EXCLUDED_EVENT_IDS = {90333089}  # 2026-02-21 슈퍼컵 전북 vs 대전
 EXCLUDED_EVENT_IDS_SQL = "(" + ",".join(str(i) for i in EXCLUDED_EVENT_IDS) + ")"
 
 
+# ── 현재 시즌 (2027 전환 대비, 2026-11-10) ──────────────────────────────────
+# '2026' 하드코딩 대신 DB의 마지막 종료 K1/K2 경기 연도. 달력 연도가 아니라 경기 기준이라
+# 1~2월 비시즌에는 직전 시즌(2026)이 유지되고, 2027 첫 경기가 끝나면 자동으로 넘어간다.
+_SEASON_CACHE = {"ts": 0.0, "v": None}
+
+
+def _current_season():
+    now = time.time()
+    if _SEASON_CACHE["v"] and now - _SEASON_CACHE["ts"] < 600:
+        return _SEASON_CACHE["v"]
+    v = None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        try:
+            r = conn.execute("""SELECT MAX(date_ts) FROM events
+                                WHERE tournament_id IN (410, 777) AND home_score IS NOT NULL""").fetchone()
+        finally:
+            conn.close()
+        if r and r[0]:
+            v = datetime.fromtimestamp(r[0]).strftime("%Y")
+    except sqlite3.Error:
+        pass
+    v = v or str(datetime.now().year)
+    _SEASON_CACHE.update(ts=now, v=v)
+    return v
+
+
+def _season_window(n):
+    """현재 시즌 포함 최근 n개 시즌 연도 문자열 (예: n=3 → ['2024','2025','2026'])."""
+    s = int(_current_season())
+    return [str(y) for y in range(s - n + 1, s + 1)]
+
+
 POSITION_LABELS = {
     "4-4-2": ["GK", "LB", "CB", "CB", "RB", "LM", "CM", "CM", "RM", "ST", "ST"],
     "4-3-3": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "CM", "LW", "ST", "RW"],
@@ -753,7 +786,8 @@ for name in POSITION_LABELS:
 
 @app.route("/")
 def index():
-    resp = app.make_response(render_template("index.html", current_user=session.get("user")))
+    resp = app.make_response(render_template("index.html", current_user=session.get("user"),
+                                             season=_current_season()))
     # index.html은 cache-bust 위해 항상 새로 받게 — query(?v=N)는 정적 파일에서 immutable 캐시
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
@@ -3025,9 +3059,10 @@ def _predict_core(cur, home_ss, away_ss, tid_filter, as_of_ts, year_str,
         _pcache_set(_lavg_key, league_avg)
 
     def _team_xg(ss_id):
-        # 학습 기간: K1은 2024 포함(데이터 부족 보강), K2는 2025+2026
+        # 학습 기간: K1은 최근 3시즌(데이터 부족 보강), K2는 최근 2시즌 — 현재 시즌 기준(2026: K1 2024~26, K2 2025~26)
         # P2(2026-04-29) 정합성 작업으로 2024 events 메타 복구되어 K1 백필 활용 가능
-        years = "('2024','2025','2026')" if tid_filter == 410 else "('2025','2026')"
+        years = _season_window(3 if tid_filter == 410 else 2)
+        year_ph = ",".join("?" * len(years))   # 플레이스홀더 개수만 조립 — 값은 바인딩
         # 서브쿼리 2개 → 단일 조건부 집계 JOIN으로 교체
         cur.execute(f"""
             SELECT e.id, e.home_team_id=? AS is_home, e.home_score, e.away_score,
@@ -3047,9 +3082,9 @@ def _predict_core(cur, home_ss, away_ss, tid_filter, as_of_ts, year_str,
               AND (e.home_team_id=? OR e.away_team_id=?)
               AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL
               AND e.date_ts < ?
-              AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) IN {years}
+              AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) IN ({year_ph})
             ORDER BY e.date_ts DESC
-        """, (ss_id, ss_id, ss_id, tid_filter, ss_id, ss_id, as_of_ts))
+        """, (ss_id, ss_id, ss_id, tid_filter, ss_id, ss_id, as_of_ts, *years))
         rows = cur.fetchall()
         if not rows:
             return None
@@ -3510,7 +3545,8 @@ def get_match_prediction():
     # ──────────────────────────────────────────────────────────────
 
     def team_xg_avg(ss_id):
-        """팀의 경기당 xG(for/against) — 2025+2026 시간 감쇠 가중 평균, xG null은 실점으로 fallback"""
+        """팀의 경기당 xG(for/against) — 최근 2시즌 시간 감쇠 가중 평균, xG null은 실점으로 fallback"""
+        yrs2 = _season_window(2)
         cur.execute("""
             SELECT e.id,
                    e.home_team_id=? AS is_home,
@@ -3524,9 +3560,9 @@ def get_match_prediction():
             WHERE e.tournament_id=?
               AND (e.home_team_id=? OR e.away_team_id=?)
               AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL
-              AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) IN ('2025','2026')
+              AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) IN (?, ?)
             ORDER BY e.date_ts DESC
-        """, (ss_id, ss_id, ss_id, tid_filter, ss_id, ss_id))
+        """, (ss_id, ss_id, ss_id, tid_filter, ss_id, ss_id, *yrs2))
         rows = cur.fetchall()
         if not rows:
             return {"games": 0, "xg_for": 1.3, "xg_against": 1.3}
@@ -4028,7 +4064,7 @@ def setpiece_efficiency():
     """
     home_slug = request.args.get("home_slug", "").strip()
     away_slug = request.args.get("away_slug", "").strip()
-    year      = request.args.get("year", "2026").strip()
+    year      = (request.args.get("year") or _current_season()).strip()
     if not home_slug or not away_slug:
         return jsonify({"error": "home_slug and away_slug required"}), 400
 
@@ -4890,7 +4926,6 @@ def _flip_points(rows, player_team_id):
     원정 데이터(≈절반)를 좌우 뒤집는 버그였음. 그대로 통과시킨다. (player_team_id는 호출부 호환용)"""
     return [{"x": r["x"], "y": r["y"]} for r in rows]
 
-CURRENT_YEAR = str(datetime.now().year)
 
 @app.route("/api/heatmap")
 @cached_response(ttl=3600)
@@ -4910,7 +4945,7 @@ def get_heatmap():
 
     event_id    = request.args.get("eventId", "").strip()
     opponent_id = request.args.get("opponentId", "").strip()
-    year        = request.args.get("year", CURRENT_YEAR).strip()
+    year        = (request.args.get("year") or _current_season()).strip()
     year_start, year_end = _year_range(year)
 
     # 특정 경기 히트맵 → AWAY면 API에서 flip
@@ -6418,9 +6453,9 @@ def _heatmap_teams_for_league(tournament_id, league_label=None):
 
 def _heatmap_players_for_team(team_id, tournament_id):
     conn = sqlite3.connect(DB_PATH)
-    # 현재 시즌(CURRENT_YEAR) 명단만 — 과거 시즌 누적 로스터 제외.
+    # 현재 시즌(_current_season()) 명단만 — 과거 시즌 누적 로스터 제외.
     # games = 현 시즌 히트맵 보유 경기수, HAVING games>0 → 빈 히트맵 선수 제외(일부 백업 GK 등).
-    ys, ye = _year_range(CURRENT_YEAR)
+    ys, ye = _year_range(_current_season())
     rows = conn.execute("""
         SELECT mps.player_id,
                COALESCE(p.name_ko, NULLIF(mps.player_name,''), p.name) AS name,
@@ -6967,7 +7002,7 @@ def _tp_apply_scores(rows):
 @cached_response(ttl=1800)
 def insights_top_performers():
     """포지션별 TOP 퍼포머 (최소 3경기 이상, 90분 환산). league=k1|k2|all 필터 지원"""
-    year = request.args.get("year", "2026")
+    year = request.args.get("year") or _current_season()
     league = request.args.get("league", "all")
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -7099,7 +7134,7 @@ def insights_top_performers():
     # ② 골·도움 — 공식 K리그 선수 기록(2025~)이 있으면 그 값(SofaScore 는 일부 선수·최근 라운드에서 어긋남).
     #    정의가 다른 세부 지표(태클·패스 등)는 섞지 않는다. 공식 출전 수가 SofaScore 출전 수의 85% 미만이면 불완전 → SofaScore 값 유지.
     official, n_official = {}, 0
-    if pids and year in ("2025", "2026"):
+    if pids and year.isdigit() and int(year) >= 2025:   # 공식 선수 기록은 2025~
         try:
             ys, ye = _year_range(year)
             ltid = _league_tid(league)
@@ -7162,7 +7197,7 @@ def _league_tid(league):
 @cached_response(ttl=1800)
 def insights_clutch():
     """승부처 — 막판(75'+) 득점 TOP + 시간대별 리그 득점 분포."""
-    year = request.args.get("year", "2026")
+    year = request.args.get("year") or _current_season()
     league = request.args.get("league", "all")
     tid = _league_tid(league)
     conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
@@ -7255,7 +7290,7 @@ def insights_shooting():
     """슈팅 인사이트 — match_shotmap 기반. 결과 깔때기 + 상황(오픈/세트피스)·바디파트·
     거리존별 결정률. 기존 인사이트(누적 스탯)와 달리 슛 위치·상황 등 shotmap 고유 차원만 사용.
     x = 골문과의 거리(검증: goal 평균 x 최소). year + league 필터 지원."""
-    year = request.args.get("year", "2026")
+    year = request.args.get("year") or _current_season()
     league = request.args.get("league", "all")
     tid = _league_tid(league)
     conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
@@ -7338,7 +7373,7 @@ def insights_shooting():
 def insights_substitution():
     """교체 영향 — sub_events 기반. 슈퍼서브(교체 투입 분 이후 본인 득점) + 교체 시점 분포
     + 최다 투입 + 평균 첫 교체 + 부상 교체 수. year + league 필터 지원."""
-    year = request.args.get("year", "2026")
+    year = request.args.get("year") or _current_season()
     league = request.args.get("league", "all")
     tid = _league_tid(league)
     conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
@@ -7658,7 +7693,7 @@ def insights_goalkeeper():
     """수문장 — 골키퍼 선방·클린시트·선방률. 실점은 경기 최종 스코어로 유도
     (goals_conceded 컬럼 미수집 → 홈 GK는 away_score, 원정 GK는 home_score).
     주전(60분+) 5경기↑. year + league 필터 지원."""
-    year = request.args.get("year", "2026")
+    year = request.args.get("year") or _current_season()
     league = request.args.get("league", "all")
     tid = _league_tid(league)
     conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
@@ -7702,7 +7737,7 @@ def insights_goalkeeper():
 def insights_duels():
     """듀얼 지배 — 돌파(드리블 성공)와 공중볼 승리. match_player_stats 기반.
     year + league 필터 지원."""
-    year = request.args.get("year", "2026")
+    year = request.args.get("year") or _current_season()
     league = request.args.get("league", "all")
     date_cond, date_params = _year_date_params(year)
     league_cond, league_params = _league_team_filter(league)
@@ -7746,7 +7781,7 @@ def insights_duels():
 def insights_card_rankings():
     """카드 수령 순위 — 선수별 + 팀별. year + league 필터 지원.
     옐로카드 TOP 10 + 레드카드 TOP 5 (선수별), 팀별 평균(/경기) TOP 8."""
-    year   = request.args.get("year", "2026")
+    year   = request.args.get("year") or _current_season()
     league = request.args.get("league", "all")
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -9548,7 +9583,7 @@ def data_freshness():
 def insights_player_detail():
     player_id = request.args.get("playerId", "").strip()
     pos       = request.args.get("pos", "F")
-    year      = request.args.get("year", "2026")
+    year      = request.args.get("year") or _current_season()
     if not player_id:
         return jsonify({"error": "playerId required"}), 400
 
@@ -10516,6 +10551,7 @@ def _season_sim_inputs(league):
 #   상위 K2 팀의 회귀(평균으로 돌아감)가 계수에 섞여 있으나, 승강 PO 상대도 같은 '상위 K2 팀'이라 예측 용도로는 맞는 방향.
 _PO_K2_TO_K1 = {"att": 0.68, "def": 1.39, "att_log_se": 0.046, "def_log_se": 0.051, "n_teams": 12}
 _PO_NO_PO_TEAM = "gimcheon"        # 이 팀이 K1 12위면 승강 PO 없음 (김천만 강등)
+_PO_RULES_SEASON = "2026"          # 아래 규정을 확인한 시즌 — 다른 시즌엔 규정 재확인 전까지 카드 비활성(잘못된 대진 방지)
 _PO_RULES = [
     "김천 상무는 순위와 무관하게 자동 강등 — K1 12위가 김천이면 승강 PO 없음",
     "K2 1·2위 자동 승격, 3~6위 승격 PO: 준PO 3위-6위·4위-5위, 결승 — 모두 상위 순위 팀 홈 단판",
@@ -10626,7 +10662,12 @@ def promotion_playoff():
     """승강 PO 시나리오: K1·K2 남은 경기 동시 시뮬 → K1 12위 · K2 승격 PO 결승 패자 대진 확률 → 홈앤드어웨이 승산.
     리그 간 전력 차이는 _PO_K2_TO_K1 계수로 보정(불확실성 → 잔류 확률 범위)."""
     import random as _rand
-    n_sim = max(500, min(int(request.args.get("n", "4000") or 4000), 10000))
+    if _current_season() != _PO_RULES_SEASON:
+        return jsonify({"ready": False, "reason": "rules_unverified", "season": _current_season()})
+    try:
+        n_sim = max(500, min(int(request.args.get("n", "4000") or 4000), 10000))
+    except ValueError:
+        n_sim = 4000
     k1, k2 = _season_sim_inputs("k1"), _season_sim_inputs("k2")
     if not (k1.get("ready") and k2.get("ready")):
         return jsonify({"ready": False, "reason": "no_schedule"})
@@ -10816,7 +10857,7 @@ def prediction_backtest():
     K2 한정으로 검증된 모델 (K1은 별도 캘리브레이션 필요).
     """
     league = request.args.get("league", "k2").lower()
-    year   = request.args.get("year", "2026")
+    year   = request.args.get("year") or _current_season()
     tid    = 410 if league == "k1" else 777
 
     import time as _time
@@ -13071,9 +13112,9 @@ def _warm_cache():
         "http://127.0.0.1:5000/api/next-round?league=K2",
         "http://127.0.0.1:5000/api/league-dashboard?league=K1",
         "http://127.0.0.1:5000/api/league-dashboard?league=K2",
-        "http://127.0.0.1:5000/api/insights/top-performers?year=2026&league=all",
-        "http://127.0.0.1:5000/api/insights/clutch?year=2026&league=all",
-        "http://127.0.0.1:5000/api/insights/card-rankings?year=2026&league=all",
+        f"http://127.0.0.1:5000/api/insights/top-performers?year={_current_season()}&league=all",
+        f"http://127.0.0.1:5000/api/insights/clutch?year={_current_season()}&league=all",
+        f"http://127.0.0.1:5000/api/insights/card-rankings?year={_current_season()}&league=all",
     ]
     threads = [threading.Thread(target=_fetch, args=(u,), daemon=True) for u in core_urls]
     for t in threads:
@@ -13085,8 +13126,8 @@ def _warm_cache():
     # 5s 딜레이: 핵심 엔드포인트 캐싱 완료 후 worker 자원을 확보한 뒤 시작
     _t.sleep(5)
     heavy_urls = [
-        "http://127.0.0.1:5000/api/prediction-backtest?league=k1&year=2026",
-        "http://127.0.0.1:5000/api/prediction-backtest?league=k2&year=2026",
+        f"http://127.0.0.1:5000/api/prediction-backtest?league=k1&year={_current_season()}",
+        f"http://127.0.0.1:5000/api/prediction-backtest?league=k2&year={_current_season()}",
         "http://127.0.0.1:5000/api/season-simulation?league=k1&n=500",
         "http://127.0.0.1:5000/api/season-simulation?league=k2&n=500",
     ]

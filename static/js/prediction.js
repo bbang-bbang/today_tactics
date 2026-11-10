@@ -1,3 +1,5 @@
+// 현재 시즌 — 서버가 <body data-season>에 넣는 값(마지막 종료 경기 연도). 여러 파일에 같은 정의(ttEsc와 같은 방식).
+function ttSeason() { return (document.body && document.body.dataset.season) || String(new Date().getFullYear()); }
 // 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
 function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 // prediction.js — 경기 예측 보고서 + 다음 경기 일정
@@ -150,7 +152,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         if (!rounds.length) return;
 
         const curRound = league === "k1" ? k1ActiveRound : activeRound;
-        const leagueLabel = league === "k1" ? "K리그1 2026" : "K리그2 2026";
+        const leagueLabel = (league === "k1" ? "K리그1 " : "K리그2 ") + ttSeason();
 
         wrap.innerHTML = `
         <div class="ksb-banner" id="${league}-schedule-banner">
@@ -484,14 +486,14 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     function loadBacktest(league) {
         const key = (league || "k2").toLowerCase();
         if (_backtestCache[key]) return Promise.resolve(_backtestCache[key]);
-        return fetch(`/api/prediction-backtest?league=${key}&year=2026`)
+        return fetch(`/api/prediction-backtest?league=${key}&year=${ttSeason()}`)
             .then(r => r.json())
             .then(d => { _backtestCache[key] = d; return d; })
             .catch(() => null);
     }
     function backtestBannerHtml(d) {
         if (!d || !d.ready) return "";
-        const leagueLabel = d.league === "K1" ? "K리그1 2026" : "K리그2 2026";
+        const leagueLabel = (d.league === "K1" ? "K리그1 " : "K리그2 ") + (d.year || ttSeason());
         return `<div class="pred-backtest">
             <span class="pbt-label">📊 ${leagueLabel} 모델 정확도</span>
             <span class="pbt-stat"><span class="pbt-v">${d.hit_1x2_pct}%</span><span class="pbt-k">1X2</span></span>
@@ -2368,7 +2370,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <span class="hab-league"><span class="hab-name">K1</span> ${stat(k1)} <span class="hab-n">${n(k1)}</span></span>
             <span class="hab-sep">|</span>
             <span class="hab-league"><span class="hab-name">K2</span> ${stat(k2)} <span class="hab-n">${n(k2)}</span></span>
-            <span class="hab-sub">2026 rolling backtest</span>
+            <span class="hab-sub">${ttSeason()} rolling backtest</span>
         `;
     }
 

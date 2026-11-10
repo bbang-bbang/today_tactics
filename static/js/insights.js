@@ -1,10 +1,12 @@
+// 현재 시즌 — 서버가 <body data-season>에 넣는 값(마지막 종료 경기 연도). 여러 파일에 같은 정의(ttEsc와 같은 방식).
+function ttSeason() { return (document.body && document.body.dataset.season) || String(new Date().getFullYear()); }
 // 외부·사용자 문자열을 HTML에 넣을 때 쓰는 이스케이프 (2026-11-03 보안 점검 — 여러 파일에 같은 정의, 전역 함수 재선언 허용)
 function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 /* insights.js — 포지션별 인사이트 섹션 */
 (function () {
   "use strict";
 
-  let currentYear = "2026";
+  let currentYear = ttSeason();
   let currentLeague = "all";  // "all" | "k1" | "k2"
   let currentPos = "all";     // "all"(통합) | "F" | "M" | "D" — 통합표 위 포지션 필터 칩
   const TOP_PREVIEW = 20;     // 기본 노출 행 수
@@ -155,7 +157,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     // 필터는 선수 탭(랭킹·카드)과 팀 탭(심화 인사이트)에 각각 있고, 상태(currentYear/League)는 공유한다
     const wraps = [...document.querySelectorAll("[data-ins-filter]")];
     if (!wraps.length) return;
-    const years = ["2026", "2025", "2024", "all"];
+    const _s = +ttSeason();
+    const years = [String(_s), String(_s - 1), String(_s - 2), "all"];
     const leagues = [
       { v: "all", label: "전체" },
       { v: "k1",  label: "K1" },
@@ -318,7 +321,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     const groups = DETAIL_TOKENS.has(currentPos) ? [currentPos] : Object.keys(W);
     const wRows = groups.map(g => `<li><span class="ins-fm-name">${ttEsc(GL[g] || g)}</span><span class="ins-fm-eq">${ttEsc(wLine(g))}</span></li>`).join("");
     const offN = meta.official_players || 0, allN = meta.players || 0;
-    const srcNote = (currentYear === "2025" || currentYear === "2026")
+    const srcNote = (currentYear !== "all" && +currentYear >= 2025)
       ? `골·도움: <b>공식 K리그 기록</b> ${offN}/${allN}명 (공식이 빠뜨린 득점은 경기 기록으로 보정 · 공식 선수 리포트와 같은 값 · 나머지는 SofaScore) · 창출·수비·몸싸움·평점: SofaScore 수집분`
       : `이 시즌은 공식 선수 기록이 없어 전 지표가 SofaScore 수집분입니다`;
     const formulaNote =
@@ -374,12 +377,12 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   let drawerRatingChart = null, drawerStatChart = null;
   let currentDrawerPlayerId = null;
   let currentDrawerPos = "F";
-  let currentDrawerYear = "2026";
+  let currentDrawerYear = ttSeason();
 
   function openDrawer(playerId, pos) {
     currentDrawerPlayerId = playerId;
     currentDrawerPos = pos;
-    currentDrawerYear = "2026";
+    currentDrawerYear = ttSeason();
     loadDrawerData();
     document.getElementById("player-drawer").classList.add("open");
     document.getElementById("player-drawer-overlay").classList.add("open");
