@@ -14,6 +14,8 @@
 - ✅ **용인FC 16경기 경기 ID 재생성 교정**(SofaScore 구 ID 404 → `crawlers/remap_event_ids.py`로 운영 16쌍 교체, 백업 `/home/rocky/players_pre_remap_20261110.db`) → mps·라인업·히트맵 채움, mps 없는 종료 경기 0. 중복 예정 경기 2건(구 ID) 삭제. 재발 방지 = **update_data STEP 29**(월 크론 자동 감지·교체, 예정 경기 중복은 경고만).
 - ✅ 남은 작업 1~6 처리: STEP 29 편입 · K1 예측 불안정 '알려진 한계' 종료 · 스카우팅 카드 3브라우저 확인 · 김해 2경기 결측 해소(라인업 복원 중복 선수 규칙 추가) → 2026 종료 경기 히트맵·라인업·mps 결측 0. ⏳ 11/16 크론 확인 후 `/home/rocky/players_pre_remap_20261110.db` 삭제.
 - ✅ **승강 PO 시나리오 카드**(경기예측 탭): `/api/promotion-playoff` — K1 12위 vs K2 승격 PO 결승 패자 대진 확률 + 홈앤드어웨이 승산(리그 간 격차 보정 K2 ×0.68/×1.39, 범위 병기) + 팀 특징·맞대결·과거 승강 PO. 2026 특례 규정 기준(김천 자동 강등) — 2027엔 `_PO_RULES`·`_PO_NO_PO_TEAM` 재검토.
+- ✅ **2027 전환 준비**(`_current_season()`·`ttSeason()` — 남은 파이프라인 파일명·TEAMS 승강은 시즌 후, backlog) · **정리·최적화**(crawlers 4·analysis 5 보관, 죽은 코드·`_league_tid` 이중 정의 제거, `_team_xg` 7배 가속) · **팀별 영입 추천**(팀 탭 '🧭 영입 추천', `/api/team-recruit`).
+- ⏸ 로컬 `players.db.bak-20261106`(258MB)·빈 `epl.db` 삭제는 사용자 판단 대기(자동 모드 차단).
 - ✅ nginx `/static/dev/` 404 규칙은 **이미 운영 반영됨**(11/10 확인: 서버 conf = 저장소 파일 동일, `/static/dev/chart_spike.html` → 404). 대기 항목 종료.
 
 ## 0-00. 🗓 2026-11-09 크론 점검
