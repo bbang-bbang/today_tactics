@@ -2272,8 +2272,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const form = (f) => (f || []).map(x => `<span class="po-f po-f-${x}">${x === "W" ? "승" : x === "D" ? "무" : "패"}</span>`).join("");
         const h2h = m.h2h.length
             ? `<ul class="po-h2h">${m.h2h.map(g => `<li><span class="po-muted">${g.date} ${ttEsc(g.comp)}</span>
-                   ${ttEsc(a.name)} ${g.a}-${g.b} ${ttEsc(b.name)} <span class="po-muted">(${g.a_home ? a.name + " 홈" : b.name + " 홈"})</span>
-                   <b class="po-res">${g.a > g.b ? a.name + " 승" : g.a < g.b ? b.name + " 승" : "무"}</b></li>`).join("")}</ul>`
+                   ${ttEsc(a.name)} ${g.a}-${g.b} ${ttEsc(b.name)} <span class="po-muted">(${ttEsc(g.a_home ? a.name : b.name)} 홈)</span>
+                   <b class="po-res">${g.a > g.b ? ttEsc(a.name) + " 승" : g.a < g.b ? ttEsc(b.name) + " 승" : "무"}</b></li>`).join("")}</ul>`
             : `<p class="po-muted">최근 맞대결 기록 없음</p>`;
         return `
             <div class="po-d-head">${poTeam(a)} <span class="po-vs">vs</span> ${poTeam(b)}

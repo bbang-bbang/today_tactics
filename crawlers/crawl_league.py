@@ -273,7 +273,7 @@ async def crawl_players(page, conn, tid, season_id, fallback_sid=None):
     - team/{id}/players 및 개인 페이지 방문 불필요 (EPL 등 상위 리그 403 우회)
     - fallback_sid: 메인 season_id 실패 시 Serie A/Ligue 1 대체 sid
     """
-    import json, time
+    import time   # json 은 모듈 상단에서 import
     log("[players] top-players/overall API로 선수 스탯 수집")
 
     async def _fetch_top(sid):

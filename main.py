@@ -544,6 +544,21 @@ def auth_me():
     return jsonify({"authenticated": True, "user": u})
 
 
+# 브라우저·크롤러가 기본으로 요청하는 경로 (운영 로그 404 정리, 2026-11-10)
+@app.route("/favicon.ico")
+def favicon_ico():
+    from flask import send_from_directory
+    resp = send_from_directory(os.path.join(BASE_DIR, "static", "img"), "favicon.png", mimetype="image/png")
+    resp.headers["Cache-Control"] = "public, max-age=604800"
+    return resp
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    # 화면은 허용, API(무거운 계산·데이터 원본)는 크롤 제외
+    return app.response_class("User-agent: *\nDisallow: /api/\n", mimetype="text/plain")
+
+
 @app.route("/health")
 def health():
     return jsonify({"ok": True})
