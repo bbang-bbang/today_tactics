@@ -269,12 +269,6 @@ def _league_db_path(league_code: str) -> str:
     return os.path.join(BASE_DIR, db_file)
 
 
-def _league_tournament_ids(league_code: str) -> list:
-    """league_code → tournament_id 리스트."""
-    cfg = LEAGUE_REGISTRY.get((league_code or "kleague").lower(), {})
-    return [t["id"] for t in cfg.get("tournaments", [])]
-
-
 @contextmanager
 def get_db(row_factory=True):
     """SQLite 연결 context manager — 예외 발생 경로에서도 conn.close() 보장."""
@@ -2788,10 +2782,6 @@ _DEFAULT_LEAGUE_CONSTANTS = {"home_adv": 1.00, "away_adj": 0.90, "draw_boost": 0
 # 0.88 → 최근 경기 대비 10경기 전은 약 27% 비중, 20경기 전(전 시즌)은 약 7% 비중
 _DECAY_LAMBDA = 0.88
 
-# 레거시 상수 (기존 코드 호환용, 내부에서는 _LEAGUE_CONSTANTS 사용)
-_HOME_ADVANTAGE    = 1.15
-_AWAY_ADJUSTMENT   = 0.90
-
 # ── 인메모리 TTL 캐시 (예측 관련 반복 쿼리 최적화) ──────────────
 _PRED_CACHE: dict = {}
 _PRED_CACHE_TTL = 600  # 10분
@@ -3063,21 +3053,16 @@ def _predict_core(cur, home_ss, away_ss, tid_filter, as_of_ts, year_str,
         # P2(2026-04-29) 정합성 작업으로 2024 events 메타 복구되어 K1 백필 활용 가능
         years = _season_window(3 if tid_filter == 410 else 2)
         year_ph = ",".join("?" * len(years))   # 플레이스홀더 개수만 조립 — 값은 바인딩
-        # 서브쿼리 2개 → 단일 조건부 집계 JOIN으로 교체
+        # 팀 경기만 상관 서브쿼리로 집계 (2026-11-10): 이전 'mps 전체 GROUP BY 후 JOIN'은 호출마다 테이블 전체를
+        # 집계해 5.8ms → 0.8ms/호출(결과 동일 검증). 예측·백테스트·시즌 시뮬·승강 PO가 모두 이 경로를 탄다.
+        # SUM은 NULL을 무시하므로 expected_goals IS NOT NULL 조건과 같은 값.
         cur.execute(f"""
             SELECT e.id, e.home_team_id=? AS is_home, e.home_score, e.away_score,
-                   mps_agg.xg_for, mps_agg.xg_against
+                   (SELECT SUM(s.expected_goals) FROM match_player_stats s
+                     WHERE s.event_id = e.id AND s.team_id = ?) AS xg_for,
+                   (SELECT SUM(s.expected_goals) FROM match_player_stats s
+                     WHERE s.event_id = e.id AND s.team_id IS NOT NULL AND s.team_id != ?) AS xg_against
             FROM events e
-            LEFT JOIN (
-                SELECT event_id,
-                       SUM(CASE WHEN team_id=? AND expected_goals IS NOT NULL
-                                THEN expected_goals END) AS xg_for,
-                       SUM(CASE WHEN team_id IS NOT NULL AND team_id != ?
-                                     AND expected_goals IS NOT NULL
-                                THEN expected_goals END) AS xg_against
-                FROM match_player_stats
-                GROUP BY event_id
-            ) mps_agg ON mps_agg.event_id=e.id
             WHERE e.tournament_id=?
               AND (e.home_team_id=? OR e.away_team_id=?)
               AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL
@@ -4514,7 +4499,6 @@ def get_pre_match_brief():
 # ═══════════════════════════════════════════════════════════════
 
 _PN_LINE = {"GK": 0, "DF": 1, "MF": 2, "FW": 3}
-_PN_LINE_KO = {"GK": "골키퍼", "DF": "수비", "MF": "미드필더", "FW": "공격"}
 
 
 def _pn_hub_notes(nodes, total_passes, matches):
@@ -4773,9 +4757,7 @@ def get_standings():
     return jsonify(result)
 
 
-# ── DB 설정 + 인덱스 ────────────────────────────────────
-DB_PATH = os.path.join(BASE_DIR, "players.db")
-
+# ── DB 인덱스 (DB_PATH는 파일 상단에서 정의) ──────────────────────
 def _ensure_indexes():
     """자주 쿼리되는 컬럼에 인덱스를 생성한다 (이미 있으면 무시)."""
     if not os.path.exists(DB_PATH):
@@ -6118,7 +6100,8 @@ def get_player_analytics():
 def get_league_dashboard():
     """K리그 전체 선수 인사이트 대시보드 (league=k1|k2, 기본 k2)"""
     year = request.args.get("year")   # None → 전체
-    tournament_id = _league_tid(request.args.get("league"))
+    # 기본 k2 — (구) 같은 이름 함수가 두 번 정의돼 뒤 정의(기본 '전체'→None)가 이겨, 생략 시 400이던 문제 (2026-11-10)
+    tournament_id = _league_tid((request.args.get("league") or "k2").strip())
     if tournament_id is None:
         return jsonify({"error": "invalid league"}), 400
 
@@ -6417,12 +6400,7 @@ def get_team_goal_timing():
 
 
 LEAGUE_TOURNAMENT_ID = {"k1": 410, "k2": 777}
-
-
-def _league_tid(league_raw):
-    """쿼리 파라미터 league → tournament_id. 기본값 k2(777). 잘못된 값은 None."""
-    key = (league_raw or "k2").strip().lower()
-    return LEAGUE_TOURNAMENT_ID.get(key)
+# _league_tid 는 인사이트 섹션에 한 번만 정의(같은 이름 중복 정의 제거, 2026-11-10)
 
 
 def _heatmap_teams_for_league(tournament_id, league_label=None):
@@ -9745,21 +9723,6 @@ _KID_TO_SSID = {
     kid: next((t["sofascore_id"] for t in TEAMS if t["id"] == slug), None)
     for kid, slug in KLEAGUE_TEAM_CODE.items()
 }
-
-def _fetch_kleague_month(league_id, year, month):
-    """K리그 공식 API에서 단일 월 경기 목록 반환 (병렬 호출용)."""
-    import urllib.request
-    url = "https://www.kleague.com/getScheduleList.do"
-    payload = json.dumps({"leagueId": str(league_id), "year": str(year), "month": str(month).zfill(2)}).encode("utf-8")
-    req = urllib.request.Request(url, data=payload,
-        headers={"Content-Type": "application/json; charset=UTF-8", "Accept": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data.get("data", {}).get("scheduleList", [])
-    except Exception:
-        return []
-
 
 def _fetch_all_games_db(league_id, year):
     """kleague_schedule DB + events round 조회 → API 호환 형식 리스트 반환."""

@@ -25,3 +25,12 @@
 | `recollect_target_events.py` | 1a00ed9 | 2026-06-01 | 특정 event_id의 선수 스탯 재수집 |
 
 남겨 둔 1회성 성격 스크립트(README에 도구로 소개됐거나 데이터 파일을 만드는 유일한 스크립트): `fix_swapped_scores.py`, `backfill_events.py`, `backfill_match_stats.py`, `crawl_stats_3yr.py`(→ `data/kleague_team_stats.json`), 초기 수집용 `crawl_*`·`fetch_*`.
+
+## 2026-11-10 정리
+
+| 파일 | 커밋 | 마지막 수정 | 용도 |
+|------|------|-------------|------|
+| `apply_name_ko_fix.py` | ab970df | 2026-11-04 | name_ko REVIEW 8건 교정 적용 (2026-11-04 운영 반영 완료) |
+| `dedupe_events.py` | f63c706 | 2026-11-04 | events 이중 등록 병합 (2026-11-04 용인FC 13+4그룹 운영 반영 완료 · 재생성 ID는 이후 remap_event_ids.py STEP 29) |
+| `crawl_stats_3yr.py` | 5b45060 | 2026-04-09 | 3시즌 선수 스탯 일괄 수집 (초기 구축용) |
+| `fetch_player_names.py` | 5b45060 | 2026-04-09 | mps.player_name NULL 백필 (가비아 실행 완료, NULL 51,064 → 0) |

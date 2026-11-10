@@ -53,3 +53,6 @@ qa_results.txt
 # 작업 중 임시 스크린샷 (차트 개편 검증용) — 결과 스크린샷(tt_*.png)만 추적
 analysis/output/_*.png
 static/dev/__lab.html
+
+# verify_tt_charts.py 가 실행할 때마다 다시 만드는 스크린샷 (2026-11-10)
+analysis/output/tt_*.png
