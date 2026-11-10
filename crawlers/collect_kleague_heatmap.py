@@ -16,7 +16,9 @@
 저장 규칙:
   - 대상: 종료 경기 중 heatmap_points가 없는 (경기, 선수)만 — SofaScore 원본이 있는 선수는 건드리지 않음.
   - 홈 GK 좌표로 방향을 정하지 못한 피리어드의 점은 버린다(뒤집힌 히트맵 저장 방지).
-  - 빈 응답 = 미공개(경기 다음 날 공개 추정) → 저장 안 하고 다음 실행에서 재시도.
+  - 빈 응답 = 미공개 → 저장 안 하고 다음 실행에서 재시도. 패스·슈팅(다음 날)과 달리 히트맵은 공개가 늦다:
+    2026-11-10 확인 — 10/24·25 경기는 11/2에, 11/1 경기는 11/9에 수집됐고 11/7·8 경기는 11/10에도 빈 응답
+    (같은 시점 과거 경기는 정상 응답 → API 차단 아님). 즉 약 1주 뒤 공개 → 월 05:00 정기 실행이 주로 채운다.
   - 원장 `kleague_recovery_log(kind='heatmap', player_id)` → 롤백:
       DELETE FROM heatmap_points WHERE (event_id, player_id) IN
         (SELECT event_id, player_id FROM kleague_recovery_log WHERE kind='heatmap');
