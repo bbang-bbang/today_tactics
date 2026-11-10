@@ -109,10 +109,12 @@ def build_side(conn, eid, side, team_id, formation):
     if len(starters) != 11:
         return None, f"{side} 포털 선발 {len(starters)}명"
     mps = conn.execute(
-        "SELECT s.player_id, s.shirt_number, s.position, p.name, p.name_ko FROM match_player_stats s "
+        "SELECT s.player_id, s.shirt_number, s.position, p.name, p.name_ko, s.minutes_played FROM match_player_stats s "
         "LEFT JOIN players p ON p.id = s.player_id WHERE s.event_id=? AND s.is_home=?", (eid, is_home)).fetchall()
     if not mps:
         return None, f"{side} SofaScore 선수 스탯 없음"
+    played = {r[0]: (r[5] or 0) for r in mps}
+    mps = [r[:5] for r in mps]
     by_shirt = {}
     for pid, shirt, pos, name, name_ko in mps:
         by_shirt.setdefault(shirt, []).append((pid, pos, name, name_ko))
@@ -123,6 +125,11 @@ def build_side(conn, eid, side, team_id, formation):
         if len(cand) != 1:   # 등번호 불일치/중복 → 같은 팀 mps에서 한글 이름으로 1명 확정 시도
             cand = [c for c in (x for v in by_shirt.values() for x in v)
                     if c[3] and norm_name(c[3]) == norm_name(s["name"])]
+        if len(cand) > 1:    # SofaScore 중복 선수 등록(같은 이름·등번호, 한쪽은 미출전) → 실제 출전자가 1명이면 그 선수
+            # 2026-11-10: 김해 #22 박상준 1634041(출전 없음) / 2188416(86분) 사례. 선발은 반드시 출전 >0.
+            on_pitch = [c for c in cand if played.get(c[0], 0) > 0]
+            if len(on_pitch) == 1:
+                cand = on_pitch
         if len(cand) != 1:
             return None, f"{side} 선발 #{s['back_no']} {s['name']} SofaScore ID 미확정"
         pid, pos, name, _ = cand[0]
