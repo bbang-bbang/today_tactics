@@ -2741,7 +2741,10 @@ _POISSON_MAX_GOALS = 5  # 스코어 매트릭스 최대 (0~5골)
 #       → draw_boost 0.06→0.18, dc_rho 0.00→0.10 (Dixon-Coles 무승부 보정 가산)
 # draw_boost 수식: new_draw% = (raw_draw + boost) / (1 + boost)
 _LEAGUE_CONSTANTS = {
-    410: {"home_adv": 0.98, "away_adj": 1.02, "draw_boost": 0.19, "dc_rho": 0.10, "shrinkage_k": 3},  # K1: 2026-05-27 draw_boost 0.04→0.19 (calibration 정상화). 이전 0.04는 무승부를 한 번도 argmax로 안 잡음(예측 0 vs 실제 27/90=30%). 오프라인 스윕(analysis/predict_param_sweep.py)으로 base rate 매칭값 채택 — 예측 무승부 0→29(≈실제27), 1X2 50.0→51.1%, brier flat. in-sample 최대 hit(52.2%)은 노이즈로 판단해 안 좇음. home_adv/away_adj는 2026-05-12 미세보정 backfire(-1.3%p) 후 유지.
+    # K1 "rolling_home": 2026-11-10 — home_adv/away_adj 고정값(2026에 맞춘 0.98/1.02) 대신 경기 직전 228경기 홈/원정 득점비를
+    #   매 경기 추정(_rolling_home_coefs). 사전에 정한 창·수축값(튜닝 없음) walk-forward: K1 2024 32.0→37.1%, 2025 43.3→49.0%,
+    #   2026 45.3→44.3%, 3시즌 가중 40.1→43.1% · Brier 0.2185→0.2171. K2는 개선 없어 미적용. 상세 checklist/work-log-2026-11-10.md
+    410: {"home_adv": 0.98, "away_adj": 1.02, "draw_boost": 0.19, "dc_rho": 0.10, "shrinkage_k": 3, "rolling_home": True},  # K1: 2026-05-27 draw_boost 0.04→0.19 (calibration 정상화). 이전 0.04는 무승부를 한 번도 argmax로 안 잡음(예측 0 vs 실제 27/90=30%). 오프라인 스윕(analysis/predict_param_sweep.py)으로 base rate 매칭값 채택 — 예측 무승부 0→29(≈실제27), 1X2 50.0→51.1%, brier flat. in-sample 최대 hit(52.2%)은 노이즈로 판단해 안 좇음. home_adv/away_adj는 2026-05-12 미세보정 backfire(-1.3%p) 후 유지.
 
     777: {"home_adv": 0.96, "away_adj": 0.90, "draw_boost": 0.18, "dc_rho": 0.10, "shrinkage_k": 0, "use_sos": True},  # K2: draw boost ↑↑ + Dixon-Coles ρ. 2026-05-27 use_sos 활성화 — 오프라인 검증상 전반기 +6%p·후반 무해·brier flat (전·후반 분할 검증). K1은 use_sos 미설정(SOS가 hit 악화).
 }
@@ -2769,8 +2772,41 @@ def _pcache_set(key, val):
     _PRED_CACHE[key] = (time.time(), val)
 
 
-def _league_coefs(tid_filter):
-    return _LEAGUE_CONSTANTS.get(tid_filter, _DEFAULT_LEAGUE_CONSTANTS)
+def _league_coefs(tid_filter, cur=None, as_of_ts=None):
+    """리그 상수. cur·as_of_ts를 주면 rolling_home 리그는 그 시점 직전 데이터로 홈/원정 계수를 대체."""
+    base = _LEAGUE_CONSTANTS.get(tid_filter, _DEFAULT_LEAGUE_CONSTANTS)
+    if cur is None or as_of_ts is None or not base.get("rolling_home"):
+        return base
+    rolled = _rolling_home_coefs(cur, tid_filter, as_of_ts)
+    return {**base, **rolled} if rolled else base
+
+
+_ROLL_HOME_WINDOW = 228   # 직전 경기 수 (K1 한 시즌 ≈ 228)
+_ROLL_HOME_SHRINK = 60    # 홈=원정(1.0) 쪽으로 당기는 가상 경기 수
+
+
+def _rolling_home_coefs(cur, tid_filter, as_of_ts):
+    """as_of_ts 직전 _ROLL_HOME_WINDOW경기의 홈/원정 평균 득점비 → {home_adv, away_adj}.
+    가상 _ROLL_HOME_SHRINK경기(홈=원정)로 수축. 데이터 없으면 None(고정값 사용)."""
+    key = f"roll_home:{tid_filter}:{as_of_ts}"
+    hit = _pcache_get(key)
+    if hit is not None:
+        return hit or None
+    cur.execute("""
+        SELECT COUNT(*), SUM(home_score), SUM(away_score) FROM (
+            SELECT home_score, away_score FROM events
+            WHERE tournament_id=? AND date_ts < ?
+              AND home_score IS NOT NULL AND away_score IS NOT NULL
+            ORDER BY date_ts DESC LIMIT ?)
+    """, (tid_filter, as_of_ts, _ROLL_HOME_WINDOW))
+    n, hg, ag = cur.fetchone()
+    res = {}
+    if n and (hg or ag):
+        m = (hg + ag) / 2.0                      # 총 득점의 절반 = 홈=원정일 때 각 팀 득점
+        pad = _ROLL_HOME_SHRINK * m / n          # 가상 경기분 득점
+        res = {"home_adv": (hg + pad) / (m + pad), "away_adj": (ag + pad) / (m + pad)}
+    _pcache_set(key, res)
+    return res or None
 
 
 def _poisson_pmf(k, lam):
@@ -2969,7 +3005,7 @@ def _predict_core(cur, home_ss, away_ss, tid_filter, as_of_ts, year_str,
     """
     if decay is None:
         decay = _DECAY_LAMBDA
-    coefs = _league_coefs(tid_filter)
+    coefs = _league_coefs(tid_filter, cur, as_of_ts)
     shrinkage_k = coefs.get("shrinkage_k", 0)
     # as_of_ts 포함 필수: 키에 없으면 rolling backtest가 첫 매치의 league_avg를 전 매치에 재사용하고,
     # 실시간 호출(as_of=now, 전 시즌 데이터)이 캐시를 오염시켜 과거 매치 예측에 look-ahead 유입.
@@ -3532,7 +3568,8 @@ def get_match_prediction():
     a_atk_adj = a_atk
 
     # 최종 람다
-    _coefs   = _league_coefs(tid_filter)
+    # rolling_home 리그는 현재 시점 직전 데이터로 홈/원정 계수 추정 (시간 단위로 끊어 캐시 키 안정화)
+    _coefs   = _league_coefs(tid_filter, cur, int(time.time()) // 3600 * 3600)
     lam_home = max(0.1, h_atk_adj * a_def * league_avg * _coefs["home_adv"])
     lam_away = max(0.1, a_atk_adj * h_def * league_avg * _coefs["away_adj"])
 
