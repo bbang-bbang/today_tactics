@@ -114,18 +114,20 @@ async def main():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    # 종료 경기 중 mps row 없거나 minutes_played NULL인 경기
+    # 종료 경기 중 홈·원정 어느 한쪽이라도 mps(출전시간 있는 행)가 없는 경기
     # (mins NULL은 SofaScore가 매치 직후 늦게 반영 — 후속 백필 필요)
+    # 2026-11-10: 예전엔 '경기 전체에 mps 없음'만 잡아, 시즌 초 수원삼성만 수집된 경기(상대 팀 0명) 14건이
+    # 계속 누락됐다. 저장은 INSERT OR REPLACE 라 이미 있는 쪽은 같은 값으로 덮어써도 무해.
     cur.execute("""
         SELECT e.id, e.date_ts, e.home_team_id, e.away_team_id
         FROM events e
         WHERE e.tournament_id = ?
           AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL
           AND e.id < 50000000
-          AND NOT EXISTS (
-            SELECT 1 FROM match_player_stats mps
-            WHERE mps.event_id = e.id AND mps.minutes_played IS NOT NULL
-          )
+          AND (NOT EXISTS (SELECT 1 FROM match_player_stats mps
+                           WHERE mps.event_id = e.id AND mps.is_home = 1 AND mps.minutes_played IS NOT NULL)
+            OR NOT EXISTS (SELECT 1 FROM match_player_stats mps
+                           WHERE mps.event_id = e.id AND mps.is_home = 0 AND mps.minutes_played IS NOT NULL))
         ORDER BY e.date_ts DESC
     """, (tid_filter,))
     events_todo = cur.fetchall()
@@ -164,7 +166,13 @@ async def main():
                 continue
 
             saved = 0
+            # 이미 출전시간까지 수집된 쪽은 건너뜀 — INSERT OR REPLACE 가 날씨·match_date 등
+            # 다른 STEP이 채운 컬럼을 지우지 않도록 (한쪽만 비어 있던 경기 보강용, 2026-11-10)
+            have_side = {r[0] for r in conn.execute(
+                "SELECT DISTINCT is_home FROM match_player_stats WHERE event_id=? AND minutes_played IS NOT NULL", (eid,))}
             for side, is_home in [("home", 1), ("away", 0)]:
+                if is_home in have_side:
+                    continue
                 side_data = data.get(side, {}) or {}
                 players  = side_data.get("players", []) or []
                 for entry in players:
