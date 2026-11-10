@@ -6,6 +6,10 @@
 
 ## 🔴 P1 — 가치 큰 단기 작업
 
+### [ ] 🔁 SofaScore 경기 ID 재생성 자동 감지 STEP 편입 (2026-11-10 등록)
+- 용인FC 16경기가 SofaScore에서 새 ID로 재생성돼 시즌 내내 mps·히트맵 미수집이었다(11/10 `crawlers/remap_event_ids.py`로 교정, 상세 work-log 11/10).
+- 할 일: update_data에 `remap_event_ids.py --detect --apply` STEP 추가(STEP 4·5 mps 백필 **앞**), 예정 경기 중복(구 ID 404 + 새 ID 존재) 정리 로직 포함 여부 결정(삭제 = Red). 크롤 파이프라인 변경 = Red → 사용자 확인.
+
 ### [ ] 🔍 K1 예측 시즌 간 불안정 — 2024 기준선 미달 (2026-11-10 검증 리포트에서 발견)
 - **사실**: K1 2024 rolling 194경기 — 모델 32.0% vs 항상 홈 승 45.9%, Brier skill −4.4%. 무승부 예측 93건 vs 실제 45건(draw_boost 0.19가 홈 강세 시즌에 과다). 2025는 43.3% vs 승점률 43.9%(동률), 2026 표본 밖(5/28~) 43.0% vs 34.2%.
 - **할 일(오프라인 분석 먼저)**: 시즌별 draw_boost·home_adv 고정값 대신 rolling 무승부율·홈 승률로 보정하는 안을 2023~2025 walk-forward로 검증. 알고리즘 변경 = **Red**(사용자 확인 필수).
