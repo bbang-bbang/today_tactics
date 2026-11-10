@@ -107,6 +107,7 @@ async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--league", choices=["K1", "K2"], default="K1")
     parser.add_argument("--limit",  type=int, default=None, help="최대 수집 경기 수 (테스트용)")
+    parser.add_argument("--since",  default="2000-01-01", help="이 날짜(YYYY-MM-DD) 이후 경기만 — 과거 시즌 백필 범위 제한용")
     args = parser.parse_args()
 
     tid_filter = 410 if args.league == "K1" else 777
@@ -124,12 +125,13 @@ async def main():
         WHERE e.tournament_id = ?
           AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL
           AND e.id < 50000000
+          AND e.date_ts >= strftime('%s', ?)
           AND (NOT EXISTS (SELECT 1 FROM match_player_stats mps
                            WHERE mps.event_id = e.id AND mps.is_home = 1 AND mps.minutes_played IS NOT NULL)
             OR NOT EXISTS (SELECT 1 FROM match_player_stats mps
                            WHERE mps.event_id = e.id AND mps.is_home = 0 AND mps.minutes_played IS NOT NULL))
         ORDER BY e.date_ts DESC
-    """, (tid_filter,))
+    """, (tid_filter, args.since))
     events_todo = cur.fetchall()
     if args.limit:
         events_todo = events_todo[:args.limit]
