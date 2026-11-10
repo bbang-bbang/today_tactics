@@ -266,7 +266,8 @@ def main() -> None:
     ap.add_argument("--db", default=DB_PATH)
     args = ap.parse_args()
 
-    conn = sqlite3.connect(args.db)
+    # 다른 수집기와 동시에 돌 때 'database is locked'로 죽지 않게 잠금 대기 (기본 5초 → 60초, 2026-11-10)
+    conn = sqlite3.connect(args.db, timeout=60)
     conn.row_factory = sqlite3.Row
     if args.compare:
         compare(conn, args.compare)
