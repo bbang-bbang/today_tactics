@@ -9,7 +9,7 @@
     <link rel="apple-touch-icon" href="/static/img/favicon.png">
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=127">
+    <link rel="stylesheet" href="/static/css/style.css?v=129">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/static/js/boot.js?v=1"></script>
 </head>
@@ -103,7 +103,10 @@
                     <button class="ws-team-mode active" data-tmode="analysis" role="tab" aria-selected="true">📊 단일 팀 분석</button>
                     <button class="ws-team-mode" data-tmode="compare" role="tab" aria-selected="false">⚖️ 팀 비교</button>
                     <button class="ws-team-mode" data-tmode="insights" role="tab" aria-selected="false">🔬 심화 인사이트</button>
+                    <button class="ws-team-mode" data-tmode="recruit" role="tab" aria-selected="false">🧭 영입 추천</button>
                 </div>
+                <!-- 영입 추천 — recruit.js 가 채움 -->
+                <div id="ws-team-recruit" class="rc-wrap hidden" aria-live="polite"></div>
                 <!-- #team-analysis-modal · #team-compare-modal 이 workspace.js 에 의해 여기로 재배치됨 -->
                 <!-- 심화 인사이트 (팀·경기 단위 차트) — 선수 탭에 있던 것을 팀 탭으로 이동. 리그/시즌 필터는 선수 탭 인사이트와 공유 -->
                 <div id="ws-team-insights" class="hidden">
@@ -1038,11 +1041,12 @@
         "ins_charts": "/static/js/ins_charts.js?v=6",
         "tera": "/static/vendor/tera-chart-7.0.2.min.js?v=1",
         "tt_charts": "/static/js/tt_charts.js?v=11",
-        "tt_dash": "/static/js/tt_dash.js?v=2"
+        "tt_dash": "/static/js/tt_dash.js?v=2",
+        "recruit": "/static/js/recruit.js?v=2"
     }</script>
 
     <!-- 작업공간 탭 컨트롤러 — 반드시 모든 모듈 스크립트 뒤에 로드 -->
-    <script src="/static/js/workspace.js?v=19"></script>
+    <script src="/static/js/workspace.js?v=20"></script>
 
     <!-- 온보딩 오버레이 -->
     <div id="onboarding-overlay" class="ob-overlay" style="display:none" aria-modal="true" role="dialog" aria-label="Today Tactics 소개">

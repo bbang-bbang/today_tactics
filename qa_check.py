@@ -239,6 +239,14 @@ d_bt2 = get('/api/prediction-backtest?league=k2&year=2026')
 qa('backtest K2 n_total>0',   lambda: assert_(d_bt2['n_total'] > 0))
 qa('backtest K2 hit>33%',     lambda: assert_(d_bt2['hit_1x2_pct'] > 33.3, f"{d_bt2['hit_1x2_pct']}%"))
 qa('backtest K2 brier<0.35',  lambda: assert_(d_bt2['brier_score'] < 0.35, f"{d_bt2['brier_score']}"))
+d_rc = get('/api/team-recruit?team=suwon')
+qa('영입 추천 후보는 다른 팀·조건 충족·점수 0~100', lambda: assert_(
+    all(c['team_slug'] != 'suwon' and c['mins'] >= d_rc['filters']['min_minutes'] and 0 <= c['fit'] <= 100
+        for n in d_rc['needs'] for c in n['candidates'])
+    and all(n['group'] in ('ST', 'W', 'AM', 'CM', 'DM', 'FB', 'CB') for n in d_rc['needs'])))
+qa('영입 추천 나이 필터·잘못된 입력', lambda: assert_(
+    all((c['age'] or 99) <= 25 for n in get('/api/team-recruit?team=gwangju&max_age=25')['needs'] for c in n['candidates'])
+    and _brief_status('/api/team-recruit?team=nope') == 404 and _brief_status('/api/team-recruit?team=suwon&scope=x') == 400))
 d_po = get('/api/promotion-playoff')
 qa('승강 PO 대진 확률 합 = 100 - 미개최', lambda: assert_(
     not d_po.get('ready') or abs(sum(m['prob'] for m in d_po['matchups']) + d_po['no_po_pct'] - 100) <= 1.5,

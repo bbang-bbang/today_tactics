@@ -8600,6 +8600,63 @@ body.pr-expanded-lock {
 }
 .season-sim-bar:empty { display: none; }
 
+/* ── 영입 추천 (팀 탭) ── */
+.rc-wrap { padding: 4px 8px 16px; color: #e3eaff; font-size: 12px; line-height: 1.5; }
+.rc-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 20px; margin-bottom: 10px; }
+.rc-title { font-size: 16px; font-weight: 700; margin: 0; }
+.rc-ctls { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-left: auto; }
+.rc-ctl { display: flex; flex-direction: column; gap: 2px; color: #94a3b8; font-size: 12px; }
+.rc-ctl select {
+    background: #0f1a2e; color: #e3eaff; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px;
+    padding: 5px 8px; font-size: 12px; min-width: 110px; cursor: pointer; transition: border-color 0.15s ease-in-out;
+}
+.rc-ctl select:hover { border-color: rgba(96, 165, 250, 0.6); }
+.rc-ctl select:focus-visible { outline: 2px solid #60a5fa; outline-offset: 1px; }
+.rc-muted { color: #94a3b8; font-weight: 400; }
+.rc-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 12px; margin-bottom: 12px;
+    background: rgba(15, 25, 45, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; }
+.rc-strip-lead { font-weight: 600; margin-right: 6px; }
+.rc-gchip { padding: 3px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); }
+.rc-gchip b { font-variant-numeric: tabular-nums; }
+.rc-gchip.is-need { border-color: rgba(250, 204, 21, 0.6); background: rgba(250, 204, 21, 0.08); }
+.rc-need { background: rgba(15, 25, 45, 0.45); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 12px; }
+.rc-need-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.rc-need-head h3 { margin: 0; font-size: 14px; color: #facc15; }
+.rc-need-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 6px; }
+.rc-k { color: #cbd5e1; font-weight: 600; min-width: 64px; }
+.rc-weak { padding: 1px 8px; border-radius: 4px; background: rgba(248, 113, 113, 0.12); color: #fecaca; }
+.rc-weak b { margin: 0 3px 0 6px; font-variant-numeric: tabular-nums; }
+.rc-sep { color: #475569; margin: 0 2px; }
+.rc-plink { background: none; border: 0; padding: 0; color: #93c5fd; cursor: pointer; font: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+.rc-plink:hover { color: #bfdbfe; }
+.rc-plink:active { color: #fff; }
+.rc-plink:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; border-radius: 2px; }
+.rc-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+.rc-table th, .rc-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); text-align: left; vertical-align: middle; }
+.rc-table thead th { color: #94a3b8; font-weight: 600; white-space: nowrap; }
+.rc-table tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
+.rc-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rc-rank { color: #94a3b8; width: 22px; }
+.rc-name { font-weight: 600; }
+.rc-sub { display: block; color: #94a3b8; font-size: 12px; }
+.rc-lg { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 4px; font-size: 12px; }
+.rc-lg-K1 { background: rgba(96, 165, 250, 0.16); color: #bfdbfe; }
+.rc-lg-K2 { background: rgba(167, 139, 250, 0.16); color: #ddd6fe; }
+.rc-pbar { display: inline-block; width: 46px; height: 6px; margin-right: 6px; vertical-align: middle;
+    background: rgba(255, 255, 255, 0.08); border-radius: 3px; overflow: hidden; }
+.rc-pbar i { display: block; height: 100%; background: #60a5fa; }
+.rc-fit b { color: #7bed9f; }
+.rc-pool { margin: 6px 0 0; font-size: 12px; }
+.rc-empty, .rc-loading, .rc-error { padding: 14px; color: #94a3b8; }
+.rc-error { color: #fca5a5; }
+.rc-notes { color: #94a3b8; margin-top: 6px; }
+.rc-notes summary { cursor: pointer; color: #cbd5e1; }
+.rc-notes summary:hover { color: #fff; }
+.rc-notes summary:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.rc-notes ul { margin: 6px 0 0 16px; padding: 0; }
+@media (max-width: 1100px) { .rc-ctls { margin-left: 0; } .rc-table .rc-sub { display: none; } }
+
 /* ── 승강 PO 시나리오 ── */
 .po-scenario { margin: 0 0 10px; }
 .po-card {

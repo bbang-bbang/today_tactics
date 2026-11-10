@@ -131,8 +131,18 @@
             b.setAttribute("aria-selected", on ? "true" : "false");
         });
         const ana = $("team-analysis-modal"), cmp = $("team-compare-modal"), ins = $("ws-team-insights");
+        const rec = $("ws-team-recruit");
         if (ins) ins.classList.toggle("hidden", mode !== "insights");
-        if (mode === "insights") {
+        if (rec) rec.classList.toggle("hidden", mode !== "recruit");
+        if (mode === "recruit") {
+            // 영입 추천: 단일 팀 분석에서 고른 팀을 기본값으로 (recruit.js)
+            if (ana) ana.classList.add("hidden");
+            if (cmp) cmp.classList.add("hidden");
+            const sel = $("ta-team-select");
+            lazyLoadSeq(["recruit"]).then(() => {
+                if (_current === "team" && _teamMode === "recruit" && window.ttRecruit) window.ttRecruit.show(sel && sel.value);
+            }).catch(lazyFail);
+        } else if (mode === "insights") {
             // 심화 인사이트(팀·경기 단위 차트): 모듈·차트 번들 로드 후 표시 시점에 그린다 (탭 이탈 시 늦은 완료는 무시)
             if (ana) ana.classList.add("hidden");
             if (cmp) cmp.classList.add("hidden");

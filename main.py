@@ -6930,8 +6930,9 @@ def _tp_metric(row, key):
             "pass_acc": row.get("pass_acc"), "rating": row.get("rating")}.get(key)
 
 
-def _tp_apply_scores(rows):
-    """각 행에 score(0~100)·score_n·score_group 을 단다. 비교군 = (리그, 세부 포지션) → 8명 미만이면 리그 합산."""
+def _tp_apply_scores(rows, keep_pcts=False):
+    """각 행에 score(0~100)·score_n·score_group 을 단다. 비교군 = (리그, 세부 포지션) → 8명 미만이면 리그 합산.
+    keep_pcts=True 이면 지표별 백분위를 r["_pcts"]에 남긴다(응답 크기 때문에 기본은 끔)."""
     def grp(r):
         return r.get("detail") or _TP_BROAD_TO_DETAIL.get(r.get("pos"), "CM")
     for r in rows:                                             # 세부 포지션 기록이 없는 선수 → 대분류로 추정(포지션 칩 필터에서 빠지지 않게)
@@ -6969,7 +6970,10 @@ def _tp_apply_scores(rows):
                 cache[ck] = [x for x in (_tp_metric(o, m) for o in pool) if x is not None]
             if len(cache[ck]) < _TP_MIN_COHORT:
                 continue
-            num += wt * pct(cache[ck], v)
+            pv = pct(cache[ck], v)
+            if keep_pcts:
+                r.setdefault("_pcts", {})[m] = round(pv, 1)
+            num += wt * pv
             den += wt
         if den >= 0.5:                                         # 핵심 지표 절반 이상이 있어야 점수 부여
             r["score"] = round(num / den, 1)
@@ -6982,6 +6986,21 @@ def insights_top_performers():
     """포지션별 TOP 퍼포머 (최소 3경기 이상, 90분 환산). league=k1|k2|all 필터 지원"""
     year = request.args.get("year") or _current_season()
     league = request.args.get("league", "all")
+    all_rows, n_official = _top_performer_rows(year, league)
+    return jsonify({
+        "all": all_rows,
+        "meta": {
+            "year": year, "league": league, "official_players": n_official, "players": len(all_rows),
+            "min_cohort": _TP_MIN_COHORT, "min_games": 5, "min_minutes": 450,
+            "weights": {g: [{"key": k, "label": _TP_METRIC_LABEL[k], "w": w} for k, w in ws.items()] for g, ws in _TP_WEIGHTS.items()},
+            "group_labels": {g: DETAIL_POS_LABELS.get(g, g) for g in _TP_WEIGHTS},
+        },
+    })
+
+
+def _top_performer_rows(year, league, keep_pcts=False):
+    """TOP 퍼포머 행(선수별 90분 환산 지표 + 리그×세부 포지션 백분위 종합 점수) 계산 → (rows, 공식 기록 적용 선수 수).
+    keep_pcts=True 이면 각 행에 지표별 백분위 `_pcts`를 남긴다(영입 추천용)."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     date_cond, date_params = _year_date_params(year)
@@ -6994,8 +7013,6 @@ def insights_top_performers():
             "team": _ko_team(r["team_id"], ""),
             "games": r["games"], "mins": r["mins"],
         }
-
-    result = {}
 
     # ── 통합 리더보드 (포지션 무관) — 단일 표에 역할별 비교 지표를 모두 실어,
     #    프런트의 포지션 칩이 컬럼 세트를 바꿔가며 보여준다 (공격=골/xG, 미드=패스, 수비=태클/인터셉트 등).
@@ -7152,17 +7169,151 @@ def insights_top_performers():
         else:
             x["src"] = "sofa"
 
-    _tp_apply_scores(all_rows)
-    result["all"] = all_rows
-    result["meta"] = {
-        "year": year, "league": league, "official_players": n_official, "players": len(all_rows),
-        "min_cohort": _TP_MIN_COHORT, "min_games": 5, "min_minutes": 450,
-        "weights": {g: [{"key": k, "label": _TP_METRIC_LABEL[k], "w": w} for k, w in ws.items()] for g, ws in _TP_WEIGHTS.items()},
-        "group_labels": {g: DETAIL_POS_LABELS.get(g, g) for g in _TP_WEIGHTS},
-    }
-
+    _tp_apply_scores(all_rows, keep_pcts=keep_pcts)
     conn.close()
-    return jsonify(result)
+    return all_rows, n_official
+
+
+# ── 영입 추천 (2026-11-10) ───────────────────────────────────────────────────
+# 팀의 약한 세부 포지션 = 그 포지션 선수들의 TOP 퍼포머 종합 점수(리그×포지션 백분위)를 출전 시간으로 가중한 값이
+# 같은 리그 팀들 중 낮은 곳. 그 포지션 안에서 팀이 특히 낮은 지표(평점 제외) 2개를 '보강 포인트'로 삼고,
+# 후보 적합도 = 종합 점수 50% + 보강 포인트 지표 백분위 평균 50%. GK는 종합 점수 체계 밖이라 제외.
+_RC_GROUPS = ("ST", "W", "AM", "CM", "DM", "FB", "CB")
+_RC_NEEDS_MAX = 3
+_RC_CANDIDATES = 6
+
+
+@app.route("/api/team-recruit")
+@cached_response(ttl=1800)
+def team_recruit():
+    """팀별 영입 추천: 약한 포지션·지표 진단 + K1·K2 후보(리그·나이·출전 필터)."""
+    slug = (request.args.get("team") or "").strip().lower()
+    info = next((t for t in TEAMS if t["id"] == slug), None)
+    if not info or info.get("league") not in ("K1", "K2"):
+        return jsonify({"error": "unknown team"}), 404
+    year = request.args.get("year") or _current_season()
+    if not (year.isdigit() and len(year) == 4):
+        return jsonify({"error": "invalid year"}), 400
+    scope = (request.args.get("scope") or "all").lower()
+    if scope not in ("all", "k1", "k2", "same"):
+        return jsonify({"error": "invalid scope"}), 400
+    try:
+        max_age = int(request.args.get("max_age")) if request.args.get("max_age") else None
+        min_mins = int(request.args.get("min_minutes") or 900)
+    except ValueError:
+        return jsonify({"error": "invalid filter"}), 400
+    min_mins = max(450, min(min_mins, 3000))
+    ss, league = info["sofascore_id"], info["league"]
+
+    ck = f"tp_rows_pcts:{year}"
+    rows = _pcache_get(ck)
+    if rows is None:
+        rows, _n = _top_performer_rows(year, "all", keep_pcts=True)
+        _pcache_set(ck, rows)
+    scored = [r for r in rows if r.get("score") is not None and r.get("detail") in _RC_GROUPS]
+
+    # 나이·국적·신체 (players 마스터)
+    pids = [r["player_id"] for r in scored]
+    meta = {}
+    if pids:
+        conn = sqlite3.connect(DB_PATH)
+        try:
+            ph = ",".join("?" * len(pids))   # 자리표시자만 조립, 값은 바인딩
+            for pid, dob, nat, h, foot in conn.execute(
+                    "SELECT id, dob, nationality, height, preferred_foot FROM players WHERE id IN (" + ph + ")", pids):
+                age = None
+                try:
+                    if dob:
+                        age = int((time.time() - float(dob)) / (365.25 * 86400))
+                except (TypeError, ValueError):
+                    age = None
+                meta[pid] = {"age": age, "nationality": nat, "height": h, "foot": foot}
+        finally:
+            conn.close()
+
+    # 팀×포지션 강도 (같은 리그) — 출전 시간 가중 평균 종합 점수
+    strength = {}
+    for r in scored:
+        if r.get("league") != league or not r.get("team_id"):
+            continue
+        k = (r["team_id"], r["detail"])
+        s = strength.setdefault(k, [0.0, 0])
+        s[0] += r["score"] * (r["mins"] or 0); s[1] += r["mins"] or 0
+    league_teams = {t["sofascore_id"] for t in TEAMS if t.get("league") == league and t.get("sofascore_id")}
+
+    needs = []
+    for g in _RC_GROUPS:
+        vals = {tid: s[0] / s[1] for (tid, gg), s in strength.items() if gg == g and s[1] and tid in league_teams}
+        mine = vals.get(ss)
+        order = sorted(vals.values(), reverse=True)
+        rank = (order.index(mine) + 1) if mine is not None else None
+        needs.append({"group": g, "label": DETAIL_POS_LABELS.get(g, g),
+                      "team_score": round(mine, 1) if mine is not None else None,
+                      "league_median": round(sorted(vals.values())[len(vals) // 2], 1) if vals else None,
+                      "rank": rank, "n_teams": len(vals)})
+    # 리그 팀 절반 이상이 기록을 가진 포지션만 판단 (세부 포지션 기록이 드문 그룹 — 예: AM·DM — 은 '선수 없음'으로 오판하지 않게)
+    needs = [n for n in needs if n["n_teams"] >= max(3, len(league_teams) // 2)]
+    # 우선순위: 해당 포지션 선수 없음(None) → 순위 낮은 순. 리그 하위 절반만, 없으면 가장 약한 2개
+    needs.sort(key=lambda n: (n["team_score"] is not None, -(n["rank"] or 0) / max(n["n_teams"], 1)))
+    weak = [n for n in needs if n["team_score"] is None or (n["rank"] and n["rank"] > n["n_teams"] / 2)]
+    picked = (weak or needs[:2])[:_RC_NEEDS_MAX]
+
+    ss_slug = {t["sofascore_id"]: t["id"] for t in TEAMS if t.get("sofascore_id")}
+    for n in picked:
+        g = n["group"]
+        mine_rows = [r for r in scored if r.get("team_id") == ss and r["detail"] == g]
+        tot = sum(r["mins"] or 0 for r in mine_rows)
+        metric_keys = [m for m in _TP_WEIGHTS[g] if m != "rating"]
+        wm = []
+        for m in metric_keys:
+            num = sum((r.get("_pcts") or {}).get(m, 0) * (r["mins"] or 0) for r in mine_rows if m in (r.get("_pcts") or {}))
+            den = sum(r["mins"] or 0 for r in mine_rows if m in (r.get("_pcts") or {}))
+            if den:
+                wm.append({"key": m, "label": _TP_METRIC_LABEL[m], "pct": round(num / den)})
+        wm.sort(key=lambda x: x["pct"])
+        focus = [w["key"] for w in wm[:2]]
+        n["weak_metrics"] = wm[:2]
+        n["current"] = [{"player_id": r["player_id"], "name": r["name"], "mins": r["mins"], "score": r["score"],
+                         "share": round((r["mins"] or 0) / tot * 100) if tot else None}
+                        for r in sorted(mine_rows, key=lambda r: -(r["mins"] or 0))[:4]]
+        cands = []
+        for r in scored:
+            if r["detail"] != g or r.get("team_id") == ss or (r["mins"] or 0) < min_mins:
+                continue
+            lg = r.get("league") or ""
+            if (scope == "k1" and lg != "K1") or (scope == "k2" and lg != "K2") or (scope == "same" and lg != league):
+                continue
+            mt = meta.get(r["player_id"], {})
+            if max_age and (mt.get("age") is None or mt["age"] > max_age):
+                continue
+            pc = r.get("_pcts") or {}
+            fv = [pc[m] for m in focus if m in pc]
+            fit = 0.5 * r["score"] + 0.5 * (sum(fv) / len(fv) if fv else r["score"])
+            cands.append({
+                "player_id": r["player_id"], "name": r["name"], "team": r.get("team"),
+                "team_slug": ss_slug.get(r.get("team_id")), "league": lg,
+                "age": mt.get("age"), "nationality": mt.get("nationality"), "height": mt.get("height"), "foot": mt.get("foot"),
+                "games": r["games"], "mins": r["mins"], "score": r["score"], "fit": round(fit, 1),
+                "focus_pcts": {m: round(pc[m]) for m in focus if m in pc},
+                "goals": r.get("goals"), "assists": r.get("assists"), "rating": r.get("rating"),
+                "detail_est": bool(r.get("detail_est")),
+            })
+        cands.sort(key=lambda c: -c["fit"])
+        n["candidates"] = cands[:_RC_CANDIDATES]
+        n["pool_size"] = len(cands)
+
+    return jsonify({
+        "team": {"slug": slug, "name": info.get("short") or info.get("name"), "league": league, "primary": info.get("primary")},
+        "year": year, "filters": {"scope": scope, "max_age": max_age, "min_minutes": min_mins},
+        "needs": picked, "all_groups": needs,
+        "metric_labels": _TP_METRIC_LABEL, "group_labels": {g: DETAIL_POS_LABELS.get(g, g) for g in _RC_GROUPS},
+        "notes": [
+            "종합 점수 = 같은 리그·같은 세부 포지션 선수 중 백분위(0~100)를 역할별 가중치로 합산 — 선수 탭 TOP 퍼포머와 같은 기준",
+            "후보 적합도 = 종합 점수 50% + 이 팀이 그 포지션에서 약한 지표 2개의 백분위 50%",
+            "백분위는 선수가 뛴 리그 안에서 계산 — K2 선수의 수치는 K2 기준(리그 간 격차 미보정)",
+            "골키퍼는 종합 점수 체계에 없어 제외 · 몸값·계약·부상 정보 없음",
+        ],
+    })
 
 
 def _league_tid(league):
