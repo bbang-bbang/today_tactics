@@ -243,8 +243,8 @@ def parse_lineup_html(html: str):
     return out
 
 
-def collect_lineups(conn: sqlite3.Connection, limit: int | None = None) -> int:
-    """kleague_event_map에 매핑된 event들 중 kleague_lineup 미보유 매치만 수집."""
+def collect_lineups(conn: sqlite3.Connection, limit: int | None = None, min_year: int = 0) -> int:
+    """kleague_event_map에 매핑된 event들 중 kleague_lineup 미보유 매치만 수집 (min_year 이후 시즌만)."""
     cur = conn.cursor()
     cur.execute("""
         SELECT m.sofa_event_id, m.year, m.league_id, m.game_id, m.meet_seq
@@ -252,8 +252,8 @@ def collect_lineups(conn: sqlite3.Connection, limit: int | None = None) -> int:
         LEFT JOIN (
             SELECT DISTINCT sofa_event_id FROM kleague_lineup
         ) l ON l.sofa_event_id = m.sofa_event_id
-        WHERE l.sofa_event_id IS NULL
-    """)
+        WHERE l.sofa_event_id IS NULL AND m.year >= ?
+    """, (min_year,))
     todo = cur.fetchall()
     if limit:
         todo = todo[:limit]
@@ -296,6 +296,7 @@ def main() -> int:
     ap.add_argument("--year", type=int, default=2026)
     ap.add_argument("--years", default="2024,2025,2026")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--min-year", type=int, default=0, help="lineup 단계: 이 시즌 이후 경기만 (과거 시즌 백필 범위 제한)")
     args = ap.parse_args()
 
     conn = sqlite3.connect(str(DB))
@@ -315,7 +316,7 @@ def main() -> int:
         map_events(conn)
     if args.phase in ("lineup", "all"):
         print("[lineup] match.do HTML 파싱 수집")
-        collect_lineups(conn, limit=args.limit)
+        collect_lineups(conn, limit=args.limit, min_year=args.min_year)
     conn.close()
     return 0
 
