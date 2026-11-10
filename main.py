@@ -9224,7 +9224,7 @@ _TREND_WINDOW = 5            # '최근 흐름' 비교 창(라운드)
 @cached_response(ttl=3600)
 def insights_standings_trend():
     """라운드별 순위 추이 (2026-11-05). 라운드 r 종료 시점의 누적 승점으로 순위를 매긴다
-    (승점 → 득실차 → 다득점, 프로젝트 순위 규칙과 동일). 팀이 라운드를 건너뛰면(연기) 직전 값 유지.
+    (승점 → 다득점 → 득실차, K리그 규정 — 2026-11-11 정정). 팀이 라운드를 건너뛰면(연기) 직전 값 유지.
     전 시즌(year=all)이면 가장 최근 시즌 하나만 쓴다 — 순위는 시즌 안에서만 의미가 있다."""
     sc = _ins_scope()
     if sc is None:
@@ -9280,7 +9280,7 @@ def insights_standings_trend():
         for h, a, hs, as_ in per_round[r]:
             for t, gf, ga in ((h, hs, as_), (a, as_, hs)):
                 cum[t][0] += _ins_pts(gf, ga); cum[t][1] += gf; cum[t][2] += ga; played[t] += 1
-        order = sorted(teams_in, key=lambda t: (-cum[t][0], -(cum[t][1] - cum[t][2]), -cum[t][1]))
+        order = sorted(teams_in, key=lambda t: (-cum[t][0], -cum[t][1], -(cum[t][1] - cum[t][2])))
         for i, t in enumerate(order):
             rank_hist[t].append(i + 1)
             pts_hist[t].append(cum[t][0])
@@ -10605,7 +10605,7 @@ def _k1_split_set(games, teams):
             seen[t] += 1
             tb[t][0] += 3 if gf > ga else 1 if gf == ga else 0
             tb[t][1] += gf; tb[t][2] += ga
-    order = sorted(teams, key=lambda t: (-tb[t][0], -(tb[t][1] - tb[t][2]), -tb[t][1]))
+    order = sorted(teams, key=lambda t: (-tb[t][0], -tb[t][1], -(tb[t][1] - tb[t][2])))
     return set(order[:_K1_SPLIT_TOP])
 
 
@@ -10617,7 +10617,7 @@ def _apply_split(order, split_set):
 
 
 def _simulate_final_ranking(standings, team_list, pending_probs, rng, split_set=None):
-    """남은 매치 1회 추첨 → 최종 순위(slug 리스트). 승점 → 득실(λ 누적 근사) → 득점 순.
+    """남은 매치 1회 추첨 → 최종 순위(slug 리스트). K리그 규정대로 승점 → 다득점 → 득실(λ 누적 근사) 순.
     split_set(K1 파이널 A 팀)이 있으면 A팀을 항상 위에 둔다."""
     sim_pts = {t: standings[t]["pts"] for t in team_list}
     sim_gf  = {t: standings[t]["gf"]  for t in team_list}
@@ -10633,7 +10633,7 @@ def _simulate_final_ranking(standings, team_list, pending_probs, rng, split_set=
         # 골차는 lam 기반 단순 누적 (정확 골 시뮬은 비용 큼 — tiebreaker용 근사)
         sim_gf[pp["home"]] += pp["lam_home"]; sim_ga[pp["home"]] += pp["lam_away"]
         sim_gf[pp["away"]] += pp["lam_away"]; sim_ga[pp["away"]] += pp["lam_home"]
-    return _apply_split(sorted(team_list, key=lambda t: (-sim_pts[t], -(sim_gf[t] - sim_ga[t]), -sim_gf[t])), split_set)
+    return _apply_split(sorted(team_list, key=lambda t: (-sim_pts[t], -sim_gf[t], -(sim_gf[t] - sim_ga[t]))), split_set)
 
 
 def _season_sim_inputs(league):
@@ -10928,8 +10928,8 @@ def promotion_playoff():
                 "h2h": h2h(t, x),
             })
 
-        def _ranks(stand):   # 현재 순위: 승점 → 득실 → 득점
-            order = sorted(stand, key=lambda z: (-stand[z]["pts"], -(stand[z]["gf"] - stand[z]["ga"]), -stand[z]["gf"]))
+        def _ranks(stand):   # 현재 순위: 승점 → 다득점 → 득실 (K리그 규정)
+            order = sorted(stand, key=lambda z: (-stand[z]["pts"], -stand[z]["gf"], -(stand[z]["gf"] - stand[z]["ga"])))
             return {s: i + 1 for i, s in enumerate(order)}
         rank_of = {"K1": _ranks(k1["standings"]), "K2": _ranks(k2["standings"])}
 
@@ -11047,6 +11047,9 @@ def season_review():
                                      (int(year), 1 if tid == 410 else 2)).fetchone()[0]
         except sqlite3.Error:
             official_n = None
+        # 공식 일정은 PO·승강 PO를 리그 경기로 센다 — DB에선 9410(PO)으로 분리돼 있으니 비교 때 더한다
+        po_n = cur.execute("""SELECT COUNT(*) FROM events WHERE tournament_id=9410 AND date_ts >= ? AND date_ts < ?
+                              AND home_score IS NOT NULL""", (ys, ye)).fetchone()[0]
         teams_in = sorted({g[3] for g in games} | {g[4] for g in games})
         split_set = _k1_split_set([(g[3], g[4], g[5], g[6]) for g in games], teams_in) if tid == 410 else None
 
@@ -11058,7 +11061,7 @@ def season_review():
                 for t, gf, ga in ((g[3], g[5], g[6]), (g[4], g[6], g[5])):
                     tb[t][0] += 3 if gf > ga else 1 if gf == ga else 0
                     tb[t][1] += gf; tb[t][2] += ga; tb[t][3] += 1
-            order = sorted(teams_in, key=lambda t: (-tb[t][0], -(tb[t][1] - tb[t][2]), -tb[t][1]))
+            order = sorted(teams_in, key=lambda t: (-tb[t][0], -tb[t][1], -(tb[t][1] - tb[t][2])))
             if split_set and max(v[3] for v in tb.values()) > _K1_SPLIT_GAMES:   # 파이널 라운드 진입 후
                 order = _apply_split(order, split_set)
             return tb, order
@@ -11205,8 +11208,8 @@ def season_review():
                  "emblem": info.get("emblem")},
         "year": year, "league": "K1" if tid == 410 else "K2", "in_progress": pending > 0, "remaining": pending,
         "final_group": ("A" if ss in split_set else "B") if split_set else None,
-        "coverage": {"db_games": len(games), "official_games": official_n,
-                     "complete": official_n is None or len(games) >= official_n - 2},
+        "coverage": {"db_games": len(games), "po_games": po_n, "official_games": official_n,
+                     "complete": official_n is None or len(games) + po_n >= official_n - 2},
         "final": {"rank": rank, "n_teams": len(teams_in), "pts": stat[0], "gf": stat[1], "ga": stat[2], "played": stat[3],
                   **{k: splits["all"][k] for k in ("w", "d", "l")}},
         "trajectory": traj, "splits": splits, "monthly": monthly, "streaks": streaks,
