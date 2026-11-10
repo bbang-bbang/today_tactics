@@ -9,7 +9,7 @@
     <link rel="apple-touch-icon" href="/static/img/favicon.png">
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=126">
+    <link rel="stylesheet" href="/static/css/style.css?v=127">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/static/js/boot.js?v=1"></script>
 </head>
@@ -96,6 +96,7 @@
             <section class="ws-panel hidden" id="ws-predict" data-ws="predict" role="tabpanel" aria-label="경기예측">
                 <!-- 시즌 시뮬레이션 (선수 탭 인사이트에서 이동) — prediction.js 가 채움 -->
                 <div id="season-sim-bar" class="season-sim-bar"></div>
+                <section id="po-scenario" class="po-scenario hidden" aria-label="승강 플레이오프 시나리오"></section>
             </section>
             <section class="ws-panel hidden" id="ws-team" data-ws="team" role="tabpanel" aria-label="팀 분석·비교">
                 <div class="ws-team-modebar" role="tablist" aria-label="팀 분석 모드">
@@ -944,7 +945,7 @@
     <!-- 해외리그 일단 비활성화 (아직 이른 단계) — 복구 시 아래 스크립트 복원
     <script src="/static/js/global_league.js?v=2"></script> -->
     <script src="/static/js/banner_stats.js?v=3"></script>
-    <script src="/static/js/prediction.js?v=67"></script>
+    <script src="/static/js/prediction.js?v=68"></script>
 
     <!-- 선수 분석 모달 -->
     <div id="player-analytics-modal" class="pa-modal hidden">

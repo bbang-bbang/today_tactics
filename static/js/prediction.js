@@ -2174,7 +2174,151 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     Promise.all([
         fetch("/api/season-simulation?league=k1&n=500").then(r => r.json()).catch(() => null),
         fetch("/api/season-simulation?league=k2&n=500").then(r => r.json()).catch(() => null),
-    ]).then(([k1s, k2s]) => renderSeasonSim(k1s, k2s));
+    ]).then(([k1s, k2s]) => {
+        renderSeasonSim(k1s, k2s);
+        // 승강 PO 시나리오 — 시즌 막바지(남은 경기 있는 동안)에만 의미. 시즌 시뮬 뒤에 로드(서버 부하 분산)
+        fetch("/api/promotion-playoff").then(r => r.ok ? r.json() : null).catch(() => null).then(renderPoScenario);
+    });
+
+    // ── 승강 PO 시나리오 카드 ──────────────────────────────
+    let _poData = null, _poSel = null;
+    function renderPoScenario(d) {
+        const el = document.getElementById("po-scenario");
+        if (!el || !d || !d.ready || !d.matchups || !d.matchups.length || d.no_po_pct >= 99.5) return;
+        _poData = d;
+        _poSel = _poSel || d.matchups[0].k2_team;
+        const k1 = d.k1_12th[0];
+        const k1Team = d.teams[k1.slug] || {};
+        const fav = d.matchups[0];
+        const confirmed = k1.pct >= 99.5 ? "12위 확정" : `12위 확률 ${k1.pct}%`;
+        el.innerHTML = `
+            <details class="po-card">
+                <summary class="po-sum">
+                    <span class="po-lead">⚔️ 승강 PO 시나리오</span>
+                    <span class="po-k1">${poTeam(k1Team)} <span class="po-muted">K1 ${confirmed}</span></span>
+                    <span class="po-stat" title="모든 대진 확률을 가중한 잔류 확률 · 괄호 = 리그 간 격차 보정값의 95% 범위">
+                        잔류 <b>${d.k1_survive_pct}%</b> <span class="po-muted">(${d.k1_survive_range[0]}~${d.k1_survive_range[1]}%)</span></span>
+                    <span class="po-stat">유력 상대 <b>${ttEsc(fav.k2_name)}</b> <span class="po-muted">${fav.prob}%</span></span>
+                </summary>
+                <div class="po-body">
+                    <div class="po-head-note">K2 승격 PO 결승에서 진 팀이 ${ttEsc(k1Team.name || k1.name)}와 홈앤드어웨이로 붙습니다 · 남은 경기 K1 ${d.pending.k1} · K2 ${d.pending.k2} · ${d.n_sim.toLocaleString()}회 시뮬</div>
+                    <div class="po-grid">
+                        <div class="po-list">${poRowsHtml(d)}</div>
+                        <div class="po-detail" id="po-detail">${poDetailHtml(d, _poSel)}</div>
+                    </div>
+                    ${poHistoryHtml(d.history)}
+                    <details class="po-notes">
+                        <summary>계산 방법·가정</summary>
+                        <ul>
+                            ${d.rules.map(r => `<li>${ttEsc(r)}</li>`).join("")}
+                            <li>리그 간 전력 보정: 리그를 옮긴 팀 ${d.factors.n_teams}개의 이동 전후 성적으로 측정 — K2 팀의 득점력 ×${d.factors.att}, 실점 ×${d.factors.def}를 K1 기준으로 환산. 과거 승강 PO 6경기에서 보정 전보다 예측이 나아짐(Brier 0.259→0.204)이지만 표본이 작아 범위로 표시.</li>
+                            <li>팀 전력 = 이번 시즌 경기당 득점·실점 ÷ 리그 평균(1.0 = 리그 평균). 홈 이점은 K1 최근 228경기 실측(홈 ×${d.factors.home_adv} · 원정 ×${d.factors.away_adj}).</li>
+                        </ul>
+                    </details>
+                </div>
+            </details>`;
+        el.classList.remove("hidden");
+        el.addEventListener("click", poOnSelect);
+        el.addEventListener("keydown", (e) => {
+            if ((e.key === "Enter" || e.key === " ") && e.target.closest("[data-po-team]")) { e.preventDefault(); poOnSelect(e); }
+        });
+    }
+
+    function poTeam(t, short) {
+        if (!t || !t.name) return "";
+        const em = t.emblem ? `<img class="po-em" src="/static/img/emblems/${ttEsc(t.emblem)}" alt="" width="18" height="18">` : "";
+        return `<span class="po-team" style="--po-tc:${ttEsc(t.primary || "#64748b")}">${em}${ttEsc(short || t.name)}</span>`;
+    }
+
+    function poRowsHtml(d) {
+        const max = Math.max(...d.matchups.map(m => m.prob), 1);
+        const rows = d.matchups.filter(m => m.k1_team === d.k1_12th[0].slug && m.prob >= 0.5);
+        const k1n = ttEsc(d.k1_12th[0].name);
+        return `<div class="po-row po-row-head" aria-hidden="true">
+                <span>K2 상대</span><span>상대가 될 확률</span><span>${k1n} 잔류</span><span>${k1n} 1차(원정)·2차(홈) 승·무·패</span>
+            </div>` + rows.map(m => {
+            const t = d.teams[m.k2_team] || {};
+            const sel = m.k2_team === _poSel;
+            return `<div class="po-row${sel ? " is-sel" : ""}" role="button" tabindex="0" data-po-team="${ttEsc(m.k2_team)}"
+                        aria-pressed="${sel}" aria-label="${ttEsc(m.k2_name)} 상세 비교">
+                <span class="po-r-team">${poTeam(t)} <span class="po-muted">K2 ${t.rank || "-"}위</span></span>
+                <span class="po-r-bar"><span class="po-bar"><i style="width:${(m.prob / max * 100).toFixed(1)}%"></i></span><b>${m.prob}%</b></span>
+                <span class="po-r-surv"><b>${m.k1_survive_pct}%</b> <span class="po-muted">${m.k1_survive_range[0]}~${m.k1_survive_range[1]}</span></span>
+                <span class="po-r-legs">${m.leg1.map(v => Math.round(v)).join("·")} <span class="po-muted">/</span> ${m.leg2.map(v => Math.round(v)).join("·")}</span>
+            </div>`;
+        }).join("");
+    }
+
+    function poDetailHtml(d, slug) {
+        const m = d.matchups.find(x => x.k2_team === slug && x.k1_team === d.k1_12th[0].slug);
+        if (!m) return "";
+        const a = d.teams[m.k1_team] || {}, b = d.teams[m.k2_team] || {};
+        const rk = (t, key) => t[key + "_rank"] ? `<span class="po-muted">${t.league} ${t[key + "_rank"]}/${t.league_teams}위</span>` : "";
+        const num = (v, s = "") => (v === null || v === undefined) ? "-" : `${v}${s}`;
+        // 더 나은 쪽 표시(▲) — 색만으로 구분하지 않음. lowBetter: 낮을수록 좋은 지표
+        const cmp = (va, vb, lowBetter) => {
+            if (va == null || vb == null || va === vb) return ["", ""];
+            const aBetter = lowBetter ? va < vb : va > vb;
+            return aBetter ? [" po-better", ""] : ["", " po-better"];
+        };
+        const row = (label, va, vb, opt = {}) => {
+            const [ca, cb] = opt.noCmp ? ["", ""] : cmp(opt.ra ?? va, opt.rb ?? vb, opt.lowBetter);
+            return `<tr><th scope="row">${label}${opt.hint ? `<span class="po-hint">${opt.hint}</span>` : ""}</th>
+                <td class="${ca}">${opt.fa ? opt.fa : num(va)}${ca ? " ▲" : ""}</td>
+                <td class="${cb}">${opt.fb ? opt.fb : num(vb)}${cb ? " ▲" : ""}</td></tr>`;
+        };
+        const form = (f) => (f || []).map(x => `<span class="po-f po-f-${x}">${x === "W" ? "승" : x === "D" ? "무" : "패"}</span>`).join("");
+        const h2h = m.h2h.length
+            ? `<ul class="po-h2h">${m.h2h.map(g => `<li><span class="po-muted">${g.date} ${ttEsc(g.comp)}</span>
+                   ${ttEsc(a.name)} ${g.a}-${g.b} ${ttEsc(b.name)} <span class="po-muted">(${g.a_home ? a.name + " 홈" : b.name + " 홈"})</span>
+                   <b class="po-res">${g.a > g.b ? a.name + " 승" : g.a < g.b ? b.name + " 승" : "무"}</b></li>`).join("")}</ul>`
+            : `<p class="po-muted">최근 맞대결 기록 없음</p>`;
+        return `
+            <div class="po-d-head">${poTeam(a)} <span class="po-vs">vs</span> ${poTeam(b)}
+                <span class="po-d-agg" title="합산 스코어 기준 · 동률은 연장·승부차기">합산 ${ttEsc(a.name)} 승 ${m.agg.agg_win}% · 동률 ${m.agg.agg_tie}% · ${ttEsc(b.name)} 승 ${m.agg.agg_loss}%</span></div>
+            <table class="po-cmp">
+                <thead><tr><th scope="col">지표</th><th scope="col">${ttEsc(a.name)} (K1)</th><th scope="col">${ttEsc(b.name)} (K2)</th></tr></thead>
+                <tbody>
+                    ${row("순위·승점", null, null, { noCmp: true, fa: `K1 ${a.rank}위 · ${a.pts}점`, fb: `K2 ${b.rank}위 · ${b.pts}점` })}
+                    ${row("경기당 승점", a.ppg, b.ppg, { hint: "각자 리그 기준", noCmp: true })}
+                    ${row("경기당 득점", a.gf_pg, b.gf_pg, { fa: `${num(a.gf_pg)} ${rk(a, "gf_pg")}`, fb: `${num(b.gf_pg)} ${rk(b, "gf_pg")}`, noCmp: true })}
+                    ${row("경기당 실점", a.ga_pg, b.ga_pg, { fa: `${num(a.ga_pg)} ${rk(a, "ga_pg")}`, fb: `${num(b.ga_pg)} ${rk(b, "ga_pg")}`, noCmp: true })}
+                    ${row("xG / 경기", a.xg_f_pg, b.xg_f_pg, { fa: `${num(a.xg_f_pg)} ${rk(a, "xg_f_pg")}`, fb: `${num(b.xg_f_pg)} ${rk(b, "xg_f_pg")}`, noCmp: true })}
+                    ${row("xGA / 경기", a.xg_a_pg, b.xg_a_pg, { fa: `${num(a.xg_a_pg)} ${rk(a, "xg_a_pg")}`, fb: `${num(b.xg_a_pg)} ${rk(b, "xg_a_pg")}`, noCmp: true })}
+                    ${row("K1 기준 공격력", a.att, m.k2_converted.att, { hint: "1.0 = K1 평균, K2는 환산" })}
+                    ${row("K1 기준 실점률", a.def, m.k2_converted.def, { hint: "낮을수록 좋음", lowBetter: true })}
+                    ${row("1차전 조건", a.away_ppg, b.home_ppg, { hint: "원정 vs 홈 경기당 승점 (각자 리그)", noCmp: true, fa: `원정 ${num(a.away_ppg)} ${rk(a, "away_ppg")}`, fb: `홈 ${num(b.home_ppg)} ${rk(b, "home_ppg")}` })}
+                    ${row("2차전 조건", a.home_ppg, b.away_ppg, { hint: "홈 vs 원정 경기당 승점 (각자 리그)", noCmp: true, fa: `홈 ${num(a.home_ppg)} ${rk(a, "home_ppg")}`, fb: `원정 ${num(b.away_ppg)} ${rk(b, "away_ppg")}` })}
+                    ${row("무실점 경기", a.clean_sheet_pct, b.clean_sheet_pct, { noCmp: true, fa: `${num(a.clean_sheet_pct, "%")}`, fb: `${num(b.clean_sheet_pct, "%")}` })}
+                    ${row("최근 5경기", null, null, { noCmp: true, fa: form(a.form5), fb: form(b.form5) })}
+                </tbody>
+            </table>
+            <p class="po-cmp-note">K1 기준 공격력·실점률만 리그 차이를 보정한 값입니다(▲ = 더 나은 쪽). 나머지는 서로 다른 리그 기록이라 원값보다 <b>자기 리그 순위</b>로 보세요.</p>
+            <h4 class="po-sub">최근 맞대결</h4>${h2h}`;
+    }
+
+    function poHistoryHtml(hist) {
+        if (!hist || !hist.length) return "";
+        const k1w = hist.filter(h => h.k1_survived === true).length;
+        return `<div class="po-hist">
+            <h4 class="po-sub">과거 승강 PO <span class="po-muted">— K1 잔류 ${k1w} · K2 승격 ${hist.length - k1w} (DB 수록 ${hist.length}건)</span></h4>
+            <ul>${hist.map(h => `<li><span class="po-muted">${h.year}</span> ${ttEsc(h.k1)}(K1) vs ${ttEsc(h.k2)}(K2)
+                ${h.legs.map(ttEsc).join(", ")} → 합산 ${ttEsc(h.agg)} <b class="${h.k1_survived ? "po-k1win" : "po-k2win"}">${h.k1_survived ? "K1 잔류" : "K2 승격"}</b></li>`).join("")}</ul>
+        </div>`;
+    }
+
+    function poOnSelect(e) {
+        const r = e.target.closest("[data-po-team]");
+        if (!r || !_poData) return;
+        _poSel = r.dataset.poTeam;
+        document.querySelectorAll("#po-scenario .po-row[data-po-team]").forEach(x => {
+            const on = x.dataset.poTeam === _poSel;
+            x.classList.toggle("is-sel", on);
+            x.setAttribute("aria-pressed", on);
+        });
+        const det = document.getElementById("po-detail");
+        if (det) det.innerHTML = poDetailHtml(_poData, _poSel);
+    }
 
     function renderSeasonSim(k1, k2) {
         const el = document.getElementById("season-sim-bar");

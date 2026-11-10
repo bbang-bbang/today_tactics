@@ -10362,19 +10362,93 @@ def season_simulation():
     league = request.args.get("league", "k1").lower()
     n_sim = int(request.args.get("n", "1000"))
     n_sim = max(100, min(n_sim, 3000))
-    tid = 410 if league == "k1" else 777
+    st = _season_sim_inputs(league)
+    if not st.get("ready"):
+        return jsonify(st)
+    SLUG_TO_SS = {t["id"]: t["sofascore_id"] for t in TEAMS}
+    SS_TO_TEAM = {t["sofascore_id"]: t for t in TEAMS if t.get("sofascore_id")}
+    standings, team_list = st["standings"], st["team_list"]
+    pending_probs = st["pending_probs"]
+    finished_games, pending_games = st["finished_games"], st["pending_games"]
+    position_counts = {t: [0] * len(team_list) for t in team_list}  # 1위~N위 횟수
 
+    for _ in range(n_sim):
+        ranked = _simulate_final_ranking(standings, team_list, pending_probs, _rand)
+        for pos, t in enumerate(ranked):
+            position_counts[t][pos] += 1
+
+    # 결과 산출
+    n_teams = len(team_list)
+    afc_top = 4 if league == "k1" else 2  # K1 상위 4 AFC, K2 상위 2 승격
+    rel_bot = 2 if league == "k1" else 2  # 강등권
+
+    results = []
+    for t in team_list:
+        info = SS_TO_TEAM.get(SLUG_TO_SS.get(t), {})
+        counts = position_counts[t]
+        total = sum(counts)
+        win_pct = counts[0] / total * 100 if total else 0
+        afc_pct = sum(counts[:afc_top]) / total * 100 if total else 0
+        rel_pct = sum(counts[n_teams - rel_bot:]) / total * 100 if total else 0
+        avg_pos = sum((i + 1) * c for i, c in enumerate(counts)) / total if total else None
+        results.append({
+            "slug": t, "name": info.get("short") or t,
+            "current_pts": standings[t]["pts"],
+            "current_played": standings[t]["played"],
+            "win_pct": round(win_pct, 1),
+            "afc_pct": round(afc_pct, 1),
+            "rel_pct": round(rel_pct, 1),
+            "avg_pos": round(avg_pos, 1) if avg_pos else None,
+            "median_pos": _median_position(counts),
+            "position_dist": counts,  # 1위~N위 횟수
+        })
+
+    results.sort(key=lambda r: r["avg_pos"] if r["avg_pos"] else 999)
+
+    return jsonify({
+        "ready": True,
+        "league": league.upper(),
+        "n_simulations": n_sim,
+        "n_teams": n_teams,
+        "finished_games": len(finished_games),
+        "pending_games": len(pending_games),
+        "pending_predicted": len(pending_probs),
+        "teams": results,
+    })
+
+
+def _simulate_final_ranking(standings, team_list, pending_probs, rng):
+    """남은 매치 1회 추첨 → 최종 순위(slug 리스트). 승점 → 득실(λ 누적 근사) → 득점 순."""
+    sim_pts = {t: standings[t]["pts"] for t in team_list}
+    sim_gf  = {t: standings[t]["gf"]  for t in team_list}
+    sim_ga  = {t: standings[t]["ga"]  for t in team_list}
+    for pp in pending_probs:
+        r = rng.random()
+        if r < pp["p_home"]:
+            sim_pts[pp["home"]] += 3
+        elif r < pp["p_home"] + pp["p_draw"]:
+            sim_pts[pp["home"]] += 1; sim_pts[pp["away"]] += 1
+        else:
+            sim_pts[pp["away"]] += 3
+        # 골차는 lam 기반 단순 누적 (정확 골 시뮬은 비용 큼 — tiebreaker용 근사)
+        sim_gf[pp["home"]] += pp["lam_home"]; sim_ga[pp["home"]] += pp["lam_away"]
+        sim_gf[pp["away"]] += pp["lam_away"]; sim_ga[pp["away"]] += pp["lam_home"]
+    return sorted(team_list, key=lambda t: (-sim_pts[t], -(sim_gf[t] - sim_ga[t]), -sim_gf[t]))
+
+
+def _season_sim_inputs(league):
+    """시즌 시뮬 공통 입력: 현재 standings(완료 매치) + 남은 매치 1X2 확률. 실패 시 {"ready": False, "reason"}."""
+    tid = 410 if league == "k1" else 777
     try:
         raw = _fetch_k1_all_games() if league == "k1" else _fetch_k2_all_games()
     except Exception:
-        return jsonify({"ready": False, "reason": "no_schedule"})
+        return {"ready": False, "reason": "no_schedule"}
     parser = _parse_k1_game if league == "k1" else _parse_k2_game
     games_all = [parser(g) for g in raw]
     if not games_all:
-        return jsonify({"ready": False, "reason": "no_games"})
+        return {"ready": False, "reason": "no_games"}
 
     SLUG_TO_SS = {t["id"]: t["sofascore_id"] for t in TEAMS}
-    SS_TO_TEAM = {t["sofascore_id"]: t for t in TEAMS if t.get("sofascore_id")}
 
     # 현재 standings — 완료 매치 기준
     standings = {}  # slug → {W,D,L, gf, ga, pts}
@@ -10429,69 +10503,295 @@ def season_simulation():
         })
     conn.close()
 
-    # Monte Carlo 시뮬레이션
-    team_list = sorted(teams_in_season)
-    position_counts = {t: [0] * len(team_list) for t in team_list}  # 1위~N위 횟수
+    return {
+        "ready": True, "standings": standings, "team_list": sorted(teams_in_season),
+        "pending_probs": pending_probs, "finished_games": finished_games, "pending_games": pending_games,
+    }
 
-    for _ in range(n_sim):
-        sim_pts = {t: standings[t]["pts"] for t in team_list}
-        sim_gf  = {t: standings[t]["gf"]  for t in team_list}
-        sim_ga  = {t: standings[t]["ga"]  for t in team_list}
-        for pp in pending_probs:
-            r = _rand.random()
-            if r < pp["p_home"]:
-                sim_pts[pp["home"]] += 3
-            elif r < pp["p_home"] + pp["p_draw"]:
-                sim_pts[pp["home"]] += 1; sim_pts[pp["away"]] += 1
-            else:
-                sim_pts[pp["away"]] += 3
-            # 골차는 lam 기반 단순 누적 (poisson 단순 가정)
-            # 정확 골 시뮬은 비용 큼 — pts 기반 순위만 산출 (tiebreaker는 gd 누적)
-            sim_gf[pp["home"]] += pp["lam_home"]; sim_ga[pp["home"]] += pp["lam_away"]
-            sim_gf[pp["away"]] += pp["lam_away"]; sim_ga[pp["away"]] += pp["lam_home"]
 
-        # 최종 순위
-        ranked = sorted(team_list, key=lambda t: (-sim_pts[t], -(sim_gf[t]-sim_ga[t]), -sim_gf[t]))
-        for pos, t in enumerate(ranked):
-            position_counts[t][pos] += 1
+# ── 승강 PO 시나리오 (2026 특례: 김천 자동 강등 → K1 12위 vs K2 승격 PO 결승 패자, 홈앤드어웨이) ──
+# K2 레이팅 → K1 환산 계수: 리그를 옮긴 팀 12개(2021→2026)의 이동 전·후 시즌 득점/실점 레이팅 비의 기하평균.
+#   공격 ×0.68, 실점 ×1.39 (log 95% ±0.09/±0.10). 울산·포항은 DB 2020~23 대회 라벨 오류로 제외.
+#   검증: 과거 승강 PO 6경기 — 계수 미적용 Brier 0.259 → 적용 0.204 (log loss 1.253 → 1.008). 표본 작음 → 화면은 범위 병기.
+#   상위 K2 팀의 회귀(평균으로 돌아감)가 계수에 섞여 있으나, 승강 PO 상대도 같은 '상위 K2 팀'이라 예측 용도로는 맞는 방향.
+_PO_K2_TO_K1 = {"att": 0.68, "def": 1.39, "att_log_se": 0.046, "def_log_se": 0.051, "n_teams": 12}
+_PO_NO_PO_TEAM = "gimcheon"        # 이 팀이 K1 12위면 승강 PO 없음 (김천만 강등)
+_PO_RULES = [
+    "김천 상무는 순위와 무관하게 자동 강등 — K1 12위가 김천이면 승강 PO 없음",
+    "K2 1·2위 자동 승격, 3~6위 승격 PO: 준PO 3위-6위·4위-5위, 결승 — 모두 상위 순위 팀 홈 단판",
+    "가정: 준PO·결승 90분 무승부는 상위 순위 팀 진출 (연맹 세부 규정 미확인)",
+    "승강 PO: K1 12위 vs 승격 PO 결승 패자, 1차전 K2 팀 홈 · 2차전 K1 팀 홈, 합산 승자",
+    "가정: 합산 동률은 연장·승부차기 50:50",
+]
 
-    # 결과 산출
-    n_teams = len(team_list)
-    afc_top = 4 if league == "k1" else 2  # K1 상위 4 AFC, K2 상위 2 승격
-    rel_bot = 2 if league == "k1" else 2  # 강등권
 
-    results = []
-    for t in team_list:
-        info = SS_TO_TEAM.get(SLUG_TO_SS.get(t), {})
-        counts = position_counts[t]
-        total = sum(counts)
-        win_pct = counts[0] / total * 100 if total else 0
-        afc_pct = sum(counts[:afc_top]) / total * 100 if total else 0
-        rel_pct = sum(counts[n_teams - rel_bot:]) / total * 100 if total else 0
-        avg_pos = sum((i + 1) * c for i, c in enumerate(counts)) / total if total else None
-        results.append({
-            "slug": t, "name": info.get("short") or t,
-            "current_pts": standings[t]["pts"],
-            "current_played": standings[t]["played"],
-            "win_pct": round(win_pct, 1),
-            "afc_pct": round(afc_pct, 1),
-            "rel_pct": round(rel_pct, 1),
-            "avg_pos": round(avg_pos, 1) if avg_pos else None,
-            "median_pos": _median_position(counts),
-            "position_dist": counts,  # 1위~N위 횟수
-        })
+def _po_team_profiles(cur, tid, year):
+    """리그 시즌 팀 프로필 {ss_id: {...}} + 리그 팀당 경기 평균 득점. 득점/실점 레이팅은 리그 평균=1.0."""
+    rows = cur.execute("""
+        SELECT id, date_ts, home_team_id, away_team_id, home_score, away_score FROM events
+        WHERE tournament_id=? AND home_score IS NOT NULL AND away_score IS NOT NULL
+          AND strftime('%Y', datetime(date_ts,'unixepoch','localtime'))=?
+        ORDER BY date_ts""", (tid, year)).fetchall()
+    P = {}
+    def bag(t):
+        return P.setdefault(t, {"n": 0, "gf": 0, "ga": 0, "pts": 0, "home": [0, 0], "away": [0, 0],
+                                "form": [], "cs": 0, "xg_f": 0.0, "xg_a": 0.0, "xg_n": 0})
+    for eid, ts, h, a, hs, as_ in rows:
+        for t, gf, ga, is_home in ((h, hs, as_, True), (a, as_, hs, False)):
+            b = bag(t)
+            pts = 3 if gf > ga else 1 if gf == ga else 0
+            b["n"] += 1; b["gf"] += gf; b["ga"] += ga; b["pts"] += pts
+            b["cs"] += ga == 0
+            side = b["home"] if is_home else b["away"]
+            side[0] += pts; side[1] += 1
+            b["form"].append("W" if pts == 3 else "D" if pts == 1 else "L")
+    # xG (SofaScore mps 합 — 수집된 경기만)
+    for eid, team, xg_f, xg_a in cur.execute("""
+        SELECT e.id, t.team_id,
+               SUM(CASE WHEN s.team_id = t.team_id THEN s.expected_goals END),
+               SUM(CASE WHEN s.team_id != t.team_id THEN s.expected_goals END)
+        FROM events e
+        JOIN (SELECT DISTINCT event_id, team_id FROM match_player_stats WHERE team_id IS NOT NULL) t ON t.event_id = e.id
+        JOIN match_player_stats s ON s.event_id = e.id AND s.expected_goals IS NOT NULL
+        WHERE e.tournament_id=? AND e.home_score IS NOT NULL
+          AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime'))=?
+        GROUP BY e.id, t.team_id""", (tid, year)):
+        if team in P and xg_f is not None and xg_a is not None:
+            P[team]["xg_f"] += xg_f; P[team]["xg_a"] += xg_a; P[team]["xg_n"] += 1
+    tot_g = sum(b["gf"] for b in P.values()); tot_n = sum(b["n"] for b in P.values())
+    avg = tot_g / tot_n if tot_n else 1.3
+    out = {}
+    for t, b in P.items():
+        if not b["n"]:
+            continue
+        out[t] = {
+            "games": b["n"], "pts": b["pts"], "ppg": round(b["pts"] / b["n"], 2),
+            "gf_pg": round(b["gf"] / b["n"], 2), "ga_pg": round(b["ga"] / b["n"], 2),
+            "att": b["gf"] / b["n"] / avg, "def": b["ga"] / b["n"] / avg,
+            "home_ppg": round(b["home"][0] / b["home"][1], 2) if b["home"][1] else None,
+            "away_ppg": round(b["away"][0] / b["away"][1], 2) if b["away"][1] else None,
+            "clean_sheet_pct": round(b["cs"] / b["n"] * 100),
+            "form5": b["form"][-5:],
+            "xg_f_pg": round(b["xg_f"] / b["xg_n"], 2) if b["xg_n"] else None,
+            "xg_a_pg": round(b["xg_a"] / b["xg_n"], 2) if b["xg_n"] else None,
+            "xg_games": b["xg_n"],
+        }
+    # 리그 내 순위(1=가장 좋음) — 리그가 달라 원값 비교가 어려우므로 '자기 리그에서 몇 위'를 함께 제공
+    for key, better_low in (("gf_pg", False), ("ga_pg", True), ("xg_f_pg", False), ("xg_a_pg", True),
+                            ("home_ppg", False), ("away_ppg", False)):
+        vals = sorted((v[key] for v in out.values() if v[key] is not None), reverse=not better_low)
+        for v in out.values():
+            v[key + "_rank"] = (vals.index(v[key]) + 1) if v[key] is not None else None
+    return out, avg, len(out)
 
-    results.sort(key=lambda r: r["avg_pos"] if r["avg_pos"] else 999)
+
+def _po_goal_dist(lam, kmax=10):
+    p = [math.exp(-lam)]
+    for k in range(1, kmax + 1):
+        p.append(p[-1] * lam / k)
+    return p
+
+
+def _po_leg(l_t, l_x):
+    """한 경기 T(K1 팀) 관점: (승, 무, 패) 확률 + T골-X골 분포 {diff: p}."""
+    pt, px = _po_goal_dist(l_t), _po_goal_dist(l_x)
+    diff = {}
+    for i, a in enumerate(pt):
+        for j, b in enumerate(px):
+            diff[i - j] = diff.get(i - j, 0.0) + a * b
+    w = sum(p for d, p in diff.items() if d > 0); d0 = diff.get(0, 0.0)
+    return (w, d0, 1 - w - d0), diff
+
+
+def _po_two_leg(t, x, avg, hc, fa, fd):
+    """T(K1 12위) vs X(K2) 홈앤드어웨이 — 1차전 X 홈, 2차전 T 홈. 반환 T 관점."""
+    ax, dx = x["att"] * fa, x["def"] * fd
+    l1_t = t["att"] * dx * avg * hc["away_adj"]; l1_x = ax * t["def"] * avg * hc["home_adv"]
+    l2_t = t["att"] * dx * avg * hc["home_adv"]; l2_x = ax * t["def"] * avg * hc["away_adj"]
+    leg1, d1 = _po_leg(l1_t, l1_x)
+    leg2, d2 = _po_leg(l2_t, l2_x)
+    agg_w = agg_t = 0.0
+    for a, pa in d1.items():
+        for b, pb in d2.items():
+            s = a + b
+            if s > 0: agg_w += pa * pb
+            elif s == 0: agg_t += pa * pb
+    return {"survive": agg_w + 0.5 * agg_t, "agg_win": agg_w, "agg_tie": agg_t, "agg_loss": 1 - agg_w - agg_t,
+            "leg1": leg1, "leg2": leg2, "lam": [round(l1_t, 2), round(l1_x, 2), round(l2_t, 2), round(l2_x, 2)]}
+
+
+@app.route("/api/promotion-playoff")
+@cached_response(ttl=3600)
+def promotion_playoff():
+    """승강 PO 시나리오: K1·K2 남은 경기 동시 시뮬 → K1 12위 · K2 승격 PO 결승 패자 대진 확률 → 홈앤드어웨이 승산.
+    리그 간 전력 차이는 _PO_K2_TO_K1 계수로 보정(불확실성 → 잔류 확률 범위)."""
+    import random as _rand
+    n_sim = max(500, min(int(request.args.get("n", "4000") or 4000), 10000))
+    k1, k2 = _season_sim_inputs("k1"), _season_sim_inputs("k2")
+    if not (k1.get("ready") and k2.get("ready")):
+        return jsonify({"ready": False, "reason": "no_schedule"})
+    if len(k1["team_list"]) < 12 or len(k2["team_list"]) < 6:
+        return jsonify({"ready": False, "reason": "teams"})
+    SLUG_TO_SS = {t["id"]: t["sofascore_id"] for t in TEAMS}
+    SLUG_INFO = {t["id"]: t for t in TEAMS}
+    year = str(datetime.now().year)
+    now_ts = int(time.time()) // 3600 * 3600
+
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    try:
+        adv_cache = {}
+        def p_higher_adv(hi, lo):   # 상위 시드 홈 단판, 무승부 = 상위 진출(가정)
+            k = (hi, lo)
+            if k not in adv_cache:
+                pr = _predict_core(cur, SLUG_TO_SS.get(hi), SLUG_TO_SS.get(lo), 777, now_ts, year)
+                adv_cache[k] = ((pr["pred_home"] + pr["pred_draw"]) / 100.0) if pr else 0.5
+            return adv_cache[k]
+
+        rng = _rand.Random(20261210)   # 재현 가능(캐시 간 수치 흔들림 방지)
+        pair_cnt, t12_cnt, x_cnt, promo_cnt = {}, {}, {}, {}
+        no_po = 0
+        for _ in range(n_sim):
+            r1 = _simulate_final_ranking(k1["standings"], k1["team_list"], k1["pending_probs"], rng)
+            t12 = r1[11]
+            t12_cnt[t12] = t12_cnt.get(t12, 0) + 1
+            if t12 == _PO_NO_PO_TEAM:
+                no_po += 1
+                continue
+            r2 = _simulate_final_ranking(k2["standings"], k2["team_list"], k2["pending_probs"], rng)
+            s3, s4, s5, s6 = r2[2:6]
+            f1 = s3 if rng.random() < p_higher_adv(s3, s6) else s6
+            f2 = s4 if rng.random() < p_higher_adv(s4, s5) else s5
+            hi, lo = (f1, f2) if r2.index(f1) < r2.index(f2) else (f2, f1)
+            win, lose = (hi, lo) if rng.random() < p_higher_adv(hi, lo) else (lo, hi)
+            promo_cnt[win] = promo_cnt.get(win, 0) + 1
+            x_cnt[lose] = x_cnt.get(lose, 0) + 1
+            pair_cnt[(t12, lose)] = pair_cnt.get((t12, lose), 0) + 1
+
+        prof1, avg1, n1 = _po_team_profiles(cur, 410, year)
+        prof2, avg2, n2 = _po_team_profiles(cur, 777, year)
+        hc = _rolling_home_coefs(cur, 410, now_ts) or {"home_adv": 1.0, "away_adj": 1.0}
+        f = _PO_K2_TO_K1
+        lo_fa, lo_fd = f["att"] * math.exp(1.96 * f["att_log_se"]), f["def"] * math.exp(-1.96 * f["def_log_se"])  # K2 강하게
+        hi_fa, hi_fd = f["att"] * math.exp(-1.96 * f["att_log_se"]), f["def"] * math.exp(1.96 * f["def_log_se"])  # K2 약하게
+
+        def name(slug):
+            i = SLUG_INFO.get(slug, {})
+            return i.get("short") or i.get("name") or slug
+
+        def h2h(sa, sb):
+            ia, ib = SLUG_TO_SS.get(sa), SLUG_TO_SS.get(sb)
+            lbl = {410: "K1", 777: "K2", 9410: "PO"}
+            out = []
+            for ts, tidv, h, hs, as_ in cur.execute("""
+                SELECT date_ts, tournament_id, home_team_id, home_score, away_score FROM events
+                WHERE ((home_team_id=? AND away_team_id=?) OR (home_team_id=? AND away_team_id=?))
+                  AND home_score IS NOT NULL ORDER BY date_ts DESC LIMIT 8""", (ia, ib, ib, ia)):
+                ga, gb = (hs, as_) if h == ia else (as_, hs)
+                out.append({"date": datetime.fromtimestamp(ts).strftime("%Y-%m-%d"), "comp": lbl.get(tidv, "컵·기타"),
+                            "a_home": h == ia, "a": ga, "b": gb})
+            return out
+
+        po_teams = sorted(t12_cnt, key=lambda s: -t12_cnt[s])
+        valid = n_sim - no_po
+        matchups, overall, overall_lo, overall_hi = [], 0.0, 0.0, 0.0
+        for (t, x), cnt in sorted(pair_cnt.items(), key=lambda kv: -kv[1]):
+            pt, px = prof1.get(SLUG_TO_SS.get(t)), prof2.get(SLUG_TO_SS.get(x))
+            if not pt or not px:
+                continue
+            res = _po_two_leg(pt, px, avg1, hc, f["att"], f["def"])
+            r_lo = _po_two_leg(pt, px, avg1, hc, lo_fa, lo_fd)["survive"]
+            r_hi = _po_two_leg(pt, px, avg1, hc, hi_fa, hi_fd)["survive"]
+            w = cnt / n_sim
+            overall += w * res["survive"]; overall_lo += w * r_lo; overall_hi += w * r_hi
+            matchups.append({
+                "k1_team": t, "k1_name": name(t), "k2_team": x, "k2_name": name(x),
+                "prob": round(cnt / n_sim * 100, 1),
+                "k1_survive_pct": round(res["survive"] * 100, 1),
+                "k1_survive_range": [round(r_lo * 100, 1), round(r_hi * 100, 1)],
+                "agg": {k: round(res[k] * 100, 1) for k in ("agg_win", "agg_tie", "agg_loss")},
+                "leg1": [round(v * 100, 1) for v in res["leg1"]],   # 1차전(K2 홈) K1 팀 승·무·패
+                "leg2": [round(v * 100, 1) for v in res["leg2"]],   # 2차전(K1 홈)
+                "lambda": res["lam"],
+                "k2_converted": {"att": round(px["att"] * f["att"], 2), "def": round(px["def"] * f["def"], 2)},
+                "h2h": h2h(t, x),
+            })
+
+        def _ranks(stand):   # 현재 순위: 승점 → 득실 → 득점
+            order = sorted(stand, key=lambda z: (-stand[z]["pts"], -(stand[z]["gf"] - stand[z]["ga"]), -stand[z]["gf"]))
+            return {s: i + 1 for i, s in enumerate(order)}
+        rank_of = {"K1": _ranks(k1["standings"]), "K2": _ranks(k2["standings"])}
+
+        def card(slug, prof, lg_n, league):
+            p = prof.get(SLUG_TO_SS.get(slug))
+            if not p:
+                return None
+            st = (k1 if league == "K1" else k2)["standings"].get(slug, {})
+            return {"slug": slug, "name": name(slug), "league": league, "league_teams": lg_n,
+                    "primary": SLUG_INFO.get(slug, {}).get("primary"), "emblem": SLUG_INFO.get(slug, {}).get("emblem"),
+                    "rank": rank_of[league].get(slug),
+                    "att": round(p["att"], 2), "def": round(p["def"], 2),
+                    **{k: v for k, v in p.items() if k not in ("att", "def")},
+                    "w": st.get("W"), "d": st.get("D"), "l": st.get("L")}
+
+        k2_cands = sorted(x_cnt, key=lambda s: -x_cnt[s])
+        teams = {}
+        for s in po_teams:
+            c = card(s, prof1, n1, "K1")
+            if c: teams[s] = c
+        for s in k2_cands:
+            c = card(s, prof2, n2, "K2")
+            if c:
+                c["opp_pct"] = round(x_cnt[s] / n_sim * 100, 1)
+                c["promote_pct"] = round(promo_cnt.get(s, 0) / n_sim * 100, 1)
+                teams[s] = c
+
+        # 과거 승강 PO (tournament 9410 중 같은 대진 2경기 = 홈앤드어웨이 승강 PO)
+        hist_rows = cur.execute("""SELECT date_ts, home_team_id, away_team_id, home_score, away_score
+                                   FROM events WHERE tournament_id=9410 AND home_score IS NOT NULL ORDER BY date_ts""").fetchall()
+        SS_SLUG = {v: k for k, v in SLUG_TO_SS.items() if v}
+        ties = {}
+        for ts, h, a, hs, as_ in hist_rows:
+            y = datetime.fromtimestamp(ts).year
+            ties.setdefault((y, frozenset((h, a))), []).append((ts, h, a, hs, as_))
+        history = []
+        for (y, pair), games in sorted(ties.items(), key=lambda kv: kv[1][0][0]):
+            if len(games) != 2:
+                continue   # 단판 = K2 내부 PO
+            k1_side = None
+            for tm in pair:
+                n410 = cur.execute("""SELECT COUNT(*) FROM events WHERE tournament_id=410 AND (home_team_id=? OR away_team_id=?)
+                                      AND strftime('%Y', datetime(date_ts,'unixepoch','localtime'))=?""", (tm, tm, str(y))).fetchone()[0]
+                if n410 >= 20:
+                    k1_side = tm
+            if k1_side is None:
+                continue
+            k2_side = next(tm for tm in pair if tm != k1_side)
+            g1 = g2 = 0
+            legs = []
+            for ts, h, a, hs, as_ in games:
+                a1, a2 = (hs, as_) if h == k1_side else (as_, hs)
+                g1 += a1; g2 += a2
+                legs.append(f"{a1}-{a2}")
+            history.append({"year": y, "k1": name(SS_SLUG.get(k1_side, k1_side)), "k2": name(SS_SLUG.get(k2_side, k2_side)),
+                            "legs": legs, "agg": f"{g1}-{g2}", "k1_survived": g1 > g2 if g1 != g2 else None})
+    finally:
+        conn.close()
 
     return jsonify({
-        "ready": True,
-        "league": league.upper(),
-        "n_simulations": n_sim,
-        "n_teams": n_teams,
-        "finished_games": len(finished_games),
-        "pending_games": len(pending_games),
-        "pending_predicted": len(pending_probs),
-        "teams": results,
+        "ready": True, "n_sim": n_sim, "year": year,
+        "no_po_pct": round(no_po / n_sim * 100, 1),
+        "k1_12th": [{"slug": s, "name": name(s), "pct": round(t12_cnt[s] / n_sim * 100, 1)} for s in po_teams],
+        "k1_survive_pct": round(overall / (valid / n_sim) * 100, 1) if valid else None,
+        "k1_survive_range": [round(overall_lo / (valid / n_sim) * 100, 1), round(overall_hi / (valid / n_sim) * 100, 1)] if valid else None,
+        "matchups": matchups,
+        "teams": teams,
+        "history": history,
+        "factors": {"att": f["att"], "def": f["def"], "n_teams": f["n_teams"],
+                    "home_adv": round(hc["home_adv"], 3), "away_adj": round(hc["away_adj"], 3),
+                    "k1_avg_goals": round(avg1, 2)},
+        "rules": _PO_RULES,
+        "pending": {"k1": len(k1["pending_probs"]), "k2": len(k2["pending_probs"])},
     })
 
 

@@ -239,6 +239,13 @@ d_bt2 = get('/api/prediction-backtest?league=k2&year=2026')
 qa('backtest K2 n_total>0',   lambda: assert_(d_bt2['n_total'] > 0))
 qa('backtest K2 hit>33%',     lambda: assert_(d_bt2['hit_1x2_pct'] > 33.3, f"{d_bt2['hit_1x2_pct']}%"))
 qa('backtest K2 brier<0.35',  lambda: assert_(d_bt2['brier_score'] < 0.35, f"{d_bt2['brier_score']}"))
+d_po = get('/api/promotion-playoff')
+qa('승강 PO 대진 확률 합 = 100 - 미개최', lambda: assert_(
+    not d_po.get('ready') or abs(sum(m['prob'] for m in d_po['matchups']) + d_po['no_po_pct'] - 100) <= 1.5,
+    f"{sum(m['prob'] for m in d_po.get('matchups', []))} + {d_po.get('no_po_pct')}"))
+qa('승강 PO 잔류 확률이 범위 안·0~100', lambda: assert_(
+    not d_po.get('ready') or all(m['k1_survive_range'][0] <= m['k1_survive_pct'] <= m['k1_survive_range'][1]
+                                 and 0 <= m['k1_survive_pct'] <= 100 for m in d_po['matchups'])))
 qa('backtest 기준선 3종 + edge 일관', lambda: assert_(
     set(d_bt2.get('baselines', {})) == {'home', 'ppg', 'rate'}
     and abs(d_bt2['edge_vs_best_pct'] - (d_bt2['hit_1x2_pct'] - max(b['hit_pct'] for b in d_bt2['baselines'].values()))) <= 0.2,
