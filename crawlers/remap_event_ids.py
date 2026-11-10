@@ -74,16 +74,40 @@ def remap(conn, pairs, apply):
     return done
 
 
-async def detect(conn):
+class Blocked(Exception):
+    pass
+
+
+def report_future_duplicates(conn):
+    """예정 경기 중복(같은 홈·원정팀, 결과 없음, 3일 이내 두 ID) — 보고만 한다(삭제 = Red, 사람이 판단)."""
+    rows = conn.execute("""
+        SELECT a.id, b.id, a.home_team_name, a.away_team_name,
+               datetime(a.date_ts, 'unixepoch', '+9 hours'), datetime(b.date_ts, 'unixepoch', '+9 hours')
+        FROM events a JOIN events b
+          ON a.home_team_id = b.home_team_id AND a.away_team_id = b.away_team_id AND a.id < b.id
+         AND ABS(a.date_ts - b.date_ts) <= 3 * 86400
+        WHERE a.tournament_id IN (410, 777) AND b.tournament_id IN (410, 777)
+          AND a.home_score IS NULL AND b.home_score IS NULL
+          AND a.date_ts > strftime('%s', 'now') - 86400""").fetchall()
+    for a, b, hn, an, da, db in rows:
+        print(f"  ⚠ 예정 경기 중복: {hn}-{an} {a}({da}) / {b}({db}) — SofaScore 404인 쪽 삭제 검토 (자동 삭제 안 함)")
+    return len(rows)
+
+
+async def detect(conn, days=None):
     """mps 없는 K1/K2 종료 경기 중 SofaScore에서 404인 것 → 같은 홈팀 최근 경기에서 ±3일·같은 원정팀·같은 스코어 후보."""
-    from playwright.async_api import async_playwright
+    since = 0 if not days else int(__import__("time").time()) - days * 86400
     rows = conn.execute("""
         SELECT e.id, e.date_ts, e.home_team_id, e.away_team_id, e.home_score, e.away_score, e.home_team_name, e.away_team_name
         FROM events e
         WHERE e.tournament_id IN (410, 777) AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL
+          AND e.date_ts >= ?
           AND NOT EXISTS (SELECT 1 FROM match_player_stats s WHERE s.event_id = e.id)
-        ORDER BY e.date_ts DESC""").fetchall()
-    print(f"mps 없는 종료 경기 {len(rows)}")
+        ORDER BY e.date_ts DESC""", (since,)).fetchall()
+    print(f"mps 없는 종료 경기 {len(rows)}" + (f" (최근 {days}일)" if days else ""))
+    if not rows:
+        return []
+    from playwright.async_api import async_playwright
     pairs = []
     async with async_playwright() as pw:
         b = await pw.chromium.launch(headless=True)
@@ -99,6 +123,9 @@ async def detect(conn):
         for eid, ts, hid, aid, hs, as_, hn, an in rows:
             st, _ = await get(f"/api/v1/event/{int(eid)}")
             await asyncio.sleep(0.4)
+            if st == 403:
+                await b.close()
+                raise Blocked(f"SofaScore 403 (event {eid}) — 차단, 판정 불가")
             if st != 404:
                 print(f"  {eid} {hn}-{an}: SofaScore {st} (ID 유효 — 대상 아님)")
                 continue
@@ -131,6 +158,7 @@ def main():
     ap.add_argument("pairs", nargs="*", help="OLD:NEW 쌍")
     ap.add_argument("--detect", action="store_true", help="404 경기 자동 탐지")
     ap.add_argument("--apply", action="store_true", help="실제 교체")
+    ap.add_argument("--days", type=int, help="--detect 대상을 최근 N일 종료 경기로 제한 (update_data 정기 실행용)")
     ap.add_argument("--db", default=DB_PATH)
     args = ap.parse_args()
 
@@ -140,7 +168,12 @@ def main():
         o, n = p.split(":")
         pairs.append((int(o), int(n)))
     if args.detect:
-        pairs += asyncio.run(detect(conn))
+        try:
+            pairs += asyncio.run(detect(conn, args.days))
+        except Blocked as e:
+            print(f"[차단 감지] {e}")
+            sys.exit(3)
+        report_future_duplicates(conn)
     if not pairs:
         print("교체할 쌍 없음")
         return

@@ -9,6 +9,7 @@ STEP 단위로 subprocess 호출한다. 모든 STEP은 NOT EXISTS / 중복 가�
 STEP 0  K리그 공식 API → kleague_results_2026.json 갱신
 STEP 1  events 테이블 동기화 (synthetic 90xxxxxx 생성될 수 있음)
 STEP 2  synthetic → SofaScore 실제 ID 교체
+STEP 29 SofaScore 재생성 경기 ID 감지·교체 (구 ID 404 → 새 ID, crawlers/remap_event_ids.py)
 STEP 3  최근 N일 라인업 수집 (K1+K2)
 STEP 4  K1 mps 백필 (양 팀 양 선수)
 STEP 5  K2 mps 백필
@@ -139,6 +140,10 @@ def main():
             [PYTHON, str(CRAWLERS/"sync_results_to_events.py")]),
         (2, "synthetic → SofaScore 실제 ID 교체",
             [PYTHON, str(CRAWLERS/"replace_synthetic_events.py")]),
+        # SofaScore가 경기를 새 ID로 재생성(구 ID 404)하면 mps·라인업·히트맵이 조용히 스킵된다(2026-11-10 용인FC 16경기).
+        # mps 없는 최근 종료 경기만 확인 — 대상 0이면 브라우저도 안 띄움. 예정 경기 중복은 보고만.
+        (29, "SofaScore 재생성 경기 ID 감지·교체 (mps 없는 최근 120일 종료 경기)",
+            [PYTHON, str(CRAWLERS/"remap_event_ids.py"), "--detect", "--apply", "--days", "120"]),
         (3, f"라인업 수집 (최근 {args.days}일)",
             [PYTHON, str(CRAWLERS/"crawl_lineups.py"), "--days", str(args.days)]),
     ]

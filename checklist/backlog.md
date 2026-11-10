@@ -6,7 +6,8 @@
 
 ## 🔴 P1 — 가치 큰 단기 작업
 
-### [ ] 🔁 SofaScore 경기 ID 재생성 자동 감지 STEP 편입 (2026-11-10 등록)
+### [x] 🔁 SofaScore 경기 ID 재생성 자동 감지 STEP 편입 (2026-11-10 등록 → 같은 날 구현)
+- ✅ update_data **STEP 29**(STEP 2 직후·라인업/mps 앞): `remap_event_ids.py --detect --apply --days 120`. mps 없는 최근 120일 종료 경기만 SofaScore 확인(대상 0이면 브라우저 미기동), 404 + 같은 홈·원정·±3일·같은 스코어 **유일 후보만** 교체, 403이면 exit 3(차단 = 판정 불가). 예정 경기 중복은 **로그 경고만**(삭제는 사람이 판단). 검증: 교정 DB → 0쌍, 미교정 DB dry-run → 16쌍, 운영 교정 전 백업 → 중복 2건 보고·현재 DB 0건.
 - 용인FC 16경기가 SofaScore에서 새 ID로 재생성돼 시즌 내내 mps·히트맵 미수집이었다(11/10 `crawlers/remap_event_ids.py`로 교정, 상세 work-log 11/10).
 - 할 일: update_data에 `remap_event_ids.py --detect --apply` STEP 추가(STEP 4·5 mps 백필 **앞**), 예정 경기 중복(구 ID 404 + 새 ID 존재) 정리 로직 포함 여부 결정(삭제 = Red). 크롤 파이프라인 변경 = Red → 사용자 확인.
 
