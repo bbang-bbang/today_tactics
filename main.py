@@ -4240,6 +4240,58 @@ def _brief_formations(ss_id, tid, year):
     return out
 
 
+def _brief_league_baseline(tid, year):
+    """리그 기준선(10분 캐시): 시간대별 득점 비중(팀 인사이트와 같은 15분 버킷 규칙) · 선제 득점/실점 시 승률.
+    스카우팅 결론은 '고정 기준'이 아니라 '리그 평균 대비 유의하게 튀는가'로 판단한다(2026-11-11 발동 빈도 점검:
+    시간대 28%·먼저 실점 25% 고정 기준은 리그 평균 자체가 높아 66~72% 브리프에 뜨는 무의미한 결론이었음)."""
+    ck = f"brief_base:{tid}:{year}"
+    hit = _pcache_get(ck)
+    if hit is not None:
+        return hit
+    ys, ye = _year_range(year)
+    buckets = [0] * 6
+    fs, fc = [0, 0], [0, 0]   # [승, 경기] — 선제 득점 팀 / 선제 실점 팀
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        for m, in conn.execute("""SELECT ge.minute + IFNULL(ge.added_time, 0) FROM goal_events ge JOIN events e ON e.id = ge.event_id
+                                  WHERE e.tournament_id = ? AND e.home_score IS NOT NULL AND e.date_ts >= ? AND e.date_ts < ?""",
+                               (tid, ys, ye)):
+            b = int((max(m or 1, 1) - 1) // 15)
+            buckets[0 if b < 0 else 5 if b > 5 else b] += 1
+        seen = set()
+        for eid, gtid, h_id, a_id, hs, as_ in conn.execute(
+                """SELECT ge.event_id, ge.team_id, e.home_team_id, e.away_team_id, e.home_score, e.away_score
+                   FROM goal_events ge JOIN events e ON e.id = ge.event_id
+                   WHERE e.tournament_id = ? AND e.home_score IS NOT NULL AND e.date_ts >= ? AND e.date_ts < ?
+                   ORDER BY ge.event_id, ge.minute, IFNULL(ge.added_time, 0), ge.id""", (tid, ys, ye)):
+            if eid in seen:
+                continue
+            seen.add(eid)
+            scorer_home = gtid == h_id
+            sg, cg = (hs, as_) if scorer_home else (as_, hs)
+            fs[1] += 1; fc[1] += 1
+            fs[0] += sg > cg      # 선제 득점 팀이 이김
+            fc[0] += cg > sg      # 선제 실점 팀이 이김(역전승)
+    finally:
+        conn.close()
+    tot = sum(buckets)
+    base = {"share": [b / tot for b in buckets] if tot else None,
+            "scored_first_win": fs[0] / fs[1] if fs[1] else None,
+            "conceded_first_win": fc[0] / fc[1] if fc[1] else None}
+    _pcache_set(ck, base)
+    return base
+
+
+def _binom_z(k, n, p):
+    """한쪽 이항 근사 z (관측 k / 시행 n vs 기대 비율 p)."""
+    if not n or p is None or p <= 0 or p >= 1:
+        return 0.0
+    return (k - n * p) / math.sqrt(n * p * (1 - p))
+
+
+_BRIEF_Z = 1.64   # 한쪽 95% — 이 이상일 때만 '리그 평균보다 튄다'고 말한다
+
+
 def _brief_peak_bucket(arr):
     """분포에서 가장 큰 구간 → (idx, 비중%, 총합). 총합 0이면 None."""
     tot = sum(arr or [])
@@ -4395,21 +4447,35 @@ def get_pre_match_brief():
 
     # ── ⑦ 규칙 기반 결론 (근거 수치 동반, 최대 3개) ──
     cands = []   # (우선순위, 제목, 근거)
-    pk = _brief_peak_bucket(timing["against"])
-    if pk and pk[2] >= 6 and pk[1] >= 28:
-        cands.append((80 + pk[1] // 5, f"상대는 {_BRIEF_BUCKETS[pk[0]]}에 가장 많이 실점 — 이 시간대 공격 강도를 높여라",
-                      f"올 시즌 실점 {pk[2]}골 중 {timing['against'][pk[0]]}골({pk[1]}%)이 이 구간"))
-    pk = _brief_peak_bucket(timing["for"])
-    if pk and pk[2] >= 6 and pk[1] >= 28:
-        cands.append((70 + pk[1] // 5, f"상대는 {_BRIEF_BUCKETS[pk[0]]}에 득점이 몰림 — 이 시간대 집중력 유지",
-                      f"올 시즌 득점 {pk[2]}골 중 {timing['for'][pk[0]]}골({pk[1]}%)이 이 구간"))
+    base = _brief_league_baseline(410 if league == "K1" else 777, year)
+
+    def timing_peak(arr):
+        """리그 시간대 비중 대비 가장 유의하게 몰린 구간 → (idx, z, 팀 %, 리그 %) 또는 None."""
+        n = sum(arr or [])
+        if not base["share"] or n < 10:
+            return None
+        best = max(range(6), key=lambda b: _binom_z(arr[b], n, base["share"][b]))
+        z = _binom_z(arr[best], n, base["share"][best])
+        if z < _BRIEF_Z or arr[best] < 5:
+            return None
+        return best, z, round(arr[best] / n * 100), round(base["share"][best] * 100)
+    pk = timing_peak(timing["against"])
+    if pk:
+        cands.append((80 + min(10, int(pk[1] * 3)), f"상대는 {_BRIEF_BUCKETS[pk[0]]}에 리그 평균보다 실점이 몰림 — 이 시간대 공격 강도를 높여라",
+                      f"실점 {sum(timing['against'])}골 중 {timing['against'][pk[0]]}골({pk[2]}%) · 리그 평균 {pk[3]}%"))
+    pk = timing_peak(timing["for"])
+    if pk:
+        cands.append((70 + min(10, int(pk[1] * 3)), f"상대는 {_BRIEF_BUCKETS[pk[0]]}에 리그 평균보다 득점이 몰림 — 이 시간대 집중력 유지",
+                      f"득점 {sum(timing['for'])}골 중 {timing['for'][pk[0]]}골({pk[2]}%) · 리그 평균 {pk[3]}%"))
     s_, c_ = first_goal["scored"], first_goal["conceded"]
-    if s_["games"] >= 5 and s_["win_pct"] is not None and s_["win_pct"] >= 75:
+    p_s, p_c = base["scored_first_win"], base["conceded_first_win"]
+    if s_["games"] >= 6 and p_s and _binom_z(s_["w"], s_["games"], p_s) >= _BRIEF_Z:
         cands.append((90, "상대에게 선제골을 내주면 사실상 패배 — 초반 실점 방지가 최우선",
-                      f"상대가 먼저 득점한 {s_['games']}경기 중 {s_['w']}승({s_['win_pct']}%)"))
-    if c_["games"] >= 5 and c_["win_pct"] is not None and c_["win_pct"] <= 25:
-        cands.append((85, "상대는 먼저 실점하면 무너짐 — 선제골을 노리는 초반 압박",
-                      f"상대가 먼저 실점한 {c_['games']}경기 중 {c_['w']}승({c_['win_pct']}%)"))
+                      f"상대가 먼저 득점한 {s_['games']}경기 중 {s_['w']}승({s_['win_pct']}%) · 리그 평균 {round(p_s * 100)}%"))
+    # '먼저 실점하면 무너짐'은 리그 평균(약 15%)이 원래 낮아 변별력이 없어 뺐다 — 대신 역전에 강한 팀만 경고
+    if c_["games"] >= 6 and p_c and _binom_z(c_["w"], c_["games"], p_c) >= _BRIEF_Z:
+        cands.append((84, "상대는 먼저 실점해도 뒤집는 팀 — 선제골 뒤에도 라인을 내리지 마라",
+                      f"상대가 먼저 실점한 {c_['games']}경기 중 {c_['w']}승({c_['win_pct']}%) · 리그 평균 {round(p_c * 100)}%"))
     for w in weaknesses[:2]:
         if w["key"] in ("duel_won_pct", "ga_per_game", "first_conceded_win_pct", "tackles_per_game"):
             cands.append((75 - w["rank"] * 0, f"상대 약점 — {w['hint']}",
@@ -7231,6 +7297,85 @@ _RC_CANDIDATES = 6
 
 _RC_PLAY_METRICS = ("goals90", "xg90", "atk90", "create", "def", "duel", "pass_acc")   # 평점 제외 — 플레이 행동 지표만
 
+# 골키퍼 종합 점수 (2026-11-11) — 필드 플레이어 TOP 퍼포머 체계 밖이라 따로. 같은 리그 GK(출전 450분+) 중 백분위 가중.
+_GK_WEIGHTS = {"save_pct": .35, "saves90": .15, "conceded90": .15, "long_acc": .10, "rating": .25}
+_GK_LOWER_BETTER = {"conceded90"}
+_GK_LABEL = {"save_pct": "선방률", "saves90": "선방/90", "conceded90": "실점/90", "long_acc": "롱볼 정확도", "rating": "평점"}
+# K2 → K1 환산(승강 PO와 같은 리그 이동 팀 측정값): 공격 생산 ×0.68
+_RC_K2_ATTACK_FACTOR = _PO_K2_TO_K1["att"] if "_PO_K2_TO_K1" in globals() else 0.68
+
+
+def _k1_equiv(r, k1_atk):
+    """K2 선수의 공격 생산(골+도움/90)을 K1 기준으로 환산(×0.68)해 같은 세부 포지션 K1 선수 중 백분위.
+    수비 행동 지표는 리그 간 환산 근거가 없어 하지 않는다. K1 선수·GK·표본 부족이면 None."""
+    if r.get("league") != "K2" or r.get("detail") not in _RC_GROUPS:
+        return None
+    v = _tp_metric(r, "atk90")
+    dist = k1_atk.get(r["detail"]) or []
+    if v is None or len(dist) < _TP_MIN_COHORT:
+        return None
+    conv = v * _RC_K2_ATTACK_FACTOR
+    less = sum(x < conv for x in dist); eq = sum(x == conv for x in dist)
+    return {"atk90": round(v, 2), "atk90_k1": round(conv, 2), "pct_k1": round((less + 0.5 * eq) / len(dist) * 100)}
+
+
+def _gk_rows(year):
+    """시즌 GK 행: 리그(최근 소속팀 기준)·출전·지표·종합 점수(score 0~100)·지표 백분위(_pcts). 10분 캐시."""
+    ck = f"gk_rows:{year}"
+    hit = _pcache_get(ck)
+    if hit is not None:
+        return hit
+    ys, ye = _year_range(year)
+    team_league = {t["sofascore_id"]: t.get("league") for t in TEAMS}
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        agg = conn.execute("""
+            SELECT m.player_id, COALESCE(p.name_ko, m.player_name, p.name), COUNT(*), SUM(m.minutes_played),
+                   SUM(COALESCE(m.saves,0)), SUM(COALESCE(m.goals_conceded,0)),
+                   SUM(COALESCE(m.accurate_long_balls,0)), SUM(COALESCE(m.total_long_balls,0)), AVG(m.rating)
+            FROM match_player_stats m JOIN events e ON e.id = m.event_id LEFT JOIN players p ON p.id = m.player_id
+            WHERE m.position = 'G' AND m.minutes_played > 0 AND e.tournament_id IN (410, 777)
+              AND e.date_ts >= ? AND e.date_ts < ?
+            GROUP BY m.player_id HAVING SUM(m.minutes_played) >= 450""", (ys, ye)).fetchall()
+        latest = {}
+        for pid, tid, md in conn.execute("""SELECT m.player_id, m.team_id, MAX(e.date_ts) FROM match_player_stats m JOIN events e ON e.id = m.event_id
+                                            WHERE m.position = 'G' AND m.minutes_played > 0 AND e.date_ts >= ? AND e.date_ts < ?
+                                            GROUP BY m.player_id, m.team_id""", (ys, ye)):
+            if pid not in latest or md > latest[pid][1]:
+                latest[pid] = (tid, md)
+    finally:
+        conn.close()
+    rows = []
+    for pid, name, games, mins, sv, gc, la, lt, rt in agg:
+        tid = latest.get(pid, (None,))[0]
+        rows.append({"player_id": pid, "name": name or "", "games": games, "mins": mins, "team_id": tid,
+                     "team": _ko_team(tid, ""), "league": team_league.get(tid) or "", "pos": "G",
+                     "detail": "GK", "detail_label": "골키퍼",
+                     "m": {"save_pct": sv / (sv + gc) * 100 if (sv + gc) else None, "saves90": sv / mins * 90,
+                           "conceded90": gc / mins * 90, "long_acc": la / lt * 100 if lt >= 20 else None,
+                           "rating": rt}})
+    for r in rows:
+        pool = [o for o in rows if o["league"] == r["league"]]
+        if len(pool) < _TP_MIN_COHORT:
+            pool = rows
+        num = den = 0.0
+        r["_pcts"] = {}
+        for k, w in _GK_WEIGHTS.items():
+            v = r["m"][k]
+            vals = [o["m"][k] for o in pool if o["m"][k] is not None]
+            if v is None or len(vals) < 5:
+                continue
+            less = sum(x < v for x in vals); eq = sum(x == v for x in vals)
+            p = (less + 0.5 * eq) / len(vals) * 100
+            if k in _GK_LOWER_BETTER:
+                p = 100 - p
+            r["_pcts"][k] = round(p, 1)
+            num += w * p; den += w
+        r["score"] = round(num / den, 1) if den >= 0.5 else None
+        r["goals"], r["assists"], r["rating"] = 0, 0, round(rt, 2) if (rt := r["m"]["rating"]) else None
+    _pcache_set(ck, rows)
+    return rows
+
 
 def _recruit_by_play(mode, rows, meta, ss, league, scope, max_age, min_mins, player_raw):
     """포지션 무관 '플레이 기준' 추천 (2026-11-11).
@@ -7265,12 +7410,18 @@ def _recruit_by_play(mode, rows, meta, ss, league, scope, max_age, min_mins, pla
         age = meta.get(r["player_id"], {}).get("age")
         return not (max_age and (age is None or age > max_age))
 
+    k1_atk = {}
+    for r in rows:
+        if r.get("league") == "K1" and (v := _tp_metric(r, "atk90")) is not None:
+            k1_atk.setdefault(r.get("detail"), []).append(v)
+
     def cand(r, **extra):
         mt = meta.get(r["player_id"], {})
         return {"player_id": r["player_id"], "name": r["name"], "team": r.get("team"), "league": r.get("league") or "",
                 "pos": r.get("detail_label") or r.get("pos"), "age": mt.get("age"), "nationality": mt.get("nationality"),
                 "height": mt.get("height"), "foot": mt.get("foot"), "games": r["games"], "mins": r["mins"],
-                "score": r.get("score"), "goals": r.get("goals"), "assists": r.get("assists"), **extra}
+                "score": r.get("score"), "goals": r.get("goals"), "assists": r.get("assists"),
+                "k1_equiv": _k1_equiv(r, k1_atk) if league == "K1" else None, **extra}
 
     labels = {m: _TP_METRIC_LABEL[m] for m in _RC_PLAY_METRICS}
     if mode == "style":
@@ -7371,9 +7522,10 @@ def team_recruit():
         rows, _n = _top_performer_rows(year, "all", keep_pcts=True)
         _pcache_set(ck, rows)
     scored = [r for r in rows if r.get("score") is not None and r.get("detail") in _RC_GROUPS]
+    gk_rows = [r for r in _gk_rows(year) if r.get("score") is not None] if mode == "position" else []
 
     # 나이·국적·신체 (players 마스터)
-    pids = [r["player_id"] for r in scored]
+    pids = [r["player_id"] for r in scored] + [r["player_id"] for r in gk_rows]
     meta = {}
     if pids:
         conn = sqlite3.connect(DB_PATH)
@@ -7402,6 +7554,14 @@ def team_recruit():
                     "filters": {"scope": scope, "max_age": max_age, "min_minutes": min_mins}})
         return jsonify(out)
 
+    # 포지션 보강은 GK도 판단 — 필드 플레이어 TOP 퍼포머 점수와 같은 형식(score·_pcts)의 GK 점수를 합류
+    scored = scored + gk_rows
+    groups = _RC_GROUPS + ("GK",)
+    k1_atk = {}   # 세부 포지션별 K1 골+도움/90 분포 — K2 후보의 'K1 환산' 백분위용
+    for r in scored:
+        if r.get("league") == "K1" and r.get("detail") in _RC_GROUPS and (v := _tp_metric(r, "atk90")) is not None:
+            k1_atk.setdefault(r["detail"], []).append(v)
+
     # 팀×포지션 강도 (같은 리그) — 출전 시간 가중 평균 종합 점수
     strength = {}
     for r in scored:
@@ -7413,12 +7573,12 @@ def team_recruit():
     league_teams = {t["sofascore_id"] for t in TEAMS if t.get("league") == league and t.get("sofascore_id")}
 
     needs = []
-    for g in _RC_GROUPS:
+    for g in groups:
         vals = {tid: s[0] / s[1] for (tid, gg), s in strength.items() if gg == g and s[1] and tid in league_teams}
         mine = vals.get(ss)
         order = sorted(vals.values(), reverse=True)
         rank = (order.index(mine) + 1) if mine is not None else None
-        needs.append({"group": g, "label": DETAIL_POS_LABELS.get(g, g),
+        needs.append({"group": g, "label": "골키퍼" if g == "GK" else DETAIL_POS_LABELS.get(g, g),
                       "team_score": round(mine, 1) if mine is not None else None,
                       "league_median": round(sorted(vals.values())[len(vals) // 2], 1) if vals else None,
                       "rank": rank, "n_teams": len(vals)})
@@ -7434,13 +7594,14 @@ def team_recruit():
         g = n["group"]
         mine_rows = [r for r in scored if r.get("team_id") == ss and r["detail"] == g]
         tot = sum(r["mins"] or 0 for r in mine_rows)
-        metric_keys = [m for m in _TP_WEIGHTS[g] if m != "rating"]
+        weights, labels = (_GK_WEIGHTS, _GK_LABEL) if g == "GK" else (_TP_WEIGHTS[g], _TP_METRIC_LABEL)
+        metric_keys = [m for m in weights if m != "rating"]
         wm = []
         for m in metric_keys:
             num = sum((r.get("_pcts") or {}).get(m, 0) * (r["mins"] or 0) for r in mine_rows if m in (r.get("_pcts") or {}))
             den = sum(r["mins"] or 0 for r in mine_rows if m in (r.get("_pcts") or {}))
             if den:
-                wm.append({"key": m, "label": _TP_METRIC_LABEL[m], "pct": round(num / den)})
+                wm.append({"key": m, "label": labels[m], "pct": round(num / den)})
         wm.sort(key=lambda x: x["pct"])
         focus = [w["key"] for w in wm[:2]]
         n["weak_metrics"] = wm[:2]
@@ -7468,6 +7629,7 @@ def team_recruit():
                 "focus_pcts": {m: round(pc[m]) for m in focus if m in pc},
                 "goals": r.get("goals"), "assists": r.get("assists"), "rating": r.get("rating"),
                 "detail_est": bool(r.get("detail_est")),
+                "k1_equiv": _k1_equiv(r, k1_atk) if league == "K1" else None,
             })
         cands.sort(key=lambda c: -c["fit"])
         n["candidates"] = cands[:_RC_CANDIDATES]
@@ -7482,8 +7644,9 @@ def team_recruit():
         "notes": [
             "종합 점수 = 같은 리그·같은 세부 포지션 선수 중 백분위(0~100)를 역할별 가중치로 합산 — 선수 탭 TOP 퍼포머와 같은 기준",
             "후보 적합도 = 종합 점수 50% + 이 팀이 그 포지션에서 약한 지표 2개의 백분위 50%",
-            "백분위는 선수가 뛴 리그 안에서 계산 — K2 선수의 수치는 K2 기준(리그 간 격차 미보정)",
-            "골키퍼는 종합 점수 체계에 없어 제외 · 몸값·계약·부상 정보 없음",
+            "백분위는 선수가 뛴 리그 안에서 계산 — K1 팀 추천의 K2 후보는 'K1 환산'(골+도움/90 ×0.68 → K1 같은 포지션 백분위)을 함께 표시. 수비 지표는 환산 근거가 없어 미보정",
+            "골키퍼 점수 = 같은 리그 GK 중 백분위: 선방률 35 · 평점 25 · 선방/90 15 · 실점/90(낮을수록) 15 · 롱볼 정확도 10",
+            "몸값·계약·부상 정보 없음",
         ],
     })
 

@@ -48,6 +48,14 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                  similar: "고른 선수와 90분당 플레이 프로필이 가장 비슷한 선수 (포지션 무관 — 대체 자원 찾기)" }[_mode];
     }
 
+    // K2 후보의 K1 환산(골+도움/90 ×0.68 → K1 같은 포지션 백분위) — K1 팀 추천일 때만 서버가 채움
+    function k1EquivHtml(c) {
+        const e = c.k1_equiv;
+        if (!e) return "";
+        return `<span class="rc-k1eq" title="K2 골+도움/90 ${e.atk90} → K1 환산 ${e.atk90_k1} (리그 이동 팀 측정 계수 ×0.68). 수비 지표는 환산 근거가 없어 미보정">
+            K1 환산 공격 ${e.pct_k1}%ile</span>`;
+    }
+
     function bar(p) {
         const v = Math.max(0, Math.min(100, p || 0));
         return `<span class="rc-pbar" aria-hidden="true"><i style="width:${v}%"></i></span>`;
@@ -82,7 +90,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                 <td class="rc-rank">${i + 1}</td>
                 <td><button type="button" class="rc-plink rc-name" data-rc-player="${c.player_id}">${ttEsc(c.name)}</button>
                     <span class="rc-sub">${ttEsc(c.nationality || "")}${c.height ? " · " + c.height + "cm" : ""}${c.foot ? " · " + ttEsc(({ Right: "오른발", Left: "왼발", Both: "양발" })[c.foot] || c.foot) : ""}${c.detail_est ? " · 포지션 추정" : ""}</span></td>
-                <td>${ttEsc(c.team || "")} <span class="rc-lg rc-lg-${ttEsc(c.league)}">${ttEsc(c.league)}</span></td>
+                <td>${ttEsc(c.team || "")} <span class="rc-lg rc-lg-${ttEsc(c.league)}">${ttEsc(c.league)}</span>${k1EquivHtml(c)}</td>
                 <td class="rc-num">${c.age ?? "-"}</td>
                 <td class="rc-num">${c.mins.toLocaleString()}<span class="rc-muted">분</span></td>
                 <td class="rc-num">${c.goals ?? 0}·${c.assists ?? 0}</td>
@@ -113,7 +121,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <td class="rc-rank">${i + 1}</td>
             <td><button type="button" class="rc-plink rc-name" data-rc-player="${c.player_id}">${ttEsc(c.name)}</button>
                 <span class="rc-sub">${ttEsc(c.pos || "")}${c.nationality ? " · " + ttEsc(c.nationality) : ""}${c.height ? " · " + c.height + "cm" : ""}</span></td>
-            <td>${ttEsc(c.team || "")} <span class="rc-lg rc-lg-${ttEsc(c.league)}">${ttEsc(c.league)}</span></td>
+            <td>${ttEsc(c.team || "")} <span class="rc-lg rc-lg-${ttEsc(c.league)}">${ttEsc(c.league)}</span>${k1EquivHtml(c)}</td>
             <td class="rc-num">${c.age ?? "-"}</td>
             <td class="rc-num">${c.mins.toLocaleString()}<span class="rc-muted">분</span></td>
             ${cols.map(([k]) => { const v = (c.focus_pcts || c.profile || {})[k]; return `<td class="rc-num">${bar(v)}${v ?? "-"}</td>`; }).join("")}

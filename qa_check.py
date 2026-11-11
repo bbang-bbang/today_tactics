@@ -243,7 +243,10 @@ d_rc = get('/api/team-recruit?team=suwon')
 qa('영입 추천 후보는 다른 팀·조건 충족·점수 0~100', lambda: assert_(
     all(c['team_slug'] != 'suwon' and c['mins'] >= d_rc['filters']['min_minutes'] and 0 <= c['fit'] <= 100
         for n in d_rc['needs'] for c in n['candidates'])
-    and all(n['group'] in ('ST', 'W', 'AM', 'CM', 'DM', 'FB', 'CB') for n in d_rc['needs'])))
+    and all(n['group'] in ('ST', 'W', 'AM', 'CM', 'DM', 'FB', 'CB', 'GK') for n in d_rc['needs'])))
+qa('스카우팅 요약: 시간대·선제골 결론은 리그 평균 근거 동반', lambda: (lambda d: assert_(
+    all('리그 평균' in c['evidence'] for c in d['conclusions'] if any(k in c['title'] for k in ('시간대', '선제골', '뒤집는')))))(
+    get('/api/pre-match-brief?team=suwon&opp=busan&home=1')))
 qa('영입 추천 나이 필터·잘못된 입력', lambda: assert_(
     all((c['age'] or 99) <= 25 for n in get('/api/team-recruit?team=gwangju&max_age=25')['needs'] for c in n['candidates'])
     and _brief_status('/api/team-recruit?team=nope') == 404 and _brief_status('/api/team-recruit?team=suwon&scope=x') == 400))
