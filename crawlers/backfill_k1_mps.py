@@ -108,6 +108,9 @@ async def main():
     parser.add_argument("--league", choices=["K1", "K2"], default="K1")
     parser.add_argument("--limit",  type=int, default=None, help="최대 수집 경기 수 (테스트용)")
     parser.add_argument("--since",  default="2000-01-01", help="이 날짜(YYYY-MM-DD) 이후 경기만 — 과거 시즌 백필 범위 제한용")
+    parser.add_argument("--partial", action="store_true",
+                        help="한쪽이라도 출전 기록 선수가 11명 미만인 '일부만 수집된' 경기도 대상 (빠진 선수만 추가). "
+                             "정기 크론에선 끔 — 채울 수 없는 옛 경기를 매주 다시 요청하지 않게")
     args = parser.parse_args()
 
     tid_filter = 410 if args.league == "K1" else 777
@@ -126,12 +129,12 @@ async def main():
           AND e.home_score IS NOT NULL AND e.away_score IS NOT NULL
           AND e.id < 50000000
           AND e.date_ts >= strftime('%s', ?)
-          AND (NOT EXISTS (SELECT 1 FROM match_player_stats mps
-                           WHERE mps.event_id = e.id AND mps.is_home = 1 AND mps.minutes_played IS NOT NULL)
-            OR NOT EXISTS (SELECT 1 FROM match_player_stats mps
-                           WHERE mps.event_id = e.id AND mps.is_home = 0 AND mps.minutes_played IS NOT NULL))
+          AND ((SELECT COUNT(*) FROM match_player_stats mps
+                WHERE mps.event_id = e.id AND mps.is_home = 1 AND mps.minutes_played > 0) < ?
+            OR (SELECT COUNT(*) FROM match_player_stats mps
+                WHERE mps.event_id = e.id AND mps.is_home = 0 AND mps.minutes_played > 0) < ?)
         ORDER BY e.date_ts DESC
-    """, (tid_filter, args.since))
+    """, (tid_filter, args.since, *((11, 11) if args.partial else (1, 1))))
     events_todo = cur.fetchall()
     if args.limit:
         events_todo = events_todo[:args.limit]
@@ -172,8 +175,10 @@ async def main():
             # 다른 STEP이 채운 컬럼을 지우지 않도록 (한쪽만 비어 있던 경기 보강용, 2026-11-10)
             have_side = {r[0] for r in conn.execute(
                 "SELECT DISTINCT is_home FROM match_player_stats WHERE event_id=? AND minutes_played IS NOT NULL", (eid,))}
+            have_pid = {r[0] for r in conn.execute(
+                "SELECT player_id FROM match_player_stats WHERE event_id=? AND minutes_played IS NOT NULL", (eid,))}
             for side, is_home in [("home", 1), ("away", 0)]:
-                if is_home in have_side:
+                if is_home in have_side and not args.partial:
                     continue
                 side_data = data.get(side, {}) or {}
                 players  = side_data.get("players", []) or []
@@ -181,7 +186,7 @@ async def main():
                     entry_team_id = entry.get("teamId") or (hid if is_home else aid)
                     player = entry.get("player") or {}
                     pid = player.get("id")
-                    if not pid:
+                    if not pid or pid in have_pid:   # 이미 수집된 선수는 덮어쓰지 않음(다른 STEP 컬럼 보존)
                         continue
                     stats_raw = entry.get("statistics") or {}
                     s_dict = parse_stats(stats_raw)
