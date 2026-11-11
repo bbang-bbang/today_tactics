@@ -43,6 +43,9 @@ LEAGUE_REGISTRY = {
     "ligue1":     {"db": "ligue1.db",       "label": "Ligue 1",        "tid": 34,  "slug": "france/ligue-1/34",
                    "season_ids": {2025: 77356},
                    "fallback_sids": {2025: 96127}},   # 팀 목록용 (standings API 403 우회)
+    # 브라질 세리에A — 단일 연도 시즌(4~12월). 2026-11-11 확인: seasons·standings·top-players·events 모두 200
+    "brasileirao": {"db": "brasileirao.db", "label": "Brasileirão Série A", "tid": 325, "slug": "brazil/brasileirao-serie-a/325",
+                    "season_ids": {2026: 87678, 2025: 72034}},
 }
 
 DELAY = 0.8

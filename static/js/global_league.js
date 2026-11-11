@@ -47,8 +47,20 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }
 
     GL.activeLeague = GL.leagues[0].code;
+    GL.activeYear = latestYear(GL.activeLeague);
     render();
     await loadSection();
+  }
+
+  /* 리그별 시즌 선택지 — /api/leagues 의 seasons(최신순). 유럽식 '2025/26', 브라질 등 단일 연도 '2026' */
+  function leagueSeasons(code) {
+    const l = GL.leagues.find(x => x.code === code);
+    return (l && l.seasons && l.seasons.length) ? l.seasons : [{ year: 2025, label: '2025/26' }];
+  }
+  function latestYear(code) { return String(leagueSeasons(code)[0].year); }
+  function yearOptionsHtml(code) {
+    return leagueSeasons(code).map(s =>
+      `<option value="${s.year}" ${String(s.year) === GL.activeYear ? 'selected' : ''}>${ttEsc(s.label)}</option>`).join('');
   }
 
   /* ── 전체 렌더 ────────────────────────────────────── */
@@ -59,11 +71,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
           <div class="gl-league-btns" id="gl-league-btns"></div>
           <div class="gl-year-wrap">
             <label class="gl-label">시즌</label>
-            <select id="gl-year" class="gl-select">
-              <option value="2025" ${GL.activeYear==='2025'?'selected':''}>2025/26</option>
-              <option value="2024" ${GL.activeYear==='2024'?'selected':''}>2024/25</option>
-              <option value="2023" ${GL.activeYear==='2023'?'selected':''}>2023/24</option>
-            </select>
+            <select id="gl-year" class="gl-select" aria-label="시즌">${yearOptionsHtml(GL.activeLeague)}</select>
           </div>
         </div>
         <div class="gl-section-tabs" id="gl-section-tabs">
@@ -113,6 +121,10 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   async function switchLeague(code) {
     GL.activeLeague = code;
     GL.teams = [];
+    // 리그마다 시즌 체계가 달라(유럽 2025/26 · 브라질 2026) 시즌 선택지를 다시 만든다
+    GL.activeYear = latestYear(code);
+    const ysel = document.getElementById('gl-year');
+    if (ysel) ysel.innerHTML = yearOptionsHtml(code);
     document.querySelectorAll('.gl-league-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.code === code)
     );

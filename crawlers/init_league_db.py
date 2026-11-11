@@ -25,6 +25,7 @@ LEAGUE_REGISTRY = {
     "bundesliga": {"db": "bundesliga.db",   "label": "Bundesliga",     "tournament_ids": [35]},
     "seriea":     {"db": "seriea.db",       "label": "Serie A",        "tournament_ids": [23]},
     "ligue1":     {"db": "ligue1.db",       "label": "Ligue 1",        "tournament_ids": [34]},
+    "brasileirao": {"db": "brasileirao.db", "label": "Brasileirão Série A", "tournament_ids": [325]},
 }
 
 SCHEMA_SQL = """

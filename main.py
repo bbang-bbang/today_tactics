@@ -257,6 +257,15 @@ LEAGUE_REGISTRY = {
         "tournaments": [{"id": 34, "name": "Ligue 1", "code": "L1"}],
         "season_ids": {2025: 77356},
     },
+    # 브라질 세리에A (2026-11-11) — 단일 연도 시즌이라 calendar_year=True (시즌 표기 '2026', 유럽 리그는 '2025/26')
+    "brasileirao": {
+        "db":        "brasileirao.db",
+        "label":     "Brasileirão Série A",
+        "flag":      "🇧🇷",
+        "tournaments": [{"id": 325, "name": "Brasileirão Série A", "code": "BRA"}],
+        "season_ids": {2026: 87678, 2025: 72034},
+        "calendar_year": True,
+    },
 }
 
 _VALID_LEAGUE_CODES = set(LEAGUE_REGISTRY.keys())
@@ -639,15 +648,37 @@ TEAMS = [
 
 @app.route("/api/leagues")
 def get_leagues():
-    """지원 리그 목록 반환 — 프론트 리그 스위처용."""
+    """지원 리그 목록 반환 — 프론트 리그 스위처용. seasons = 리그별 시즌 선택지(최신순, 단일 연도/유럽식 표기)."""
+    def seasons(cfg):
+        cal = cfg.get("calendar_year")
+        ys = sorted(cfg.get("season_ids", {}), reverse=True)
+        return [{"year": y, "label": str(y) if cal else f"{y}/{str(y + 1)[2:]}"} for y in ys]
+
+    def has_data(code):
+        """해외 리그는 DB에 팀이 있을 때만 노출 — 등록만 하고 수집 전인 리그(예: 브라질)가 빈 화면으로 뜨지 않게."""
+        if code == "kleague":
+            return True
+        path = _league_db_path(code)
+        if not os.path.exists(path):
+            return False
+        try:
+            c = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            try:
+                return (c.execute("SELECT COUNT(*) FROM teams").fetchone() or [0])[0] > 0
+            finally:
+                c.close()
+        except sqlite3.Error:
+            return False
+
     return jsonify([
         {
             "code":  code,
             "label": cfg["label"],
             "flag":  cfg["flag"],
             "tournaments": cfg["tournaments"],
+            "seasons": seasons(cfg),
         }
-        for code, cfg in LEAGUE_REGISTRY.items()
+        for code, cfg in LEAGUE_REGISTRY.items() if has_data(code)
     ])
 
 
