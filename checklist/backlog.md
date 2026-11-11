@@ -282,6 +282,29 @@ prediction.js 라운드 버튼 핸들러에 `clearMatchContext()` 추가, prev !
 - **선택지**: ①공식/허가된 API(API-Football 등 — 키 필요, 무료 한도 소량) ②FBref(Sports Reference) 페이지 — 이용약관·요청 빈도 제한 확인 필요 ③해외 탭 제거. 브라질(2026 시즌)은 레지스트리·시즌 표기까지 준비 완료(`brasileirao`).
 - **11/11 진행**: ① 선택 — API-Football(Pro) `crawlers/collect_apifootball.py`로 운영 6개 리그 수집 완료(190회). 남은 것: [ ] 해외 탭 다시 노출(index.html 주석 해제 + 브라우저 확인) · [ ] 주간 크론(`--league all --apply`, 약 200회) · xG·몸값은 출처 없음.
 
+### [ ] 🌍 해외 하위 리그(2·3부) 추가 — 다음 작업 (2026-11-11 등록, 범위 A/B 결정 대기)
+- **요청**: 각 리그마다 하위 리그, 최소 3부까지.
+- **API-Football 커버리지 확인**(2026 시즌, `/leagues?id=&season=2026`, 13회 사용):
+
+| 나라 | 2부 (id) | 3부 (id) |
+|---|---|---|
+| 잉글랜드 | Championship 40 — 전체 | League One 41 — 전체 (4부 League Two 42도 전체) |
+| 독일 | 2. Bundesliga 79 — 전체 | 3. Liga 80 — 전체 |
+| 스페인 | Segunda División 141 — 전체 | Primera RFEF 435·436(2개 조) — 순위표만 |
+| 이탈리아 | Serie B 136 — 전체 | Serie C 138·942·943(3개 조) — 순위표만 |
+| 프랑스 | Ligue 2 62 — 전체 | Ligue 3 63 — 순위표만 |
+| 브라질 | Série B 72 — 전체 (11/14 종료) | Série C 75 — 순위표+선수 시즌 기록(경기별 선수 통계 X, 10/25 종료) |
+
+  '전체' = standings + players(시즌 기록) + 경기별 선수 통계 coverage True.
+- **범위 선택지**: **A** 선수 기록 있는 리그만(2부 6개 + 잉글랜드·독일·브라질 3부) / **B** 순위표만 있는 3부(스페인·이탈리아·프랑스)까지 전부.
+- **작업 범위**:
+  1. `main.py` `LEAGUE_REGISTRY`에 `country`·`tier` 추가 → `/api/leagues` 응답에 포함, `global_league.js` 리그 선택을 나라별 그룹(1·2·3부)으로.
+  2. `collect_apifootball.py` `LEAGUES`·`DB_FILES`에 추가. 조 나뉜 리그는 `standings` 배열이 여러 개(조별) — 현재 코드는 `groups[0]`만 씀 → 조 컬럼 또는 리그 코드 분리 필요. 순위표만 리그는 `/players` 건너뛰기(옵션).
+  3. `crawl_league.py`·`init_league_db.py` 레지스트리도 맞추기(기존 3곳 동기화 패턴). 리그당 DB 파일 1개(약 12개 추가, 같은 스키마). tournament_id는 API-Football id와 겹치지 않게 정할 것(기존은 SofaScore tid 사용 — 하위 리그는 SofaScore tid 조회 or 별도 규칙).
+  4. 순위표만 리그 → 팀 랭킹·선수 TOP 영역에 '데이터 없음' 안내. `/api/leagues`의 '팀 없는 리그 숨김' 로직이 순위표만 리그를 숨기지 않는지 확인(standings 저장 시 teams도 넣으므로 OK일 것).
+  5. 호출량: 하위 리그는 리그당 약 40회 → 1부 포함 전체 약 700회/실행. `--max-calls` 기본 400 → 상향 필요(하루 한도 7,500 · `--reserve` 200 유지).
+  6. 운영 수집(승인 후) → 해외 탭 노출 결정(위 항목)과 같이 브라우저 확인 → 주간 크론.
+
 ### [ ] 세리에A · 리그앙 선수 스탯 수집 — 2026-06-14 백로그 등록
 
 **현황**: SofaScore `top-players/overall` API가 세리에A(tid=23)·리그앙(tid=34)에서 403 완전 차단. EPL·라리가·분데스는 정상 수집 중.  
