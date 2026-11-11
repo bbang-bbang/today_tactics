@@ -210,7 +210,9 @@ os.makedirs(SQUADS_DIR, exist_ok=True)
 
 # ════════════════════════════════════════════════════════════════
 # 리그 레지스트리 — 해외 리그 확장 기반
-# tournament_id: SofaScore 기준 (2025/26 시즌 동일 ID 사용)
+# tournament_id: 리그 DB 안의 대회 키(과거 SofaScore ID 유지). 해외 리그 데이터는 2026-11-11부터
+#   API-Football(crawlers/collect_apifootball.py)로 수집 — season_ids 값 = API-Football 시즌(시작 연도).
+#   API-Football엔 xG·몸값이 없다.
 # ════════════════════════════════════════════════════════════════
 LEAGUE_REGISTRY = {
     "kleague": {
@@ -227,35 +229,35 @@ LEAGUE_REGISTRY = {
         "label":     "Premier League",
         "flag":      "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
         "tournaments": [{"id": 17, "name": "Premier League", "code": "PL"}],
-        "season_ids": {2025: 76986},
+        "season_ids": {2026: 2026},   # API-Football 시즌(시작 연도) = 2026/27
     },
     "laliga": {
         "db":        "laliga.db",
         "label":     "La Liga",
         "flag":      "🇪🇸",
         "tournaments": [{"id": 8, "name": "La Liga", "code": "LL"}],
-        "season_ids": {2025: 77559},
+        "season_ids": {2026: 2026},
     },
     "bundesliga": {
         "db":        "bundesliga.db",
         "label":     "Bundesliga",
         "flag":      "🇩🇪",
         "tournaments": [{"id": 35, "name": "Bundesliga", "code": "BL"}],
-        "season_ids": {2025: 77333},
+        "season_ids": {2026: 2026},
     },
     "seriea": {
         "db":        "seriea.db",
         "label":     "Serie A",
         "flag":      "🇮🇹",
         "tournaments": [{"id": 23, "name": "Serie A", "code": "SA"}],
-        "season_ids": {2025: 76457},
+        "season_ids": {2026: 2026},
     },
     "ligue1": {
         "db":        "ligue1.db",
         "label":     "Ligue 1",
         "flag":      "🇫🇷",
         "tournaments": [{"id": 34, "name": "Ligue 1", "code": "L1"}],
-        "season_ids": {2025: 77356},
+        "season_ids": {2026: 2026},
     },
     # 브라질 세리에A (2026-11-11) — 단일 연도 시즌이라 calendar_year=True (시즌 표기 '2026', 유럽 리그는 '2025/26')
     "brasileirao": {
@@ -263,7 +265,7 @@ LEAGUE_REGISTRY = {
         "label":     "Brasileirão Série A",
         "flag":      "🇧🇷",
         "tournaments": [{"id": 325, "name": "Brasileirão Série A", "code": "BRA"}],
-        "season_ids": {2026: 87678, 2025: 72034},
+        "season_ids": {2026: 2026},
         "calendar_year": True,
     },
 }
@@ -13985,7 +13987,7 @@ def league_team_rankings(code):
               AND COALESCE(ps.appearances, 0) >= 1
               {sid_cond}
             GROUP BY p.team_id
-            ORDER BY xg DESC
+            ORDER BY xg DESC, goals DESC   -- API-Football 수집 리그는 xG 없음(0) → 득점순
         """, (*tids, *sid_params)).fetchall()
 
         if rows:
