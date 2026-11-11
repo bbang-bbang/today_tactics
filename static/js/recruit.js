@@ -8,6 +8,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     const root = () => document.getElementById("ws-team-recruit");
     let _teams = null, _team = null, _req = 0;
     const _f = { scope: "all", max_age: "", min_minutes: "900" };
+    // 추천 방식: position(약한 포지션 보강) · style(약한 플레이 지표 보강, 포지션 무관) · similar(고른 선수와 비슷한 플레이)
+    let _mode = "position", _player = null, _squad = [];
+    const MODES = [["position", "포지션 보강"], ["style", "플레이 보강"], ["similar", "비슷한 선수"]];
 
     function teamsReady() {
         if (_teams) return Promise.resolve(_teams);
@@ -31,7 +34,18 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                 ${sel("rc-mins", "최소 출전", _f.min_minutes, [["900", "900분+"], ["1350", "1350분+"], ["1800", "1800분+"]])}
             </div>
         </div>
+        <div class="rc-modes" role="tablist" aria-label="추천 방식">
+            ${MODES.map(([k, l]) => `<button type="button" role="tab" class="rc-mode${k === _mode ? " is-on" : ""}" data-rc-mode="${k}"
+                aria-selected="${k === _mode}">${l}</button>`).join("")}
+            <span class="rc-mode-hint rc-muted" id="rc-mode-hint">${modeHint()}</span>
+        </div>
         <div id="rc-body" class="rc-body"></div>`;
+    }
+
+    function modeHint() {
+        return { position: "팀이 약한 세부 포지션에서, 같은 포지션 선수 중 약한 지표가 강한 선수",
+                 style: "포지션과 무관하게 — 팀 전체가 약한 플레이 지표(수비 행동·창출 등)가 강한 선수",
+                 similar: "고른 선수와 90분당 플레이 프로필이 가장 비슷한 선수 (포지션 무관 — 대체 자원 찾기)" }[_mode];
     }
 
     function bar(p) {
@@ -92,16 +106,84 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         </section>`;
     }
 
+    // ── 플레이 기준 공통: 후보 표 ─────────────────────────────
+    function playTable(cands, cols, scoreLabel, scoreKey, scoreTitle) {
+        if (!cands.length) return `<p class="rc-empty">조건에 맞는 후보가 없습니다 — 필터를 완화해 보세요.</p>`;
+        const rows = cands.map((c, i) => `<tr>
+            <td class="rc-rank">${i + 1}</td>
+            <td><button type="button" class="rc-plink rc-name" data-rc-player="${c.player_id}">${ttEsc(c.name)}</button>
+                <span class="rc-sub">${ttEsc(c.pos || "")}${c.nationality ? " · " + ttEsc(c.nationality) : ""}${c.height ? " · " + c.height + "cm" : ""}</span></td>
+            <td>${ttEsc(c.team || "")} <span class="rc-lg rc-lg-${ttEsc(c.league)}">${ttEsc(c.league)}</span></td>
+            <td class="rc-num">${c.age ?? "-"}</td>
+            <td class="rc-num">${c.mins.toLocaleString()}<span class="rc-muted">분</span></td>
+            ${cols.map(([k]) => { const v = (c.focus_pcts || c.profile || {})[k]; return `<td class="rc-num">${bar(v)}${v ?? "-"}</td>`; }).join("")}
+            <td class="rc-num rc-fit"><b>${c[scoreKey]}</b></td></tr>`).join("");
+        return `<table class="rc-table"><thead><tr><th scope="col">#</th><th scope="col">후보</th><th scope="col">소속</th>
+            <th scope="col">나이</th><th scope="col">출전</th>
+            ${cols.map(([, l]) => `<th scope="col" title="같은 리그 필드 플레이어 전체 중 백분위(포지션 무관)">${ttEsc(l)}</th>`).join("")}
+            <th scope="col" title="${ttEsc(scoreTitle)}">${scoreLabel}</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    function styleHtml(d) {
+        const lgLbl = d.team.league === "K1" ? "K리그1" : "K리그2";
+        const chips = d.team_metrics.map(m => {
+            const weak = d.weak_metrics.some(w => w.key === m.key);
+            return `<span class="rc-gchip${weak ? " is-need" : ""}" title="스쿼드 백분위 출전 가중 평균 · ${lgLbl} ${m.n}팀 중 순위">
+                ${ttEsc(m.label)} <b>${m.value}</b> <span class="rc-muted">${m.rank}/${m.n}위</span>${weak ? " · 보강" : ""}</span>`;
+        }).join("");
+        const cols = d.weak_metrics.map(w => [w.key, w.label]);
+        return `<div class="rc-strip"><span class="rc-strip-lead">${ttEsc(d.team.name)} 플레이 지표 <span class="rc-muted">(${d.year} · 리그 순위)</span></span>${chips}</div>
+            <section class="rc-need"><div class="rc-need-head"><h3>보강할 플레이: ${d.weak_metrics.map(w => ttEsc(w.label)).join(" · ")}</h3>
+                <span class="rc-muted">포지션 무관 후보 ${d.pool_size}명 중 상위 ${d.candidates.length}명</span></div>
+                ${playTable(d.candidates, cols, "적합도", "fit", "약한 지표 백분위 평균 70% + 종합 점수 30%")}</section>
+            <details class="rc-notes"><summary>추천 기준</summary><ul>${d.notes.map(x => `<li>${ttEsc(x)}</li>`).join("")}</ul></details>`;
+    }
+
+    function similarHtml(d) {
+        const t = d.target, keys = Object.keys(t.profile);
+        const cols = keys.map(k => [k, d.metric_labels[k] || k]);
+        const prof = keys.map(k => `<span class="rc-gchip">${ttEsc(d.metric_labels[k] || k)} <b>${t.profile[k]}</b></span>`).join("");
+        return `<div class="rc-strip"><span class="rc-strip-lead">기준 선수
+                <button type="button" class="rc-plink" data-rc-player="${t.player_id}">${ttEsc(t.name)}</button>
+                <span class="rc-muted">${ttEsc(t.pos || "")} · ${t.mins.toLocaleString()}분 · 프로필(백분위)</span></span>${prof}</div>
+            <section class="rc-need"><div class="rc-need-head"><h3>플레이가 비슷한 선수</h3>
+                <span class="rc-muted">후보 ${d.pool_size}명 중 상위 ${d.candidates.length}명</span></div>
+                ${playTable(d.candidates, cols, "유사도", "similarity", "100 − 지표 백분위 차이의 RMS")}</section>
+            <details class="rc-notes"><summary>추천 기준</summary><ul>${d.notes.map(x => `<li>${ttEsc(x)}</li>`).join("")}</ul></details>`;
+    }
+
+    function playerPickerHtml() {
+        if (_mode !== "similar" || !_squad.length) return "";
+        return `<label class="rc-ctl rc-picker"><span>기준 선수 (우리 팀)</span><select id="rc-player">
+            ${_squad.map(p => `<option value="${p.player_id}"${p.player_id === _player ? " selected" : ""}>${ttEsc(p.name)} · ${ttEsc(p.pos || "")} · ${p.mins}분</option>`).join("")}
+        </select></label>`;
+    }
+
     function load() {
         const body = document.getElementById("rc-body");
         if (!body || !_team) return;
         const id = ++_req;
         body.innerHTML = `<div class="rc-loading" role="status">영입 후보 분석 중...</div>`;
-        const q = new URLSearchParams({ team: _team, scope: _f.scope, min_minutes: _f.min_minutes });
+        const q = new URLSearchParams({ team: _team, scope: _f.scope, min_minutes: _f.min_minutes, mode: _mode });
         if (_f.max_age) q.set("max_age", _f.max_age);
+        // '비슷한 선수'는 기준 선수가 필요 — 스쿼드를 아직 모르면 포지션 응답으로 스쿼드부터 받는다
+        const needSquad = _mode === "similar" && !_player;
+        if (needSquad) q.set("mode", "position");
+        else if (_mode === "similar") q.set("player", _player);
         fetch(`/api/team-recruit?${q}`)
-            .then(r => { if (!r.ok) throw new Error(`recruit ${r.status}`); return r.json(); })
-            .then(d => { if (id === _req) body.innerHTML = bodyHtml(d); })
+            .then(r => r.json().then(j => ({ ok: r.ok, j })))
+            .then(({ ok, j }) => {
+                if (id !== _req) return;
+                if (!ok) throw new Error(j.error || "recruit");
+                _squad = j.squad || _squad;
+                if (needSquad) {
+                    if (!_squad.length) { body.innerHTML = `<p class="rc-empty">기준으로 고를 선수 기록이 없습니다.</p>`; return; }
+                    _player = _squad[0].player_id;
+                    return load();
+                }
+                const inner = j.mode === "style" ? styleHtml(j) : j.mode === "similar" ? similarHtml(j) : bodyHtml(j);
+                body.innerHTML = playerPickerHtml() + inner;
+            })
             .catch(err => {
                 console.error("[영입 추천 실패]", err);
                 if (id === _req) body.innerHTML = `<div class="rc-error" role="alert">영입 추천을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</div>`;
@@ -113,14 +195,27 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         el._rcBound = true;
         el.addEventListener("change", (e) => {
             const t = e.target;
-            if (t.id === "rc-team") _team = t.value;
+            if (t.id === "rc-team") { _team = t.value; _player = null; _squad = []; }
             else if (t.id === "rc-scope") _f.scope = t.value;
             else if (t.id === "rc-age") _f.max_age = t.value;
             else if (t.id === "rc-mins") _f.min_minutes = t.value;
+            else if (t.id === "rc-player") _player = parseInt(t.value, 10);
             else return;
             load();
         });
         el.addEventListener("click", (e) => {
+            const m = e.target.closest("[data-rc-mode]");
+            if (m) {
+                _mode = m.dataset.rcMode;
+                el.querySelectorAll("[data-rc-mode]").forEach(b => {
+                    const on = b.dataset.rcMode === _mode;
+                    b.classList.toggle("is-on", on); b.setAttribute("aria-selected", on);
+                });
+                const h = document.getElementById("rc-mode-hint");
+                if (h) h.textContent = modeHint();
+                load();
+                return;
+            }
             const b = e.target.closest("[data-rc-player]");
             if (!b) return;
             const pid = parseInt(b.dataset.rcPlayer, 10);

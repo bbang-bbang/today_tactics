@@ -247,6 +247,14 @@ qa('영입 추천 후보는 다른 팀·조건 충족·점수 0~100', lambda: as
 qa('영입 추천 나이 필터·잘못된 입력', lambda: assert_(
     all((c['age'] or 99) <= 25 for n in get('/api/team-recruit?team=gwangju&max_age=25')['needs'] for c in n['candidates'])
     and _brief_status('/api/team-recruit?team=nope') == 404 and _brief_status('/api/team-recruit?team=suwon&scope=x') == 400))
+d_rs = get('/api/team-recruit?team=suwon&mode=style')
+qa('영입 추천 플레이 보강: 약점 지표는 리그 하위 절반·후보 다른 팀', lambda: assert_(
+    d_rs['mode'] == 'style' and d_rs['weak_metrics']
+    and all(w['rank'] > w['n'] / 2 for w in d_rs['weak_metrics']) or len(d_rs['weak_metrics']) == 1))
+qa('영입 추천 비슷한 선수: 유사도 내림차순·기준 선수 제외', lambda: (lambda d: assert_(
+    d['candidates'] and all(c['player_id'] != d['target']['player_id'] for c in d['candidates'])
+    and [c['similarity'] for c in d['candidates']] == sorted((c['similarity'] for c in d['candidates']), reverse=True)))(
+    get(f"/api/team-recruit?team=suwon&mode=similar&player={d_rs['squad'][0]['player_id']}")))
 d_sr = get('/api/season-review?team=suwon')
 qa('시즌 리뷰 기록 합 일관 (승무패=경기, 순위 흐름 = 경기 수)', lambda: assert_(
     d_sr['final']['w'] + d_sr['final']['d'] + d_sr['final']['l'] == d_sr['final']['played']
