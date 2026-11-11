@@ -277,6 +277,10 @@ prediction.js 라운드 버튼 핸들러에 `clearMatchContext()` 추가, prev !
 
 ---
 
+### [ ] 🌍 해외 리그 데이터 복구 + 브라질 세리에A (2026-11-11)
+- **사실**: 운영 해외 리그 DB 5개가 0바이트(6월~) → 해외 리그 탭 API 500이었음(이제 데이터 없는 리그는 숨김). 크롤러(`crawl_league.py`)는 SofaScore standings·top-players 403 — 우회 안 함.
+- **선택지**: ①공식/허가된 API(API-Football 등 — 키 필요, 무료 한도 소량) ②FBref(Sports Reference) 페이지 — 이용약관·요청 빈도 제한 확인 필요 ③해외 탭 제거. 브라질(2026 시즌)은 레지스트리·시즌 표기까지 준비 완료(`brasileirao`).
+
 ### [ ] 세리에A · 리그앙 선수 스탯 수집 — 2026-06-14 백로그 등록
 
 **현황**: SofaScore `top-players/overall` API가 세리에A(tid=23)·리그앙(tid=34)에서 403 완전 차단. EPL·라리가·분데스는 정상 수집 중.  
