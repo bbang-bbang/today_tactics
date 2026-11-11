@@ -7697,6 +7697,148 @@ def team_recruit():
     })
 
 
+# ── 해외 후보 영입 추천 (2026-11-12) ───────────────────────────────────────────
+# API-Football 시즌 누적 기록(player_stats)만 사용 — xG·몸값·경기별 데이터 없음. 평점은 출처가 달라 점수에서 제외(참고 표시만).
+# 점수 = 같은 리그·같은 포지션(G/D/M/F) 선수 중 90분 환산 지표 백분위의 가중 합. 리그 수준 보정은 '추정 계수'(검증 전) —
+# 보정 전 백분위(raw)와 보정 후(adj)를 항상 같이 낸다.
+_OS_LEAGUE_FACTOR = {1: 1.0, 2: 0.85, 3: 0.75}    # 티어별 추정 보정 (K리그 영입 후보 기준 — 근거 미검증)
+_OS_BRA_FACTOR = {1: 0.90, 2: 0.80, 3: 0.70}       # 브라질은 같은 티어 유럽보다 한 단계 낮게 가정
+_OS_GROUP_POS = {"ST": "F", "W": "F", "AM": "M", "CM": "M", "DM": "M", "FB": "D", "CB": "D", "GK": "G"}
+_OS_METRICS = {"goals90": "골/90", "assists90": "도움/90", "sot90": "유효슈팅/90", "kp90": "키패스/90",
+               "dribble90": "드리블성공/90", "def90": "태클+인터셉트/90", "pass_acc": "패스 성공률(%)",
+               "save90": "선방/90", "conceded90": "실점/90", "save_pct": "선방률(%)"}
+_OS_WEIGHTS = {
+    "F": {"goals90": 0.35, "assists90": 0.2, "sot90": 0.2, "kp90": 0.15, "dribble90": 0.1},
+    "M": {"goals90": 0.15, "assists90": 0.2, "kp90": 0.25, "def90": 0.2, "dribble90": 0.1, "pass_acc": 0.1},
+    "D": {"def90": 0.4, "pass_acc": 0.2, "kp90": 0.15, "assists90": 0.1, "goals90": 0.05, "dribble90": 0.1},
+    "G": {"save_pct": 0.45, "save90": 0.2, "conceded90": 0.35},
+}
+_OS_LOWER_BETTER = {"conceded90"}
+_OS_MIN_COHORT = 20
+
+
+def _overseas_rows(min_minutes):
+    """해외 리그 DB 전체 → 선수 행 리스트(90분 환산 지표 포함). 읽기 전용 연결."""
+    rows = []
+    for code, cfg in LEAGUE_REGISTRY.items():
+        if code == "kleague":
+            continue
+        path = _league_db_path(code)
+        if not os.path.exists(path):
+            continue
+        tier = cfg.get("tier", 1)
+        factor = (_OS_BRA_FACTOR if code.startswith("brasileiro") else _OS_LEAGUE_FACTOR).get(tier, 0.7)
+        tids = [t["id"] for t in cfg["tournaments"]]
+        ph = ",".join("?" * len(tids))
+        try:
+            conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=10)
+        except sqlite3.Error:
+            continue
+        try:
+            # 시즌 초반 리그(유럽 2026/27은 아직 10여 경기)는 고정 900분이면 표본이 거의 없어, 그 리그 최다 출전 시간의 50%로 하향
+            lm = (conn.execute("SELECT MAX(minutes_played) FROM player_stats WHERE tournament_id IN (" + ph + ")", tids).fetchone() or [0])[0] or 0
+            thr = min(min_minutes, max(450, int(lm * 0.5)))
+            q = ("SELECT p.id, p.name, p.position, p.height, p.birth_date, p.nationality, t.name, ps.appearances, ps.minutes_played, ps.rating, "
+                 "ps.goals, ps.assists, ps.shots_on_target, ps.key_passes, ps.successful_dribbles, ps.tackles, ps.interceptions, "
+                 "ps.accurate_passes_pct, ps.total_passes, ps.saves, ps.goals_conceded "
+                 "FROM player_stats ps JOIN players p ON p.id = ps.player_id LEFT JOIN teams t ON t.id = p.team_id "
+                 "WHERE ps.tournament_id IN (" + ph + ") AND COALESCE(ps.minutes_played,0) >= ?")   # ph 는 '?' 자리표시자만, 값은 바인딩
+            for (pid, name, pos, h, bd, nat, team, apps, mins, rating, g, a, sot, kp, dr, tk, ic, pacc, tp,
+                 sv, gc) in conn.execute(q, (*tids, thr)):
+                if pos not in ("G", "D", "M", "F"):
+                    continue
+                n90 = mins / 90.0
+                age = None
+                try:
+                    if bd:
+                        y, mo, d = (int(x) for x in str(bd)[:10].split("-"))
+                        age = int((time.time() - time.mktime((y, mo, d, 0, 0, 0, 0, 0, -1))) / (365.25 * 86400))
+                except (ValueError, OverflowError):
+                    age = None
+                m = {"goals90": (g or 0) / n90, "assists90": (a or 0) / n90, "sot90": (sot or 0) / n90, "kp90": (kp or 0) / n90,
+                     "dribble90": (dr or 0) / n90, "def90": ((tk or 0) + (ic or 0)) / n90,
+                     "pass_acc": pacc if (pacc is not None and (tp or 0) >= 200) else None}
+                if pos == "G":
+                    m.update({"save90": (sv or 0) / n90, "conceded90": (gc or 0) / n90,
+                              "save_pct": (sv / (sv + gc) * 100) if ((sv or 0) + (gc or 0)) >= 20 else None})
+                rows.append({"id": f"{code}:{pid}", "name": name or "", "team": team or "", "league_code": code,
+                             "league": cfg["label"], "country": cfg.get("country"), "tier": tier, "factor": factor,
+                             "pos": pos, "age": age, "height": h, "nationality": nat, "apps": apps or 0, "mins": mins,
+                             "rating": rating, "goals": g or 0, "assists": a or 0, "m": m})
+        except sqlite3.Error:
+            pass
+        finally:
+            conn.close()
+    return rows
+
+
+@app.route("/api/overseas-recruit")
+@cached_response(ttl=1800)
+def overseas_recruit():
+    """해외 후보 영입 추천 — 포지션(G/D/M/F 또는 세부 그룹) 기준 상위 후보. 해외 DB 데이터 있는 리그만 대상."""
+    pos = (request.args.get("pos") or "").upper()
+    pos = _OS_GROUP_POS.get(pos, pos)
+    if pos not in ("G", "D", "M", "F"):
+        return jsonify({"error": "invalid pos"}), 400
+    try:
+        min_mins = max(450, min(int(request.args.get("min_minutes") or 900), 3000))
+        max_age = int(request.args.get("max_age")) if request.args.get("max_age") else None
+        tier = int(request.args.get("tier")) if request.args.get("tier") else None
+        limit = max(1, min(int(request.args.get("limit") or 10), 30))
+    except ValueError:
+        return jsonify({"error": "invalid filter"}), 400
+    focus = [m for m in (request.args.get("focus") or "").split(",") if m in _OS_WEIGHTS[pos]][:3]
+
+    rows = [r for r in _overseas_rows(min_mins) if r["pos"] == pos]
+    by_lg = {}
+    for r in rows:
+        by_lg.setdefault(r["league_code"], []).append(r)
+    import bisect
+    weights = _OS_WEIGHTS[pos]
+    for lg, pool in by_lg.items():
+        dist = {k: sorted(o["m"][k] for o in pool if o["m"].get(k) is not None) for k in weights}
+        for r in pool:
+            num = den = 0.0
+            r["pcts"] = {}
+            for k, w in weights.items():
+                v, arr = r["m"].get(k), dist[k]
+                if v is None or len(arr) < _OS_MIN_COHORT:
+                    continue
+                p = (bisect.bisect_left(arr, v) + bisect.bisect_right(arr, v)) / 2 / len(arr) * 100
+                if k in _OS_LOWER_BETTER:
+                    p = 100 - p
+                r["pcts"][k] = p
+                num += w * p
+                den += w
+            r["raw"] = num / den if den >= 0.5 else None
+    cands = [r for r in rows if r.get("raw") is not None and (tier is None or r["tier"] == tier)
+             and (not max_age or (r["age"] is not None and r["age"] <= max_age))]
+    for r in cands:
+        fv = [r["pcts"][k] for k in focus if k in r["pcts"]]
+        base = 0.5 * r["raw"] + 0.5 * (sum(fv) / len(fv)) if fv else r["raw"]
+        r["adj"] = base * r["factor"]
+    cands.sort(key=lambda r: -r["adj"])
+    return jsonify({
+        "pos": pos, "pool_size": len(cands), "leagues": sorted({r["league_code"] for r in rows}),
+        "metric_labels": {k: _OS_METRICS[k] for k in weights},
+        "filters": {"min_minutes": min_mins, "max_age": max_age, "tier": tier, "focus": focus},
+        "candidates": [{
+            "id": r["id"], "name": r["name"], "team": r["team"], "league": r["league"], "league_code": r["league_code"],
+            "country": r["country"], "tier": r["tier"], "age": r["age"], "height": r["height"], "nationality": r["nationality"],
+            "apps": r["apps"], "mins": r["mins"], "goals": r["goals"], "assists": r["assists"],
+            "raw": round(r["raw"], 1), "adj": round(r["adj"], 1), "factor": r["factor"],
+            "pcts": {k: round(v) for k, v in r["pcts"].items()},
+            "stats": {k: (round(v, 2) if v is not None else None) for k, v in r["m"].items() if k in weights},
+        } for r in cands[:limit]],
+        "notes": [
+            "점수(raw) = 같은 리그·같은 포지션(G/D/M/F) 선수 중 90분 환산 지표 백분위의 가중 합 — 리그 내 위치",
+            "보정(adj) = raw × 리그 수준 계수(1부 1.0 · 2부 0.85 · 3부 0.75, 브라질은 한 단계 낮게) — 추정치이며 K리그 이적 실적으로 검증되지 않음. 참고용",
+            "API-Football 시즌 누적 기록 기반 — xG·몸값·경기별 데이터·세부 포지션 없음. 평점은 SofaScore와 산출 방식이 달라 점수에서 제외",
+            f"출전 {min_mins}분 이상(시즌 초반 리그는 그 리그 최다 출전의 50%로 하향) · 리그·포지션별 비교군 {_OS_MIN_COHORT}명 미만이면 해당 지표 제외",
+        ],
+    })
+
+
 def _league_tid(league):
     """league('k1'|'k2'|'all') → tournament_id(410/777) 또는 None(전체)."""
     league = (league or "all").lower()

@@ -111,7 +111,52 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <div class="rc-need-meta"><span class="rc-k">현재 주전</span>${cur}</div>
             ${table}
             <p class="rc-pool rc-muted">조건 충족 후보 ${n.pool_size}명 중 적합도 상위 ${n.candidates.length}명</p>
+            <button type="button" class="rc-os-btn" data-rc-os="${ttEsc(n.group)}" data-rc-focus="${ttEsc(focusKeys.map(k => OS_FOCUS[k]).filter(Boolean).join(","))}"
+                aria-expanded="false">🌍 해외 후보 보기 <span class="rc-muted">(유럽 1~3부·브라질)</span></button>
+            <div class="rc-os" id="rc-os-${ttEsc(n.group)}" aria-live="polite"></div>
         </section>`;
+    }
+
+    // ── 해외 후보 (/api/overseas-recruit) — 약한 지표(K리그 키)를 해외 API 지표 키로 매핑 ──
+    const OS_FOCUS = { goals90: "goals90", atk90: "assists90", create: "kp90", def: "def90", pass_acc: "pass_acc", duel: "dribble90" };
+    const OS_TIER = { 1: "1부", 2: "2부", 3: "3부" };
+    function osHtml(d) {
+        if (!d.candidates.length) return `<p class="rc-empty">해외 후보가 없습니다 — 데이터가 수집된 리그가 없거나 필터가 너무 좁습니다.</p>`;
+        const keys = Object.keys(d.metric_labels);
+        const rows = d.candidates.map((c, i) => `<tr>
+            <td class="rc-rank">${i + 1}</td>
+            <td><span class="rc-name">${ttEsc(c.name)}</span><span class="rc-sub">${ttEsc(c.nationality || "")}${c.height ? " · " + c.height + "cm" : ""}</span></td>
+            <td>${ttEsc(c.team || "")} <span class="rc-lg" title="${ttEsc(c.league)}">${ttEsc(c.country || "")} ${OS_TIER[c.tier] || ""}</span>
+                <span class="rc-sub">${ttEsc(c.league)}</span></td>
+            <td class="rc-num">${c.age ?? "-"}</td>
+            <td class="rc-num">${c.mins.toLocaleString()}<span class="rc-muted">분</span></td>
+            <td class="rc-num">${c.goals}·${c.assists}</td>
+            ${keys.map(k => `<td class="rc-num" title="${ttEsc(d.metric_labels[k])}: ${c.stats[k] ?? "-"}">${bar(c.pcts[k])}${c.pcts[k] ?? "-"}</td>`).join("")}
+            <td class="rc-num">${c.raw}</td>
+            <td class="rc-num rc-fit" title="리그 내 점수 ${c.raw} × 리그 수준 계수 ${c.factor} (추정)"><b>${c.adj}</b></td></tr>`).join("");
+        return `<table class="rc-table"><thead><tr><th scope="col">#</th><th scope="col">후보</th><th scope="col">소속</th><th scope="col">나이</th>
+            <th scope="col">출전</th><th scope="col">골·도움</th>
+            ${keys.map(k => `<th scope="col" title="같은 리그·같은 포지션 중 백분위">${ttEsc(d.metric_labels[k])}</th>`).join("")}
+            <th scope="col" title="리그 내 종합 백분위(0~100)">종합</th><th scope="col" title="종합 × 리그 수준 추정 계수 — 참고용">보정</th></tr></thead>
+            <tbody>${rows}</tbody></table>
+            <p class="rc-pool rc-muted">후보 ${d.pool_size}명 중 상위 ${d.candidates.length}명 · 보정 점수는 추정 계수 적용(검증 전, 참고용)</p>
+            <details class="rc-notes"><summary>해외 후보 기준</summary><ul>${d.notes.map(x => `<li>${ttEsc(x)}</li>`).join("")}</ul></details>`;
+    }
+    function loadOverseas(btn) {
+        const box = document.getElementById("rc-os-" + btn.dataset.rcOs);
+        if (!box) return;
+        if (btn.getAttribute("aria-expanded") === "true") {      // 토글: 접기
+            btn.setAttribute("aria-expanded", "false"); box.innerHTML = ""; return;
+        }
+        btn.setAttribute("aria-expanded", "true");
+        box.innerHTML = `<div class="rc-loading" role="status">해외 후보 분석 중...</div>`;
+        const q = new URLSearchParams({ pos: btn.dataset.rcOs, min_minutes: _f.min_minutes, limit: "10" });
+        if (_f.max_age) q.set("max_age", _f.max_age);
+        if (btn.dataset.rcFocus) q.set("focus", btn.dataset.rcFocus);
+        fetch(`/api/overseas-recruit?${q}`).then(r => r.json().then(j => ({ ok: r.ok, j })))
+            .then(({ ok, j }) => { if (!ok) throw new Error(j.error || "overseas"); box.innerHTML = osHtml(j); })
+            .catch(err => { console.error("[해외 후보 실패]", err);
+                box.innerHTML = `<div class="rc-error" role="alert">해외 후보를 불러오지 못했습니다.</div>`; });
     }
 
     // ── 플레이 기준 공통: 후보 표 ─────────────────────────────
@@ -224,6 +269,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                 load();
                 return;
             }
+            const os = e.target.closest("[data-rc-os]");
+            if (os) { loadOverseas(os); return; }
             const b = e.target.closest("[data-rc-player]");
             if (!b) return;
             const pid = parseInt(b.dataset.rcPlayer, 10);
