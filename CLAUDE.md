@@ -26,7 +26,7 @@ Ralph는 단순 코더가 아니라 **축구 전술 + 데이터 사이언스 + �
 | Database | SQLite (`players.db`) |
 | Frontend | Vanilla JS + HTML5 Canvas + CSS |
 | Template | Jinja2 (`templates/index.html`) |
-| Data Source | SofaScore API (Playwright), Open-Meteo API, Nominatim |
+| Data Source | SofaScore API (Playwright — 라인업 등 일부 403 차단), **K리그 공식 API**(kleague.com: 일정·득점·패스·히트맵·선수 기록), Open-Meteo API, Nominatim |
 | Data Files | `data/*.json` (팀/선수/전적/스탯) |
 
 ## 프로젝트 구조
@@ -36,8 +36,9 @@ today_tactics/
   README.md                          # 프로젝트 설명 + DB 스키마 + 수집 절차
   PERSPECTIVES.md                    # 5인 관점별 사용자 분석
   requirements.txt                   # Python 의존성
-  main.py                            # Flask 서버 + 전체 API 엔드포인트 (~30+)
-  update_data.py                     # 증분 업데이트 (통합 실행)
+  main.py                            # Flask 서버 + 전체 API (~12,700줄 · 라우트 118개)
+  update_data.py                     # 증분 업데이트 (통합 실행, STEP 0~29 · --official-only)
+  RESUME.md                          # 다른 PC/새 세션 작업 재개 가이드 (최신 상태 요약 — 먼저 읽을 것)
   qa_check.py                        # API/DB 스모크 테스트 (로컬 5000 대상)
   players.db                         # SQLite DB (선수/경기/히트맵/날씨)  ※ gitignored
   templates/
@@ -54,8 +55,14 @@ today_tactics/
       k2heatmap.js                   # K2 히트맵 시각화
       player_analytics.js            # 선수 개인 분석 모달
       player_report.js               # 선수 리포트 패널 (레이더 차트, 스탯 바)
-      prediction.js                  # 경기 예측 + 시즌 시뮬레이션
+      prediction.js                  # 경기 예측 + 시즌 시뮬레이션 + 백테스트(기준선 비교) + 승강 PO 시나리오
       team_compare.js                # 팀 비교 모달 (Chart.js 레이더 오버레이)
+      workspace.js                   # 작업공간 탭 컨트롤러 + 지연 로딩(ttLazy) — 팀 탭 5모드(분석·비교·심화·영입·시즌 리뷰)
+      pass_network.js                # 팀 패스 네트워크 (K리그 공식 패스 행렬)
+      recruit.js                     # 팀 탭 '영입 추천' (/api/team-recruit)
+      season_review.js               # 팀 탭 '시즌 리뷰' (/api/season-review)
+      # 그 외: insights.js·ins_charts.js·tt_charts.js·tt_dash.js(심화 인사이트), player_*.js, match_report.js 등
+      # JS 공통 헬퍼(파일마다 같은 정의): ttEsc(HTML 이스케이프 — 외부 문자열은 반드시), ttSeason()(<body data-season>)
     img/emblems/                     # 팀 엠블럼 (K01~K42, 29팀)
   data/
     kleague_players_2026.json        # 2026 시즌 K리그 선수 데이터
@@ -64,7 +71,12 @@ today_tactics/
     kleague_team_stats.json          # 팀 스탯
     sofascore_teams.json             # SofaScore 팀 ID 매핑
     player_status.json               # 선수 상태 (이적/부상 등)
-  crawlers/                          # 데이터 수집 스크립트 (42개)
+  crawlers/                          # 데이터 수집 스크립트 (45개 — 대부분 기본 dry-run, --apply 로 저장)
+    collect_kleague_*.py             #   K리그 공식 API(득점·카드·교체/패스/히트맵/선수 기록) — SofaScore 차단 대체
+    recover_lineups_kleague.py       #   포털 선발 + mps 등번호 → match_lineups 복원
+    remap_event_ids.py               #   SofaScore 재생성 경기 ID 감지·교체 (STEP 29)
+    backfill_missing_events.py       #   공식 일정 대비 누락 경기 채움 + 리그 라벨 교정
+    resolve_event_player_ids.py      #   득점·카드·교체의 빈 선수 ID를 경기 명단 이름으로 채움
     crawl_sofascore.py               #   선수 기본정보 + 시즌 스탯 + 히트맵
     crawl_match_stats.py             #   경기별 선수 세부 스탯 (수원 삼성)
     crawl_kleague_lineup.py          #   K리그 포털 ground-truth 라인업/포메이션
@@ -122,6 +134,9 @@ today_tactics/
 | `events` | id, home/away_team, date_ts, score, venue_* | 경기 메타 + 경기장 |
 | `heatmap_points` | player_id, event_id, x, y | 히트맵 좌표 (158K+) |
 | `match_player_stats` | event_id, player_id, is_home, result, rating, 35개 스탯 + 날씨 | 경기별 선수 세부 |
+| `kleague_schedule` · `kleague_event_map` | 공식 일정(year, league_id, game_id, meet_seq) ↔ SofaScore event | 조인은 **game_id + meet_seq**(PO가 game_id 재사용) |
+| `kleague_*`(pass_edge/player_match/lineup/player_map) · `kleague_recovery_log` | 공식 API 수집분 · 출처 원장(선택 롤백용) | 2023~ 완비(2026-11-11) |
+| `events.tournament_id` | 410=K1 · 777=K2 · **9410=PO·승강 PO**(STEP 26 재분류) | 리그 집계에서 PO 제외 |
 
 ## 주요 API 엔드포인트
 | 엔드포인트 | 용도 |
@@ -140,6 +155,16 @@ today_tactics/
 | `/api/player-matches` | 선수 경기별 스탯 |
 | `/api/player-stat-report` | 선수 스탯 리포트 |
 | `/api/player-analytics` | 선수 개인 분석 (활동량 지수 포함) |
+| `/api/prediction-backtest` | 롤링 백테스트 + 기준선 3종(홈 승·승점률·리그 분포)·Brier skill |
+| `/api/season-simulation` | 남은 경기 몬테카를로 (K1 파이널 A/B 분리 반영) |
+| `/api/promotion-playoff` | 승강 PO 대진 확률·홈앤드어웨이 승산 (리그 간 격차 보정, 2026 규정) |
+| `/api/team-recruit` | 영입 추천 — 약한 세부 포지션·지표 → K1·K2 후보 |
+| `/api/season-review` | 팀 시즌 리뷰 (순위 흐름·분할 기록·핵심 선수·예측 적중) |
+| `/api/insights/top-performers` | 리그×세부 포지션 백분위 종합 점수 (영입 추천·시즌 리뷰가 재사용) |
+| `/api/pass-network` | 팀 패스 네트워크 (공식 패스 행렬) |
+| `/api/update-status` | 헤더 신선도 배지 (`.update_status.json` + 크론 일정) |
+
+> 자체 순위 계산(시즌 리뷰·시뮬·승강 PO·순위 추이)은 **K리그 규정 '승점 → 다득점 → 득실차'** + K1 33라운드 뒤 파이널 A/B 분리(`_k1_split_set`). 메인 순위표(`/api/standings`)는 공식 API 그대로.
 
 ---
 
@@ -348,6 +373,12 @@ python crawlers/fetch_weather.py
 > **테스트 단일 항목**: 별도 테스트 러너(pytest 등) 없음. `qa_check.py`는 `qa('라벨', lambda: ...)` 배열 한 파일이라, 특정 항목만 보려면 해당 `qa(...)` 줄만 남기거나 라벨로 출력을 grep한다.
 > **`requirements.txt`는 ASCII 전용** — Windows pip cp949 인코딩 충돌 방지. 주석에 한글 금지.
 
+### 🚀 운영 배포 · 운영 DB 작업
+- **배포 = `git push origin main`만** (GitHub Actions 'Deploy to production' → 서버 reset + gunicorn 재시작 + health). `deploy/deploy.sh`는 **운영 `players.db`를 덮어쓰므로 쓰지 말 것**.
+- 운영 SSH(Windows): PowerShell OpenSSH로 `ssh -i "$env:USERPROFILE\.ssh\today-project.pem" rocky@1.201.126.200` (Git Bash ssh는 한글 경로로 실패). rocky는 root 아님 — nginx 변경은 사용자가 root 콘솔에서.
+- 운영 DB 쓰기(백필·교정)는 **사용자 확인 후**, 직전에 `sqlite3 backup` 스냅샷을 `/home/rocky/`에. 긴 수집은 `setsid nohup ... < /dev/null & disown`으로 띄우고 로그로 확인(동시 쓰기 시 `timeout=60` 연결).
+- 데이터 갱신 후엔 `.cache_generation` 갱신 + `/api/cache-invalidate`(전 워커 캐시 무효화).
+
 ### ⚠️ `players.db`는 gitignored — 클론에 DB 없음
 새 환경/클론에는 SQLite DB가 **존재하지 않는다**. 코드만 읽는 작업은 무관하나, 서버를 띄우거나 `qa_check.py`를 돌리려면 DB가 필요하다. 두 경로 중 하나로 확보:
 - **운영 dump 복원** (가장 빠름): 운영 서버(`rocky@1.201.126.200`)의 `players.db`를 `scp`로 받아온다. → 메모리 `feedback_update_data_partial_failures` 참조.
@@ -357,14 +388,15 @@ python crawlers/fetch_weather.py
 
 ## 런타임 아키텍처 (main.py 핵심)
 
-`main.py`(~7,600줄)는 45+ 엔드포인트 + 인증 + 캐시 + 스케줄러가 한 파일에 모여 있다. 코드 변경 전 아래 4개 횡단 관심사를 반드시 인지할 것.
+`main.py`(~12,700줄)는 118개 라우트 + 인증 + 캐시 + 스케줄러가 한 파일에 모여 있다. 코드 변경 전 아래 횡단 관심사를 반드시 인지할 것.
 
 | 관심사 | 메커니즘 | 변경 시 주의 |
 |--------|----------|-------------|
 | **API 캐싱** | `@cached_response(ttl)` 데코레이터 → 인메모리 `_API_CACHE`(TTL 1h, 4096키 cap, Lock 보호). `request.full_path` 키. K리그 스케줄 원본은 `_GAMES_CACHE`(30m). | **데이터 반영 안 됨 증상의 90%가 캐시.** 응답 형태/계산 로직을 바꿨는데 화면이 그대로면 캐시 TTL 탓. 데이터 갱신 경로는 반드시 `invalidate_api_cache()`를 호출해야 새 값이 보인다. |
 | **부팅 워밍업** | 서버 기동 시 `_warm_cache` 데몬 스레드가 주요 엔드포인트를 자기 호출해 첫 화면을 ms 단위로. | 워밍업 URL 목록은 `_warm_cache` 안에 하드코딩 — 새 핵심 엔드포인트 추가 시 여기도 갱신 고려. |
 | **인증 게이트** | OAuth(Google/Kakao/Naver, authlib). `LOGIN_REQUIRED=0`이면 공개 모드(쓰기도 허용). 쓰기 API는 `@login_required_api`, 페이지는 `@login_required`. `users` 테이블은 부팅 시 자동 생성. | 기본은 공개(OFF). 게이트 활성 시 `/static/ /login /auth/ /health /favicon`만 무인증 허용(`_auth_gate`). |
-| **내장 스케줄러** | `_scheduler_loop` 데몬이 주기적으로 `update_data.py`를 subprocess 실행(운영은 월 05:00). `/api/update`는 subprocess로 full 수집 트리거. | `DISABLE_SCHEDULER=1`로 끈다. `/api/update`는 `UPDATE_SECRET` 미설정 시 fail-closed(비활성). |
+| **내장 스케줄러** | `_scheduler_loop` 데몬이 주기적으로 `update_data.py`를 subprocess 실행. `/api/update`는 subprocess로 full 수집 트리거. | **운영에선 미기동**(서비스 `FLASK_DEBUG=0` 문자열이 truthy) — 운영 수집은 **서버 crontab**: 월 02:00 `fetch_next_round.py` · 월 05:00 `update_data.py --days 14` · 화 05:00 `--official-only` · 매일 03:00 백업. 크론 일정을 바꾸면 main.py `_CRON_UPDATE_SLOTS`도 맞출 것. `/api/update`는 `UPDATE_SECRET` 미설정 시 fail-closed. |
+| **현재 시즌** | `_current_season()` = DB 마지막 종료 K1/K2 경기 연도(비시즌엔 직전 시즌 유지). JS는 `<body data-season>` → `ttSeason()`. | '2026' 하드코딩 금지. 학습 창은 `_season_window(n)`. |
 
 **DB 접근**: `get_db(row_factory=True)` 헬퍼가 있으나 다수 엔드포인트는 `sqlite3.connect(db_path)` 직접 사용. 어느 쪽이든 **쿼리는 파라미터 바인딩만**(절대 금지 항목, f-string/% 금지). 커넥션은 함수 종료 전 `close()`.
 
