@@ -282,7 +282,9 @@ prediction.js 라운드 버튼 핸들러에 `clearMatchContext()` 추가, prev !
 - **선택지**: ①공식/허가된 API(API-Football 등 — 키 필요, 무료 한도 소량) ②FBref(Sports Reference) 페이지 — 이용약관·요청 빈도 제한 확인 필요 ③해외 탭 제거. 브라질(2026 시즌)은 레지스트리·시즌 표기까지 준비 완료(`brasileirao`).
 - **11/11 진행**: ① 선택 — API-Football(Pro) `crawlers/collect_apifootball.py`로 운영 6개 리그 수집 완료(190회). 남은 것: [ ] 해외 탭 다시 노출(index.html 주석 해제 + 브라우저 확인) · [ ] 주간 크론(`--league all --apply`, 약 200회) · xG·몸값은 출처 없음.
 
-### [ ] 🌍 해외 하위 리그(2·3부) 추가 — 다음 작업 (2026-11-11 등록, 범위 A/B 결정 대기)
+### [ ] 🌍 해외 하위 리그(2·3부) 추가 — 코드 완료·운영 수집 대기 (2026-11-11 등록, **범위 B 확정 2026-11-12**)
+- **2026-11-12 구현 완료(미커밋·미배포)**: `main.py` `_register_lower_league`로 15개 등록(조 나뉜 3부는 조마다 별도 코드: `primerarfef1/2`·`seriec_a/b/c`) + `/api/leagues`에 `country`·`tier`·`standingsOnly` · `collect_apifootball.py` `LEAGUES` 4-튜플(players 여부) · `init_league_db.py` 동기화 · `global_league.js` 나라별 행(1·2·3부 버튼) + 순위표만 리그 안내 · CSS. 임시 가짜 DB로 `/api/leagues`·standings API 확인(로컬엔 해외 DB·API 키 없음).
+- **남은 일**: ① 커밋·푸시 ② 운영에서 `collect_apifootball.py --league all --apply --max-calls 800`(약 700회, 승인 후·사전 백업) ③ 브라질 Série C 등 1페이지 조 구성(`standings` 배열이 여러 조면 `groups[0]`만 저장됨) 첫 실행 로그 확인 ④ 해외 탭 노출(`templates/index.html` 주석 해제) + 브라우저 확인 ⑤ 주간 크론.
 - **요청**: 각 리그마다 하위 리그, 최소 3부까지.
 - **API-Football 커버리지 확인**(2026 시즌, `/leagues?id=&season=2026`, 13회 사용):
 

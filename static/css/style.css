@@ -9895,7 +9895,10 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 
 /* 상단 툴바 */
 .gl-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-.gl-league-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.gl-league-btns { display: flex; flex-direction: column; gap: 6px; }
+.gl-country-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.gl-country-label { min-width: 88px; font-size: 12px; font-weight: 600; color: #8fa0c0; }
+.gl-tier { font-size: 11px; opacity: .75; margin-right: 2px; }
 .gl-league-btn {
   padding: 6px 14px; border-radius: 20px; border: 1px solid #444;
   background: #1e2330; color: #bcc8e0; font-size: 13px; cursor: pointer;

@@ -35,17 +35,33 @@ sys.path.insert(0, str(ROOT / "crawlers"))
 from init_league_db import SCHEMA_SQL   # noqa: E402
 
 BASE = "https://v3.football.api-sports.io"
-# code → (API-Football league id, 시즌(시작 연도), 이 DB에서 쓰는 tournament_id — main.LEAGUE_REGISTRY 와 일치)
+# code → (API-Football league id, 시즌(시작 연도), 이 DB에서 쓰는 tournament_id — main.LEAGUE_REGISTRY 와 일치, 선수 기록 수집 여부)
+# 하위 리그 tournament_id = API-Football id (리그별 DB 파일이라 충돌 없음). players=False → 순위표만(coverage 없음, /players 호출 생략).
 LEAGUES = {
-    "epl":         (39, 2026, 17),
-    "laliga":      (140, 2026, 8),
-    "bundesliga":  (78, 2026, 35),
-    "seriea":      (135, 2026, 23),
-    "ligue1":      (61, 2026, 34),
-    "brasileirao": (71, 2026, 325),
+    "epl":         (39, 2026, 17, True),
+    "laliga":      (140, 2026, 8, True),
+    "bundesliga":  (78, 2026, 35, True),
+    "seriea":      (135, 2026, 23, True),
+    "ligue1":      (61, 2026, 34, True),
+    "brasileirao": (71, 2026, 325, True),
+    # ── 2·3부 (2026-11-12) ──
+    "championship": (40, 2026, 40, True),
+    "leagueone":    (41, 2026, 41, True),
+    "bundesliga2":  (79, 2026, 79, True),
+    "liga3":        (80, 2026, 80, True),
+    "segunda":      (141, 2026, 141, True),
+    "primerarfef1": (435, 2026, 435, False),
+    "primerarfef2": (436, 2026, 436, False),
+    "serieb":       (136, 2026, 136, True),
+    "seriec_a":     (942, 2026, 942, False),
+    "seriec_b":     (943, 2026, 943, False),
+    "seriec_c":     (138, 2026, 138, False),
+    "ligue2":       (62, 2026, 62, True),
+    "ligue3":       (63, 2026, 63, False),
+    "brasileirob":  (72, 2026, 72, True),
+    "brasileiroc":  (75, 2026, 75, True),
 }
-DB_FILES = {"epl": "epl.db", "laliga": "laliga.db", "bundesliga": "bundesliga.db", "seriea": "seriea.db",
-            "ligue1": "ligue1.db", "brasileirao": "brasileirao.db"}
+DB_FILES = {code: f"{code}.db" for code in LEAGUES}
 POS = {"Goalkeeper": "G", "Defender": "D", "Midfielder": "M", "Attacker": "F"}
 
 
@@ -114,7 +130,7 @@ def f_float(v):
 
 
 def collect(cli, code, apply):
-    lid, season, tid = LEAGUES[code]
+    lid, season, tid, with_players = LEAGUES[code]
     db = ROOT / DB_FILES[code]
     print(f"\n=== {code} (API-Football league {lid}, season {season}) → {db.name} ===", flush=True)
 
@@ -126,12 +142,13 @@ def collect(cli, code, apply):
 
     # 2) 선수 시즌 기록 (페이지)
     players, page, total = [], 1, 1
-    while page <= total:
+    while with_players and page <= total:
         d = cli.get(f"/players?league={lid}&season={season}&page={page}")
         total = (d.get("paging") or {}).get("total") or 1
         players += d.get("response") or []
         page += 1
-    print(f"  players: {len(players)}명 ({total}페이지 · 호출 누계 {cli.calls} · 오늘 남은 {cli.remaining})", flush=True)
+    print(f"  players: {len(players)}명 ({total}페이지 · 호출 누계 {cli.calls} · 오늘 남은 {cli.remaining})"
+          if with_players else "  players: 건너뜀 (순위표만 제공 리그)", flush=True)
 
     if not apply:
         print("  (dry-run: 저장 안 함)")
@@ -190,7 +207,7 @@ def main():
     ap = argparse.ArgumentParser(description="API-Football 해외 리그 수집 (기본 dry-run)")
     ap.add_argument("--league", required=True, help=f"{', '.join(LEAGUES)} 또는 all")
     ap.add_argument("--apply", action="store_true")
-    ap.add_argument("--max-calls", type=int, default=400, help="이번 실행 최대 호출 수")
+    ap.add_argument("--max-calls", type=int, default=400, help="이번 실행 최대 호출 수 (--league all 은 약 700회 필요 → 800 이상 권장)")
     ap.add_argument("--reserve", type=int, default=200, help="오늘 남은 호출이 이 이하가 되면 중단")
     args = ap.parse_args()
     cli = Client(load_key(), args.max_calls, args.reserve)

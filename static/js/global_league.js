@@ -87,15 +87,32 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       </div>
     `;
 
-    // 리그 버튼 렌더
+    // 리그 버튼 렌더 — 나라별 한 줄(국기·나라명 + 1·2·3부 버튼). 2026-11-12 하위 리그 추가
     const btnWrap = document.getElementById('gl-league-btns');
+    const byCountry = new Map();
     GL.leagues.forEach(l => {
-      const btn = document.createElement('button');
-      btn.className = 'gl-league-btn' + (l.code === GL.activeLeague ? ' active' : '');
-      btn.dataset.code = l.code;
-      btn.textContent = l.label;
-      btn.addEventListener('click', () => switchLeague(l.code));
-      btnWrap.appendChild(btn);
+      const k = l.country || '기타';
+      if (!byCountry.has(k)) byCountry.set(k, []);
+      byCountry.get(k).push(l);
+    });
+    byCountry.forEach((list, country) => {
+      const row = document.createElement('div');
+      row.className = 'gl-country-row';
+      const lab = document.createElement('span');
+      lab.className = 'gl-country-label';
+      lab.textContent = `${list[0].flag || ''} ${country}`;
+      row.appendChild(lab);
+      list.sort((a, b) => (a.tier || 1) - (b.tier || 1)).forEach(l => {
+        const btn = document.createElement('button');
+        btn.className = 'gl-league-btn' + (l.code === GL.activeLeague ? ' active' : '');
+        btn.dataset.code = l.code;
+        btn.title = `${l.label} (${l.tier || 1}부)`;
+        btn.setAttribute('aria-label', `${country} ${l.tier || 1}부 ${l.label}`);
+        btn.innerHTML = `<span class="gl-tier">${l.tier || 1}부</span> ${ttEsc(l.label)}`;
+        btn.addEventListener('click', () => switchLeague(l.code));
+        row.appendChild(btn);
+      });
+      btnWrap.appendChild(row);
     });
 
     document.getElementById('gl-year').addEventListener('change', e => {
@@ -140,6 +157,13 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     const code = GL.activeLeague;
     const year = GL.activeYear;
     const qs   = `?year=${year}`;
+
+    const lg = GL.leagues.find(x => x.code === code);
+    if (lg && lg.standingsOnly && GL.activeSection !== 'standings') {
+      content.innerHTML = `<div class="gl-empty"><p><strong>${ttEsc(lg.label)}</strong>은(는) 순위표만 제공합니다.</p>
+        <p class="gl-empty-sub">이 리그는 선수·팀 지표 데이터 제공원이 없어 📋 순위표 탭만 사용할 수 있습니다.</p></div>`;
+      return;
+    }
 
     try {
       switch (GL.activeSection) {
@@ -353,7 +377,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       <div class="gl-empty">
         <p>아직 <strong>${code.toUpperCase()}</strong> 데이터가 수집되지 않았습니다.</p>
         <p class="gl-empty-sub">아래 명령으로 수집을 시작하세요:</p>
-        <code class="gl-code">python crawlers/crawl_league.py --league ${code} --year 2025</code>
+        <code class="gl-code">python crawlers/collect_apifootball.py --league ${code} --apply</code>
       </div>
     `;
   }

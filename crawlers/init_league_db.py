@@ -26,6 +26,13 @@ LEAGUE_REGISTRY = {
     "seriea":     {"db": "seriea.db",       "label": "Serie A",        "tournament_ids": [23]},
     "ligue1":     {"db": "ligue1.db",       "label": "Ligue 1",        "tournament_ids": [34]},
     "brasileirao": {"db": "brasileirao.db", "label": "Brasileirão Série A", "tournament_ids": [325]},
+    # 2·3부 (2026-11-12) — tournament_id = API-Football 리그 id, collect_apifootball.py 가 채움
+    **{c: {"db": f"{c}.db", "label": l, "tournament_ids": [i]} for c, l, i in (
+        ("championship", "Championship", 40), ("leagueone", "League One", 41), ("bundesliga2", "2. Bundesliga", 79),
+        ("liga3", "3. Liga", 80), ("segunda", "Segunda División", 141), ("primerarfef1", "Primera RFEF 1조", 435),
+        ("primerarfef2", "Primera RFEF 2조", 436), ("serieb", "Serie B", 136), ("seriec_a", "Serie C A조", 942),
+        ("seriec_b", "Serie C B조", 943), ("seriec_c", "Serie C C조", 138), ("ligue2", "Ligue 2", 62),
+        ("ligue3", "Ligue 3", 63), ("brasileirob", "Brasileirão Série B", 72), ("brasileiroc", "Brasileirão Série C", 75))},
 }
 
 SCHEMA_SQL = """

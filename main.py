@@ -270,6 +270,47 @@ LEAGUE_REGISTRY = {
     },
 }
 
+
+def _register_lower_league(code, country, flag, tier, label, af_id, standings_only=False, calendar_year=False):
+    """2·3부 리그 등록 (2026-11-12). tournament_id = API-Football 리그 id(리그별 DB 파일이라 충돌 없음).
+    standings_only=True → 순위표만 제공(API-Football 선수 기록 coverage 없음) — 팀 지표·TOP 퍼포머는 '데이터 없음' 안내.
+    조가 나뉜 리그(스페인·이탈리아 3부)는 조마다 별도 코드(DB 1개씩)."""
+    LEAGUE_REGISTRY[code] = {
+        "db": f"{code}.db", "label": label, "flag": flag, "country": country, "tier": tier,
+        "tournaments": [{"id": af_id, "name": label, "code": code.upper()[:6]}],
+        "season_ids": {2026: 2026},
+        **({"calendar_year": True} if calendar_year else {}),
+        **({"standings_only": True} if standings_only else {}),
+    }
+
+
+# 1부 리그의 나라·티어 (표시 그룹화용)
+for _c, _country in (("epl", "잉글랜드"), ("laliga", "스페인"), ("bundesliga", "독일"), ("seriea", "이탈리아"),
+                     ("ligue1", "프랑스"), ("brasileirao", "브라질")):
+    LEAGUE_REGISTRY[_c].update({"country": _country, "tier": 1})
+LEAGUE_REGISTRY["kleague"].update({"country": "한국", "tier": 1})
+
+# (code, 나라, 국기, 티어, 라벨, API-Football id, 순위표만?, 단일연도?)
+for _args in (
+    ("championship", "잉글랜드", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", 2, "Championship", 40),
+    ("leagueone",    "잉글랜드", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", 3, "League One", 41),
+    ("bundesliga2",  "독일", "🇩🇪", 2, "2. Bundesliga", 79),
+    ("liga3",        "독일", "🇩🇪", 3, "3. Liga", 80),
+    ("segunda",      "스페인", "🇪🇸", 2, "Segunda División", 141),
+    ("primerarfef1", "스페인", "🇪🇸", 3, "Primera RFEF · 1조", 435, True),
+    ("primerarfef2", "스페인", "🇪🇸", 3, "Primera RFEF · 2조", 436, True),
+    ("serieb",       "이탈리아", "🇮🇹", 2, "Serie B", 136),
+    ("seriec_a",     "이탈리아", "🇮🇹", 3, "Serie C · A조", 942, True),
+    ("seriec_b",     "이탈리아", "🇮🇹", 3, "Serie C · B조", 943, True),
+    ("seriec_c",     "이탈리아", "🇮🇹", 3, "Serie C · C조", 138, True),
+    ("ligue2",       "프랑스", "🇫🇷", 2, "Ligue 2", 62),
+    ("ligue3",       "프랑스", "🇫🇷", 3, "Ligue 3", 63, True),
+    ("brasileirob",  "브라질", "🇧🇷", 2, "Brasileirão Série B", 72, False, True),
+    ("brasileiroc",  "브라질", "🇧🇷", 3, "Brasileirão Série C", 75, False, True),
+):
+    _register_lower_league(*_args[:6], standings_only=(len(_args) > 6 and _args[6]),
+                           calendar_year=(len(_args) > 7 and _args[7]))
+
 _VALID_LEAGUE_CODES = set(LEAGUE_REGISTRY.keys())
 
 
@@ -679,6 +720,9 @@ def get_leagues():
             "flag":  cfg["flag"],
             "tournaments": cfg["tournaments"],
             "seasons": seasons(cfg),
+            "country": cfg.get("country"),
+            "tier": cfg.get("tier", 1),
+            "standingsOnly": bool(cfg.get("standings_only")),
         }
         for code, cfg in LEAGUE_REGISTRY.items() if has_data(code)
     ])
