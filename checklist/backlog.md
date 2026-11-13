@@ -280,7 +280,10 @@ prediction.js 라운드 버튼 핸들러에 `clearMatchContext()` 추가, prev !
 ### [ ] 🌍 해외 리그 데이터 복구 + 브라질 세리에A (2026-11-11)
 - **사실**: 운영 해외 리그 DB 5개가 0바이트(6월~) → 해외 리그 탭 API 500이었음(이제 데이터 없는 리그는 숨김). 크롤러(`crawl_league.py`)는 SofaScore standings·top-players 403 — 우회 안 함.
 - **선택지**: ①공식/허가된 API(API-Football 등 — 키 필요, 무료 한도 소량) ②FBref(Sports Reference) 페이지 — 이용약관·요청 빈도 제한 확인 필요 ③해외 탭 제거. 브라질(2026 시즌)은 레지스트리·시즌 표기까지 준비 완료(`brasileirao`).
-- **11/11 진행**: ① 선택 — API-Football(Pro) `crawlers/collect_apifootball.py`로 운영 6개 리그 수집 완료(190회). 남은 것: [ ] 해외 탭 다시 노출(index.html 주석 해제 + 브라우저 확인) · [ ] 주간 크론(`--league all --apply`, 약 200회) · xG·몸값은 출처 없음.
+- **11/11 진행**: ① 선택 — API-Football(Pro) `crawlers/collect_apifootball.py`로 운영 6개 리그 수집 완료(190회). 남은 것: [x] 해외 탭 다시 노출(11/13 2a6645e 배포) · [x] 주간 크론(11/13 등록 — 아래) · xG·몸값은 출처 없음.
+- **11/13 해외 선수 경기별 기록 (2b7f1c3)**: `collect_apifootball.py --part matches`(/fixtures + 끝난 경기마다 /fixtures/players, 이미 받은 경기는 건너뜀) → `events`·`match_player_stats`. `/api/league/<code>/player-matches` + TOP 퍼포머 선수 이름 클릭 → 경기별 기록 모달. 경기별 `passes.accuracy`는 **성공 패스 수**(시즌 /players 응답은 %). 운영 1부 6개 리그 수집(백업 `/home/rocky/bk_matches_20261113/`, 로그 `/home/rocky/collect_matches_20261113.log`).
+  - 운영 크론(rocky): 월 06:30 `--league all --part season --max-calls 900` · 월 07:30 `--league top --part matches --max-calls 400` → `/var/log/today_tactics/apifootball.log`. 이전 crontab `/home/rocky/crontab_bk_20261113.txt`.
+  - [ ] 브라우저 확인(이 세션은 크롬 확장 미연결) · [ ] 2부 리그 경기별 기록(리그별 coverage `statistics_players` 확인 후)
 
 ### [ ] 🌍 해외 하위 리그(2·3부) 추가 — 코드 완료·운영 수집 대기 (2026-11-11 등록, **범위 B 확정 2026-11-12**)
 - **2026-11-12 구현 완료(미커밋·미배포)**: `main.py` `_register_lower_league`로 15개 등록(조 나뉜 3부는 조마다 별도 코드: `primerarfef1/2`·`seriec_a/b/c`) + `/api/leagues`에 `country`·`tier`·`standingsOnly` · `collect_apifootball.py` `LEAGUES` 4-튜플(players 여부) · `init_league_db.py` 동기화 · `global_league.js` 나라별 행(1·2·3부 버튼) + 순위표만 리그 안내 · CSS. 임시 가짜 DB로 `/api/leagues`·standings API 확인(로컬엔 해외 DB·API 키 없음).
