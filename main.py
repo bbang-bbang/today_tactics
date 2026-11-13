@@ -14381,6 +14381,98 @@ def league_top_performers(code):
     } for r in rows])
 
 
+@app.route("/api/league/<code>/player-matches")
+def league_player_matches(code):
+    """해외 선수 경기별 기록 (2026-11-13) — API-Football /fixtures/players 수집분(match_player_stats).
+    xG·히트맵 없음. 경기는 날짜 오름차순."""
+    cfg, err = _validate_league(code)
+    if err:
+        return err
+    pid = request.args.get("playerId", type=int)
+    if not pid:
+        return jsonify({"error": "playerId required"}), 400
+    season_id = _league_season_id(cfg, request.args.get("year"))
+    tids = [t["id"] for t in cfg["tournaments"]]
+    ph = ",".join("?" * len(tids))
+    sid_cond = "AND e.season_id = ?" if season_id else ""
+
+    try:
+        info, rows, team_names = _league_player_match_rows(code, pid, ph, tids, sid_cond, season_id)
+    except sqlite3.OperationalError:   # 리그 DB 미수집(테이블 없음)
+        info, rows, team_names = None, [], {}
+    if not info and not rows:
+        return jsonify({"error": "player not found"}), 404
+    return _league_player_matches_json(pid, info, rows, team_names)
+
+
+def _league_player_match_rows(code, pid, ph, tids, sid_cond, season_id):
+    with get_league_db(code) as conn:
+        info = conn.execute("""
+            SELECT p.id, p.name, p.position, p.nationality, p.birth_date, t.name
+            FROM players p LEFT JOIN teams t ON t.id = p.team_id WHERE p.id = ?
+        """, (pid,)).fetchone()
+        rows = conn.execute(f"""
+            SELECT e.id, e.date_ts, e.round, e.home_score, e.away_score,
+                   m.is_home, m.team_id, CASE WHEN m.is_home=1 THEN e.away_team_id ELSE e.home_team_id END AS opp_id,
+                   m.minutes_played, m.position, m.rating, m.goals, m.assists, m.total_shots, m.shots_on_target,
+                   m.passes_total, m.passes_accurate, m.key_passes, m.dribbles_succeeded, m.dribbles_attempted,
+                   m.duel_won, m.duel_lost, m.tackles, m.interceptions, m.fouls_committed, m.fouls_suffered,
+                   m.yellow_cards, m.red_cards, m.saves, m.goals_conceded, m.player_name
+            FROM match_player_stats m
+            JOIN events e ON e.id = m.event_id
+            WHERE m.player_id = ? AND e.tournament_id IN ({ph}) {sid_cond}
+            ORDER BY e.date_ts ASC
+        """, (pid, *tids, *([season_id] if season_id else []))).fetchall()
+        team_names = dict(conn.execute("SELECT id, name FROM teams").fetchall())
+    return info, rows, team_names
+
+
+def _league_player_matches_json(pid, info, rows, team_names):
+    matches = []
+    for r in rows:
+        gf, ga = (r[3], r[4]) if r[5] else (r[4], r[3])
+        res = None if gf is None or ga is None else ("W" if gf > ga else "L" if gf < ga else "D")
+        matches.append({
+            "eventId": r[0], "date": r[1], "round": r[2], "home": bool(r[5]),
+            "team": team_names.get(r[6], ""), "opponent": team_names.get(r[7], ""),
+            "gf": gf, "ga": ga, "result": res,
+            "minutes": r[8], "position": r[9] or "", "rating": r[10],
+            "goals": r[11], "assists": r[12], "shots": r[13], "shotsOn": r[14],
+            "passes": r[15], "passesAcc": r[16],
+            "passPct": round(r[16] * 100 / r[15], 1) if r[15] else None,
+            "keyPasses": r[17], "dribbles": r[18], "dribblesAtt": r[19],
+            "duelWon": r[20], "duelLost": r[21], "tackles": r[22], "interceptions": r[23],
+            "fouls": r[24], "fouled": r[25], "yellow": r[26], "red": r[27],
+            "saves": r[28], "conceded": r[29],
+        })
+
+    rated = [m["rating"] for m in matches if m["rating"]]
+    mins = sum(m["minutes"] or 0 for m in matches)
+    summary = {
+        "games": len(matches),
+        "minutes": mins,
+        "goals": sum(m["goals"] or 0 for m in matches),
+        "assists": sum(m["assists"] or 0 for m in matches),
+        "avgRating": round(sum(rated) / len(rated), 2) if rated else None,
+        "wins": sum(1 for m in matches if m["result"] == "W"),
+        "draws": sum(1 for m in matches if m["result"] == "D"),
+        "losses": sum(1 for m in matches if m["result"] == "L"),
+    }
+    return jsonify({
+        "player": {
+            "id": pid,
+            "name": (info[1] if info else None) or (rows[-1][30] if rows else ""),
+            "position": info[2] if info else "",
+            "nationality": info[3] if info else "",
+            "birthDate": info[4] if info else "",
+            "team": (info[5] if info else "") or (matches[-1]["team"] if matches else ""),
+        },
+        "summary": summary,
+        "matches": matches,
+        "source": "API-Football 경기별 선수 기록 (xG·히트맵 미제공)",
+    })
+
+
 @app.route("/api/league/<code>/team-shape")
 def league_team_shape(code):
     """팀 평균 진형 (avg_positions 기반)."""

@@ -418,7 +418,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
               return `
                 <tr>
                   <td class="gl-rank">${i + 1}</td>
-                  <td class="gl-player-name">${ttEsc(p.name)}</td>
+                  <td class="gl-player-name"><button type="button" class="gl-pname-btn" data-pid="${Number(p.playerId) || ''}"
+                      title="경기별 기록 보기" aria-label="${ttEsc(p.name)} 경기별 기록 보기">${ttEsc(p.name)}</button></td>
                   <td class="gl-team-sub">${ttEsc(p.team)}</td>
                   <td class="gl-pos">${posLabel(p.position)}</td>
                   <td>${p.games}</td>
@@ -430,6 +431,133 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         </table>
       </div>
     `;
+    area.querySelectorAll('.gl-pname-btn').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.pid) openPlayerMatches(code, b.dataset.pid, b);
+    }));
+  }
+
+  /* ── 선수 경기별 기록 모달 (2026-11-13) ───────────────── */
+  const RES_LABEL = { W: '승', D: '무', L: '패' };
+
+  function ratingBand(r) {
+    return r >= 7.5 ? 'hi' : r >= 6.5 ? 'mid' : 'lo';
+  }
+
+  // 평점 막대 — 막대 위 숫자로 값을 함께 표기(색에만 의존하지 않음)
+  function ratingChartSvg(matches) {
+    const pts = matches.filter(m => m.rating);
+    if (pts.length < 2) return '';
+    const W = Math.max(pts.length * 34, 300), H = 120, base = 5, top = 10, plotH = 78;
+    const y = r => H - 22 - ((Math.min(Math.max(r, base), top) - base) / (top - base)) * plotH;
+    const avg = pts.reduce((s, m) => s + m.rating, 0) / pts.length;
+    const bars = pts.map((m, i) => {
+      const x = i * 34 + 8, yy = y(m.rating);
+      return `<g><title>${m.round ? m.round + 'R ' : ''}vs ${ttEsc(m.opponent)} · 평점 ${m.rating.toFixed(1)}</title>
+        <rect class="gl-pm-bar ${ratingBand(m.rating)}" x="${x}" y="${yy}" width="20" height="${H - 22 - yy}" rx="3"></rect>
+        <text class="gl-pm-bar-val" x="${x + 10}" y="${yy - 4}" text-anchor="middle">${m.rating.toFixed(1)}</text>
+        <text class="gl-pm-bar-lab" x="${x + 10}" y="${H - 6}" text-anchor="middle">${m.round ? m.round + 'R' : i + 1}</text></g>`;
+    }).join('');
+    return `
+      <div class="gl-pm-chart" role="img" aria-label="경기별 평점 추이, 평균 ${avg.toFixed(2)}">
+        <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+          <line class="gl-pm-avg" x1="0" x2="${W}" y1="${y(avg)}" y2="${y(avg)}"></line>
+          ${bars}
+        </svg>
+      </div>`;
+  }
+
+  async function openPlayerMatches(code, pid, opener) {
+    document.querySelector('.gl-pm-overlay')?.remove();
+    const ov = document.createElement('div');
+    ov.className = 'gd-overlay gl-pm-overlay';
+    ov.innerHTML = `
+      <div class="gd-card gl-pm-card" role="dialog" aria-modal="true" aria-labelledby="gl-pm-title">
+        <div class="gd-head">
+          <h2 class="gd-title" id="gl-pm-title">경기별 기록</h2>
+          <button type="button" class="gd-close" aria-label="닫기">✕</button>
+        </div>
+        <div class="gl-pm-body"><div class="gl-loading">로딩 중…</div></div>
+      </div>`;
+    document.body.appendChild(ov);
+    requestAnimationFrame(() => ov.classList.add('gd-visible'));
+    const close = () => {
+      document.removeEventListener('keydown', onKey);
+      ov.remove();
+      opener?.focus();
+    };
+    const onKey = e => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    ov.querySelector('.gd-close').addEventListener('click', close);
+    ov.querySelector('.gd-close').focus();
+
+    const body = ov.querySelector('.gl-pm-body');
+    let d;
+    try {
+      const r = await fetch(`/api/league/${encodeURIComponent(code)}/player-matches?playerId=${encodeURIComponent(pid)}&year=${encodeURIComponent(GL.activeYear || '')}`);
+      d = await r.json();
+      if (!r.ok && r.status !== 404) throw new Error(d.error || r.status);
+    } catch (e) {
+      body.innerHTML = `<div class="gl-error">데이터 로드 실패: ${ttEsc(e.message)}</div>`;
+      return;
+    }
+    if (!ov.isConnected) return;
+    const p = d.player || {}, s = d.summary || {}, ms = d.matches || [];
+    ov.querySelector('#gl-pm-title').textContent = p.name || '경기별 기록';
+    if (!ms.length) {
+      body.innerHTML = `<div class="gl-empty"><p>경기별 기록이 아직 없습니다.</p>
+        <p class="gl-empty-sub">주간 업데이트 때 수집됩니다. 순위표만 제공되는 리그는 경기별 기록이 없습니다.</p></div>`;
+      return;
+    }
+    const isGk = p.position === 'G';
+    const age = p.birthDate ? Math.floor((Date.now() - new Date(p.birthDate)) / 31557600000) : null;
+    const tile = (lab, val) => `<div class="gl-pm-tile"><span class="gl-pm-tile-val">${val ?? '-'}</span><span class="gl-pm-tile-lab">${lab}</span></div>`;
+    const fmtDate = ts => new Date(ts * 1000).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
+    const n = v => (v === null || v === undefined) ? '-' : v;
+
+    body.innerHTML = `
+      <p class="gl-pm-sub">${ttEsc(p.team)} · ${posLabel(p.position)}${p.nationality ? ' · ' + ttEsc(p.nationality) : ''}${age ? ` · ${age}세` : ''}</p>
+      <div class="gl-pm-tiles">
+        ${tile('경기', s.games)}${tile('출전(분)', s.minutes)}${tile('득점', s.goals)}${tile('도움', s.assists)}
+        ${tile('평균 평점', s.avgRating != null ? Number(s.avgRating).toFixed(2) : '-')}
+        ${tile('팀 성적', `${s.wins}승 ${s.draws}무 ${s.losses}패`)}
+      </div>
+      <h3 class="gl-pm-h">평점 추이 <span class="gl-pm-h-sub">점선 = 평균 · 막대 숫자 = 평점</span></h3>
+      ${ratingChartSvg(ms) || '<p class="gl-pm-h-sub">평점이 있는 경기가 2경기 미만입니다.</p>'}
+      <h3 class="gl-pm-h">경기 목록 <span class="gl-pm-h-sub">최근 경기부터</span></h3>
+      <div class="gl-table-wrap gl-pm-tbl-wrap">
+        <table class="gl-table gl-pm-tbl">
+          <thead><tr>
+            <th>R</th><th>날짜</th><th>상대</th><th>결과</th><th class="num-col">분</th><th class="num-col">평점</th>
+            <th class="num-col">골</th><th class="num-col">도움</th>
+            ${isGk ? '<th class="num-col">선방</th><th class="num-col">실점</th>'
+                   : '<th class="num-col">슈팅(유효)</th><th class="num-col">키패스</th><th class="num-col">드리블</th>'}
+            <th class="num-col">패스(성공%)</th><th class="num-col">경합 승</th><th class="num-col">태클</th><th class="num-col">인터셉트</th><th>카드</th>
+          </tr></thead>
+          <tbody>
+            ${ms.slice().reverse().map(m => `
+              <tr>
+                <td class="gl-team-sub">${n(m.round)}</td>
+                <td class="gl-team-sub">${fmtDate(m.date)}</td>
+                <td>${ttEsc(m.opponent)} <span class="gl-pm-ha">${m.home ? '홈' : '원정'}</span></td>
+                <td><span class="gl-pm-res ${m.result || ''}">${RES_LABEL[m.result] || '-'}</span> ${n(m.gf)}-${n(m.ga)}</td>
+                <td class="num-col">${n(m.minutes)}</td>
+                <td class="num-col"><span class="gl-pm-rt ${m.rating ? ratingBand(m.rating) : ''}">${m.rating ? m.rating.toFixed(1) : '-'}</span></td>
+                <td class="num-col">${m.goals ? `<strong>${m.goals}</strong>` : 0}</td>
+                <td class="num-col">${m.assists ? `<strong>${m.assists}</strong>` : 0}</td>
+                ${isGk ? `<td class="num-col">${n(m.saves)}</td><td class="num-col">${n(m.conceded)}</td>`
+                       : `<td class="num-col">${n(m.shots)}(${n(m.shotsOn)})</td><td class="num-col">${n(m.keyPasses)}</td>
+                          <td class="num-col">${n(m.dribbles)}/${n(m.dribblesAtt)}</td>`}
+                <td class="num-col">${n(m.passes)}${m.passPct != null ? ` (${m.passPct}%)` : ''}</td>
+                <td class="num-col">${n(m.duelWon)}/${(m.duelWon || 0) + (m.duelLost || 0)}</td>
+                <td class="num-col">${n(m.tackles)}</td>
+                <td class="num-col">${n(m.interceptions)}</td>
+                <td>${m.red ? '<span class="gl-pm-bk red" title="퇴장">퇴장</span>' : m.yellow ? '<span class="gl-pm-bk yel" title="경고">경고</span>' : ''}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <p class="gl-pm-src">📡 ${ttEsc(d.source || '')}</p>`;
   }
 
   /* ── 데이터 없음 안내 ─────────────────────────────── */

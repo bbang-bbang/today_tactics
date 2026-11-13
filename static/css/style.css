@@ -10010,6 +10010,52 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .gl-sortable td.num-col, .gl-sortable th.num-col { text-align: right; }
 .gl-perf-tbl th:nth-child(3), .gl-perf-tbl td:nth-child(3) { text-align: left; }
 
+/* 해외 선수 경기별 기록 모달 (2026-11-13) — .gd-overlay/.gd-card 재사용 */
+.gl-pname-btn {
+  background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: left;
+  border-bottom: 1px dashed rgba(147,197,253,0.4); transition: color var(--trans-fast), border-color var(--trans-fast);
+}
+.gl-pname-btn:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+.gl-pname-btn:active { color: #bfdbfe; }
+.gl-pname-btn:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; border-radius: 2px; }
+.gl-pm-card { width: min(1040px, 96vw); }
+.gl-pm-body { overflow-y: auto; margin: 0 -6px; padding: 0 6px; }
+.gl-pm-sub { margin: -4px 0 12px; font-size: 13px; color: #94a3b8; }
+.gl-pm-tiles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 14px; }
+.gl-pm-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+}
+.gl-pm-tile-val { font-size: 18px; font-weight: 700; color: #e2e8f0; font-variant-numeric: tabular-nums; }
+.gl-pm-tile-lab { font-size: 12px; color: #94a3b8; }
+.gl-pm-h { margin: 14px 0 6px; font-size: 14px; font-weight: 700; color: #e2e8f0; }
+.gl-pm-h-sub { font-size: 12px; font-weight: 400; color: #8fa0c0; margin-left: 6px; }
+.gl-pm-chart { overflow-x: auto; padding: 4px 0; }
+.gl-pm-chart svg { display: block; }
+.gl-pm-bar { transition: opacity var(--trans-fast); }
+.gl-pm-bar.hi  { fill: #4ade80; }
+.gl-pm-bar.mid { fill: #60a5fa; }
+.gl-pm-bar.lo  { fill: #64748b; }
+.gl-pm-chart g:hover .gl-pm-bar { opacity: 0.75; }
+.gl-pm-bar-val { font-size: 11px; fill: #cbd5e1; font-variant-numeric: tabular-nums; }
+.gl-pm-bar-lab { font-size: 11px; fill: #8fa0c0; }
+.gl-pm-avg { stroke: #fbbf24; stroke-width: 1; stroke-dasharray: 4 3; }
+.gl-pm-tbl { font-size: 12px; }
+.gl-pm-tbl td, .gl-pm-tbl th { white-space: nowrap; }
+.gl-pm-tbl td.num-col, .gl-pm-tbl th.num-col { text-align: right; font-variant-numeric: tabular-nums; }
+.gl-pm-ha { font-size: 11px; color: #8fa0c0; }
+.gl-pm-res { display: inline-block; min-width: 20px; text-align: center; font-weight: 700; border-radius: 4px; padding: 0 3px; }
+.gl-pm-res.W { color: #4ade80; background: rgba(74,222,128,0.12); }
+.gl-pm-res.D { color: #cbd5e1; background: rgba(203,213,225,0.10); }
+.gl-pm-res.L { color: #f87171; background: rgba(248,113,113,0.12); }
+.gl-pm-rt { font-weight: 700; }
+.gl-pm-rt.hi { color: #4ade80; } .gl-pm-rt.mid { color: #93c5fd; } .gl-pm-rt.lo { color: #94a3b8; }
+.gl-pm-bk { font-size: 11px; padding: 1px 5px; border-radius: 3px; font-weight: 700; }
+.gl-pm-bk.yel { background: #facc15; color: #1a1a1a; }
+.gl-pm-bk.red { background: #dc2626; color: #fff; }
+.gl-pm-src { margin: 10px 0 0; font-size: 12px; color: #8fa0c0; }
+@media (max-width: 700px) { .gl-pm-tiles { grid-template-columns: repeat(3, 1fr); } }
+
 /* ── 분석 읽는 법 (도움말 모달) ───────────────────────────── */
 .gd-overlay {
     position: fixed; inset: 0; z-index: 9998;
