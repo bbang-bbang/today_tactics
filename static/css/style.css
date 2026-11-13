@@ -9983,6 +9983,33 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .gl-loading, .gl-error { text-align: center; padding: 32px; color: #7a8ba8; font-size: 14px; }
 .gl-error { color: #f87171; }
 
+/* 선택 리그 머리말 (2026-11-12) — 리그명(1단) · 칩(2단) · 출처 노트(3단) */
+.gl-league-head {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin: 4px 0 12px; padding: 10px 14px;
+  background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px;
+}
+.gl-lh-flag { font-size: 20px; line-height: 1; }
+.gl-lh-name { font-size: 17px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
+.gl-lh-chip {
+  font-size: 12px; padding: 2px 8px; border-radius: 10px;
+  background: #1a2235; border: 1px solid var(--border-subtle); color: #bcc8e0;
+}
+.gl-lh-note { margin-left: auto; font-size: 12px; color: #8fa0c0; }
+
+/* 정렬 가능한 열 제목 */
+.gl-sort-btn {
+  background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer;
+  white-space: nowrap; transition: color var(--trans-fast);
+}
+.gl-sort-btn:hover { color: #93c5fd; }
+.gl-sort-btn:focus-visible,
+.gl-league-btn:focus-visible, .gl-sec-btn:focus-visible, .gl-perf-btn:focus-visible {
+  outline: 2px solid #60a5fa; outline-offset: 2px;
+}
+.gl-sortable td.num-col, .gl-sortable th.num-col { text-align: right; }
+.gl-perf-tbl th:nth-child(3), .gl-perf-tbl td:nth-child(3) { text-align: left; }
+
 /* ── 분석 읽는 법 (도움말 모달) ───────────────────────────── */
 .gd-overlay {
     position: fixed; inset: 0; z-index: 9998;

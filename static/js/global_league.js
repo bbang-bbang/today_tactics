@@ -74,9 +74,10 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <select id="gl-year" class="gl-select" aria-label="시즌">${yearOptionsHtml(GL.activeLeague)}</select>
           </div>
         </div>
-        <div class="gl-section-tabs" id="gl-section-tabs">
+        <div class="gl-league-head" id="gl-league-head" aria-live="polite"></div>
+        <div class="gl-section-tabs" id="gl-section-tabs" role="tablist">
           ${['standings','team-rankings','top-performers'].map(s =>
-            `<button class="gl-sec-btn${GL.activeSection===s?' active':''}" data-sec="${s}">
+            `<button type="button" role="tab" aria-selected="${GL.activeSection===s}" class="gl-sec-btn${GL.activeSection===s?' active':''}" data-sec="${s}">
               ${sectionLabel(s)}
             </button>`
           ).join('')}
@@ -104,7 +105,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       row.appendChild(lab);
       list.sort((a, b) => (a.tier || 1) - (b.tier || 1)).forEach(l => {
         const btn = document.createElement('button');
+        btn.type = 'button';
         btn.className = 'gl-league-btn' + (l.code === GL.activeLeague ? ' active' : '');
+        btn.setAttribute('aria-pressed', String(l.code === GL.activeLeague));
         btn.dataset.code = l.code;
         btn.title = `${l.label} (${l.tier || 1}부)`;
         btn.setAttribute('aria-label', `${country} ${l.tier || 1}부 ${l.label}`);
@@ -117,17 +120,37 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
     document.getElementById('gl-year').addEventListener('change', e => {
       GL.activeYear = e.target.value;
+      renderLeagueHead();
       loadSection();
     });
 
     document.querySelectorAll('.gl-sec-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         GL.activeSection = btn.dataset.sec;
-        document.querySelectorAll('.gl-sec-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+        document.querySelectorAll('.gl-sec-btn').forEach(b => {
+          b.classList.toggle('active', b === btn);
+          b.setAttribute('aria-selected', String(b === btn));
+        });
         loadSection();
       });
     });
+    renderLeagueHead();
+  }
+
+  /* 선택 리그 머리말 — 국기·리그명·티어·시즌 + 데이터 출처/한계 */
+  function renderLeagueHead() {
+    const el = document.getElementById('gl-league-head');
+    const l = GL.leagues.find(x => x.code === GL.activeLeague);
+    if (!el || !l) return;
+    const season = leagueSeasons(l.code).find(s => String(s.year) === GL.activeYear);
+    el.innerHTML = `
+      <span class="gl-lh-flag" aria-hidden="true">${ttEsc(l.flag || '')}</span>
+      <span class="gl-lh-name">${ttEsc(l.label)}</span>
+      <span class="gl-lh-chip">${ttEsc(l.country || '')} ${l.tier || 1}부</span>
+      <span class="gl-lh-chip">${ttEsc(season ? season.label : GL.activeYear)} 시즌</span>
+      <span class="gl-lh-note">${l.standingsOnly
+        ? '순위표만 제공되는 리그'
+        : '출처 API-Football · 시즌 누적 기록 (xG·히트맵 미제공)'}</span>`;
   }
 
   function sectionLabel(s) {
@@ -142,9 +165,11 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     GL.activeYear = latestYear(code);
     const ysel = document.getElementById('gl-year');
     if (ysel) ysel.innerHTML = yearOptionsHtml(code);
-    document.querySelectorAll('.gl-league-btn').forEach(b =>
-      b.classList.toggle('active', b.dataset.code === code)
-    );
+    document.querySelectorAll('.gl-league-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.code === code);
+      b.setAttribute('aria-pressed', String(b.dataset.code === code));
+    });
+    renderLeagueHead();
     await loadSection();
   }
 
@@ -172,7 +197,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         case 'top-performers': await renderTopPerformers(code, qs);  break;
       }
     } catch (e) {
-      content.innerHTML = `<div class="gl-error">데이터 로드 실패: ${e.message}</div>`;
+      content.innerHTML = `<div class="gl-error">데이터 로드 실패: ${ttEsc(e.message)}</div>`;
     }
   }
 
@@ -228,56 +253,89 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       return;
     }
 
-    const isSeason = data[0] && data[0].source === 'player_stats';
+    GL.teamRows = data;
+    GL.teamSort = GL.teamSort || { key: 'goals', dir: -1 };
+    drawTeamTable();
+  }
+
+  // xG 는 데이터가 있는 리그(값>0)만 열을 보인다 — API-Football 수집 리그는 xG 미제공
+  const TEAM_COLS = [
+    ['matches', '경기'], ['goals', '득점'], ['xg', 'xG'], ['shots', '슈팅'], ['shotsOn', '유효슈팅'],
+    ['keyPasses', '키패스'], ['dribbles', '드리블'], ['tackles', '태클'], ['interceptions', '인터셉트'],
+    ['avgRating', '평균 평점'],
+  ];
+
+  function drawTeamTable() {
+    const content = document.getElementById('gl-content');
+    const rows = GL.teamRows || [];
+    if (!content || !rows.length) return;
+    const hasXg = rows.some(r => Number(r.xg) > 0);
+    const cols = TEAM_COLS.filter(([k]) => k !== 'xg' || hasXg)
+                          .filter(([k]) => rows.some(r => r[k] !== undefined));
+    const { key, dir } = GL.teamSort;
+    const sorted = rows.slice().sort((a, b) => ((Number(a[key]) || 0) - (Number(b[key]) || 0)) * dir);
+    const fmt = (k, v) => (v === null || v === undefined) ? '-'
+      : (k === 'avgRating' ? Number(v).toFixed(2) : v);
+
     content.innerHTML = `
       <div class="gl-table-wrap">
-        ${isSeason ? '<div class="gl-src-badge">📡 SofaScore 시즌 누적 스탯</div>' : ''}
-        <table class="gl-table">
+        <div class="gl-src-badge">📡 선수 시즌 누적 기록을 팀별로 합산 · 열 제목을 누르면 정렬</div>
+        <table class="gl-table gl-sortable">
           <thead>
             <tr>
-              <th>팀</th><th>경기</th><th class="num-col gl-perf-primary">xG</th><th>득점</th>
-              <th>슈팅</th><th>유효슈팅</th><th>키패스</th><th>태클</th><th>평점</th>
+              <th>#</th><th>팀</th>
+              ${cols.map(([k, lab]) => {
+                const on = k === key;
+                return `<th class="num-col${on ? ' gl-perf-primary' : ''}" aria-sort="${on ? (dir < 0 ? 'descending' : 'ascending') : 'none'}">
+                  <button type="button" class="gl-sort-btn" data-key="${k}">${lab}${on ? (dir < 0 ? ' ▾' : ' ▴') : ''}</button></th>`;
+              }).join('')}
             </tr>
           </thead>
           <tbody>
-            ${data.map(r => `
+            ${sorted.map((r, i) => `
               <tr>
+                <td class="gl-rank">${i + 1}</td>
                 <td class="gl-team-name">${ttEsc(r.team)}</td>
-                <td>${r.matches}</td>
-                <td class="num-col gl-perf-primary"><strong>${r.xg}</strong></td>
-                <td class="num-col">${r.goals}</td>
-                <td>${r.shots}</td>
-                <td>${r.shotsOn}</td>
-                <td>${r.keyPasses ?? '-'}</td>
-                <td>${r.tackles}</td>
-                <td class="rating-col">${r.avgRating}</td>
+                ${cols.map(([k]) => `<td class="num-col${k === key ? ' gl-perf-primary' : ''}">${k === key ? `<strong>${fmt(k, r[k])}</strong>` : fmt(k, r[k])}</td>`).join('')}
               </tr>
             `).join('')}
           </tbody>
         </table>
       </div>
     `;
+    content.querySelectorAll('.gl-sort-btn').forEach(b => b.addEventListener('click', () => {
+      const k = b.dataset.key;
+      GL.teamSort = (GL.teamSort.key === k) ? { key: k, dir: -GL.teamSort.dir } : { key: k, dir: -1 };
+      drawTeamTable();
+      const again = document.querySelector(`.gl-sort-btn[data-key="${k}"]`);
+      if (again) again.focus();
+    }));
   }
 
   /* ── TOP 퍼포머 ───────────────────────────────────── */
 
+  // API-Football 수집 리그엔 xG 가 없어(전부 0) xG 지표는 뺐다 (2026-11-12)
   const PERF_METRICS = [
-    { key: 'goals',      label: '⚽ 득점'   },
-    { key: 'assists',    label: '🤝 도움'   },
-    { key: 'xg',         label: '🎯 xG'    },
-    { key: 'key_passes', label: '🔑 키패스' },
-    { key: 'tackles',    label: '🛡️ 태클'  },
-    { key: 'rating',     label: '⭐ 평점'   },
+    { key: 'goals',         label: '⚽ 득점'     },
+    { key: 'assists',       label: '🤝 도움'     },
+    { key: 'shots',         label: '🎯 슈팅'     },
+    { key: 'key_passes',    label: '🔑 키패스'   },
+    { key: 'dribbles',      label: '💨 드리블'   },
+    { key: 'tackles',       label: '🛡️ 태클'    },
+    { key: 'interceptions', label: '✋ 인터셉트' },
+    { key: 'rating',        label: '⭐ 평점'     },
   ];
 
   // [헤더 라벨, API 필드]  — 첫 번째가 주요 지표 (굵게 + 하이라이트)
   const PERF_COLS = {
-    goals:      [['득점','goals'],    ['도움','assists'],   ['xG','xg'],       ['평점','avgRating']],
-    assists:    [['도움','assists'],   ['키패스','keyPasses'],['득점','goals'],  ['평점','avgRating']],
-    xg:         [['xG','xg'],         ['득점','goals'],     ['도움','assists'], ['평점','avgRating']],
-    key_passes: [['키패스','keyPasses'],['도움','assists'],  ['득점','goals'],   ['평점','avgRating']],
-    tackles:    [['태클','tackles'],   ['키패스','keyPasses'],['도움','assists'],['평점','avgRating']],
-    rating:     [['평점','avgRating'], ['득점','goals'],     ['도움','assists'], ['xG','xg']],
+    goals:         [['득점','goals'],         ['도움','assists'],      ['슈팅','shots'],      ['평점','avgRating']],
+    assists:       [['도움','assists'],       ['키패스','keyPasses'],  ['득점','goals'],      ['평점','avgRating']],
+    shots:         [['슈팅','shots'],         ['유효','shotsOn'],      ['득점','goals'],      ['평점','avgRating']],
+    key_passes:    [['키패스','keyPasses'],   ['도움','assists'],      ['패스%','passPct'],   ['평점','avgRating']],
+    dribbles:      [['드리블','dribbles'],    ['키패스','keyPasses'],  ['득점','goals'],      ['평점','avgRating']],
+    tackles:       [['태클','tackles'],       ['인터셉트','interceptions'], ['패스%','passPct'], ['평점','avgRating']],
+    interceptions: [['인터셉트','interceptions'], ['태클','tackles'], ['패스%','passPct'],   ['평점','avgRating']],
+    rating:        [['평점','avgRating'],     ['득점','goals'],        ['도움','assists'],    ['키패스','keyPasses']],
   };
 
   function posLabel(pos) {
@@ -290,8 +348,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       <div class="gl-perf-wrap2">
         <div class="gl-perf-metrics" id="gl-perf-metrics">
           ${PERF_METRICS.map(m => `
-            <button class="gl-perf-btn${GL.activePerfMetric === m.key ? ' active' : ''}"
-                    data-metric="${m.key}">${m.label}</button>
+            <button type="button" class="gl-perf-btn${GL.activePerfMetric === m.key ? ' active' : ''}"
+                    aria-pressed="${GL.activePerfMetric === m.key}" data-metric="${m.key}">${m.label}</button>
           `).join('')}
         </div>
         <div id="gl-perf-table" class="gl-perf-table-area">
@@ -303,8 +361,10 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     document.querySelectorAll('.gl-perf-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         GL.activePerfMetric = btn.dataset.metric;
-        document.querySelectorAll('.gl-perf-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+        document.querySelectorAll('.gl-perf-btn').forEach(b => {
+          b.classList.toggle('active', b === btn);
+          b.setAttribute('aria-pressed', String(b === btn));
+        });
         await _loadPerfTable(code, qs, GL.activePerfMetric);
       });
     });
@@ -335,15 +395,14 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     }
 
     const cols     = PERF_COLS[metric] || PERF_COLS.goals;
-    const isSeason = data[0] && data[0].source === 'season_stats';
 
     area.innerHTML = `
       <div class="gl-table-wrap">
-        ${isSeason ? '<div class="gl-src-badge">📡 SofaScore 시즌 누적 스탯</div>' : ''}
+        <div class="gl-src-badge">📡 시즌 누적 · 3경기 이상 출전 선수${metric === 'rating' ? ' · 평점은 출전 시간이 적으면 높게 나올 수 있음' : ''}</div>
         <table class="gl-table gl-perf-tbl">
           <thead>
             <tr>
-              <th>#</th><th>선수</th><th>팀</th><th>POS</th><th>경기</th>
+              <th>#</th><th>선수</th><th>팀</th><th>POS</th><th>경기</th><th>출전(분)</th>
               ${cols.map((c, i) => `<th class="num-col${i === 0 ? ' gl-perf-primary' : ''}">${c[0]}</th>`).join('')}
             </tr>
           </thead>
@@ -351,7 +410,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             ${data.slice(0, 20).map((p, i) => {
               const cells = cols.map((c, ci) => {
                 const val  = p[c[1]];
-                const disp = (val === null || val === undefined) ? '-' : val;
+                const disp = (val === null || val === undefined) ? '-'
+                  : (c[1] === 'avgRating' ? (Number(val) > 0 ? Number(val).toFixed(2) : '-') : val);
                 const cls  = `num-col${ci === 0 ? ' gl-perf-primary' : ''}`;
                 return `<td class="${cls}">${ci === 0 ? `<strong>${disp}</strong>` : disp}</td>`;
               }).join('');
@@ -362,6 +422,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                   <td class="gl-team-sub">${ttEsc(p.team)}</td>
                   <td class="gl-pos">${posLabel(p.position)}</td>
                   <td>${p.games}</td>
+                  <td class="gl-team-sub">${p.minutes ?? '-'}</td>
                   ${cells}
                 </tr>`;
             }).join('')}
@@ -372,12 +433,13 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   }
 
   /* ── 데이터 없음 안내 ─────────────────────────────── */
+  // 사용자 화면용 — 내부 수집 명령은 노출하지 않는다
   function noDataHtml(section, code) {
+    const l = GL.leagues.find(x => x.code === code);
     return `
       <div class="gl-empty">
-        <p>아직 <strong>${code.toUpperCase()}</strong> 데이터가 수집되지 않았습니다.</p>
-        <p class="gl-empty-sub">아래 명령으로 수집을 시작하세요:</p>
-        <code class="gl-code">python crawlers/collect_apifootball.py --league ${code} --apply</code>
+        <p><strong>${ttEsc(l ? l.label : code)}</strong> ${ttEsc(section)} 데이터가 아직 없습니다.</p>
+        <p class="gl-empty-sub">시즌 초반이거나 수집 전입니다. 주간 업데이트 뒤 다시 확인해 주세요.</p>
       </div>
     `;
   }

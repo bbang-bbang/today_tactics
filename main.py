@@ -14060,6 +14060,14 @@ def _validate_league(code):
     return LEAGUE_REGISTRY[code], None
 
 
+def _league_season_id(cfg, year):
+    """?year= → 리그 DB season_id. 숫자가 아니면 None(전체) — int() ValueError 500 방지."""
+    try:
+        return cfg.get("season_ids", {}).get(int(year)) if year else None
+    except (TypeError, ValueError):
+        return None
+
+
 @app.route("/api/league/<code>/standings")
 def league_standings(code):
     """리그 순위표 — league_standings 테이블 우선, 없으면 events 집계."""
@@ -14143,7 +14151,7 @@ def league_team_rankings(code):
     if err:
         return err
     year   = request.args.get("year")
-    season_id = cfg.get("season_ids", {}).get(int(year)) if year else None
+    season_id = _league_season_id(cfg, year)
 
     with get_league_db(code) as conn:
         tids = [t["id"] for t in cfg["tournaments"]]
@@ -14162,7 +14170,9 @@ def league_team_rankings(code):
                    SUM(COALESCE(ps.shots_on_target, 0))   AS shots_on,
                    SUM(COALESCE(ps.key_passes, 0))        AS key_passes,
                    SUM(COALESCE(ps.tackles, 0))           AS tackles,
-                   ROUND(AVG(CASE WHEN COALESCE(ps.rating,0)>0 THEN ps.rating END), 2) AS avg_rating
+                   ROUND(AVG(CASE WHEN COALESCE(ps.rating,0)>0 THEN ps.rating END), 2) AS avg_rating,
+                   SUM(COALESCE(ps.interceptions, 0))     AS interceptions,
+                   SUM(COALESCE(ps.successful_dribbles, 0)) AS dribbles
             FROM player_stats ps
             JOIN players p ON p.id = ps.player_id
             LEFT JOIN teams t ON t.id = p.team_id
@@ -14188,6 +14198,8 @@ def league_team_rankings(code):
                 "keyPasses": r[7] or 0,
                 "tackles":   r[8] or 0,
                 "avgRating": r[9] or 0,
+                "interceptions": r[10] or 0,
+                "dribbles":  r[11] or 0,
                 "source":    "player_stats",
             } for r in rows])
 
@@ -14242,19 +14254,26 @@ def league_top_performers(code):
         return err
     year   = request.args.get("year")
     metric = request.args.get("metric", "goals")
-    limit  = min(int(request.args.get("limit", 25)), 50)
+    try:
+        limit = max(1, min(int(request.args.get("limit", 25)), 50))
+    except (TypeError, ValueError):
+        limit = 25
 
+    # 화이트리스트 ORDER BY (외부 입력은 키로만 사용) — 동률은 득점·출전 시간으로 정렬
     order_map = {
-        "goals":      "ps.goals DESC",
-        "assists":    "ps.assists DESC",
-        "rating":     "ps.rating DESC",
-        "xg":         "ps.expected_goals DESC",
-        "key_passes": "ps.key_passes DESC",
-        "tackles":    "ps.tackles DESC",
+        "goals":         "ps.goals DESC",
+        "assists":       "ps.assists DESC",
+        "rating":        "ps.rating DESC",
+        "xg":            "ps.expected_goals DESC",
+        "key_passes":    "ps.key_passes DESC",
+        "tackles":       "ps.tackles DESC",
+        "interceptions": "ps.interceptions DESC",
+        "dribbles":      "ps.successful_dribbles DESC",
+        "shots":         "ps.total_shots DESC",
     }
-    order = order_map.get(metric, "ps.goals DESC")
+    order = order_map.get(metric, "ps.goals DESC") + ", ps.goals DESC, ps.minutes_played ASC"
 
-    season_id = cfg.get("season_ids", {}).get(int(year)) if year else None
+    season_id = _league_season_id(cfg, year)
     sid_cond  = "AND ps.season_id = ?" if season_id else ""
 
     with get_league_db(code) as conn:
@@ -14276,7 +14295,12 @@ def league_top_performers(code):
                    ROUND(COALESCE(ps.rating, 0), 2) AS rating,
                    COALESCE(ps.minutes_played, 0)   AS minutes,
                    COALESCE(ps.key_passes, 0)        AS key_passes,
-                   COALESCE(ps.tackles, 0)           AS tackles
+                   COALESCE(ps.tackles, 0)           AS tackles,
+                   COALESCE(ps.interceptions, 0)     AS interceptions,
+                   COALESCE(ps.successful_dribbles, 0) AS dribbles,
+                   COALESCE(ps.total_shots, 0)       AS shots,
+                   COALESCE(ps.shots_on_target, 0)   AS shots_on,
+                   ps.accurate_passes_pct            AS pass_pct
             FROM player_stats ps
             JOIN players p ON p.id = ps.player_id
             LEFT JOIN teams t ON t.id = p.team_id
@@ -14348,6 +14372,11 @@ def league_top_performers(code):
         "minutes":   r[10],
         "keyPasses": r[11],
         "tackles":   r[12],
+        "interceptions": r[13],
+        "dribbles":  r[14],
+        "shots":     r[15],
+        "shotsOn":   r[16],
+        "passPct":   round(r[17], 1) if r[17] else None,
         "source":    "season_stats",
     } for r in rows])
 
