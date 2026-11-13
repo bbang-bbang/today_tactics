@@ -207,6 +207,11 @@ def collect(cli, code, apply):
 
 FINISHED = ("FT", "AET", "PEN")
 TOP_LEAGUES = ["epl", "laliga", "bundesliga", "seriea", "ligue1", "brasileirao"]
+# 시즌 선수 기록은 있지만 경기별 선수 기록(coverage statistics_players)이 없는 리그 — 2026-11-13 표본 확인(선수 0명)
+NO_MATCH_STATS = {"brasileiroc"}
+# 경기별 기록까지 받는 하위 리그 (2026-11-13)
+LOWER_LEAGUES = [c for c, v in LEAGUES.items() if v[3] and c not in TOP_LEAGUES and c not in NO_MATCH_STATS]
+ALIASES = {"top": TOP_LEAGUES, "lower": LOWER_LEAGUES, "all": list(LEAGUES)}
 
 
 def _round_no(s):
@@ -220,15 +225,18 @@ def collect_matches(cli, code, apply):
     /fixtures 1회 + 아직 기록이 없는 끝난 경기마다 /fixtures/players 1회(증분 — 중단돼도 다음 실행이 이어 받음).
     dry-run: 일정 1회 + 표본 1경기만 호출하고 저장하지 않는다."""
     lid, season, tid, with_players = LEAGUES[code]
-    if not with_players:
-        print(f"  [{code}] 경기별 기록: 건너뜀 (순위표만 제공 리그)", flush=True)
+    if not with_players or code in NO_MATCH_STATS:
+        print(f"  [{code}] 경기별 기록: 건너뜀 (API-Football 경기별 선수 기록 미제공)", flush=True)
         return
     db = ROOT / DB_FILES[code]
     d = cli.get(f"/fixtures?league={lid}&season={season}")
     fixtures = d.get("response") or []
     done = [f for f in fixtures if ((f.get("fixture") or {}).get("status") or {}).get("short") in FINISHED]
 
-    conn = sqlite3.connect(db, timeout=60)
+    if not apply and not db.exists():   # dry-run 은 DB 파일을 만들지 않는다
+        conn = sqlite3.connect(":memory:")
+    else:
+        conn = sqlite3.connect(db, timeout=60)
     try:
         conn.executescript(SCHEMA_SQL)
         have = {r[0] for r in conn.execute("SELECT DISTINCT event_id FROM match_player_stats")}
@@ -300,7 +308,7 @@ def collect_matches(cli, code, apply):
 
 def main():
     ap = argparse.ArgumentParser(description="API-Football 해외 리그 수집 (기본 dry-run)")
-    ap.add_argument("--league", required=True, help=f"{', '.join(LEAGUES)} · top(1부 6개) · all")
+    ap.add_argument("--league", required=True, help=f"{', '.join(LEAGUES)} · top(1부 6개) · lower(경기별 기록 있는 2·3부) · all — 쉼표로 여러 개")
     ap.add_argument("--part", choices=("season", "matches", "both"), default="season",
                     help="season=순위표+시즌 누적(기본) · matches=경기 일정+경기별 선수 기록(증분) · both")
     ap.add_argument("--apply", action="store_true")
@@ -309,7 +317,11 @@ def main():
     ap.add_argument("--reserve", type=int, default=200, help="오늘 남은 호출이 이 이하가 되면 중단")
     args = ap.parse_args()
     cli = Client(load_key(), args.max_calls, args.reserve)
-    codes = (list(LEAGUES) if args.league == "all" else TOP_LEAGUES if args.league == "top" else [args.league])
+    codes = []
+    for part in args.league.split(","):   # 예: top,lower · epl,laliga
+        for c in ALIASES.get(part.strip(), [part.strip()]):
+            if c not in codes:
+                codes.append(c)
     for c in codes:
         if c not in LEAGUES:
             raise SystemExit(f"알 수 없는 리그: {c}")

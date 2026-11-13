@@ -277,15 +277,18 @@ prediction.js 라운드 버튼 핸들러에 `clearMatchContext()` 추가, prev !
 
 ---
 
-### [ ] 🌍 해외 리그 데이터 복구 + 브라질 세리에A (2026-11-11)
+### [x] 🌍 해외 리그 데이터 복구 + 브라질 세리에A (2026-11-11 → 11/13 완료)
 - **사실**: 운영 해외 리그 DB 5개가 0바이트(6월~) → 해외 리그 탭 API 500이었음(이제 데이터 없는 리그는 숨김). 크롤러(`crawl_league.py`)는 SofaScore standings·top-players 403 — 우회 안 함.
 - **선택지**: ①공식/허가된 API(API-Football 등 — 키 필요, 무료 한도 소량) ②FBref(Sports Reference) 페이지 — 이용약관·요청 빈도 제한 확인 필요 ③해외 탭 제거. 브라질(2026 시즌)은 레지스트리·시즌 표기까지 준비 완료(`brasileirao`).
 - **11/11 진행**: ① 선택 — API-Football(Pro) `crawlers/collect_apifootball.py`로 운영 6개 리그 수집 완료(190회). 남은 것: [x] 해외 탭 다시 노출(11/13 2a6645e 배포) · [x] 주간 크론(11/13 등록 — 아래) · xG·몸값은 출처 없음.
 - **11/13 해외 선수 경기별 기록 (2b7f1c3)**: `collect_apifootball.py --part matches`(/fixtures + 끝난 경기마다 /fixtures/players, 이미 받은 경기는 건너뜀) → `events`·`match_player_stats`. `/api/league/<code>/player-matches` + TOP 퍼포머 선수 이름 클릭 → 경기별 기록 모달. 경기별 `passes.accuracy`는 **성공 패스 수**(시즌 /players 응답은 %). 운영 1부 6개 리그 수집(백업 `/home/rocky/bk_matches_20261113/`, 로그 `/home/rocky/collect_matches_20261113.log`).
   - 운영 크론(rocky): 월 06:30 `--league all --part season --max-calls 900` · 월 07:30 `--league top --part matches --max-calls 400` → `/var/log/today_tactics/apifootball.log`. 이전 crontab `/home/rocky/crontab_bk_20261113.txt`.
-  - [ ] 브라우저 확인(이 세션은 크롬 확장 미연결) · [ ] 2부 리그 경기별 기록(리그별 coverage `statistics_players` 확인 후)
+  - [x] 화면 확인(11/13 헤드리스 Playwright — 크롬 확장 미연결) · [x] 2·3부 경기별 기록 8개 리그(`--league lower`, 브라질 세리에C는 경기별 선수 기록 미제공이라 제외)
+- **11/13 선수 탐색 (8492c92)**: '🔎 선수 탐색' 섹션(검색·팀·포지션·최소 출전·90분당·정렬) + '🔥 최근 폼 상승'(`/player-form`) + 모달 '비슷한 선수'(`/similar-players`, 같은 리그·1부 6개). 운영 확인: 6개 리그 폼 카드·홀란 1부 비교(티츠·이삭·라이몬도).
+  - 운영 크론 07:30을 `--league top,lower --part matches`로 확장.
 
-### [ ] 🌍 해외 하위 리그(2·3부) 추가 — 코드 완료·운영 수집 대기 (2026-11-11 등록, **범위 B 확정 2026-11-12**)
+### [x] 🌍 해외 하위 리그(2·3부) 추가 — 11/12 배포(70ecb00)·운영 수집 완료 (2026-11-11 등록, **범위 B 확정 2026-11-12**)
+- 남은 확인: [ ] 조가 나뉜 3부 순위표(`standings` 여러 조 → `groups[0]`만 저장) — 브라질 세리에C 등 운영 데이터로 확인
 - **2026-11-12 구현 완료(미커밋·미배포)**: `main.py` `_register_lower_league`로 15개 등록(조 나뉜 3부는 조마다 별도 코드: `primerarfef1/2`·`seriec_a/b/c`) + `/api/leagues`에 `country`·`tier`·`standingsOnly` · `collect_apifootball.py` `LEAGUES` 4-튜플(players 여부) · `init_league_db.py` 동기화 · `global_league.js` 나라별 행(1·2·3부 버튼) + 순위표만 리그 안내 · CSS. 임시 가짜 DB로 `/api/leagues`·standings API 확인(로컬엔 해외 DB·API 키 없음).
 - **남은 일**: ① 커밋·푸시 ② 운영에서 `collect_apifootball.py --league all --apply --max-calls 800`(약 700회, 승인 후·사전 백업) ③ 브라질 Série C 등 1페이지 조 구성(`standings` 배열이 여러 조면 `groups[0]`만 저장됨) 첫 실행 로그 확인 ④ 해외 탭 노출(`templates/index.html` 주석 해제) + 브라우저 확인 ⑤ 주간 크론.
 - **요청**: 각 리그마다 하위 리그, 최소 3부까지.
@@ -310,7 +313,7 @@ prediction.js 라운드 버튼 핸들러에 `clearMatchContext()` 추가, prev !
   5. 호출량: 하위 리그는 리그당 약 40회 → 1부 포함 전체 약 700회/실행. `--max-calls` 기본 400 → 상향 필요(하루 한도 7,500 · `--reserve` 200 유지).
   6. 운영 수집(승인 후) → 해외 탭 노출 결정(위 항목)과 같이 브라우저 확인 → 주간 크론.
 
-### [ ] 세리에A · 리그앙 선수 스탯 수집 — 2026-06-14 백로그 등록
+### [x] ~~세리에A · 리그앙 선수 스탯 수집~~ — 2026-11-11 API-Football 수집으로 해결 (2026-06-14 등록)
 
 **현황**: SofaScore `top-players/overall` API가 세리에A(tid=23)·리그앙(tid=34)에서 403 완전 차단. EPL·라리가·분데스는 정상 수집 중.  
 **증상**: `/leagues` 리그 분석 탭에서 두 리그 선택 시 "수집 불가" 안내 노출.
