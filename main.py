@@ -14381,6 +14381,169 @@ def league_top_performers(code):
     } for r in rows])
 
 
+def _age_from_birth(bd):
+    try:
+        y, mo, d = (int(x) for x in str(bd)[:10].split("-"))
+        t = datetime.now()
+        return t.year - y - ((t.month, t.day) < (mo, d))
+    except (TypeError, ValueError):
+        return None
+
+
+@app.route("/api/league/<code>/players")
+@cached_response(ttl=1800)
+def league_players(code):
+    """선수 탐색용 전체 목록 (2026-11-13) — 리그 시즌 누적 기록 전부. 검색·필터·정렬은 화면에서(리그당 수백 명)."""
+    cfg, err = _validate_league(code)
+    if err:
+        return err
+    season_id = _league_season_id(cfg, request.args.get("year"))
+    tids = [t["id"] for t in cfg["tournaments"]]
+    ph = ",".join("?" * len(tids))
+    sid_cond = "AND ps.season_id = ?" if season_id else ""
+    try:
+        with get_league_db(code) as conn:
+            rows = conn.execute(f"""
+                SELECT p.id, p.name, p.position, p.birth_date, p.nationality, p.team_id, t.name,
+                       ps.appearances, ps.minutes_played, ps.rating, ps.goals, ps.assists, ps.total_shots,
+                       ps.shots_on_target, ps.key_passes, ps.successful_dribbles, ps.tackles, ps.interceptions,
+                       ps.accurate_passes_pct, ps.total_passes, ps.saves, ps.goals_conceded, ps.yellow_cards, ps.red_cards
+                FROM player_stats ps
+                JOIN players p ON p.id = ps.player_id
+                LEFT JOIN teams t ON t.id = p.team_id
+                WHERE ps.tournament_id IN ({ph}) AND COALESCE(ps.minutes_played, 0) > 0 {sid_cond}
+            """, (*tids, *([season_id] if season_id else []))).fetchall()
+            has_matches = conn.execute("SELECT 1 FROM match_player_stats LIMIT 1").fetchone() is not None
+    except sqlite3.OperationalError:   # 리그 DB 미수집
+        rows, has_matches = [], False
+    return jsonify({
+        "hasMatches": has_matches,
+        "players": [{
+            "id": r[0], "name": r[1] or "", "position": r[2] or "", "age": _age_from_birth(r[3]),
+            "nationality": r[4] or "", "teamId": r[5], "team": r[6] or "",
+            "games": r[7] or 0, "minutes": r[8] or 0, "rating": round(r[9], 2) if r[9] else None,
+            "goals": r[10] or 0, "assists": r[11] or 0, "shots": r[12] or 0, "shotsOn": r[13] or 0,
+            "keyPasses": r[14] or 0, "dribbles": r[15] or 0, "tackles": r[16] or 0, "interceptions": r[17] or 0,
+            "passPct": round(r[18], 1) if r[18] and (r[19] or 0) >= 50 else None, "passes": r[19] or 0,
+            "saves": r[20], "conceded": r[21], "yellow": r[22] or 0, "red": r[23] or 0,
+        } for r in rows],
+    })
+
+
+@app.route("/api/league/<code>/player-form")
+@cached_response(ttl=1800)
+def league_player_form(code):
+    """최근 폼 상승 선수 (2026-11-13) — 경기별 기록 기준.
+    최근 5경기(평점 있는 출전) 평균 − 그 이전 경기 평균. 이전 3경기 이상 · 최근 평균 6.8 이상 ·
+    마지막 출전이 리그 최근 경기일 21일 이내(부상·명단 제외 선수 배제)."""
+    cfg, err = _validate_league(code)
+    if err:
+        return err
+    season_id = _league_season_id(cfg, request.args.get("year"))
+    tids = [t["id"] for t in cfg["tournaments"]]
+    ph = ",".join("?" * len(tids))
+    sid_cond = "AND e.season_id = ?" if season_id else ""
+    try:
+        with get_league_db(code) as conn:
+            rows = conn.execute(f"""
+                SELECT m.player_id, COALESCE(p.name, m.player_name), m.position, t.name, e.date_ts,
+                       m.rating, m.goals, m.assists, m.minutes_played
+                FROM match_player_stats m
+                JOIN events e ON e.id = m.event_id
+                LEFT JOIN players p ON p.id = m.player_id
+                LEFT JOIN teams t ON t.id = m.team_id
+                WHERE e.tournament_id IN ({ph}) AND m.rating IS NOT NULL AND m.minutes_played >= 20 {sid_cond}
+                ORDER BY m.player_id, e.date_ts
+            """, (*tids, *([season_id] if season_id else []))).fetchall()
+    except sqlite3.OperationalError:
+        rows = []
+    if not rows:
+        return jsonify({"risers": [], "n": 5})
+    latest = max(r[4] for r in rows)
+    by_p = {}
+    for r in rows:
+        by_p.setdefault(r[0], []).append(r)
+    N = 5
+    out = []
+    for pid, apps in by_p.items():
+        if len(apps) < N + 3 or latest - apps[-1][4] > 21 * 86400:
+            continue
+        recent, earlier = apps[-N:], apps[:-N]
+        r_avg = sum(a[5] for a in recent) / N
+        e_avg = sum(a[5] for a in earlier) / len(earlier)
+        if r_avg < 6.8:
+            continue
+        last = apps[-1]
+        out.append({"id": pid, "name": last[1] or "", "position": last[2] or "", "team": last[3] or "",
+                    "recentAvg": round(r_avg, 2), "earlierAvg": round(e_avg, 2), "delta": round(r_avg - e_avg, 2),
+                    "recentGoals": sum(a[6] or 0 for a in recent), "recentAssists": sum(a[7] or 0 for a in recent),
+                    "recentRatings": [round(a[5], 1) for a in recent], "games": len(apps)})
+    out.sort(key=lambda x: -x["delta"])
+    return jsonify({"risers": out[:8], "n": N})
+
+
+# 비슷한 선수 — 같은 포지션(G/D/M/F) 비교군에서 90분 환산 지표 z-점수의 유클리드 거리가 가까운 순
+_SIM_FEATURES = {
+    "F": ["goals90", "assists90", "sot90", "kp90", "dribble90", "def90", "pass_acc"],
+    "M": ["goals90", "assists90", "sot90", "kp90", "dribble90", "def90", "pass_acc"],
+    "D": ["goals90", "assists90", "kp90", "dribble90", "def90", "pass_acc"],
+    "G": ["save90", "conceded90", "save_pct", "pass_acc"],
+}
+_TOP_LEAGUES = ("epl", "laliga", "bundesliga", "seriea", "ligue1", "brasileirao")
+
+
+@app.route("/api/league/<code>/similar-players")
+@cached_response(ttl=1800)
+def league_similar_players(code):
+    """비슷한 선수 (2026-11-13). scope=league(같은 리그, 기본) | top(1부 6개 리그).
+    시즌 누적 기록 기반 · 리그 수준 차이는 보정하지 않음 · 출전 450분 미만(시즌 초반 리그는 하향) 선수는 비교 불가."""
+    cfg, err = _validate_league(code)
+    if err:
+        return err
+    pid = request.args.get("playerId", type=int)
+    if not pid:
+        return jsonify({"error": "playerId required"}), 400
+    scope = "top" if request.args.get("scope") == "top" else "league"
+    leagues = set(_TOP_LEAGUES) | {code} if scope == "top" else {code}
+    rows = [r for r in _overseas_rows(450) if r["league_code"] in leagues]
+    target = next((r for r in rows if r["id"] == f"{code}:{pid}"), None)
+    if not target:
+        return jsonify({"scope": scope, "similar": [], "reason": "출전 시간이 짧아 비교할 수 없습니다 (450분 미만)"})
+    feats = _SIM_FEATURES[target["pos"]]
+    pool = [r for r in rows if r["pos"] == target["pos"]]
+    stats = {}
+    for k in feats:
+        vals = [r["m"][k] for r in pool if r["m"].get(k) is not None]
+        if len(vals) >= 5:
+            mu = sum(vals) / len(vals)
+            sd = (sum((v - mu) ** 2 for v in vals) / len(vals)) ** 0.5
+            if sd > 0:
+                stats[k] = (mu, sd)
+    if len(stats) < 3:
+        return jsonify({"scope": scope, "similar": [], "reason": "비교군이 너무 작습니다"})
+    z = lambda r, k: ((r["m"][k] - stats[k][0]) / stats[k][1]) if r["m"].get(k) is not None else 0.0
+    tz = {k: z(target, k) for k in stats}
+    cands = []
+    for r in pool:
+        if r["id"] == target["id"]:
+            continue
+        d = sum((z(r, k) - tz[k]) ** 2 for k in stats) ** 0.5 / len(stats) ** 0.5
+        cands.append((d, r))
+    cands.sort(key=lambda x: x[0])
+    rnd = lambda v: round(v, 2) if v is not None else None
+    return jsonify({
+        "scope": scope, "pos": target["pos"], "poolSize": len(pool),
+        "metrics": [{"key": k, "label": _OS_METRICS[k]} for k in feats if k in stats],   # 순서 유지(jsonify는 dict 키를 정렬)
+        "target": {k: rnd(target["m"].get(k)) for k in stats},
+        "similar": [{
+            "code": r["league_code"], "id": int(r["id"].split(":")[1]), "name": r["name"], "team": r["team"],
+            "league": r["league"], "age": r["age"], "mins": r["mins"], "distance": round(d, 2),
+            "stats": {k: rnd(r["m"].get(k)) for k in stats},
+        } for d, r in cands[:5]],
+        "note": "같은 포지션 선수의 90분당 기록을 표준화해 가까운 순 · 리그 수준 차이 미보정 · 시즌 누적 기록 기준",
+    })
+
+
 @app.route("/api/league/<code>/player-matches")
 def league_player_matches(code):
     """해외 선수 경기별 기록 (2026-11-13) — API-Football /fixtures/players 수집분(match_player_stats).

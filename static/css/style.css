@@ -10018,7 +10018,7 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .gl-pname-btn:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
 .gl-pname-btn:active { color: #bfdbfe; }
 .gl-pname-btn:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; border-radius: 2px; }
-.gl-pm-card { width: min(1040px, 96vw); }
+.gd-card.gl-pm-card { width: min(1040px, 96vw); }
 .gl-pm-body { overflow-y: auto; margin: 0 -6px; padding: 0 6px; }
 .gl-pm-sub { margin: -4px 0 12px; font-size: 13px; color: #94a3b8; }
 .gl-pm-tiles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 14px; }
@@ -10026,7 +10026,7 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
   display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px;
   background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
 }
-.gl-pm-tile-val { font-size: 18px; font-weight: 700; color: #e2e8f0; font-variant-numeric: tabular-nums; }
+.gl-pm-tile-val { font-size: 18px; font-weight: 700; color: #e2e8f0; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gl-pm-tile-lab { font-size: 12px; color: #94a3b8; }
 .gl-pm-h { margin: 14px 0 6px; font-size: 14px; font-weight: 700; color: #e2e8f0; }
 .gl-pm-h-sub { font-size: 12px; font-weight: 400; color: #8fa0c0; margin-left: 6px; }
@@ -10055,6 +10055,56 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .gl-pm-bk.red { background: #dc2626; color: #fff; }
 .gl-pm-src { margin: 10px 0 0; font-size: 12px; color: #8fa0c0; }
 @media (max-width: 700px) { .gl-pm-tiles { grid-template-columns: repeat(3, 1fr); } }
+
+/* 선수 탐색 · 비슷한 선수 (2026-11-13) */
+.gl-chip {
+  padding: 4px 12px; border-radius: 16px; border: 1px solid #334155; background: transparent;
+  color: #94a3b8; font-size: 12px; cursor: pointer; transition: all var(--trans-fast);
+}
+.gl-chip:hover { border-color: #60a5fa; color: #93c5fd; }
+.gl-chip:active { transform: scale(0.96); }
+.gl-chip.active { background: #1e3a5f; border-color: #3b82f6; color: #bfdbfe; font-weight: 600; }
+.gl-chip:focus-visible, .gl-px-input:focus-visible, .gl-select:focus-visible, .gl-px-toggle input:focus-visible,
+.gl-px-more:focus-visible, .gl-px-card:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.gl-px-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.gl-px-input {
+  flex: 1 1 200px; max-width: 280px; padding: 6px 10px; border-radius: 6px; font-size: 13px;
+  background: #1e2330; border: 1px solid #444; color: #e2e8f0; transition: border-color var(--trans-fast);
+}
+.gl-px-input:hover { border-color: #64748b; }
+.gl-px-input::placeholder { color: #8fa0c0; }
+.gl-px-chips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.gl-px-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #bcc8e0; cursor: pointer; }
+.gl-px-tbl th:nth-child(2), .gl-px-tbl td:nth-child(2), .gl-px-tbl th:nth-child(3), .gl-px-tbl td:nth-child(3) { text-align: left; }
+.gl-px-tbl td, .gl-px-tbl th { white-space: nowrap; }
+.gl-px-none { text-align: center; padding: 24px; color: #8fa0c0; }
+.gl-px-more {
+  display: block; margin: 10px auto 0; padding: 6px 18px; border-radius: 16px; font-size: 13px; cursor: pointer;
+  background: transparent; border: 1px solid #334155; color: #93c5fd; transition: all var(--trans-fast);
+}
+.gl-px-more:hover { background: #1e3a5f; border-color: #3b82f6; }
+.gl-px-form { margin-bottom: 14px; }
+.gl-px-form .gl-pm-h { margin-top: 0; }
+.gl-px-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.gl-px-card {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; cursor: pointer; font: inherit;
+  background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px; color: inherit;
+  transition: border-color var(--trans-fast), transform var(--trans-fast);
+}
+.gl-px-card:hover { border-color: #3b82f6; transform: translateY(-1px); }
+.gl-px-card:active { transform: translateY(0); }
+.gl-px-card-name { font-size: 14px; font-weight: 700; color: #e2e8f0; }
+.gl-px-card-sub { font-size: 12px; color: #8fa0c0; }
+.gl-px-card-num { font-size: 13px; color: #e2e8f0; margin: 2px 0; font-variant-numeric: tabular-nums; }
+.gl-px-card-num strong { font-size: 18px; }
+.gl-px-up { color: #4ade80; font-weight: 700; margin-left: 4px; }
+.gl-sim { margin-top: 4px; }
+.gl-sim-scope { display: inline-flex; gap: 4px; margin-left: 8px; vertical-align: middle; }
+.gl-sim-tbl { font-size: 12px; }
+.gl-sim-tbl td, .gl-sim-tbl th { white-space: nowrap; }
+.gl-sim-tbl td.num-col, .gl-sim-tbl th.num-col { text-align: right; font-variant-numeric: tabular-nums; }
+.gl-sim-self td { color: #fbbf24; font-weight: 600; background: rgba(251,191,36,0.06); }
+.gl-sim-tbl th:not(.num-col), .gl-pm-tbl th:not(.num-col), .gl-sim-tbl td:not(.num-col) { text-align: left; }
 
 /* ── 분석 읽는 법 (도움말 모달) ───────────────────────────── */
 .gd-overlay {

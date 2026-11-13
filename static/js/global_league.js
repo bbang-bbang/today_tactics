@@ -76,7 +76,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         </div>
         <div class="gl-league-head" id="gl-league-head" aria-live="polite"></div>
         <div class="gl-section-tabs" id="gl-section-tabs" role="tablist">
-          ${['standings','team-rankings','top-performers'].map(s =>
+          ${['standings','team-rankings','top-performers','players'].map(s =>
             `<button type="button" role="tab" aria-selected="${GL.activeSection===s}" class="gl-sec-btn${GL.activeSection===s?' active':''}" data-sec="${s}">
               ${sectionLabel(s)}
             </button>`
@@ -154,7 +154,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   }
 
   function sectionLabel(s) {
-    return { standings: '📋 순위표', 'team-rankings': '📊 팀 지표', 'top-performers': '⭐ TOP 퍼포머' }[s] || s;
+    return { standings: '📋 순위표', 'team-rankings': '📊 팀 지표', 'top-performers': '⭐ TOP 퍼포머', players: '🔎 선수 탐색' }[s] || s;
   }
 
   /* ── 리그 전환 ────────────────────────────────────── */
@@ -195,6 +195,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         case 'standings':      await renderStandings(code, qs);      break;
         case 'team-rankings':  await renderTeamRankings(code, qs);   break;
         case 'top-performers': await renderTopPerformers(code, qs);  break;
+        case 'players':        await renderPlayerExplorer(code, qs); break;
       }
     } catch (e) {
       content.innerHTML = `<div class="gl-error">데이터 로드 실패: ${ttEsc(e.message)}</div>`;
@@ -466,7 +467,10 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       </div>`;
   }
 
+  let _pmCleanup = null;   // 모달 안에서 다른 선수를 열 때 이전 Esc 리스너 정리
+
   async function openPlayerMatches(code, pid, opener) {
+    if (_pmCleanup) _pmCleanup();
     document.querySelector('.gl-pm-overlay')?.remove();
     const ov = document.createElement('div');
     ov.className = 'gd-overlay gl-pm-overlay';
@@ -481,12 +485,13 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     document.body.appendChild(ov);
     requestAnimationFrame(() => ov.classList.add('gd-visible'));
     const close = () => {
-      document.removeEventListener('keydown', onKey);
+      _pmCleanup();
       ov.remove();
-      opener?.focus();
+      if (opener?.isConnected) opener.focus();
     };
     const onKey = e => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', onKey);
+    _pmCleanup = () => { document.removeEventListener('keydown', onKey); _pmCleanup = null; };
     ov.addEventListener('click', e => { if (e.target === ov) close(); });
     ov.querySelector('.gd-close').addEventListener('click', close);
     ov.querySelector('.gd-close').focus();
@@ -506,7 +511,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     ov.querySelector('#gl-pm-title').textContent = p.name || '경기별 기록';
     if (!ms.length) {
       body.innerHTML = `<div class="gl-empty"><p>경기별 기록이 아직 없습니다.</p>
-        <p class="gl-empty-sub">주간 업데이트 때 수집됩니다. 순위표만 제공되는 리그는 경기별 기록이 없습니다.</p></div>`;
+        <p class="gl-empty-sub">이 리그는 시즌 누적 기록만 있습니다. 1부 6개 리그는 매주 경기별 기록을 받습니다.</p></div>
+        <div class="gl-sim" id="gl-sim"></div>`;
+      loadSimilar(code, pid, opener, 'league');
       return;
     }
     const isGk = p.position === 'G';
@@ -524,6 +531,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       </div>
       <h3 class="gl-pm-h">평점 추이 <span class="gl-pm-h-sub">점선 = 평균 · 막대 숫자 = 평점</span></h3>
       ${ratingChartSvg(ms) || '<p class="gl-pm-h-sub">평점이 있는 경기가 2경기 미만입니다.</p>'}
+      <div class="gl-sim" id="gl-sim"></div>
       <h3 class="gl-pm-h">경기 목록 <span class="gl-pm-h-sub">최근 경기부터</span></h3>
       <div class="gl-table-wrap gl-pm-tbl-wrap">
         <table class="gl-table gl-pm-tbl">
@@ -558,6 +566,236 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         </table>
       </div>
       <p class="gl-pm-src">📡 ${ttEsc(d.source || '')}</p>`;
+    loadSimilar(code, pid, opener, 'league');
+  }
+
+  /* 비슷한 선수 — 같은 리그 / 1부 6개 리그 전환 */
+  async function loadSimilar(code, pid, opener, scope) {
+    const box = document.getElementById('gl-sim');
+    if (!box) return;
+    const head = `
+      <h3 class="gl-pm-h">비슷한 선수
+        <span class="gl-sim-scope" role="group" aria-label="비교 범위">
+          ${[['league', '같은 리그'], ['top', '1부 6개 리그']].map(([k, lab]) =>
+            `<button type="button" class="gl-chip${k === scope ? ' active' : ''}" aria-pressed="${k === scope}" data-scope="${k}">${lab}</button>`).join('')}
+        </span>
+      </h3>`;
+    box.innerHTML = head + '<div class="gl-loading">찾는 중…</div>';
+    const bind = () => box.querySelectorAll('[data-scope]').forEach(b =>
+      b.addEventListener('click', () => loadSimilar(code, pid, opener, b.dataset.scope)));
+    bind();
+    let d;
+    try {
+      const r = await fetch(`/api/league/${encodeURIComponent(code)}/similar-players?playerId=${encodeURIComponent(pid)}&scope=${scope}`);
+      d = await r.json();
+      if (!r.ok) throw new Error(d.error || r.status);
+    } catch (e) {
+      box.innerHTML = head + `<div class="gl-error">불러오지 못했습니다: ${ttEsc(e.message)}</div>`;
+      bind();
+      return;
+    }
+    if (!box.isConnected) return;
+    if (!d.similar || !d.similar.length) {
+      box.innerHTML = head + `<p class="gl-pm-h-sub">${ttEsc(d.reason || '비슷한 선수를 찾지 못했습니다.')}</p>`;
+      bind();
+      return;
+    }
+    const mets = d.metrics || [];
+    const keys = mets.map(m => m.key);
+    const v = x => (x === null || x === undefined) ? '-' : x;
+    box.innerHTML = head + `
+      <div class="gl-table-wrap">
+        <table class="gl-table gl-sim-tbl">
+          <thead><tr><th>선수</th><th>팀</th>${scope === 'top' ? '<th>리그</th>' : ''}<th class="num-col">나이</th><th class="num-col">출전(분)</th>
+            ${mets.map(m => `<th class="num-col">${ttEsc(m.label)}</th>`).join('')}</tr></thead>
+          <tbody>
+            <tr class="gl-sim-self"><td>기준 선수</td><td></td>${scope === 'top' ? '<td></td>' : ''}<td></td><td></td>
+              ${keys.map(k => `<td class="num-col">${v(d.target[k])}</td>`).join('')}</tr>
+            ${d.similar.map(s => `
+              <tr>
+                <td><button type="button" class="gl-pname-btn" data-code="${ttEsc(s.code)}" data-pid="${Number(s.id)}">${ttEsc(s.name)}</button></td>
+                <td class="gl-team-sub">${ttEsc(s.team)}</td>
+                ${scope === 'top' ? `<td class="gl-team-sub">${ttEsc(s.league)}</td>` : ''}
+                <td class="num-col">${v(s.age)}</td><td class="num-col">${v(s.mins)}</td>
+                ${keys.map(k => `<td class="num-col">${v(s.stats[k])}</td>`).join('')}
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <p class="gl-pm-src">${ttEsc(d.note || '')} · 비교군 ${Number(d.poolSize) || 0}명</p>`;
+    bind();
+    box.querySelectorAll('.gl-pname-btn').forEach(b => b.addEventListener('click', () =>
+      openPlayerMatches(b.dataset.code, b.dataset.pid, opener)));
+  }
+
+  /* ── 선수 탐색 (2026-11-13) — 전체 선수 검색·필터·정렬 + 최근 폼 추천 ── */
+  const _playersCache = {};
+  const PX = { q: '', team: '', pos: '', minMins: 0, per90: false, sort: 'goals', dir: -1, shown: 50 };
+  const PX_COLS = [
+    ['games', '경기', false], ['minutes', '출전(분)', false], ['goals', '골', true], ['assists', '도움', true],
+    ['shots', '슈팅', true], ['keyPasses', '키패스', true], ['dribbles', '드리블', true], ['tackles', '태클', true],
+    ['interceptions', '인터셉트', true], ['passPct', '패스%', false], ['rating', '평점', false],
+  ];
+  const fold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+  async function renderPlayerExplorer(code, qs) {
+    const content = document.getElementById('gl-content');
+    const cKey = code + qs;
+    if (!_playersCache[cKey]) {
+      const r = await fetch(`/api/league/${code}/players${qs}`);
+      _playersCache[cKey] = await r.json();
+    }
+    const data = _playersCache[cKey];
+    const players = data.players || [];
+    if (!players.length) {
+      content.innerHTML = noDataHtml('선수', code);
+      return;
+    }
+    players.forEach(p => { p._q = fold(p.name) + ' ' + fold(p.team); });
+    const teams = [...new Map(players.map(p => [p.teamId, p.team])).entries()]
+      .filter(([id]) => id != null).sort((a, b) => a[1].localeCompare(b[1]));
+    if (PX.team && !teams.some(([id]) => String(id) === PX.team)) PX.team = '';   // 리그가 바뀌면 팀 필터 초기화
+
+    content.innerHTML = `
+      <div class="gl-px">
+        <div class="gl-px-form" id="gl-px-form" hidden></div>
+        <div class="gl-px-bar">
+          <input type="search" id="gl-px-q" class="gl-px-input" placeholder="선수·팀 이름 검색" aria-label="선수 또는 팀 이름 검색" value="${ttEsc(PX.q)}">
+          <select id="gl-px-team" class="gl-select" aria-label="팀">
+            <option value="">전체 팀</option>
+            ${teams.map(([id, name]) => `<option value="${id}"${String(id) === PX.team ? ' selected' : ''}>${ttEsc(name)}</option>`).join('')}
+          </select>
+          <span class="gl-px-chips" role="group" aria-label="포지션">
+            ${[['', '전체'], ['F', '공격'], ['M', '미드'], ['D', '수비'], ['G', '골키퍼']].map(([k, lab]) =>
+              `<button type="button" class="gl-chip${PX.pos === k ? ' active' : ''}" aria-pressed="${PX.pos === k}" data-pos="${k}">${lab}</button>`).join('')}
+          </span>
+          <select id="gl-px-min" class="gl-select" aria-label="최소 출전 시간">
+            ${[[0, '출전 전체'], [270, '270분+'], [450, '450분+'], [900, '900분+']].map(([v, lab]) =>
+              `<option value="${v}"${PX.minMins === v ? ' selected' : ''}>${lab}</option>`).join('')}
+          </select>
+          <label class="gl-px-toggle"><input type="checkbox" id="gl-px-90"${PX.per90 ? ' checked' : ''}> 90분당</label>
+        </div>
+        <div id="gl-px-table"></div>
+      </div>`;
+
+    const redraw = () => { PX.shown = 50; drawPlayerTable(code, players); };
+    let t;
+    document.getElementById('gl-px-q').addEventListener('input', e => {
+      clearTimeout(t); t = setTimeout(() => { PX.q = e.target.value; redraw(); }, 200);
+    });
+    document.getElementById('gl-px-team').addEventListener('change', e => { PX.team = e.target.value; redraw(); });
+    document.getElementById('gl-px-min').addEventListener('change', e => { PX.minMins = Number(e.target.value); redraw(); });
+    document.getElementById('gl-px-90').addEventListener('change', e => {
+      PX.per90 = e.target.checked;
+      if (PX.per90 && PX.minMins < 270) {   // 출전이 짧은 선수의 90분당 수치는 과장되므로 기본 하한
+        PX.minMins = 270;
+        document.getElementById('gl-px-min').value = '270';
+      }
+      redraw();
+    });
+    content.querySelectorAll('[data-pos]').forEach(b => b.addEventListener('click', () => {
+      PX.pos = b.dataset.pos;
+      content.querySelectorAll('[data-pos]').forEach(x => {
+        x.classList.toggle('active', x === b); x.setAttribute('aria-pressed', String(x === b));
+      });
+      redraw();
+    }));
+    drawPlayerTable(code, players);
+    if (data.hasMatches) loadFormRisers(code, qs);
+  }
+
+  function drawPlayerTable(code, players) {
+    const area = document.getElementById('gl-px-table');
+    if (!area) return;
+    const q = fold(PX.q.trim());
+    const val = (p, k, per90) => {
+      const raw = p[k];
+      if (raw === null || raw === undefined) return null;
+      return (per90 && PX_COLS.find(c => c[0] === k)?.[2]) ? (p.minutes ? raw * 90 / p.minutes : 0) : raw;
+    };
+    const list = players.filter(p =>
+      (!q || p._q.includes(q)) && (!PX.team || String(p.teamId) === PX.team) &&
+      (!PX.pos || p.position === PX.pos) && p.minutes >= PX.minMins);
+    list.sort((a, b) => {
+      const va = val(a, PX.sort, PX.per90), vb = val(b, PX.sort, PX.per90);
+      if (va === null && vb === null) return 0;
+      if (va === null) return 1;      // 값 없는 선수는 정렬 방향과 관계없이 맨 뒤
+      if (vb === null) return -1;
+      return (va - vb) * PX.dir || (b.minutes - a.minutes);
+    });
+    const fmt = (p, k) => {
+      const v = val(p, k, PX.per90);
+      if (v === null) return '-';
+      if (k === 'rating') return v.toFixed(2);
+      return (PX.per90 && PX_COLS.find(c => c[0] === k)?.[2]) ? v.toFixed(2) : v;
+    };
+    const shown = list.slice(0, PX.shown);
+    area.innerHTML = `
+      <div class="gl-table-wrap">
+        <div class="gl-src-badge">${list.length}명 · 시즌 누적${PX.per90 ? ' · 득점·슈팅 등은 90분당' : ''} · 이름을 누르면 경기별 기록과 비슷한 선수</div>
+        <table class="gl-table gl-sortable gl-px-tbl">
+          <thead><tr>
+            <th>#</th><th>선수</th><th>팀</th><th>POS</th><th class="num-col">나이</th>
+            ${PX_COLS.map(([k, lab]) => {
+              const on = k === PX.sort;
+              return `<th class="num-col${on ? ' gl-perf-primary' : ''}" aria-sort="${on ? (PX.dir < 0 ? 'descending' : 'ascending') : 'none'}">
+                <button type="button" class="gl-sort-btn" data-key="${k}">${lab}${on ? (PX.dir < 0 ? ' ▾' : ' ▴') : ''}</button></th>`;
+            }).join('')}
+          </tr></thead>
+          <tbody>
+            ${shown.length ? shown.map((p, i) => `
+              <tr>
+                <td class="gl-rank">${i + 1}</td>
+                <td class="gl-player-name"><button type="button" class="gl-pname-btn" data-pid="${Number(p.id)}"
+                    aria-label="${ttEsc(p.name)} 경기별 기록 보기">${ttEsc(p.name)}</button></td>
+                <td class="gl-team-sub">${ttEsc(p.team)}</td>
+                <td class="gl-pos">${posLabel(p.position)}</td>
+                <td class="num-col">${p.age ?? '-'}</td>
+                ${PX_COLS.map(([k]) => `<td class="num-col${k === PX.sort ? ' gl-perf-primary' : ''}">${fmt(p, k)}</td>`).join('')}
+              </tr>`).join('')
+            : `<tr><td colspan="${5 + PX_COLS.length}" class="gl-px-none">조건에 맞는 선수가 없습니다.</td></tr>`}
+          </tbody>
+        </table>
+        ${list.length > PX.shown ? `<button type="button" class="gl-px-more" id="gl-px-more">더 보기 (${list.length - PX.shown}명 남음)</button>` : ''}
+      </div>`;
+    area.querySelectorAll('.gl-sort-btn').forEach(b => b.addEventListener('click', () => {
+      const k = b.dataset.key;
+      PX.dir = PX.sort === k ? -PX.dir : -1;
+      PX.sort = k;
+      drawPlayerTable(code, players);
+      document.querySelector(`#gl-px-table .gl-sort-btn[data-key="${k}"]`)?.focus();
+    }));
+    area.querySelectorAll('.gl-pname-btn').forEach(b => b.addEventListener('click', () =>
+      openPlayerMatches(code, b.dataset.pid, b)));
+    document.getElementById('gl-px-more')?.addEventListener('click', () => {
+      PX.shown += 50;
+      drawPlayerTable(code, players);
+    });
+  }
+
+  async function loadFormRisers(code, qs) {
+    const box = document.getElementById('gl-px-form');
+    if (!box) return;
+    let d;
+    try {
+      d = await (await fetch(`/api/league/${code}/player-form${qs}`)).json();
+    } catch (e) { return; }
+    if (!box.isConnected || !d.risers || !d.risers.length) return;
+    box.hidden = false;
+    box.innerHTML = `
+      <h3 class="gl-pm-h">🔥 최근 폼 상승 <span class="gl-pm-h-sub">최근 ${d.n}경기 평균 평점 − 그 이전 평균 · 21일 안에 뛴 선수</span></h3>
+      <div class="gl-px-cards">
+        ${d.risers.map(r => `
+          <button type="button" class="gl-px-card" data-pid="${Number(r.id)}" aria-label="${ttEsc(r.name)} 경기별 기록 보기">
+            <span class="gl-px-card-name">${ttEsc(r.name)}</span>
+            <span class="gl-px-card-sub">${ttEsc(r.team)} · ${posLabel(r.position)}</span>
+            <span class="gl-px-card-num"><strong>${r.recentAvg.toFixed(2)}</strong>
+              <span class="gl-px-up">▲ ${r.delta.toFixed(2)}</span></span>
+            <span class="gl-px-card-sub">이전 ${r.earlierAvg.toFixed(2)} · 최근 ${d.n}경기 ${r.recentGoals}골 ${r.recentAssists}도움</span>
+          </button>`).join('')}
+      </div>`;
+    box.querySelectorAll('.gl-px-card').forEach(b => b.addEventListener('click', () =>
+      openPlayerMatches(code, b.dataset.pid, b)));
   }
 
   /* ── 데이터 없음 안내 ─────────────────────────────── */
