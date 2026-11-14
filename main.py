@@ -11732,6 +11732,131 @@ def season_review():
     })
 
 
+# ── 리그 총평 (2026-11-15) ───────────────────────────────────────────────────
+# 시즌 리뷰(팀 단위)의 리그 버전: 순위 · 리그 지표 · 기록 · 개인 TOP. 시즌 진행 중이면 in_progress/remaining 표시,
+# 마지막 경기가 끝나면 자동으로 '최종'. 순위는 K리그 규정(승점→다득점→득실) + K1 파이널 A/B 분리(시즌 리뷰와 동일 규칙).
+@app.route("/api/league-season-summary")
+@cached_response(ttl=1800)
+def league_season_summary():
+    league = (request.args.get("league") or "k1").strip().lower()
+    if league not in ("k1", "k2"):
+        return jsonify({"error": "invalid league"}), 400
+    year = request.args.get("year") or _current_season()
+    if not (year.isdigit() and len(year) == 4):
+        return jsonify({"error": "invalid year"}), 400
+    tid = 410 if league == "k1" else 777
+    SS_INFO = {t["sofascore_id"]: t for t in TEAMS if t.get("sofascore_id")}
+
+    def tname(t):
+        i = SS_INFO.get(t, {})
+        return i.get("short") or i.get("name") or str(t)
+
+    ys, ye = _year_range(year)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        games = conn.execute("""SELECT date_ts, home_team_id, away_team_id, home_score, away_score FROM events
+                                WHERE tournament_id=? AND date_ts >= ? AND date_ts < ?
+                                  AND home_score IS NOT NULL AND away_score IS NOT NULL ORDER BY date_ts""",
+                             (tid, ys, ye)).fetchall()
+        pending = conn.execute("""SELECT COUNT(*) FROM events WHERE tournament_id=? AND date_ts >= ? AND date_ts < ?
+                                  AND home_score IS NULL""", (tid, ys, ye)).fetchone()[0]
+        # 데이터 완결성 — 공식 일정의 종료 경기 수(PO 포함 집계)와 비교. 과거 K1 시즌은 events 누락이 있다(시즌 리뷰와 동일 규칙)
+        try:
+            official_n = conn.execute("SELECT COUNT(*) FROM kleague_schedule WHERE year=? AND league_id=? AND end_yn='Y'",
+                                      (int(year), 1 if tid == 410 else 2)).fetchone()[0]
+        except sqlite3.Error:
+            official_n = None
+        po_n = conn.execute("""SELECT COUNT(*) FROM events WHERE tournament_id=9410 AND date_ts >= ? AND date_ts < ?
+                               AND home_score IS NOT NULL""", (ys, ye)).fetchone()[0]
+    finally:
+        conn.close()
+    if not games:
+        return jsonify({"error": "no games", "year": year}), 404
+    coverage = {"db_games": len(games), "po_games": po_n, "official_games": official_n,
+                "complete": official_n is None or len(games) + po_n >= official_n}
+
+    teams_in = sorted({g[1] for g in games} | {g[2] for g in games})
+    tb = {t: {"pts": 0, "gf": 0, "ga": 0, "w": 0, "d": 0, "l": 0} for t in teams_in}
+    seq = {t: [] for t in teams_in}   # 팀별 결과 순서(W/D/L)
+    n_home = n_draw = n_away = n_goals = n_zero = 0
+    top_goals_game = None
+    for ts, h, a, hs, as_ in games:
+        n_goals += hs + as_
+        if hs > as_: n_home += 1
+        elif hs == as_: n_draw += 1
+        else: n_away += 1
+        if hs == 0 and as_ == 0: n_zero += 1
+        if top_goals_game is None or hs + as_ > top_goals_game[3] + top_goals_game[4]:
+            top_goals_game = (ts, h, a, hs, as_)
+        for t, gf, ga in ((h, hs, as_), (a, as_, hs)):
+            r = tb[t]
+            r["gf"] += gf; r["ga"] += ga
+            res = "W" if gf > ga else "D" if gf == ga else "L"
+            r[res.lower()] += 1
+            r["pts"] += 3 if res == "W" else 1 if res == "D" else 0
+            seq[t].append(res)
+
+    order = sorted(teams_in, key=lambda t: (-tb[t]["pts"], -tb[t]["gf"], -(tb[t]["gf"] - tb[t]["ga"])))
+    split_set = _k1_split_set([(g[1], g[2], g[3], g[4]) for g in games], teams_in) if tid == 410 else None
+    played_max = max(r["w"] + r["d"] + r["l"] for r in tb.values())
+    if split_set and played_max > _K1_SPLIT_GAMES:
+        order = _apply_split(order, split_set)
+
+    def row(i, t):
+        r = tb[t]
+        sl = SS_INFO.get(t, {})
+        return {"rank": i + 1, "team": tname(t), "slug": sl.get("id"), "primary": sl.get("primary"), "emblem": sl.get("emblem"),
+                "played": r["w"] + r["d"] + r["l"], "pts": r["pts"], "w": r["w"], "d": r["d"], "l": r["l"],
+                "gf": r["gf"], "ga": r["ga"], "gd": r["gf"] - r["ga"],
+                "group": ("A" if t in split_set else "B") if split_set and played_max > _K1_SPLIT_GAMES else None}
+
+    standings = [row(i, t) for i, t in enumerate(order)]
+
+    def streak(pred):
+        best = (0, None)
+        for t, s in seq.items():
+            run = 0
+            for x in s:
+                run = run + 1 if pred(x) else 0
+                if run > best[0]:
+                    best = (run, t)
+        return {"n": best[0], "team": tname(best[1])} if best[1] is not None else None
+
+    most_gf = max(teams_in, key=lambda t: (tb[t]["gf"], -tb[t]["ga"]))
+    least_ga = min(teams_in, key=lambda t: (tb[t]["ga"], -tb[t]["gf"]))
+    big = max(games, key=lambda g: (abs(g[3] - g[4]), g[3] + g[4]))
+    gm = lambda g: {"date": datetime.fromtimestamp(g[0]).strftime("%Y-%m-%d"), "home": tname(g[1]), "away": tname(g[2]),
+                    "score": f"{g[3]}-{g[4]}"}
+
+    # 개인 TOP — 공식 골·도움 + 종합 점수 (시즌 리뷰와 같은 캐시 키)
+    ck = f"tp_rows:{year}"
+    rows = _pcache_get(ck)
+    if rows is None:
+        rows, _n = _top_performer_rows(year, "all")
+        _pcache_set(ck, rows)
+    lg_rows = [r for r in rows if r.get("league") == league.upper()]
+    pl = lambda r, key: {"player_id": r["player_id"], "name": r["name"], "team": r.get("team"), "pos": r.get("detail_label") or r.get("pos"),
+                         "mins": r["mins"], "value": r.get(key)}
+    scorers = [pl(r, "goals") for r in sorted(lg_rows, key=lambda r: (-(r.get("goals") or 0), r["mins"] or 0)) if (r.get("goals") or 0) > 0][:5]
+    assisters = [pl(r, "assists") for r in sorted(lg_rows, key=lambda r: (-(r.get("assists") or 0), r["mins"] or 0)) if (r.get("assists") or 0) > 0][:5]
+    best = [pl(r, "score") for r in sorted([r for r in lg_rows if r.get("score") is not None and (r["mins"] or 0) >= 900],
+                                           key=lambda r: -r["score"])[:5]]
+
+    n = len(games)
+    return jsonify({
+        "year": year, "league": league.upper(), "in_progress": pending > 0, "remaining": pending,
+        "games": n, "teams": len(teams_in), "final_stage": bool(split_set and played_max > _K1_SPLIT_GAMES),
+        "coverage": coverage, "standings": standings,
+        "league_stats": {"goals_pg": round(n_goals / n, 2), "home_pct": round(n_home / n * 100, 1),
+                         "draw_pct": round(n_draw / n * 100, 1), "away_pct": round(n_away / n * 100, 1), "zero_zero": n_zero},
+        "records": {"most_gf": {"team": tname(most_gf), "n": tb[most_gf]["gf"]},
+                    "least_ga": {"team": tname(least_ga), "n": tb[least_ga]["ga"]},
+                    "win_streak": streak(lambda x: x == "W"), "unbeaten": streak(lambda x: x != "L"),
+                    "biggest_win": gm(big), "highest_scoring": gm(top_goals_game)},
+        "top_scorers": scorers, "top_assists": assisters, "top_rated": best,
+    })
+
+
 def _median_position(counts):
     total = sum(counts)
     if not total: return None

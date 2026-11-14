@@ -9,6 +9,7 @@ function ttSeason() { return (document.body && document.body.dataset.season) || 
     "use strict";
     const root = () => document.getElementById("ws-team-review");
     let _teams = null, _team = null, _year = null, _req = 0;
+    let _mode = "team", _lg = "k1";   // 'team' = 팀 시즌 리뷰, 'league' = 리그 총평 (/api/league-season-summary)
     const ACC = "#60a5fa";
 
     function teamsReady() {
@@ -24,14 +25,67 @@ function ttSeason() { return (document.body && document.body.dataset.season) || 
             .map(t => `<option value="${ttEsc(t.id)}"${t.id === _team ? " selected" : ""}>${ttEsc(t.short || t.name)}</option>`).join("");
         const s = +ttSeason();
         const years = [s, s - 1, s - 2].map(y => `<option value="${y}"${String(y) === _year ? " selected" : ""}>${y}</option>`).join("");
+        const mode = (k, label) => `<button type="button" class="sr-mode${_mode === k ? " is-on" : ""}" data-sr-mode="${k}" aria-pressed="${_mode === k}">${label}</button>`;
+        const pick = _mode === "league"
+            ? `<label class="rc-ctl"><span>리그</span><select id="sr-lg"><option value="k1"${_lg === "k1" ? " selected" : ""}>K리그1</option><option value="k2"${_lg === "k2" ? " selected" : ""}>K리그2</option></select></label>`
+            : `<label class="rc-ctl"><span>팀</span><select id="sr-team"><optgroup label="K리그1">${opt("K1")}</optgroup><optgroup label="K리그2">${opt("K2")}</optgroup></select></label>`;
         return `<div class="sr-head">
             <h2 class="sr-title">📘 시즌 리뷰</h2>
+            <div class="sr-modes" role="group" aria-label="보기 범위">${mode("team", "팀")}${mode("league", "리그 총평")}</div>
             <div class="sr-ctls">
-                <label class="rc-ctl"><span>팀</span><select id="sr-team"><optgroup label="K리그1">${opt("K1")}</optgroup><optgroup label="K리그2">${opt("K2")}</optgroup></select></label>
+                ${pick}
                 <label class="rc-ctl"><span>시즌</span><select id="sr-year">${years}</select></label>
             </div>
         </div>
         <div id="sr-body"></div>`;
+    }
+
+    // ── 리그 총평 ────────────────────────────────────────────────
+    function playerList(list, unit) {
+        if (!list || !list.length) return `<p class="sr-muted">기록이 없습니다.</p>`;
+        return `<ol class="sr-players">${list.map((x, i) => `<li><span class="sr-rank">${i + 1}</span>
+            <button type="button" class="rc-plink" data-sr-player="${x.player_id}">${ttEsc(x.name)}</button>
+            <span class="sr-muted">${ttEsc(x.team || "")} · ${ttEsc(x.pos || "")}</span>
+            <span class="sr-score">${ttEsc(x.value)}${unit}</span></li>`).join("")}</ol>`;
+    }
+
+    function leagueBodyHtml(d) {
+        const lg = d.league === "K1" ? "K리그1" : "K리그2";
+        const status = d.in_progress ? `<span class="sr-badge">시즌 진행 중 · 잔여 ${d.remaining}경기</span>` : `<span class="sr-badge sr-badge-done">시즌 종료 · 최종</span>`;
+        const cov = d.coverage && !d.coverage.complete
+            ? `<div class="sr-warn" role="note">⚠ 이 시즌은 경기 기록이 일부 빠져 있습니다 (수집 ${d.coverage.db_games} / 공식 ${d.coverage.official_games}경기) — 순위·기록이 실제와 다를 수 있습니다.</div>` : "";
+        const s = d.league_stats, r = d.records;
+        const gm = (g) => g ? `${ttEsc(g.home)} ${ttEsc(g.score)} ${ttEsc(g.away)} <span class="sr-muted">(${ttEsc(g.date)})</span>` : "-";
+        const stk = (x, unit) => x ? `${ttEsc(x.team)} <b>${x.n}${unit}</b>` : "-";
+        const rows = d.standings.map(t => `<tr>
+            <th scope="row" class="sr-num">${t.rank}</th>
+            <td>${t.slug ? `<button type="button" class="rc-plink" data-sr-team="${ttEsc(t.slug)}" title="${ttEsc(t.team)} 시즌 리뷰 보기">${ttEsc(t.team)}</button>` : ttEsc(t.team)}${t.group ? ` <span class="sr-muted">파이널 ${t.group}</span>` : ""}</td>
+            <td class="sr-num">${t.played}</td><td class="sr-num"><b>${t.pts}</b></td><td class="sr-num">${t.w}·${t.d}·${t.l}</td>
+            <td class="sr-num">${t.gf}·${t.ga}</td><td class="sr-num">${t.gd > 0 ? "+" : ""}${t.gd}</td></tr>`).join("");
+        return `${cov}
+        <div class="sr-hero">
+            ${tile("경기", d.games, `${lg} · ${d.teams}팀`)}
+            ${tile("경기당 득점", s.goals_pg, `무득점 경기 ${s.zero_zero}`)}
+            ${tile("홈 승", `${s.home_pct}<span class="sr-unit">%</span>`, `무 ${s.draw_pct}% · 원정 승 ${s.away_pct}%`)}
+            <div class="sr-status">${status}</div>
+        </div>
+        <section class="sr-card"><h3>순위 ${d.final_stage ? `<span class="sr-muted">파이널 A/B 분리 반영</span>` : ""}</h3>
+            <table class="sr-tbl"><thead><tr><th>순위</th><th>팀</th><th>경기</th><th>승점</th><th>승·무·패</th><th>득·실</th><th>득실</th></tr></thead>
+            <tbody>${rows}</tbody></table></section>
+        <div class="sr-grid2">
+            <section class="sr-card"><h3>기록</h3><ul class="sr-list">
+                <li>최다 득점 팀: ${stk(r.most_gf, "골")}</li>
+                <li>최소 실점 팀: ${stk(r.least_ga, "실점")}</li>
+                <li>최다 연승: ${stk(r.win_streak, "연승")}</li>
+                <li>최장 무패: ${stk(r.unbeaten, "경기")}</li>
+                <li>최다 점수차 경기: ${gm(r.biggest_win)}</li>
+                <li>최다 득점 경기: ${gm(r.highest_scoring)}</li></ul></section>
+            <section class="sr-card"><h3>득점 TOP5 <span class="sr-muted">공식 기록</span></h3>${playerList(d.top_scorers, "골")}</section>
+        </div>
+        <div class="sr-grid2">
+            <section class="sr-card"><h3>도움 TOP5</h3>${playerList(d.top_assists, "도움")}</section>
+            <section class="sr-card"><h3>종합 점수 TOP5 <span class="sr-muted">같은 포지션 백분위 · 900분+</span></h3>${playerList(d.top_rated, "")}</section>
+        </div>`;
     }
 
     const num = (v, d = "-") => (v === null || v === undefined) ? d : v;
@@ -158,6 +212,20 @@ function ttSeason() { return (document.body && document.body.dataset.season) || 
         if (!body || !_team) return;
         const id = ++_req;
         body.innerHTML = `<div class="rc-loading" role="status">시즌 기록 정리 중...</div>`;
+        if (_mode === "league") {
+            fetch(`/api/league-season-summary?league=${encodeURIComponent(_lg)}&year=${encodeURIComponent(_year)}`)
+                .then(r => r.json().then(j => ({ ok: r.ok, j })))
+                .then(({ ok, j }) => {
+                    if (id !== _req) return;
+                    body.innerHTML = ok ? leagueBodyHtml(j)
+                        : `<div class="rc-empty">${j.error === "no games" ? "이 시즌에는 이 리그의 경기 기록이 없습니다." : "리그 총평을 만들 수 없습니다."}</div>`;
+                })
+                .catch(err => {
+                    console.error("[리그 총평 실패]", err);
+                    if (id === _req) body.innerHTML = `<div class="rc-error" role="alert">리그 총평을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</div>`;
+                });
+            return;
+        }
         fetch(`/api/season-review?team=${encodeURIComponent(_team)}&year=${encodeURIComponent(_year)}`)
             .then(r => r.json().then(j => ({ ok: r.ok, j })))
             .then(({ ok, j }) => {
@@ -176,11 +244,21 @@ function ttSeason() { return (document.body && document.body.dataset.season) || 
         el._srBound = true;
         el.addEventListener("change", (e) => {
             if (e.target.id === "sr-team") _team = e.target.value;
+            else if (e.target.id === "sr-lg") _lg = e.target.value;
             else if (e.target.id === "sr-year") _year = e.target.value;
             else return;
             load();
         });
         el.addEventListener("click", (e) => {
+            const m = e.target.closest("[data-sr-mode]");
+            const tm = e.target.closest("[data-sr-team]");
+            if (m || tm) {   // 모드 전환(팀↔리그 총평) / 순위표의 팀 클릭 → 그 팀 시즌 리뷰
+                if (m) _mode = m.dataset.srMode;
+                else { _mode = "team"; _team = tm.dataset.srTeam; }
+                el.innerHTML = controlsHtml();
+                load();
+                return;
+            }
             const b = e.target.closest("[data-sr-player]");
             if (!b) return;
             const pid = parseInt(b.dataset.srPlayer, 10);

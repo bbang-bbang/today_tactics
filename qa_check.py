@@ -266,6 +266,20 @@ qa('시즌 리뷰 기록 합 일관 (승무패=경기, 순위 흐름 = 경기 �
     and sum(m['games'] for m in d_sr['monthly']) == d_sr['final']['played']))
 qa('시즌 리뷰 잘못된 입력 404/400', lambda: assert_(
     _brief_status('/api/season-review?team=nope') == 404 and _brief_status('/api/season-review?team=suwon&year=20x6') == 400))
+d_ls = get('/api/league-season-summary?league=k2')
+def _ls_consistent():
+    st = d_ls['standings']
+    me = next(r for r in st if r['slug'] == 'suwon')
+    return (
+        [r['rank'] for r in st] == list(range(1, len(st) + 1))
+        and all(r['w'] + r['d'] + r['l'] == r['played'] for r in st)
+        and sum(r['gf'] for r in st) == sum(r['ga'] for r in st)                  # 리그 전체 득점 = 실점
+        and sum(r['played'] for r in st) == d_ls['games'] * 2
+        and abs(d_ls['league_stats']['home_pct'] + d_ls['league_stats']['draw_pct'] + d_ls['league_stats']['away_pct'] - 100) < 0.5
+        and (me['rank'], me['pts'], me['played']) == (d_sr['final']['rank'], d_sr['final']['pts'], d_sr['final']['played']))  # 시즌 리뷰와 같은 순위
+qa('리그 총평 순위·합계 일관 + 시즌 리뷰(수원)와 동일', lambda: assert_(_ls_consistent()))
+qa('리그 총평 잘못된 입력 400', lambda: assert_(
+    _brief_status('/api/league-season-summary?league=k3') == 400 and _brief_status('/api/league-season-summary?league=k1&year=20x6') == 400))
 d_po = get('/api/promotion-playoff')
 qa('승강 PO 대진 확률 합 = 100 - 미개최', lambda: assert_(
     not d_po.get('ready') or abs(sum(m['prob'] for m in d_po['matchups']) + d_po['no_po_pct'] - 100) <= 1.5,
