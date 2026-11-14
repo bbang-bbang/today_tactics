@@ -293,7 +293,7 @@ prediction.js 라운드 버튼 핸들러에 `clearMatchContext()` 추가, prev !
 - **11/13 선수 탐색 (8492c92)**: '🔎 선수 탐색' 섹션(검색·팀·포지션·최소 출전·90분당·정렬) + '🔥 최근 폼 상승'(`/player-form`) + 모달 '비슷한 선수'(`/similar-players`, 같은 리그·1부 6개). 운영 확인: 6개 리그 폼 카드·홀란 1부 비교(티츠·이삭·라이몬도).
   - 11/13 운영 2·3부 수집(백업 `/home/rocky/bk_lower_matches_20261113/`): Championship 180 · League One 158 · 2.BL 99 · 3.Liga 82/130 · Segunda 140 · Serie B 110 · Ligue 2 108 · Série B 372/373경기. **3.Liga 1~7R(8/9~9/26) 48경기는 API-Football 선수 기록 없음** — 매주 재시도(약 48회), 채워질 가능성 낮음.
   - [x] 운영 크론 07:30에 2·3부 추가(11/13 사용자 실행) — `for c in top championship leagueone bundesliga2 liga3 segunda serieb ligue2 brasileirob; do ... --league $c --part matches --max-calls 450; done`. 이전 crontab `/home/rocky/crontab_bk_20261113_lower.txt`. 첫 실행 11/16(월).
-  - [ ] 운영 브라질 세리에C 시즌 선수 기록 0명(선수 탐색 빈 화면) — `/players` 응답 확인
+  - [x] 운영 브라질 세리에C 선수 탐색 빈 화면 — 2026-11-15 원인 확인: API-Football `/players`가 29명·출전시간 없음만 반환(소스 한계, 세리에B는 869명 정상). **'순위표만 제공' 리그로 전환**(14bf29a, 수집기 `/players`도 중단).
 
 ### [x] 🌍 해외 하위 리그(2·3부) 추가 — 11/12 배포(70ecb00)·운영 수집 완료 (2026-11-11 등록, **범위 B 확정 2026-11-12**)
 - 남은 확인: [ ] 조가 나뉜 3부 순위표(`standings` 여러 조 → `groups[0]`만 저장) — 브라질 세리에C 등 운영 데이터로 확인
