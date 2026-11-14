@@ -61,7 +61,7 @@ LEAGUES = {
     "ligue2":       (62, 2026, 62, True),
     "ligue3":       (63, 2026, 63, False),
     "brasileirob":  (72, 2026, 72, True),
-    "brasileiroc":  (75, 2026, 75, True),
+    "brasileiroc":  (75, 2026, 75, False),   # /players가 29명·출전시간 없음 → 순위표만
 }
 DB_FILES = {code: f"{code}.db" for code in LEAGUES}
 POS = {"Goalkeeper": "G", "Defender": "D", "Midfielder": "M", "Attacker": "F"}

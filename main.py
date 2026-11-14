@@ -306,7 +306,7 @@ for _args in (
     ("ligue2",       "프랑스", "🇫🇷", 2, "Ligue 2", 62),
     ("ligue3",       "프랑스", "🇫🇷", 3, "Ligue 3", 63, True),
     ("brasileirob",  "브라질", "🇧🇷", 2, "Brasileirão Série B", 72, False, True),
-    ("brasileiroc",  "브라질", "🇧🇷", 3, "Brasileirão Série C", 75, False, True),
+    ("brasileiroc",  "브라질", "🇧🇷", 3, "Brasileirão Série C", 75, True, True),   # 선수 기록 29명·출전시간 없음(2026-11-15 확인) → 순위표만
 ):
     _register_lower_league(*_args[:6], standings_only=(len(_args) > 6 and _args[6]),
                            calendar_year=(len(_args) > 7 and _args[7]))
