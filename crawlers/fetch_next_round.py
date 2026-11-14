@@ -34,12 +34,12 @@ async def api_fetch(page, path):
 async def collect_for_league(page, conn, tid, label):
     log(f"\n[{label}] 다음 경기 수집 (T{tid})")
 
-    # 해당 리그에서 최근 활동 팀 (올해 events에서 추출)
+    # 해당 리그에서 최근 활동 팀 (최근 300일 events — 연초(1월)에도 직전 시즌 팀으로 다음 일정 조회)
     team_ids = [r[0] for r in conn.execute("""
         SELECT DISTINCT t FROM (
-            SELECT home_team_id t FROM events WHERE tournament_id=? AND date_ts >= strftime('%s','2026-01-01')
+            SELECT home_team_id t FROM events WHERE tournament_id=? AND date_ts >= strftime('%s','now','-300 days')
             UNION
-            SELECT away_team_id   FROM events WHERE tournament_id=? AND date_ts >= strftime('%s','2026-01-01')
+            SELECT away_team_id   FROM events WHERE tournament_id=? AND date_ts >= strftime('%s','now','-300 days')
         ) WHERE t IS NOT NULL
     """, (tid, tid)).fetchall()]
     log(f"  대상 팀 {len(team_ids)}개")

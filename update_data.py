@@ -35,6 +35,7 @@ import os
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 if sys.platform == "win32":
@@ -180,7 +181,7 @@ def main():
         (15, "K리그 포털 formation 덮어쓰기",
             [PYTHON, str(CRAWLERS/"fill_formation_from_kleague.py")]),
         (16, "K리그 포털 스케줄 + 라인업 (현재 시즌)",
-            [PYTHON, str(CRAWLERS/"crawl_kleague_lineup.py"), "all", "--years", "2026"]),
+            [PYTHON, str(CRAWLERS/"crawl_kleague_lineup.py"), "all", "--years", str(datetime.now().year)]),
         (21, "K리그 공식 API → 득점·카드·교체 복구 (SofaScore incidents 차단 대체, 데이터 없는 경기만)",
             [PYTHON, str(CRAWLERS/"collect_kleague_events.py"), "--apply"]),
         (22, "K리그 공식 API → 패스 네트워크(선수 간 패스 행렬) 수집 (경기 다음 날 공개, 미공개는 다음 실행에서 재시도)",

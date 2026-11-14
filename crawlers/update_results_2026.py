@@ -60,11 +60,12 @@ for team_id, matches in results.items():
 
 new_count = 0
 current_month = datetime.now().month
+YEAR = datetime.now().year   # 2027 개막 후 자동 전환 (파일명은 호환을 위해 _2026 유지)
 LEAGUES = [("1", "K1"), ("2", "K2")]
 
 for league_id, league_name in LEAGUES:
     for month in range(1, current_month + 1):
-        games = fetch_schedule(league_id, 2026, month)
+        games = fetch_schedule(league_id, YEAR, month)
         for g in games:
             if g.get("endYn") != "Y" and g.get("gameStatus") != "FE":
                 continue
@@ -113,7 +114,7 @@ for league_id, league_name in LEAGUES:
                 new_count += 1
 
         time.sleep(0.1)
-    print(f"  2026 {league_name} done")
+    print(f"  {YEAR} {league_name} done")
 
 # 날짜 내림차순 정렬
 for team_id in results:
