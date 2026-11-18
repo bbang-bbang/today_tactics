@@ -7713,8 +7713,23 @@ _OS_WEIGHTS = {
     "D": {"def90": 0.4, "pass_acc": 0.2, "kp90": 0.15, "assists90": 0.1, "goals90": 0.05, "dribble90": 0.1},
     "G": {"save_pct": 0.45, "save90": 0.2, "conceded90": 0.35},
 }
+# 세부 포지션(K리그 8그룹과 동일) — 라인업 grid 로 라벨링(crawlers/collect_apifootball_lineups.py). 가진 지표(API-Football)만으로 역할별 가중.
+_OS_DETAIL_WEIGHTS = {
+    "GK": {"save_pct": 0.45, "save90": 0.2, "conceded90": 0.35},
+    "CB": {"def90": 0.5, "pass_acc": 0.3, "goals90": 0.1, "kp90": 0.1},
+    "FB": {"def90": 0.3, "kp90": 0.25, "assists90": 0.15, "dribble90": 0.15, "pass_acc": 0.15},
+    "DM": {"def90": 0.45, "pass_acc": 0.3, "kp90": 0.15, "dribble90": 0.1},
+    "CM": {"kp90": 0.25, "def90": 0.2, "assists90": 0.15, "pass_acc": 0.15, "goals90": 0.15, "dribble90": 0.1},
+    "AM": {"kp90": 0.3, "assists90": 0.25, "goals90": 0.2, "dribble90": 0.15, "sot90": 0.1},
+    "W":  {"dribble90": 0.25, "kp90": 0.25, "assists90": 0.2, "goals90": 0.2, "sot90": 0.1},
+    "ST": {"goals90": 0.45, "sot90": 0.25, "assists90": 0.1, "kp90": 0.1, "dribble90": 0.1},
+}
+_OS_WEIGHTS.update(_OS_DETAIL_WEIGHTS)
 _OS_LOWER_BETTER = {"conceded90"}
 _OS_MIN_COHORT = 20
+_OS_MIN_COHORT_DETAIL = 12     # 세부 포지션은 표본이 작아 리그 비교군이 이보다 작으면 같은 티어 리그끼리 합쳐 백분위 계산
+_OS_MIN_STARTS = 3             # 세부 포지션 라벨 = 선발 3회 이상 + 최빈 포지션 비중 50% 이상
+_OS_MIN_SHARE = 0.5
 
 
 def _overseas_rows(min_minutes):
@@ -7753,6 +7768,22 @@ def _overseas_rows(min_minutes):
                         ranks[team_id_] = (pos_, n_by_t[tid_])
             except sqlite3.Error:
                 ranks = {}
+            # 세부 포지션 라벨(라인업 grid 기반) — 선수별 최빈 포지션, 라벨 수집 전 리그는 빈 dict
+            detail_by_pid = {}
+            try:
+                tmp = {}
+                for pid_, dp, n_ in conn.execute("SELECT player_id, detail_pos, COUNT(*) FROM match_lineups "
+                                                 "WHERE is_starter=1 AND detail_pos IS NOT NULL GROUP BY player_id, detail_pos"):
+                    g_ = _detail_group_for_label(dp)
+                    if g_:
+                        tmp.setdefault(pid_, {})[g_] = tmp.setdefault(pid_, {}).get(g_, 0) + n_
+                for pid_, cnt_ in tmp.items():
+                    tot_ = sum(cnt_.values())
+                    g_, top_ = max(cnt_.items(), key=lambda kv: kv[1])
+                    if tot_ >= _OS_MIN_STARTS and top_ / tot_ >= _OS_MIN_SHARE:
+                        detail_by_pid[pid_] = (g_, tot_)
+            except sqlite3.Error:
+                detail_by_pid = {}
             lm = (conn.execute("SELECT MAX(minutes_played) FROM player_stats WHERE tournament_id IN (" + ph + ")", tids).fetchone() or [0])[0] or 0
             thr = min(min_minutes, max(450, int(lm * 0.5)))
             q = ("SELECT p.id, p.name, p.position, p.height, p.birth_date, p.nationality, t.name, p.team_id, ps.appearances, ps.minutes_played, ps.rating, "
@@ -7782,6 +7813,8 @@ def _overseas_rows(min_minutes):
                              "league": cfg["label"], "country": cfg.get("country"), "tier": tier, "factor": factor,
                              "pos": pos, "age": age, "height": h, "nationality": nat, "apps": apps or 0, "mins": mins,
                              "rating": rating, "goals": g or 0, "assists": a or 0, "m": m,
+                             "detail": "GK" if pos == "G" else (detail_by_pid.get(pid) or (None, 0))[0],
+                             "starts": (detail_by_pid.get(pid) or (None, 0))[1],
                              "team_rank": (ranks.get(team_id) or (None, None))[0], "team_n": (ranks.get(team_id) or (None, None))[1]})
         except sqlite3.Error:
             pass
@@ -7793,9 +7826,11 @@ def _overseas_rows(min_minutes):
 @app.route("/api/overseas-recruit")
 @cached_response(ttl=1800)
 def overseas_recruit():
-    """해외 후보 영입 추천 — 포지션(G/D/M/F 또는 세부 그룹) 기준 상위 후보. 해외 DB 데이터 있는 리그만 대상."""
-    pos = (request.args.get("pos") or "").upper()
-    pos = _OS_GROUP_POS.get(pos, pos)
+    """해외 후보 영입 추천 — 세부 포지션(GK·CB·FB·DM·CM·AM·W·ST, 라인업 grid 라벨) 또는 대분류(G/D/M/F) 기준 상위 후보.
+    해외 DB 데이터 있는 리그만 대상. 세부 라벨이 아직 없으면 대분류로 폴백."""
+    pos_in = (request.args.get("pos") or "").upper()
+    detail = pos_in if pos_in in DETAIL_POS_GROUPS else None
+    pos = DETAIL_TO_BROAD[detail] if detail else pos_in
     if pos not in ("G", "D", "M", "F"):
         return jsonify({"error": "invalid pos"}), 400
     try:
@@ -7805,23 +7840,42 @@ def overseas_recruit():
         limit = max(1, min(int(request.args.get("limit") or 10), 30))
     except ValueError:
         return jsonify({"error": "invalid filter"}), 400
-    focus = [m for m in (request.args.get("focus") or "").split(",") if m in _OS_WEIGHTS[pos]][:3]
     realistic = request.args.get("realistic", "1") != "0"     # 기본 ON — 상위권 구단 주전 제외
 
-    rows = [r for r in _overseas_rows(min_mins) if r["pos"] == pos]
+    all_rows = _overseas_rows(min_mins)
+    fallback = False
+    if detail and not any(r["detail"] for r in all_rows if r["pos"] != "G"):
+        detail, fallback = None, True      # 라인업 라벨 수집 전 — 대분류로 폴백
+    unlabeled = 0
+    if detail:
+        rows = [r for r in all_rows if r["detail"] == detail]
+        unlabeled = sum(1 for r in all_rows if r["pos"] == pos and r["detail"] is None)
+    else:
+        rows = [r for r in all_rows if r["pos"] == pos]
+    weights = _OS_WEIGHTS[detail or pos]
+    focus = [m for m in (request.args.get("focus") or "").split(",") if m in weights][:3]
     by_lg = {}
     for r in rows:
         by_lg.setdefault(r["league_code"], []).append(r)
+    cohorts = {}
+    min_c = _OS_MIN_COHORT
+    if detail:
+        # 세부 포지션은 리그 안 표본이 작다 → 비교군이 작은 리그는 같은 티어 리그끼리 합쳐 백분위 계산
+        min_c = _OS_MIN_COHORT_DETAIL
+        for lg, pool in by_lg.items():
+            key = lg if len(pool) >= min_c else f"_tier{pool[0]['tier']}"
+            cohorts.setdefault(key, []).extend(pool)
+    else:
+        cohorts = by_lg
     import bisect
-    weights = _OS_WEIGHTS[pos]
-    for lg, pool in by_lg.items():
+    for lg, pool in cohorts.items():
         dist = {k: sorted(o["m"][k] for o in pool if o["m"].get(k) is not None) for k in weights}
         for r in pool:
             num = den = 0.0
             r["pcts"] = {}
             for k, w in weights.items():
                 v, arr = r["m"].get(k), dist[k]
-                if v is None or len(arr) < _OS_MIN_COHORT:
+                if v is None or len(arr) < min_c:
                     continue
                 p = (bisect.bisect_left(arr, v) + bisect.bisect_right(arr, v)) / 2 / len(arr) * 100
                 if k in _OS_LOWER_BETTER:
@@ -7848,13 +7902,15 @@ def overseas_recruit():
         r["adj"] = base * r["factor"]
     cands.sort(key=lambda r: -r["adj"])
     return jsonify({
-        "pos": pos, "pool_size": len(cands), "leagues": sorted({r["league_code"] for r in rows}),
+        "pos": detail or pos, "detail": detail, "detail_label": DETAIL_POS_LABELS.get(detail) if detail else None,
+        "pool_size": len(cands), "leagues": sorted({r["league_code"] for r in rows}), "unlabeled": unlabeled,
         "metric_labels": {k: _OS_METRICS[k] for k in weights},
         "filters": {"min_minutes": min_mins, "max_age": max_age, "tier": tier, "focus": focus, "realistic": realistic},
         "excluded_top_clubs": excluded_top,
         "candidates": [{
             "id": r["id"], "name": r["name"], "team": r["team"], "league": r["league"], "league_code": r["league_code"],
             "country": r["country"], "tier": r["tier"], "age": r["age"], "height": r["height"], "nationality": r["nationality"],
+            "detail": r.get("detail"), "starts": r.get("starts"),
             "apps": r["apps"], "mins": r["mins"], "goals": r["goals"], "assists": r["assists"],
             "team_rank": r.get("team_rank"), "team_n": r.get("team_n"),
             "raw": round(r["raw"], 1), "adj": round(r["adj"], 1), "factor": r["factor"],
@@ -7862,10 +7918,16 @@ def overseas_recruit():
             "stats": {k: (round(v, 2) if v is not None else None) for k, v in r["m"].items() if k in weights},
         } for r in cands[:limit]],
         "notes": [
-            "점수(raw) = 같은 리그·같은 포지션(G/D/M/F) 선수 중 90분 환산 지표 백분위의 가중 합 — 리그 내 위치",
+            (f"포지션 = {DETAIL_POS_LABELS[detail]} — 경기 라인업(포메이션+grid)으로 라벨링한 선발 포지션(선발 {_OS_MIN_STARTS}회 이상·최빈 포지션 {int(_OS_MIN_SHARE * 100)}% 이상). "
+             f"라벨 없는 같은 대분류 선수 {unlabeled}명은 제외"
+             if detail else
+             ("세부 포지션 라벨이 아직 없어 대분류(G/D/M/F)로 조회 — 센터백·풀백, 윙어·스트라이커가 섞임" if fallback
+              else "대분류(G/D/M/F) 기준 조회 — 센터백·풀백 등 세부 포지션이 섞임")),
+            ("점수(raw) = 같은 리그·같은 세부 포지션 선수 중 90분 환산 지표 백분위의 가중 합(비교군 12명 미만 리그는 같은 티어 리그끼리 합산)"
+             if detail else "점수(raw) = 같은 리그·같은 포지션(G/D/M/F) 선수 중 90분 환산 지표 백분위의 가중 합 — 리그 내 위치"),
             "보정(adj) = raw × 리그 수준 계수(1부 1.0 · 2부 0.85 · 3부 0.75, 브라질은 한 단계 낮게) — 추정치이며 K리그 이적 실적으로 검증되지 않음. 참고용",
-            "API-Football 시즌 누적 기록 기반 — xG·몸값·경기별 데이터·세부 포지션 없음. 평점은 SofaScore와 산출 방식이 달라 점수에서 제외",
-            f"출전 {min_mins}분 이상(시즌 초반 리그는 그 리그 최다 출전의 50%로 하향) · 리그·포지션별 비교군 {_OS_MIN_COHORT}명 미만이면 해당 지표 제외",
+            "API-Football 시즌 누적 기록 기반 — xG·몸값·걷어내기·제공권·크로스 없음. 평점은 SofaScore와 산출 방식이 달라 점수에서 제외",
+            f"출전 {min_mins}분 이상(시즌 초반 리그는 그 리그 최다 출전의 50%로 하향) · 비교군 {min_c}명 미만이면 해당 지표 제외",
             ("현실적 후보만: 1·2부에서 소속 팀이 리그 순위 상위 1/3(5경기 이상 치른 리그)인 선수 " + str(excluded_top) + "명 제외 — 상위 구단 주전은 K리그 영입이 어렵다고 보는 근사(몸값·계약 정보 없음). 3부·순위 미수집 리그는 제외 없음")
             if realistic else "전체 보기: 상위 구단 선수도 포함 — 실제 영입 가능성과 무관하게 기록만으로 정렬",
         ],

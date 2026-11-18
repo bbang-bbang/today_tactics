@@ -121,12 +121,13 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     // ── 해외 후보 (/api/overseas-recruit) — 약한 지표(K리그 키)를 해외 API 지표 키로 매핑 ──
     const OS_FOCUS = { goals90: "goals90", atk90: "assists90", create: "kp90", def: "def90", pass_acc: "pass_acc", duel: "dribble90" };
     const OS_TIER = { 1: "1부", 2: "2부", 3: "3부" };
+    const OS_DETAIL = { GK: "골키퍼", CB: "센터백", FB: "풀백·윙백", DM: "수비형 MF", CM: "중앙 MF", AM: "공격형 MF", W: "윙어", ST: "스트라이커" };
     function osHtml(d) {
         if (!d.candidates.length) return `<p class="rc-empty">해외 후보가 없습니다 — 데이터가 수집된 리그가 없거나 필터가 너무 좁습니다.</p>`;
         const keys = Object.keys(d.metric_labels);
         const rows = d.candidates.map((c, i) => `<tr>
             <td class="rc-rank">${i + 1}</td>
-            <td><span class="rc-name">${ttEsc(c.name)}</span><span class="rc-sub">${ttEsc(c.nationality || "")}${c.height ? " · " + c.height + "cm" : ""}</span></td>
+            <td><span class="rc-name">${ttEsc(c.name)}</span><span class="rc-sub">${ttEsc(c.nationality || "")}${c.height ? " · " + c.height + "cm" : ""}${c.detail && OS_DETAIL[c.detail] ? ` · ${OS_DETAIL[c.detail]}${c.starts ? ` (선발 ${c.starts})` : ""}` : ""}</span></td>
             <td>${ttEsc(c.team || "")} <span class="rc-lg" title="${ttEsc(c.league)}">${ttEsc(c.country || "")} ${OS_TIER[c.tier] || ""}</span>
                 <span class="rc-sub">${ttEsc(c.league)}${c.team_rank ? ` · 팀 ${c.team_rank}/${c.team_n}위` : ""}</span></td>
             <td class="rc-num">${c.age ?? "-"}</td>
@@ -140,7 +141,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             ${keys.map(k => `<th scope="col" title="같은 리그·같은 포지션 중 백분위">${ttEsc(d.metric_labels[k])}</th>`).join("")}
             <th scope="col" title="리그 내 종합 백분위(0~100)">종합</th><th scope="col" title="종합 × 리그 수준 추정 계수 — 참고용">보정</th></tr></thead>
             <tbody>${rows}</tbody></table>
-            <p class="rc-pool rc-muted">후보 ${d.pool_size}명 중 상위 ${d.candidates.length}명${d.filters.realistic ? ` · 상위 구단 소속 ${d.excluded_top_clubs}명 제외` : " · 상위 구단 포함"} · 보정 점수는 추정 계수 적용(검증 전, 참고용)</p>
+            <p class="rc-pool rc-muted">후보 ${d.pool_size}명 중 상위 ${d.candidates.length}명${d.detail_label ? ` · ${ttEsc(d.detail_label)}${d.unlabeled ? ` (라인업 라벨 없는 ${d.unlabeled}명 제외)` : ""}` : ""}${d.filters.realistic ? ` · 상위 구단 소속 ${d.excluded_top_clubs}명 제외` : " · 상위 구단 포함"} · 보정 점수는 추정 계수 적용(검증 전, 참고용)</p>
             <details class="rc-notes"><summary>해외 후보 기준</summary><ul>${d.notes.map(x => `<li>${ttEsc(x)}</li>`).join("")}</ul></details>`;
     }
     function loadOverseas(btn) {

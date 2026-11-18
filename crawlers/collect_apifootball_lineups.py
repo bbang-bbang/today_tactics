@@ -104,7 +104,7 @@ def collect(cli, code, apply):
             n_fx += 1
             n_rows += len(rows)
             if not apply:
-                print(f"  (dry-run 표본 {fid}: {side.get('formation')} → "
+                print(f"  (dry-run 표본 {fid}: {resp[0].get('formation')} → "
                       f"{[(r[6], r[9]) for r in rows[:11]]} · 저장 안 함)")
                 return
             with conn:
