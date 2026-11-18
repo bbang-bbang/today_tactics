@@ -76,6 +76,22 @@
       "dob": "2005/10/14"
     },
     {
+      "number": 22,
+      "name": "윤재운",
+      "position": "DF",
+      "height": 178,
+      "weight": 73,
+      "dob": "2002/04/01"
+    },
+    {
+      "number": 44,
+      "name": "이용혁",
+      "position": "DF",
+      "height": 188,
+      "weight": 85,
+      "dob": "1996/08/03"
+    },
+    {
       "number": 15,
       "name": "이인재",
       "position": "DF",
@@ -85,7 +101,7 @@
     },
     {
       "number": 5,
-      "name": "이찬형1",
+      "name": "이찬형",
       "position": "DF",
       "height": 188,
       "weight": 78,
@@ -196,14 +212,6 @@
       "dob": "1998/03/18"
     },
     {
-      "number": 99,
-      "name": "김결",
-      "position": "FW",
-      "height": 188,
-      "weight": 75,
-      "dob": "2005/01/14"
-    },
-    {
       "number": 20,
       "name": "김민석",
       "position": "FW",
@@ -212,20 +220,20 @@
       "dob": "2002/09/05"
     },
     {
+      "number": 18,
+      "name": "김준서",
+      "position": "FW",
+      "height": 182,
+      "weight": 73,
+      "dob": "2008/01/26"
+    },
+    {
       "number": 40,
       "name": "남현우",
       "position": "FW",
       "height": 180,
       "weight": 73,
       "dob": "2003/05/05"
-    },
-    {
-      "number": 24,
-      "name": "루이스",
-      "position": "FW",
-      "height": 180,
-      "weight": 78,
-      "dob": "1993/08/10"
     },
     {
       "number": 33,
@@ -244,22 +252,22 @@
       "dob": "1994/12/10"
     },
     {
-      "number": 22,
-      "name": "윤재운",
-      "position": "FW",
-      "height": 178,
-      "weight": 73,
-      "dob": "2002/04/01"
-    },
-    {
       "number": 70,
       "name": "최성범",
       "position": "FW",
       "height": 173,
       "weight": 68,
       "dob": "2001/12/24"
+    },
+    {
+      "number": 96,
+      "name": "파울리뇨",
+      "position": "FW",
+      "height": 167,
+      "weight": 69,
+      "dob": "1996/06/24"
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

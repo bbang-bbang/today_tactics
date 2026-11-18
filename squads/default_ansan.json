@@ -76,14 +76,6 @@
       "dob": "1999/12/27"
     },
     {
-      "number": 88,
-      "name": "이규빈",
-      "position": "DF",
-      "height": 172,
-      "weight": 67,
-      "dob": "2000/05/30"
-    },
-    {
       "number": 55,
       "name": "이효준",
       "position": "DF",
@@ -124,6 +116,14 @@
       "dob": "2001/10/22"
     },
     {
+      "number": 13,
+      "name": "김건오",
+      "position": "MF",
+      "height": 167,
+      "weight": 68,
+      "dob": "2001/08/13"
+    },
+    {
       "number": 66,
       "name": "김백민",
       "position": "MF",
@@ -138,6 +138,14 @@
       "height": 178,
       "weight": 69,
       "dob": "2004/02/20"
+    },
+    {
+      "number": 28,
+      "name": "김정현",
+      "position": "MF",
+      "height": 180,
+      "weight": 70,
+      "dob": "2004/06/29"
     },
     {
       "number": 87,
@@ -188,12 +196,12 @@
       "dob": "1990/05/29"
     },
     {
-      "number": 13,
-      "name": "김건오",
+      "number": 92,
+      "name": "김인성",
       "position": "FW",
-      "height": 167,
-      "weight": 68,
-      "dob": "2001/08/13"
+      "height": 180,
+      "weight": 77,
+      "dob": "1989/09/09"
     },
     {
       "number": 17,
@@ -226,14 +234,6 @@
       "height": 175,
       "weight": 75,
       "dob": "2002/08/07"
-    },
-    {
-      "number": 18,
-      "name": "박준혁",
-      "position": "FW",
-      "height": 183,
-      "weight": 74,
-      "dob": "2005/10/26"
     },
     {
       "number": 16,
@@ -277,5 +277,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

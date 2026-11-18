@@ -108,6 +108,22 @@
       "dob": "1993/11/04"
     },
     {
+      "number": 26,
+      "name": "이정택",
+      "position": "DF",
+      "height": 183,
+      "weight": 75,
+      "dob": "1998/05/23"
+    },
+    {
+      "number": 42,
+      "name": "임유석",
+      "position": "DF",
+      "height": 190,
+      "weight": 83,
+      "dob": "2001/01/15"
+    },
+    {
       "number": 5,
       "name": "임종은",
       "position": "DF",
@@ -172,6 +188,14 @@
       "dob": "1995/05/04"
     },
     {
+      "number": 41,
+      "name": "박병찬",
+      "position": "MF",
+      "height": 181,
+      "weight": 70,
+      "dob": "2008/10/21"
+    },
+    {
       "number": 8,
       "name": "밥신",
       "position": "MF",
@@ -204,12 +228,36 @@
       "dob": "1996/03/21"
     },
     {
+      "number": 37,
+      "name": "구훈민",
+      "position": "FW",
+      "height": 173,
+      "weight": 64,
+      "dob": "2009/04/24"
+    },
+    {
+      "number": 28,
+      "name": "김지호",
+      "position": "FW",
+      "height": 187,
+      "weight": 73,
+      "dob": "2009/04/18"
+    },
+    {
       "number": 9,
       "name": "디오고",
       "position": "FW",
       "height": 193,
       "weight": 97,
       "dob": "1996/12/04"
+    },
+    {
+      "number": 29,
+      "name": "문건호",
+      "position": "FW",
+      "height": 183,
+      "weight": 73,
+      "dob": "2004/06/16"
     },
     {
       "number": 19,
@@ -253,5 +301,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

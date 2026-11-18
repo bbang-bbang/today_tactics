@@ -44,6 +44,14 @@
       "dob": "2006/04/11"
     },
     {
+      "number": 23,
+      "name": "김민우",
+      "position": "DF",
+      "height": 185,
+      "weight": 78,
+      "dob": "2002/03/16"
+    },
+    {
       "number": 3,
       "name": "모경빈",
       "position": "DF",
@@ -100,14 +108,6 @@
       "dob": "2003/07/14"
     },
     {
-      "number": 2,
-      "name": "장석환",
-      "position": "DF",
-      "height": 180,
-      "weight": 70,
-      "dob": "2004/10/11"
-    },
-    {
       "number": 32,
       "name": "정동윤",
       "position": "DF",
@@ -132,6 +132,22 @@
       "dob": "1998/10/09"
     },
     {
+      "number": 66,
+      "name": "한현서",
+      "position": "DF",
+      "height": 186,
+      "weight": 75,
+      "dob": "2004/01/02"
+    },
+    {
+      "number": 44,
+      "name": "홍상원",
+      "position": "DF",
+      "height": 181,
+      "weight": 80,
+      "dob": "2007/06/09"
+    },
+    {
       "number": 20,
       "name": "홍정호",
       "position": "DF",
@@ -154,14 +170,6 @@
       "height": 173,
       "weight": 70,
       "dob": "1994/04/24"
-    },
-    {
-      "number": 23,
-      "name": "김민우",
-      "position": "MF",
-      "height": 185,
-      "weight": 78,
-      "dob": "2002/03/16"
     },
     {
       "number": 19,
@@ -228,12 +236,28 @@
       "dob": "2003/03/26"
     },
     {
+      "number": 90,
+      "name": "김결",
+      "position": "FW",
+      "height": 188,
+      "weight": 81,
+      "dob": "2005/01/14"
+    },
+    {
       "number": 99,
       "name": "김도연",
       "position": "FW",
       "height": 183,
       "weight": 76,
       "dob": "2005/02/22"
+    },
+    {
+      "number": 37,
+      "name": "김주찬",
+      "position": "FW",
+      "height": 177,
+      "weight": 72,
+      "dob": "2004/03/29"
     },
     {
       "number": 77,
@@ -244,12 +268,36 @@
       "dob": "1996/07/22"
     },
     {
-      "number": 91,
-      "name": "박지원",
+      "number": 71,
+      "name": "김지호",
       "position": "FW",
-      "height": 166,
-      "weight": 63,
-      "dob": "2000/11/01"
+      "height": 174,
+      "weight": 66,
+      "dob": "2003/01/28"
+    },
+    {
+      "number": 98,
+      "name": "두비츠카스",
+      "position": "FW",
+      "height": 188,
+      "weight": 83,
+      "dob": "1998/07/09"
+    },
+    {
+      "number": 70,
+      "name": "루이스",
+      "position": "FW",
+      "height": 180,
+      "weight": 78,
+      "dob": "1993/08/10"
+    },
+    {
+      "number": 8,
+      "name": "르본",
+      "position": "FW",
+      "height": 173,
+      "weight": 70,
+      "dob": "1997/07/04"
     },
     {
       "number": 58,
@@ -268,22 +316,6 @@
       "dob": "2004/06/29"
     },
     {
-      "number": 9,
-      "name": "일류첸코",
-      "position": "FW",
-      "height": 187,
-      "weight": 82,
-      "dob": "1990/08/13"
-    },
-    {
-      "number": 96,
-      "name": "파울리뇨",
-      "position": "FW",
-      "height": 167,
-      "weight": 69,
-      "dob": "1996/06/24"
-    },
-    {
       "number": 7,
       "name": "페신",
       "position": "FW",
@@ -293,5 +325,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

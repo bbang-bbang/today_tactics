@@ -4,12 +4,28 @@
   "name": "2026 시즌 (충북청주)",
   "players": [
     {
+      "number": 31,
+      "name": "공태윤",
+      "position": "GK",
+      "height": 182,
+      "weight": 70,
+      "dob": "2008/01/07"
+    },
+    {
       "number": 1,
       "name": "노동건",
       "position": "GK",
       "height": 190,
       "weight": 88,
       "dob": "1991/10/04"
+    },
+    {
+      "number": 32,
+      "name": "이승환",
+      "position": "GK",
+      "height": 187,
+      "weight": 78,
+      "dob": "2003/04/05"
     },
     {
       "number": 23,
@@ -36,20 +52,20 @@
       "dob": "1998/04/01"
     },
     {
-      "number": 33,
-      "name": "김윤환",
-      "position": "DF",
-      "height": 188,
-      "weight": 80,
-      "dob": "2006/07/14"
-    },
-    {
       "number": 8,
       "name": "박건우",
       "position": "DF",
       "height": 171,
       "weight": 70,
       "dob": "2001/08/09"
+    },
+    {
+      "number": 40,
+      "name": "박진영",
+      "position": "DF",
+      "height": 188,
+      "weight": 85,
+      "dob": "2002/05/13"
     },
     {
       "number": 25,
@@ -84,14 +100,6 @@
       "dob": "1995/11/16"
     },
     {
-      "number": 39,
-      "name": "임준영",
-      "position": "DF",
-      "height": 177,
-      "weight": 63,
-      "dob": "2005/11/14"
-    },
-    {
       "number": 4,
       "name": "조윤성",
       "position": "DF",
@@ -124,14 +132,6 @@
       "dob": "2005/03/31"
     },
     {
-      "number": 10,
-      "name": "웰치",
-      "position": "MF",
-      "height": 171,
-      "weight": 65,
-      "dob": "2004/10/03"
-    },
-    {
       "number": 17,
       "name": "이동원",
       "position": "MF",
@@ -146,6 +146,14 @@
       "height": 188,
       "weight": 79,
       "dob": "2004/09/24"
+    },
+    {
+      "number": 80,
+      "name": "제랄데스",
+      "position": "MF",
+      "height": 175,
+      "weight": 68,
+      "dob": "1995/04/18"
     },
     {
       "number": 47,
@@ -170,6 +178,22 @@
       "height": 180,
       "weight": 73,
       "dob": "1998/04/28"
+    },
+    {
+      "number": 10,
+      "name": "김두현",
+      "position": "FW",
+      "height": 184,
+      "weight": 75,
+      "dob": "2007/03/02"
+    },
+    {
+      "number": 7,
+      "name": "백성동",
+      "position": "FW",
+      "height": 171,
+      "weight": 66,
+      "dob": "1991/08/13"
     },
     {
       "number": 14,
@@ -212,14 +236,6 @@
       "dob": "2000/12/17"
     },
     {
-      "number": 7,
-      "name": "이라클리",
-      "position": "FW",
-      "height": 175,
-      "weight": 83,
-      "dob": "1998/01/03"
-    },
-    {
       "number": 37,
       "name": "이윤환",
       "position": "FW",
@@ -234,16 +250,8 @@
       "height": 179,
       "weight": 70,
       "dob": "2001/05/08"
-    },
-    {
-      "number": 77,
-      "name": "홍석준",
-      "position": "FW",
-      "height": 173,
-      "weight": 67,
-      "dob": "2004/06/02"
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

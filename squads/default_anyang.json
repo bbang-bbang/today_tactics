@@ -29,19 +29,11 @@
     },
     {
       "number": 1,
-      "name": "김태훈",
+      "name": "정민재",
       "position": "GK",
-      "height": 190,
-      "weight": 77,
-      "dob": "1997/04/24"
-    },
-    {
-      "number": 41,
-      "name": "황병근",
-      "position": "GK",
-      "height": 193,
-      "weight": 93,
-      "dob": "1994/06/14"
+      "height": 188,
+      "weight": 85,
+      "dob": "2007/10/14"
     },
     {
       "number": 21,
@@ -58,14 +50,6 @@
       "height": 177,
       "weight": 74,
       "dob": "1992/12/28"
-    },
-    {
-      "number": 37,
-      "name": "김민호",
-      "position": "DF",
-      "height": 174,
-      "weight": 68,
-      "dob": "2003/01/09"
     },
     {
       "number": 5,
@@ -92,6 +76,22 @@
       "dob": "2004/10/14"
     },
     {
+      "number": 33,
+      "name": "대니 바커",
+      "position": "DF",
+      "height": 184,
+      "weight": 75,
+      "dob": "1995/01/16"
+    },
+    {
+      "number": 66,
+      "name": "박종현",
+      "position": "DF",
+      "height": 185,
+      "weight": 83,
+      "dob": "2000/11/24"
+    },
+    {
       "number": 4,
       "name": "이창용",
       "position": "DF",
@@ -108,36 +108,12 @@
       "dob": "1992/06/16"
     },
     {
-      "number": 89,
-      "name": "정준연",
-      "position": "DF",
-      "height": 178,
-      "weight": 70,
-      "dob": "1989/04/30"
-    },
-    {
       "number": 99,
       "name": "주현우",
       "position": "DF",
       "height": 173,
       "weight": 67,
       "dob": "1990/09/12"
-    },
-    {
-      "number": 55,
-      "name": "토마스",
-      "position": "DF",
-      "height": 185,
-      "weight": 80,
-      "dob": "1996/03/20"
-    },
-    {
-      "number": 20,
-      "name": "홍재석",
-      "position": "DF",
-      "height": 188,
-      "weight": 80,
-      "dob": "2003/07/03"
     },
     {
       "number": 6,
@@ -204,12 +180,12 @@
       "dob": "2004/11/09"
     },
     {
-      "number": 16,
-      "name": "최규현",
+      "number": 18,
+      "name": "크네제비치",
       "position": "MF",
-      "height": 177,
-      "weight": 72,
-      "dob": "2000/09/19"
+      "height": 184,
+      "weight": 75,
+      "dob": "2002/07/21"
     },
     {
       "number": 13,
@@ -244,6 +220,14 @@
       "dob": "2004/08/21"
     },
     {
+      "number": 28,
+      "name": "블레이즈",
+      "position": "FW",
+      "height": 183,
+      "weight": 91,
+      "dob": "2000/05/07"
+    },
+    {
       "number": 11,
       "name": "아일톤",
       "position": "FW",
@@ -266,6 +250,14 @@
       "height": 183,
       "weight": 76,
       "dob": "2007/04/17"
+    },
+    {
+      "number": 20,
+      "name": "유정완",
+      "position": "FW",
+      "height": 177,
+      "weight": 75,
+      "dob": "1996/04/05"
     },
     {
       "number": 10,
@@ -293,5 +285,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

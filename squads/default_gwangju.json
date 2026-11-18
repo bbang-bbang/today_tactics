@@ -20,12 +20,12 @@
       "dob": "2003/05/07"
     },
     {
-      "number": 21,
-      "name": "노희동",
+      "number": 71,
+      "name": "이윤성",
       "position": "GK",
-      "height": 194,
-      "weight": 85,
-      "dob": "2002/06/03"
+      "height": 186,
+      "weight": 87,
+      "dob": "2005/05/23"
     },
     {
       "number": 26,
@@ -36,14 +36,6 @@
       "dob": "2007/03/05"
     },
     {
-      "number": 15,
-      "name": "곽성훈",
-      "position": "DF",
-      "height": 190,
-      "weight": 82,
-      "dob": "2006/06/18"
-    },
-    {
       "number": 24,
       "name": "김용혁",
       "position": "DF",
@@ -52,20 +44,36 @@
       "dob": "2007/01/11"
     },
     {
-      "number": 27,
-      "name": "김진호",
-      "position": "DF",
-      "height": 178,
-      "weight": 74,
-      "dob": "2000/01/21"
-    },
-    {
       "number": 39,
       "name": "민상기",
       "position": "DF",
       "height": 184,
       "weight": 77,
       "dob": "1991/08/27"
+    },
+    {
+      "number": 33,
+      "name": "박원재",
+      "position": "DF",
+      "height": 176,
+      "weight": 66,
+      "dob": "1994/05/07"
+    },
+    {
+      "number": 4,
+      "name": "반 흐룬스벤",
+      "position": "DF",
+      "height": 194,
+      "weight": 78,
+      "dob": "1999/10/30"
+    },
+    {
+      "number": 66,
+      "name": "배진우",
+      "position": "DF",
+      "height": 185,
+      "weight": 74,
+      "dob": "2002/01/23"
     },
     {
       "number": 6,
@@ -84,6 +92,30 @@
       "dob": "1993/05/19"
     },
     {
+      "number": 20,
+      "name": "임승겸",
+      "position": "DF",
+      "height": 185,
+      "weight": 78,
+      "dob": "1995/04/26"
+    },
+    {
+      "number": 2,
+      "name": "장석환",
+      "position": "DF",
+      "height": 180,
+      "weight": 70,
+      "dob": "2004/10/11"
+    },
+    {
+      "number": 17,
+      "name": "주앙 페드로",
+      "position": "DF",
+      "height": 186,
+      "weight": 75,
+      "dob": "2003/03/14"
+    },
+    {
       "number": 42,
       "name": "강희수",
       "position": "MF",
@@ -92,12 +124,52 @@
       "dob": "2003/02/25"
     },
     {
+      "number": 70,
+      "name": "김우진",
+      "position": "MF",
+      "height": 170,
+      "weight": 58,
+      "dob": "2005/05/06"
+    },
+    {
+      "number": 21,
+      "name": "김종석",
+      "position": "MF",
+      "height": 180,
+      "weight": 75,
+      "dob": "1995/01/11"
+    },
+    {
+      "number": 37,
+      "name": "리영직",
+      "position": "MF",
+      "height": 189,
+      "weight": 75,
+      "dob": "1991/02/08"
+    },
+    {
       "number": 88,
       "name": "문민서",
       "position": "MF",
       "height": 182,
       "weight": 74,
       "dob": "2004/02/18"
+    },
+    {
+      "number": 28,
+      "name": "박성현",
+      "position": "MF",
+      "height": 173,
+      "weight": 65,
+      "dob": "2009/07/14"
+    },
+    {
+      "number": 77,
+      "name": "오하종",
+      "position": "MF",
+      "height": 172,
+      "weight": 64,
+      "dob": "2003/06/08"
     },
     {
       "number": 14,
@@ -156,12 +228,20 @@
       "dob": "2007/05/13"
     },
     {
-      "number": 13,
-      "name": "박정인",
+      "number": 50,
+      "name": "바 루아",
       "position": "FW",
-      "height": 178,
-      "weight": 70,
-      "dob": "2000/10/07"
+      "height": 170,
+      "weight": 75,
+      "dob": "1996/07/25"
+    },
+    {
+      "number": 7,
+      "name": "사이토스키",
+      "position": "FW",
+      "height": 176,
+      "weight": 63,
+      "dob": "2003/05/08"
     },
     {
       "number": 40,
@@ -170,6 +250,14 @@
       "height": 170,
       "weight": 70,
       "dob": "1992/09/17"
+    },
+    {
+      "number": 18,
+      "name": "아이데일",
+      "position": "FW",
+      "height": 188,
+      "weight": 86,
+      "dob": "1999/08/01"
     },
     {
       "number": 19,
@@ -205,5 +293,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

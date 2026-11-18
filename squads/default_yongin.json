@@ -20,6 +20,14 @@
       "dob": "1992/08/26"
     },
     {
+      "number": 31,
+      "name": "노희동",
+      "position": "GK",
+      "height": 194,
+      "weight": 85,
+      "dob": "2002/06/03"
+    },
+    {
       "number": 21,
       "name": "황성민",
       "position": "GK",
@@ -28,20 +36,20 @@
       "dob": "1991/06/23"
     },
     {
+      "number": 2,
+      "name": "강신명",
+      "position": "DF",
+      "height": 183,
+      "weight": 83,
+      "dob": "1997/02/12"
+    },
+    {
       "number": 4,
       "name": "곽윤호",
       "position": "DF",
       "height": 185,
       "weight": 83,
       "dob": "1995/09/30"
-    },
-    {
-      "number": 7,
-      "name": "김민우",
-      "position": "DF",
-      "height": 174,
-      "weight": 66,
-      "dob": "1990/02/25"
     },
     {
       "number": 22,
@@ -100,28 +108,12 @@
       "dob": "2005/01/01"
     },
     {
-      "number": 13,
-      "name": "차승현",
-      "position": "DF",
-      "height": 173,
-      "weight": 69,
-      "dob": "2000/02/26"
-    },
-    {
       "number": 90,
       "name": "김동민",
       "position": "MF",
       "height": 171,
       "weight": 70,
       "dob": "2005/02/22"
-    },
-    {
-      "number": 14,
-      "name": "김종석",
-      "position": "MF",
-      "height": 180,
-      "weight": 75,
-      "dob": "1995/01/11"
     },
     {
       "number": 24,
@@ -156,14 +148,6 @@
       "dob": "2004/01/24"
     },
     {
-      "number": 88,
-      "name": "이승준",
-      "position": "MF",
-      "height": 170,
-      "weight": 61,
-      "dob": "2004/08/11"
-    },
-    {
       "number": 44,
       "name": "이진섭",
       "position": "MF",
@@ -178,6 +162,14 @@
       "height": 178,
       "weight": 65,
       "dob": "2003/06/29"
+    },
+    {
+      "number": 17,
+      "name": "진태호",
+      "position": "MF",
+      "height": 168,
+      "weight": 58,
+      "dob": "2006/01/20"
     },
     {
       "number": 8,
@@ -204,12 +196,12 @@
       "dob": "1998/01/10"
     },
     {
-      "number": 29,
-      "name": "로페즈",
+      "number": 7,
+      "name": "비티뉴",
       "position": "FW",
       "height": 177,
       "weight": 70,
-      "dob": "1997/10/28"
+      "dob": "1998/09/08"
     },
     {
       "number": 9,
@@ -226,14 +218,6 @@
       "height": 181,
       "weight": 74,
       "dob": "1995/05/25"
-    },
-    {
-      "number": 17,
-      "name": "이선유",
-      "position": "FW",
-      "height": 175,
-      "weight": 70,
-      "dob": "2001/03/05"
     },
     {
       "number": 10,
@@ -253,5 +237,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

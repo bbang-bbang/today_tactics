@@ -134,6 +134,19 @@
       "slotIdx": null
     },
     {
+      "id": "3fcedda0",
+      "number": 2,
+      "name": "아하도프",
+      "position": "DF",
+      "height": 189,
+      "weight": 71,
+      "dob": "2004/12/31",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "1ddc73b0",
       "number": 11,
       "name": "안현범",
@@ -186,6 +199,19 @@
       "slotIdx": null
     },
     {
+      "id": "3a6cdf4a",
+      "number": 3,
+      "name": "조동재",
+      "position": "DF",
+      "height": 180,
+      "weight": 74,
+      "dob": "2003/05/16",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "c96e9a26",
       "number": 44,
       "name": "최동렬",
@@ -193,32 +219,6 @@
       "height": 184,
       "weight": 74,
       "dob": "2004/11/21",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
-      "id": "e9538ca2",
-      "number": 22,
-      "name": "최예훈",
-      "position": "DF",
-      "height": 180,
-      "weight": 73,
-      "dob": "2003/08/19",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
-      "id": "de475d15",
-      "number": 19,
-      "name": "홍욱현",
-      "position": "DF",
-      "height": 188,
-      "weight": 74,
-      "dob": "2004/01/06",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -316,6 +316,19 @@
       "slotIdx": null
     },
     {
+      "id": "34ee8ad6",
+      "number": 80,
+      "name": "구템베르그",
+      "position": "FW",
+      "height": 168,
+      "weight": 62,
+      "dob": "2000/08/28",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "632521ae",
       "number": 9,
       "name": "김찬",
@@ -382,5 +395,5 @@
     }
   ],
   "createdAt": "2026-03-30T09:59:46.528974",
-  "updatedAt": "2026-03-30T10:23:55.285793"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

@@ -36,20 +36,20 @@
       "dob": "2004/05/22"
     },
     {
+      "number": 31,
+      "name": "안광문",
+      "position": "GK",
+      "height": 193,
+      "weight": 90,
+      "dob": "2004/05/13"
+    },
+    {
       "number": 22,
       "name": "김대환",
       "position": "DF",
       "height": 175,
       "weight": 75,
       "dob": "2004/10/19"
-    },
-    {
-      "number": 33,
-      "name": "김성진",
-      "position": "DF",
-      "height": 175,
-      "weight": 73,
-      "dob": "2004/02/28"
     },
     {
       "number": 27,
@@ -124,12 +124,12 @@
       "dob": "2002/05/10"
     },
     {
-      "number": 3,
-      "name": "조동재",
+      "number": 24,
+      "name": "최예훈",
       "position": "DF",
       "height": 180,
-      "weight": 74,
-      "dob": "2003/05/16"
+      "weight": 73,
+      "dob": "2003/08/19"
     },
     {
       "number": 44,
@@ -138,14 +138,6 @@
       "height": 192,
       "weight": 84,
       "dob": "2005/01/28"
-    },
-    {
-      "number": 25,
-      "name": "김신리",
-      "position": "MF",
-      "height": 174,
-      "weight": 68,
-      "dob": "2002/06/26"
     },
     {
       "number": 6,
@@ -178,6 +170,14 @@
       "height": 177,
       "weight": 68,
       "dob": "2003/12/09"
+    },
+    {
+      "number": 97,
+      "name": "이래준",
+      "position": "MF",
+      "height": 193,
+      "weight": 84,
+      "dob": "1997/03/19"
     },
     {
       "number": 92,
@@ -228,28 +228,12 @@
       "dob": "1989/06/26"
     },
     {
-      "number": 30,
-      "name": "문건호",
-      "position": "FW",
-      "height": 183,
-      "weight": 73,
-      "dob": "2004/06/16"
-    },
-    {
-      "number": 70,
-      "name": "오창환",
+      "number": 29,
+      "name": "손승범",
       "position": "FW",
       "height": 180,
-      "weight": 75,
-      "dob": "2007/11/01"
-    },
-    {
-      "number": 19,
-      "name": "우제욱",
-      "position": "FW",
-      "height": 185,
-      "weight": 80,
-      "dob": "1994/05/04"
+      "weight": 65,
+      "dob": "2004/05/04"
     },
     {
       "number": 77,
@@ -258,6 +242,14 @@
       "height": 182,
       "weight": 71,
       "dob": "2003/01/08"
+    },
+    {
+      "number": 90,
+      "name": "일류첸코",
+      "position": "FW",
+      "height": 187,
+      "weight": 82,
+      "dob": "1990/08/13"
     },
     {
       "number": 7,
@@ -293,5 +285,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

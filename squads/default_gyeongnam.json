@@ -4,6 +4,14 @@
   "name": "2026 시즌 (경남)",
   "players": [
     {
+      "number": 31,
+      "name": "김태훈",
+      "position": "GK",
+      "height": 190,
+      "weight": 77,
+      "dob": "1997/04/24"
+    },
+    {
       "number": 1,
       "name": "신준서",
       "position": "GK",
@@ -100,6 +108,14 @@
       "dob": "2004/02/10"
     },
     {
+      "number": 4,
+      "name": "이찬욱",
+      "position": "DF",
+      "height": 186,
+      "weight": 79,
+      "dob": "2003/02/03"
+    },
+    {
       "number": 55,
       "name": "장승우",
       "position": "DF",
@@ -130,14 +146,6 @@
       "height": 187,
       "weight": 78,
       "dob": "2005/03/24"
-    },
-    {
-      "number": 4,
-      "name": "최성진",
-      "position": "DF",
-      "height": 192,
-      "weight": 85,
-      "dob": "2002/06/24"
     },
     {
       "number": 5,
@@ -196,6 +204,14 @@
       "dob": "1993/01/10"
     },
     {
+      "number": 71,
+      "name": "이헌재",
+      "position": "MF",
+      "height": 178,
+      "weight": 73,
+      "dob": "2006/03/23"
+    },
+    {
       "number": 6,
       "name": "임은수",
       "position": "MF",
@@ -220,44 +236,20 @@
       "dob": "1997/06/26"
     },
     {
+      "number": 9,
+      "name": "김수민",
+      "position": "FW",
+      "height": 186,
+      "weight": 83,
+      "dob": "2006/06/15"
+    },
+    {
       "number": 90,
       "name": "김현오",
       "position": "FW",
       "height": 183,
       "weight": 76,
       "dob": "2007/09/12"
-    },
-    {
-      "number": 9,
-      "name": "단레이",
-      "position": "FW",
-      "height": 185,
-      "weight": 80,
-      "dob": "1995/11/21"
-    },
-    {
-      "number": 98,
-      "name": "마르쿠스",
-      "position": "FW",
-      "height": 183,
-      "weight": 95,
-      "dob": "2000/03/15"
-    },
-    {
-      "number": 11,
-      "name": "마세도",
-      "position": "FW",
-      "height": 171,
-      "weight": 69,
-      "dob": "1996/03/09"
-    },
-    {
-      "number": 7,
-      "name": "원기종",
-      "position": "FW",
-      "height": 178,
-      "weight": 75,
-      "dob": "1996/01/06"
     },
     {
       "number": 24,
@@ -274,14 +266,6 @@
       "height": 188,
       "weight": 84,
       "dob": "1999/11/03"
-    },
-    {
-      "number": 19,
-      "name": "정충근",
-      "position": "FW",
-      "height": 184,
-      "weight": 73,
-      "dob": "1995/03/01"
     },
     {
       "number": 66,
@@ -317,5 +301,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

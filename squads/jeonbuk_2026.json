@@ -147,6 +147,19 @@
       "slotIdx": null
     },
     {
+      "id": "9a3a1cc8",
+      "number": 62,
+      "name": "김태영",
+      "position": "DF",
+      "height": 176,
+      "weight": 63,
+      "dob": "2008/10/17",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "13c707a5",
       "number": 77,
       "name": "김태현",
@@ -277,6 +290,19 @@
       "slotIdx": null
     },
     {
+      "id": "46b67456",
+      "number": 37,
+      "name": "한재빈",
+      "position": "DF",
+      "height": 189,
+      "weight": 80,
+      "dob": "2006/11/04",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "7cf69488",
       "number": 27,
       "name": "황승준",
@@ -316,13 +342,13 @@
       "slotIdx": null
     },
     {
-      "id": "fd687969",
-      "number": 30,
-      "name": "김영환",
+      "id": "68f028ce",
+      "number": 61,
+      "name": "구교빈",
       "position": "MF",
-      "height": 180,
-      "weight": 74,
-      "dob": "2002/03/23",
+      "height": 174,
+      "weight": 63,
+      "dob": "2008/10/06",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -381,19 +407,6 @@
       "slotIdx": null
     },
     {
-      "id": "67a4872a",
-      "number": 8,
-      "name": "오베르단",
-      "position": "MF",
-      "height": 175,
-      "weight": 69,
-      "dob": "1995/07/30",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "cb642164",
       "number": 42,
       "name": "우현수",
@@ -433,6 +446,19 @@
       "slotIdx": null
     },
     {
+      "id": "5936540c",
+      "number": 17,
+      "name": "이수빈",
+      "position": "MF",
+      "height": 180,
+      "weight": 70,
+      "dob": "2000/05/07",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "ad20cf6d",
       "number": 28,
       "name": "이영재",
@@ -459,26 +485,26 @@
       "slotIdx": null
     },
     {
-      "id": "f3586a18",
-      "number": 17,
-      "name": "진태호",
+      "id": "067a9431",
+      "number": 63,
+      "name": "한승민",
       "position": "MF",
-      "height": 168,
-      "weight": 58,
-      "dob": "2006/01/20",
+      "height": 179,
+      "weight": 73,
+      "dob": "2009/11/09",
       "onField": false,
       "x": 0,
       "y": 0,
       "slotIdx": null
     },
     {
-      "id": "66ace0fe",
-      "number": 92,
-      "name": "김두현",
+      "id": "535e1e1b",
+      "number": 81,
+      "name": "기티스",
       "position": "FW",
-      "height": 184,
-      "weight": 75,
-      "dob": "2007/03/02",
+      "height": 193,
+      "weight": 94,
+      "dob": "1999/09/27",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -498,19 +524,6 @@
       "slotIdx": null
     },
     {
-      "id": "4065ea23",
-      "number": 73,
-      "name": "김예건",
-      "position": "FW",
-      "height": 167,
-      "weight": 58,
-      "dob": "2008/08/07",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "b982f51c",
       "number": 79,
       "name": "김창훈",
@@ -518,6 +531,19 @@
       "height": 170,
       "weight": 69,
       "dob": "2004/10/23",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "b6bb89cc",
+      "number": 30,
+      "name": "도도",
+      "position": "FW",
+      "height": 170,
+      "weight": 69,
+      "dob": "2001/06/15",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -602,6 +628,19 @@
       "slotIdx": null
     },
     {
+      "id": "b7ccf26e",
+      "number": 95,
+      "name": "이탈로",
+      "position": "FW",
+      "height": 181,
+      "weight": 75,
+      "dob": "2002/10/13",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "3cffb9b1",
       "number": 98,
       "name": "임준휘",
@@ -609,6 +648,19 @@
       "height": 176,
       "weight": 75,
       "dob": "2005/02/14",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "b1f7a356",
+      "number": 14,
+      "name": "전병관",
+      "position": "FW",
+      "height": 178,
+      "weight": 63,
+      "dob": "2002/11/10",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -681,5 +733,5 @@
     }
   ],
   "createdAt": "2026-03-30T09:59:46.528974",
-  "updatedAt": "2026-03-30T10:23:55.285793"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

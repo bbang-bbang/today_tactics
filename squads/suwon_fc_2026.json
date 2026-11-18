@@ -134,6 +134,19 @@
       "slotIdx": null
     },
     {
+      "id": "3bf5219d",
+      "number": 17,
+      "name": "민준영",
+      "position": "DF",
+      "height": 170,
+      "weight": 66,
+      "dob": "1996/07/27",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "a4abf691",
       "number": 88,
       "name": "박재훈",
@@ -141,6 +154,19 @@
       "height": 170,
       "weight": 63,
       "dob": "2007/08/24",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "4b10671e",
+      "number": 59,
+      "name": "박철우",
+      "position": "DF",
+      "height": 176,
+      "weight": 68,
+      "dob": "1997/10/21",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -329,13 +355,13 @@
       "slotIdx": null
     },
     {
-      "id": "7afeb050",
-      "number": 34,
-      "name": "장윤호",
+      "id": "34d92fee",
+      "number": 18,
+      "name": "코키",
       "position": "MF",
-      "height": 178,
-      "weight": 68,
-      "dob": "1996/08/25",
+      "height": 184,
+      "weight": 78,
+      "dob": "1994/07/16",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -420,13 +446,13 @@
       "slotIdx": null
     },
     {
-      "id": "aab9044f",
-      "number": 44,
-      "name": "윌리안",
+      "id": "9b9d517a",
+      "number": 89,
+      "name": "이광혁",
       "position": "FW",
-      "height": 170,
-      "weight": 69,
-      "dob": "1994/02/17",
+      "height": 169,
+      "weight": 60,
+      "dob": "1995/09/11",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -483,21 +509,8 @@
       "x": 0,
       "y": 0,
       "slotIdx": null
-    },
-    {
-      "id": "b82a0a08",
-      "number": 17,
-      "name": "훌",
-      "position": "FW",
-      "height": 191,
-      "weight": 80,
-      "dob": "1995/12/04",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
     }
   ],
   "createdAt": "2026-03-30T09:59:46.528974",
-  "updatedAt": "2026-03-30T10:23:55.285793"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

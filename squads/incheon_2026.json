@@ -30,19 +30,6 @@
       "slotIdx": null
     },
     {
-      "id": "5a923f4e",
-      "number": 31,
-      "name": "이상현",
-      "position": "GK",
-      "height": 188,
-      "weight": 82,
-      "dob": "2006/07/19",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "af9a4075",
       "number": 21,
       "name": "이태희",
@@ -50,19 +37,6 @@
       "height": 189,
       "weight": 84,
       "dob": "1995/04/26",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
-      "id": "8c3d23cf",
-      "number": 34,
-      "name": "강영훈",
-      "position": "DF",
-      "height": 187,
-      "weight": 83,
-      "dob": "1998/09/28",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -102,6 +76,19 @@
       "height": 177,
       "weight": 76,
       "dob": "2000/07/17",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "b359c4b3",
+      "number": 28,
+      "name": "김연수",
+      "position": "DF",
+      "height": 185,
+      "weight": 78,
+      "dob": "1993/12/29",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -173,19 +160,6 @@
       "slotIdx": null
     },
     {
-      "id": "4d929eb2",
-      "number": 25,
-      "name": "정태욱",
-      "position": "DF",
-      "height": 194,
-      "weight": 92,
-      "dob": "1997/05/16",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "5fd307ae",
       "number": 13,
       "name": "최승구",
@@ -212,13 +186,26 @@
       "slotIdx": null
     },
     {
-      "id": "4ff58a97",
-      "number": 17,
-      "name": "김성민",
+      "id": "55e029bb",
+      "number": 30,
+      "name": "김영환",
       "position": "MF",
-      "height": 171,
-      "weight": 69,
-      "dob": "2000/07/03",
+      "height": 180,
+      "weight": 74,
+      "dob": "2002/03/23",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "10ee3945",
+      "number": 70,
+      "name": "레안드로",
+      "position": "MF",
+      "height": 179,
+      "weight": 75,
+      "dob": "1995/01/13",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -264,19 +251,6 @@
       "slotIdx": null
     },
     {
-      "id": "93dfb242",
-      "number": 7,
-      "name": "오후성",
-      "position": "MF",
-      "height": 173,
-      "weight": 64,
-      "dob": "1999/08/25",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "9ddae82b",
       "number": 5,
       "name": "이명주",
@@ -284,6 +258,19 @@
       "height": 176,
       "weight": 74,
       "dob": "1990/04/24",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "edac352c",
+      "number": 26,
+      "name": "이민혁",
+      "position": "MF",
+      "height": 178,
+      "weight": 70,
+      "dob": "2002/01/19",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -355,6 +342,19 @@
       "slotIdx": null
     },
     {
+      "id": "4ff58a97",
+      "number": 17,
+      "name": "김성민",
+      "position": "FW",
+      "height": 171,
+      "weight": 69,
+      "dob": "2000/07/03",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "9a31b702",
       "number": 9,
       "name": "무고사",
@@ -381,19 +381,6 @@
       "slotIdx": null
     },
     {
-      "id": "d4b8886f",
-      "number": 19,
-      "name": "박호민",
-      "position": "FW",
-      "height": 191,
-      "weight": 86,
-      "dob": "2001/10/09",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "5acc0a0b",
       "number": 14,
       "name": "백민규",
@@ -401,6 +388,19 @@
       "height": 184,
       "weight": 75,
       "dob": "2005/11/20",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "93dfb242",
+      "number": 7,
+      "name": "오후성",
+      "position": "FW",
+      "height": 173,
+      "weight": 64,
+      "dob": "1999/08/25",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -434,5 +434,5 @@
     }
   ],
   "createdAt": "2026-03-30T09:59:46.528974",
-  "updatedAt": "2026-03-30T10:23:55.285793"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

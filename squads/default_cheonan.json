@@ -4,6 +4,14 @@
   "name": "2026 시즌 (천안)",
   "players": [
     {
+      "number": 31,
+      "name": "김동하",
+      "position": "GK",
+      "height": 186,
+      "weight": 58,
+      "dob": "2008/01/11"
+    },
+    {
       "number": 21,
       "name": "박대한",
       "position": "GK",
@@ -26,14 +34,6 @@
       "height": 193,
       "weight": 85,
       "dob": "1992/07/27"
-    },
-    {
-      "number": 31,
-      "name": "허자웅",
-      "position": "GK",
-      "height": 185,
-      "weight": 70,
-      "dob": "1998/05/12"
     },
     {
       "number": 29,
@@ -84,6 +84,14 @@
       "dob": "2006/11/10"
     },
     {
+      "number": 55,
+      "name": "오성민",
+      "position": "DF",
+      "height": 187,
+      "weight": 78,
+      "dob": "2006/09/29"
+    },
+    {
       "number": 3,
       "name": "이광준",
       "position": "DF",
@@ -108,14 +116,6 @@
       "dob": "1994/03/19"
     },
     {
-      "number": 26,
-      "name": "이현왕",
-      "position": "DF",
-      "height": 186,
-      "weight": 81,
-      "dob": "2001/06/09"
-    },
-    {
       "number": 13,
       "name": "장현도",
       "position": "DF",
@@ -130,6 +130,14 @@
       "height": 177,
       "weight": 70,
       "dob": "2003/08/16"
+    },
+    {
+      "number": 72,
+      "name": "차승현",
+      "position": "DF",
+      "height": 173,
+      "weight": 69,
+      "dob": "2000/02/26"
     },
     {
       "number": 6,
@@ -228,6 +236,14 @@
       "dob": "2007/05/12"
     },
     {
+      "number": 94,
+      "name": "윌리안",
+      "position": "FW",
+      "height": 170,
+      "weight": 69,
+      "dob": "1994/02/17"
+    },
+    {
       "number": 77,
       "name": "이규민",
       "position": "FW",
@@ -269,5 +285,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

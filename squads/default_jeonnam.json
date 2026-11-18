@@ -28,14 +28,6 @@
       "dob": "1992/04/06"
     },
     {
-      "number": 6,
-      "name": "강신명",
-      "position": "DF",
-      "height": 183,
-      "weight": 83,
-      "dob": "1997/02/12"
-    },
-    {
       "number": 4,
       "name": "구현준",
       "position": "DF",
@@ -68,6 +60,14 @@
       "dob": "2000/04/05"
     },
     {
+      "number": 97,
+      "name": "김주헌",
+      "position": "DF",
+      "height": 184,
+      "weight": 77,
+      "dob": "1997/04/09"
+    },
+    {
       "number": 44,
       "name": "노동건",
       "position": "DF",
@@ -82,14 +82,6 @@
       "height": 181,
       "weight": 71,
       "dob": "2003/11/18"
-    },
-    {
-      "number": 12,
-      "name": "민준영",
-      "position": "DF",
-      "height": 170,
-      "weight": 66,
-      "dob": "1996/07/27"
     },
     {
       "number": 2,
@@ -114,14 +106,6 @@
       "height": 173,
       "weight": 68,
       "dob": "2004/03/11"
-    },
-    {
-      "number": 91,
-      "name": "코리누스",
-      "position": "DF",
-      "height": 188,
-      "weight": 81,
-      "dob": "1997/03/16"
     },
     {
       "number": 22,
@@ -164,6 +148,14 @@
       "dob": "1999/10/17"
     },
     {
+      "number": 34,
+      "name": "장윤호",
+      "position": "MF",
+      "height": 178,
+      "weight": 68,
+      "dob": "1996/08/25"
+    },
+    {
       "number": 20,
       "name": "정태인",
       "position": "MF",
@@ -178,14 +170,6 @@
       "height": 187,
       "weight": 81,
       "dob": "1997/03/16"
-    },
-    {
-      "number": 77,
-      "name": "홍원진",
-      "position": "MF",
-      "height": 183,
-      "weight": 85,
-      "dob": "2000/04/04"
     },
     {
       "number": 96,
@@ -212,12 +196,12 @@
       "dob": "2000/04/08"
     },
     {
-      "number": 50,
-      "name": "르본",
+      "number": 79,
+      "name": "미란징야",
       "position": "FW",
-      "height": 173,
-      "weight": 70,
-      "dob": "1997/07/04"
+      "height": 178,
+      "weight": 72,
+      "dob": "1999/12/19"
     },
     {
       "number": 10,
@@ -242,6 +226,14 @@
       "height": 174,
       "weight": 69,
       "dob": "2004/06/28"
+    },
+    {
+      "number": 27,
+      "name": "이라클리",
+      "position": "FW",
+      "height": 175,
+      "weight": 83,
+      "dob": "1998/01/03"
     },
     {
       "number": 99,
@@ -285,5 +277,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

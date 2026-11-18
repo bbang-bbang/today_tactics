@@ -121,6 +121,32 @@
       "slotIdx": null
     },
     {
+      "id": "4b1e3295",
+      "number": 22,
+      "name": "윤재운",
+      "position": "DF",
+      "height": 178,
+      "weight": 73,
+      "dob": "2002/04/01",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "047cd46a",
+      "number": 44,
+      "name": "이용혁",
+      "position": "DF",
+      "height": 188,
+      "weight": 85,
+      "dob": "1996/08/03",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "1e9c2895",
       "number": 15,
       "name": "이인재",
@@ -134,9 +160,9 @@
       "slotIdx": null
     },
     {
-      "id": "878533cf",
+      "id": "dc5262a3",
       "number": 5,
-      "name": "이찬형1",
+      "name": "이찬형",
       "position": "DF",
       "height": 188,
       "weight": 78,
@@ -316,19 +342,6 @@
       "slotIdx": null
     },
     {
-      "id": "e1a30de7",
-      "number": 99,
-      "name": "김결",
-      "position": "FW",
-      "height": 188,
-      "weight": 75,
-      "dob": "2005/01/14",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "fdab029f",
       "number": 20,
       "name": "김민석",
@@ -342,6 +355,19 @@
       "slotIdx": null
     },
     {
+      "id": "1400749e",
+      "number": 18,
+      "name": "김준서",
+      "position": "FW",
+      "height": 182,
+      "weight": 73,
+      "dob": "2008/01/26",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "3318f52b",
       "number": 40,
       "name": "남현우",
@@ -349,19 +375,6 @@
       "height": 180,
       "weight": 73,
       "dob": "2003/05/05",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
-      "id": "7ac2efce",
-      "number": 24,
-      "name": "루이스",
-      "position": "FW",
-      "height": 180,
-      "weight": 78,
-      "dob": "1993/08/10",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -394,19 +407,6 @@
       "slotIdx": null
     },
     {
-      "id": "4b1e3295",
-      "number": 22,
-      "name": "윤재운",
-      "position": "FW",
-      "height": 178,
-      "weight": 73,
-      "dob": "2002/04/01",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "26e8e098",
       "number": 70,
       "name": "최성범",
@@ -418,8 +418,21 @@
       "x": 0,
       "y": 0,
       "slotIdx": null
+    },
+    {
+      "id": "bda3fe36",
+      "number": 96,
+      "name": "파울리뇨",
+      "position": "FW",
+      "height": 167,
+      "weight": 69,
+      "dob": "1996/06/24",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
     }
   ],
   "createdAt": "2026-03-30T09:59:46.528974",
-  "updatedAt": "2026-03-30T10:23:55.285793"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

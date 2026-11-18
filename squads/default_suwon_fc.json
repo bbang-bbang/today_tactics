@@ -84,12 +84,28 @@
       "dob": "1996/02/03"
     },
     {
+      "number": 17,
+      "name": "민준영",
+      "position": "DF",
+      "height": 170,
+      "weight": 66,
+      "dob": "1996/07/27"
+    },
+    {
       "number": 88,
       "name": "박재훈",
       "position": "DF",
       "height": 170,
       "weight": 63,
       "dob": "2007/08/24"
+    },
+    {
+      "number": 59,
+      "name": "박철우",
+      "position": "DF",
+      "height": 176,
+      "weight": 68,
+      "dob": "1997/10/21"
     },
     {
       "number": 38,
@@ -204,12 +220,12 @@
       "dob": "1997/02/21"
     },
     {
-      "number": 34,
-      "name": "장윤호",
+      "number": 18,
+      "name": "코키",
       "position": "MF",
-      "height": 178,
-      "weight": 68,
-      "dob": "1996/08/25"
+      "height": 184,
+      "weight": 78,
+      "dob": "1994/07/16"
     },
     {
       "number": 10,
@@ -260,12 +276,12 @@
       "dob": "2004/02/14"
     },
     {
-      "number": 44,
-      "name": "윌리안",
+      "number": 89,
+      "name": "이광혁",
       "position": "FW",
-      "height": 170,
-      "weight": 69,
-      "dob": "1994/02/17"
+      "height": 169,
+      "weight": 60,
+      "dob": "1995/09/11"
     },
     {
       "number": 70,
@@ -298,16 +314,8 @@
       "height": 191,
       "weight": 87,
       "dob": "2005/11/08"
-    },
-    {
-      "number": 17,
-      "name": "훌",
-      "position": "FW",
-      "height": 191,
-      "weight": 80,
-      "dob": "1995/12/04"
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

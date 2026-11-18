@@ -30,6 +30,19 @@
       "slotIdx": null
     },
     {
+      "id": "088bcb31",
+      "number": 25,
+      "name": "양승민",
+      "position": "GK",
+      "height": 193,
+      "weight": 82,
+      "dob": "2008/04/02",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "e818fc7e",
       "number": 18,
       "name": "엄예훈",
@@ -121,19 +134,6 @@
       "slotIdx": null
     },
     {
-      "id": "62af3350",
-      "number": 4,
-      "name": "박진영",
-      "position": "DF",
-      "height": 188,
-      "weight": 85,
-      "dob": "2002/05/13",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "0885769d",
       "number": 23,
       "name": "배서준",
@@ -141,19 +141,6 @@
       "height": 173,
       "weight": 63,
       "dob": "2003/12/11",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
-      "id": "66fd1d98",
-      "number": 77,
-      "name": "배진우",
-      "position": "DF",
-      "height": 185,
-      "weight": 74,
-      "dob": "2002/01/23",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -206,6 +193,19 @@
       "height": 178,
       "weight": 73,
       "dob": "2002/07/25",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "c28c9fc6",
+      "number": 38,
+      "name": "카이오",
+      "position": "DF",
+      "height": 192,
+      "weight": 89,
+      "dob": "1998/03/14",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -394,32 +394,6 @@
       "slotIdx": null
     },
     {
-      "id": "d42cebe2",
-      "number": 11,
-      "name": "변경준",
-      "position": "FW",
-      "height": 181,
-      "weight": 70,
-      "dob": "2002/04/08",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
-      "id": "9b4eaaa0",
-      "number": 9,
-      "name": "아이데일",
-      "position": "FW",
-      "height": 188,
-      "weight": 86,
-      "dob": "1999/08/01",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "e095e1db",
       "number": 70,
       "name": "안주완",
@@ -457,8 +431,21 @@
       "x": 0,
       "y": 0,
       "slotIdx": null
+    },
+    {
+      "id": "b6af5c00",
+      "number": 77,
+      "name": "홍석준",
+      "position": "FW",
+      "height": 173,
+      "weight": 67,
+      "dob": "2004/06/02",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
     }
   ],
   "createdAt": "2026-03-30T09:59:46.528974",
-  "updatedAt": "2026-03-30T10:23:55.285793"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

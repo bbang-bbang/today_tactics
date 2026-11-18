@@ -60,6 +60,22 @@
       "dob": "1998/09/11"
     },
     {
+      "number": 33,
+      "name": "박재현",
+      "position": "DF",
+      "height": 177,
+      "weight": 69,
+      "dob": "2003/09/16"
+    },
+    {
+      "number": 23,
+      "name": "성호영",
+      "position": "DF",
+      "height": 175,
+      "weight": 73,
+      "dob": "1999/01/08"
+    },
+    {
       "number": 5,
       "name": "여재율",
       "position": "DF",
@@ -103,17 +119,25 @@
       "number": 6,
       "name": "최준영",
       "position": "DF",
-      "height": 182,
-      "weight": 76,
+      "height": 184,
+      "weight": 79,
       "dob": "2005/07/16"
     },
     {
-      "number": 15,
-      "name": "김경수",
+      "number": 29,
+      "name": "홍욱현",
+      "position": "DF",
+      "height": 188,
+      "weight": 74,
+      "dob": "2004/01/06"
+    },
+    {
+      "number": 34,
+      "name": "곽성욱",
       "position": "MF",
-      "height": 181,
-      "weight": 78,
-      "dob": "2000/12/05"
+      "height": 168,
+      "weight": 65,
+      "dob": "1993/07/12"
     },
     {
       "number": 24,
@@ -140,36 +164,20 @@
       "dob": "2003/11/19"
     },
     {
+      "number": 41,
+      "name": "박요한",
+      "position": "MF",
+      "height": 182,
+      "weight": 78,
+      "dob": "1994/12/17"
+    },
+    {
       "number": 28,
       "name": "박형빈",
       "position": "MF",
       "height": 178,
       "weight": 73,
       "dob": "2003/11/18"
-    },
-    {
-      "number": 10,
-      "name": "브루노 코스타",
-      "position": "MF",
-      "height": 172,
-      "weight": 72,
-      "dob": "1997/04/19"
-    },
-    {
-      "number": 23,
-      "name": "성호영",
-      "position": "MF",
-      "height": 175,
-      "weight": 73,
-      "dob": "1999/01/08"
-    },
-    {
-      "number": 18,
-      "name": "이민영",
-      "position": "MF",
-      "height": 172,
-      "weight": 67,
-      "dob": "2005/09/16"
     },
     {
       "number": 27,
@@ -180,12 +188,12 @@
       "dob": "2003/08/04"
     },
     {
-      "number": 13,
-      "name": "조영광",
+      "number": 16,
+      "name": "최원철",
       "position": "MF",
-      "height": 176,
-      "weight": 66,
-      "dob": "2003/03/28"
+      "height": 178,
+      "weight": 72,
+      "dob": "1995/05/26"
     },
     {
       "number": 14,
@@ -228,6 +236,14 @@
       "dob": "2000/03/10"
     },
     {
+      "number": 94,
+      "name": "우제욱",
+      "position": "FW",
+      "height": 185,
+      "weight": 80,
+      "dob": "1994/05/04"
+    },
+    {
       "number": 11,
       "name": "이강욱",
       "position": "FW",
@@ -236,22 +252,30 @@
       "dob": "1994/03/19"
     },
     {
-      "number": 97,
-      "name": "이래준",
-      "position": "FW",
-      "height": 193,
-      "weight": 84,
-      "dob": "1997/03/19"
-    },
-    {
       "number": 7,
       "name": "이승재",
       "position": "FW",
       "height": 181,
       "weight": 74,
       "dob": "1998/02/06"
+    },
+    {
+      "number": 13,
+      "name": "조영광",
+      "position": "FW",
+      "height": 176,
+      "weight": 66,
+      "dob": "2003/03/28"
+    },
+    {
+      "number": 96,
+      "name": "후벵 마세도",
+      "position": "FW",
+      "height": 171,
+      "weight": 69,
+      "dob": "1996/03/09"
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

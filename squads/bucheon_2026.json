@@ -4,19 +4,6 @@
   "name": "부천 2026",
   "players": [
     {
-      "id": "96a4617f",
-      "number": 50,
-      "name": "김찬영",
-      "position": "GK",
-      "height": 190,
-      "weight": 100,
-      "dob": "2007/01/09",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "5c1a0b82",
       "number": 21,
       "name": "김현엽",
@@ -37,6 +24,19 @@
       "height": 188,
       "weight": 78,
       "dob": "1994/01/06",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "8f999fb2",
+      "number": 31,
+      "name": "이상현",
+      "position": "GK",
+      "height": 188,
+      "weight": 82,
+      "dob": "2006/07/19",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -121,19 +121,6 @@
       "slotIdx": null
     },
     {
-      "id": "69df6570",
-      "number": 5,
-      "name": "이상혁",
-      "position": "DF",
-      "height": 185,
-      "weight": 76,
-      "dob": "2001/01/06",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "503fcdc9",
       "number": 44,
       "name": "이예찬",
@@ -154,6 +141,32 @@
       "height": 183,
       "weight": 75,
       "dob": "2002/05/05",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "343739cd",
+      "number": 6,
+      "name": "정호진",
+      "position": "DF",
+      "height": 182,
+      "weight": 72,
+      "dob": "1999/08/06",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "327f5c2f",
+      "number": 83,
+      "name": "조성준",
+      "position": "DF",
+      "height": 176,
+      "weight": 72,
+      "dob": "1990/11/27",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -251,6 +264,19 @@
       "slotIdx": null
     },
     {
+      "id": "e4b3d083",
+      "number": 4,
+      "name": "성예건",
+      "position": "MF",
+      "height": 183,
+      "weight": 74,
+      "dob": "2005/10/30",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "51511fa5",
       "number": 25,
       "name": "여봉훈",
@@ -271,32 +297,6 @@
       "height": 178,
       "weight": 75,
       "dob": "1990/05/07",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
-      "id": "343739cd",
-      "number": 6,
-      "name": "정호진",
-      "position": "MF",
-      "height": 182,
-      "weight": 72,
-      "dob": "1999/08/06",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
-      "id": "4346a096",
-      "number": 4,
-      "name": "최원철",
-      "position": "MF",
-      "height": 178,
-      "weight": 72,
-      "dob": "1995/05/26",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -342,6 +342,19 @@
       "slotIdx": null
     },
     {
+      "id": "7cdd4cc9",
+      "number": 99,
+      "name": "구스타보",
+      "position": "FW",
+      "height": 189,
+      "weight": 76,
+      "dob": "2000/03/12",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "02bf5201",
       "number": 17,
       "name": "김규민",
@@ -381,19 +394,6 @@
       "slotIdx": null
     },
     {
-      "id": "0fb82092",
-      "number": 9,
-      "name": "몬타뇨",
-      "position": "FW",
-      "height": 184,
-      "weight": 79,
-      "dob": "1997/05/07",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "7d6b6953",
       "number": 10,
       "name": "바사니",
@@ -401,6 +401,19 @@
       "height": 177,
       "weight": 80,
       "dob": "1997/10/17",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "ebdfe130",
+      "number": 9,
+      "name": "박정인",
+      "position": "FW",
+      "height": 178,
+      "weight": 70,
+      "dob": "2000/10/07",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -433,19 +446,6 @@
       "slotIdx": null
     },
     {
-      "id": "68918a6d",
-      "number": 30,
-      "name": "이충현",
-      "position": "FW",
-      "height": 177,
-      "weight": 69,
-      "dob": "2007/09/12",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "c6c86d7f",
       "number": 22,
       "name": "한지호",
@@ -460,5 +460,5 @@
     }
   ],
   "createdAt": "2026-03-30T09:59:46.528974",
-  "updatedAt": "2026-03-30T10:23:55.285793"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

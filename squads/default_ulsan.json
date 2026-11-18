@@ -28,6 +28,14 @@
       "dob": "1998/03/16"
     },
     {
+      "number": 37,
+      "name": "문현호",
+      "position": "GK",
+      "height": 193,
+      "weight": 82,
+      "dob": "2003/05/13"
+    },
+    {
       "number": 21,
       "name": "조현우",
       "position": "GK",
@@ -42,6 +50,14 @@
       "height": 195,
       "weight": 83,
       "dob": "2008/01/12"
+    },
+    {
+      "number": 31,
+      "name": "황병근",
+      "position": "GK",
+      "height": 193,
+      "weight": 93,
+      "dob": "1994/06/14"
     },
     {
       "number": 17,
@@ -84,12 +100,28 @@
       "dob": "1998/03/20"
     },
     {
+      "number": 88,
+      "name": "이용",
+      "position": "DF",
+      "height": 180,
+      "weight": 74,
+      "dob": "1986/12/24"
+    },
+    {
       "number": 28,
       "name": "이재익",
       "position": "DF",
       "height": 185,
       "weight": 76,
       "dob": "1999/05/21"
+    },
+    {
+      "number": 3,
+      "name": "정성빈",
+      "position": "DF",
+      "height": 193,
+      "weight": 80,
+      "dob": "2007/05/12"
     },
     {
       "number": 15,
@@ -116,12 +148,28 @@
       "dob": "2003/01/13"
     },
     {
+      "number": 55,
+      "name": "토마스",
+      "position": "DF",
+      "height": 185,
+      "weight": 80,
+      "dob": "1996/03/20"
+    },
+    {
       "number": 66,
       "name": "트로야크",
       "position": "DF",
       "height": 191,
       "weight": 85,
       "dob": "1994/05/05"
+    },
+    {
+      "number": 38,
+      "name": "박용우",
+      "position": "MF",
+      "height": 188,
+      "weight": 80,
+      "dob": "1993/09/10"
     },
     {
       "number": 16,
@@ -162,14 +210,6 @@
       "height": 175,
       "weight": 68,
       "dob": "1997/09/20"
-    },
-    {
-      "number": 22,
-      "name": "이민혁",
-      "position": "MF",
-      "height": 178,
-      "weight": 70,
-      "dob": "2002/01/19"
     },
     {
       "number": 14,
@@ -250,16 +290,8 @@
       "height": 188,
       "weight": 83,
       "dob": "2004/05/25"
-    },
-    {
-      "number": 18,
-      "name": "허율",
-      "position": "FW",
-      "height": 192,
-      "weight": 82,
-      "dob": "2001/04/12"
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

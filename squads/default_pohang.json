@@ -20,14 +20,6 @@
       "dob": "1992/02/08"
     },
     {
-      "number": 23,
-      "name": "이승환",
-      "position": "GK",
-      "height": 187,
-      "weight": 78,
-      "dob": "2003/04/05"
-    },
-    {
       "number": 29,
       "name": "홍성민",
       "position": "GK",
@@ -82,14 +74,6 @@
       "height": 178,
       "weight": 73,
       "dob": "1987/03/18"
-    },
-    {
-      "number": 2,
-      "name": "어정원",
-      "position": "DF",
-      "height": 175,
-      "weight": 68,
-      "dob": "1999/07/08"
     },
     {
       "number": 77,
@@ -148,14 +132,6 @@
       "dob": "2002/08/05"
     },
     {
-      "number": 24,
-      "name": "한현서",
-      "position": "DF",
-      "height": 184,
-      "weight": 75,
-      "dob": "2004/01/02"
-    },
-    {
       "number": 40,
       "name": "기성용",
       "position": "MF",
@@ -204,14 +180,6 @@
       "dob": "2005/05/28"
     },
     {
-      "number": 71,
-      "name": "이헌재",
-      "position": "MF",
-      "height": 178,
-      "weight": 73,
-      "dob": "2006/03/23"
-    },
-    {
       "number": 70,
       "name": "황서웅",
       "position": "MF",
@@ -228,20 +196,20 @@
       "dob": "2001/04/12"
     },
     {
+      "number": 22,
+      "name": "김광원",
+      "position": "FW",
+      "height": 177,
+      "weight": 72,
+      "dob": "2004/01/16"
+    },
+    {
       "number": 30,
       "name": "김용학",
       "position": "FW",
       "height": 172,
       "weight": 64,
       "dob": "2003/05/20"
-    },
-    {
-      "number": 7,
-      "name": "김인성",
-      "position": "FW",
-      "height": 180,
-      "weight": 77,
-      "dob": "1989/09/09"
     },
     {
       "number": 34,
@@ -252,14 +220,6 @@
       "dob": "2006/02/15"
     },
     {
-      "number": 28,
-      "name": "손승범",
-      "position": "FW",
-      "height": 180,
-      "weight": 65,
-      "dob": "2004/05/04"
-    },
-    {
       "number": 9,
       "name": "안재준",
       "position": "FW",
@@ -268,12 +228,12 @@
       "dob": "2001/04/03"
     },
     {
-      "number": 19,
-      "name": "이호재",
+      "number": 7,
+      "name": "원기종",
       "position": "FW",
-      "height": 191,
-      "weight": 85,
-      "dob": "2000/10/14"
+      "height": 178,
+      "weight": 75,
+      "dob": "1996/01/06"
     },
     {
       "number": 37,
@@ -317,5 +277,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

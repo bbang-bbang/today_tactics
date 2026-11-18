@@ -60,6 +60,14 @@
       "dob": "2004/07/16"
     },
     {
+      "number": 17,
+      "name": "박수빈",
+      "position": "DF",
+      "height": 176,
+      "weight": 69,
+      "dob": "2005/08/27"
+    },
+    {
       "number": 33,
       "name": "보닐라",
       "position": "DF",
@@ -106,6 +114,14 @@
       "height": 176,
       "weight": 67,
       "dob": "2001/12/15"
+    },
+    {
+      "number": 55,
+      "name": "장하윤",
+      "position": "DF",
+      "height": 191,
+      "weight": 84,
+      "dob": "2005/06/30"
     },
     {
       "number": 97,
@@ -156,14 +172,6 @@
       "dob": "2000/01/13"
     },
     {
-      "number": 19,
-      "name": "유재준",
-      "position": "MF",
-      "height": 170,
-      "weight": 66,
-      "dob": "2004/09/01"
-    },
-    {
       "number": 77,
       "name": "이찬호",
       "position": "MF",
@@ -186,14 +194,6 @@
       "height": 181,
       "weight": 76,
       "dob": "1994/12/28"
-    },
-    {
-      "number": 17,
-      "name": "박수빈",
-      "position": "FW",
-      "height": 176,
-      "weight": 69,
-      "dob": "2005/08/27"
     },
     {
       "number": 92,
@@ -220,20 +220,28 @@
       "dob": "2003/05/21"
     },
     {
-      "number": 95,
-      "name": "시암",
-      "position": "FW",
-      "height": 181,
-      "weight": 78,
-      "dob": "2004/05/27"
-    },
-    {
       "number": 9,
       "name": "아리아스",
       "position": "FW",
       "height": 193,
       "weight": 93,
       "dob": "1995/06/16"
+    },
+    {
+      "number": 70,
+      "name": "안준혁",
+      "position": "FW",
+      "height": 171,
+      "weight": 67,
+      "dob": "1999/07/30"
+    },
+    {
+      "number": 19,
+      "name": "유재준",
+      "position": "FW",
+      "height": 170,
+      "weight": 66,
+      "dob": "2004/09/01"
     },
     {
       "number": 16,
@@ -285,5 +293,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

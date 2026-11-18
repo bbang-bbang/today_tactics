@@ -121,19 +121,6 @@
       "slotIdx": null
     },
     {
-      "id": "a9eb5d8f",
-      "number": 88,
-      "name": "이규빈",
-      "position": "DF",
-      "height": 172,
-      "weight": 67,
-      "dob": "2000/05/30",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "c903a258",
       "number": 55,
       "name": "이효준",
@@ -199,6 +186,19 @@
       "slotIdx": null
     },
     {
+      "id": "22c39a6f",
+      "number": 13,
+      "name": "김건오",
+      "position": "MF",
+      "height": 167,
+      "weight": 68,
+      "dob": "2001/08/13",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "69bf3349",
       "number": 66,
       "name": "김백민",
@@ -219,6 +219,19 @@
       "height": 178,
       "weight": 69,
       "dob": "2004/02/20",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "8183c594",
+      "number": 28,
+      "name": "김정현",
+      "position": "MF",
+      "height": 180,
+      "weight": 70,
+      "dob": "2004/06/29",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -303,13 +316,13 @@
       "slotIdx": null
     },
     {
-      "id": "22c39a6f",
-      "number": 13,
-      "name": "김건오",
+      "id": "148d545e",
+      "number": 92,
+      "name": "김인성",
       "position": "FW",
-      "height": 167,
-      "weight": 68,
-      "dob": "2001/08/13",
+      "height": 180,
+      "weight": 77,
+      "dob": "1989/09/09",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -362,19 +375,6 @@
       "height": 175,
       "weight": 75,
       "dob": "2002/08/07",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
-      "id": "40929de5",
-      "number": 18,
-      "name": "박준혁",
-      "position": "FW",
-      "height": 183,
-      "weight": 74,
-      "dob": "2005/10/26",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -447,5 +447,5 @@
     }
   ],
   "createdAt": "2026-03-30T09:59:46.528974",
-  "updatedAt": "2026-03-30T10:23:55.285793"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

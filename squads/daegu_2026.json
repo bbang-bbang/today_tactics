@@ -17,13 +17,13 @@
       "slotIdx": null
     },
     {
-      "id": "21dece33",
-      "number": 41,
-      "name": "박상영",
+      "id": "5616c328",
+      "number": 51,
+      "name": "박도훈",
       "position": "GK",
       "height": 188,
-      "weight": 78,
-      "dob": "2005/09/17",
+      "weight": 87,
+      "dob": "2008/04/08",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -89,19 +89,6 @@
       "height": 185,
       "weight": 72,
       "dob": "1993/12/20",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
-      "id": "f3aad93a",
-      "number": 33,
-      "name": "박재현",
-      "position": "DF",
-      "height": 177,
-      "weight": 69,
-      "dob": "2003/09/16",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -212,19 +199,6 @@
       "slotIdx": null
     },
     {
-      "id": "efce24b3",
-      "number": 3,
-      "name": "정우재",
-      "position": "DF",
-      "height": 179,
-      "weight": 70,
-      "dob": "1992/06/28",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "da809991",
       "number": 27,
       "name": "정헌택",
@@ -238,6 +212,19 @@
       "slotIdx": null
     },
     {
+      "id": "0ce46d71",
+      "number": 4,
+      "name": "조현태",
+      "position": "DF",
+      "height": 187,
+      "weight": 78,
+      "dob": "2004/10/27",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "6e648e11",
       "number": 72,
       "name": "최강민",
@@ -245,6 +232,19 @@
       "height": 176,
       "weight": 70,
       "dob": "2002/04/24",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "7825d9ee",
+      "number": 55,
+      "name": "홍재석",
+      "position": "DF",
+      "height": 188,
+      "weight": 80,
+      "dob": "2003/07/03",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -329,6 +329,19 @@
       "slotIdx": null
     },
     {
+      "id": "c5dee1cb",
+      "number": 14,
+      "name": "박세진",
+      "position": "MF",
+      "height": 171,
+      "weight": 67,
+      "dob": "2004/03/19",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "06332625",
       "number": 21,
       "name": "손승민",
@@ -336,19 +349,6 @@
       "height": 175,
       "weight": 68,
       "dob": "2005/05/09",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
-      "id": "c4b06425",
-      "number": 88,
-      "name": "카를로스",
-      "position": "MF",
-      "height": 181,
-      "weight": 78,
-      "dob": "1995/09/15",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -375,6 +375,19 @@
       "height": 180,
       "weight": 67,
       "dob": "2003/05/02",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "068c77fa",
+      "number": 17,
+      "name": "고재현",
+      "position": "FW",
+      "height": 180,
+      "weight": 67,
+      "dob": "1999/03/05",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -414,6 +427,19 @@
       "height": 180,
       "weight": 66,
       "dob": "1996/04/23",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "5f69205c",
+      "number": 7,
+      "name": "단레이",
+      "position": "FW",
+      "height": 185,
+      "weight": 80,
+      "dob": "1995/11/21",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -509,21 +535,8 @@
       "x": 0,
       "y": 0,
       "slotIdx": null
-    },
-    {
-      "id": "f8aa31e7",
-      "number": 7,
-      "name": "지오바니",
-      "position": "FW",
-      "height": 175,
-      "weight": 72,
-      "dob": "2001/05/15",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
     }
   ],
   "createdAt": "2026-03-30T09:59:46.528974",
-  "updatedAt": "2026-03-30T10:23:55.285793"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

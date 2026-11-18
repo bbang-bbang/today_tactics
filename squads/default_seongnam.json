@@ -52,12 +52,28 @@
       "dob": "2007/04/13"
     },
     {
+      "number": 33,
+      "name": "김찬일",
+      "position": "DF",
+      "height": 183,
+      "weight": 78,
+      "dob": "2008/07/03"
+    },
+    {
       "number": 52,
       "name": "료지",
       "position": "DF",
       "height": 168,
       "weight": 62,
       "dob": "1997/04/11"
+    },
+    {
+      "number": 17,
+      "name": "박병규",
+      "position": "DF",
+      "height": 182,
+      "weight": 77,
+      "dob": "2004/10/28"
     },
     {
       "number": 4,
@@ -74,6 +90,14 @@
       "height": 175,
       "weight": 71,
       "dob": "2001/12/18"
+    },
+    {
+      "number": 19,
+      "name": "양태양",
+      "position": "DF",
+      "height": 180,
+      "weight": 70,
+      "dob": "2004/04/08"
     },
     {
       "number": 3,
@@ -124,20 +148,20 @@
       "dob": "2005/02/26"
     },
     {
+      "number": 35,
+      "name": "김지혁",
+      "position": "MF",
+      "height": 176,
+      "weight": 65,
+      "dob": "2008/02/17"
+    },
+    {
       "number": 16,
       "name": "류준선",
       "position": "MF",
       "height": 178,
       "weight": 69,
       "dob": "2003/09/25"
-    },
-    {
-      "number": 17,
-      "name": "박병규",
-      "position": "MF",
-      "height": 182,
-      "weight": 77,
-      "dob": "2004/10/28"
     },
     {
       "number": 21,
@@ -148,20 +172,12 @@
       "dob": "1998/04/20"
     },
     {
-      "number": 33,
-      "name": "박수빈",
+      "number": 34,
+      "name": "이수윤",
       "position": "MF",
-      "height": 180,
-      "weight": 74,
-      "dob": "1999/09/22"
-    },
-    {
-      "number": 19,
-      "name": "양태양",
-      "position": "MF",
-      "height": 180,
-      "weight": 70,
-      "dob": "2004/04/08"
+      "height": 179,
+      "weight": 68,
+      "dob": "2008/09/13"
     },
     {
       "number": 36,
@@ -244,6 +260,14 @@
       "dob": "2003/11/19"
     },
     {
+      "number": 90,
+      "name": "전민규",
+      "position": "FW",
+      "height": 193,
+      "weight": 88,
+      "dob": "2006/07/08"
+    },
+    {
       "number": 14,
       "name": "프레이타스",
       "position": "FW",
@@ -253,5 +277,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

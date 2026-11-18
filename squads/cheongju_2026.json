@@ -4,6 +4,19 @@
   "name": "충북청주 2026",
   "players": [
     {
+      "id": "84488fd1",
+      "number": 31,
+      "name": "공태윤",
+      "position": "GK",
+      "height": 182,
+      "weight": 70,
+      "dob": "2008/01/07",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
       "id": "d474613d",
       "number": 1,
       "name": "노동건",
@@ -11,6 +24,19 @@
       "height": 190,
       "weight": 88,
       "dob": "1991/10/04",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "66787385",
+      "number": 32,
+      "name": "이승환",
+      "position": "GK",
+      "height": 187,
+      "weight": 78,
+      "dob": "2003/04/05",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -56,19 +82,6 @@
       "slotIdx": null
     },
     {
-      "id": "fc5c34bc",
-      "number": 33,
-      "name": "김윤환",
-      "position": "DF",
-      "height": 188,
-      "weight": 80,
-      "dob": "2006/07/14",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "0560b602",
       "number": 8,
       "name": "박건우",
@@ -76,6 +89,19 @@
       "height": 171,
       "weight": 70,
       "dob": "2001/08/09",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "1d71661a",
+      "number": 40,
+      "name": "박진영",
+      "position": "DF",
+      "height": 188,
+      "weight": 85,
+      "dob": "2002/05/13",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -134,19 +160,6 @@
       "slotIdx": null
     },
     {
-      "id": "9520a8c9",
-      "number": 39,
-      "name": "임준영",
-      "position": "DF",
-      "height": 177,
-      "weight": 63,
-      "dob": "2005/11/14",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "6dc8f582",
       "number": 4,
       "name": "조윤성",
@@ -199,19 +212,6 @@
       "slotIdx": null
     },
     {
-      "id": "7980d559",
-      "number": 10,
-      "name": "웰치",
-      "position": "MF",
-      "height": 171,
-      "weight": 65,
-      "dob": "2004/10/03",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "5ac5a79b",
       "number": 17,
       "name": "이동원",
@@ -232,6 +232,19 @@
       "height": 188,
       "weight": 79,
       "dob": "2004/09/24",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "50f9656b",
+      "number": 80,
+      "name": "제랄데스",
+      "position": "MF",
+      "height": 175,
+      "weight": 68,
+      "dob": "1995/04/18",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -271,6 +284,32 @@
       "height": 180,
       "weight": 73,
       "dob": "1998/04/28",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "a9406c55",
+      "number": 10,
+      "name": "김두현",
+      "position": "FW",
+      "height": 184,
+      "weight": 75,
+      "dob": "2007/03/02",
+      "onField": false,
+      "x": 0,
+      "y": 0,
+      "slotIdx": null
+    },
+    {
+      "id": "fc6dbacb",
+      "number": 7,
+      "name": "백성동",
+      "position": "FW",
+      "height": 171,
+      "weight": 66,
+      "dob": "1991/08/13",
       "onField": false,
       "x": 0,
       "y": 0,
@@ -342,19 +381,6 @@
       "slotIdx": null
     },
     {
-      "id": "f7867005",
-      "number": 7,
-      "name": "이라클리",
-      "position": "FW",
-      "height": 175,
-      "weight": 83,
-      "dob": "1998/01/03",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
-    },
-    {
       "id": "3d49d8dd",
       "number": 37,
       "name": "이윤환",
@@ -379,21 +405,8 @@
       "x": 0,
       "y": 0,
       "slotIdx": null
-    },
-    {
-      "id": "f6d44b5f",
-      "number": 77,
-      "name": "홍석준",
-      "position": "FW",
-      "height": 173,
-      "weight": 67,
-      "dob": "2004/06/02",
-      "onField": false,
-      "x": 0,
-      "y": 0,
-      "slotIdx": null
     }
   ],
   "createdAt": "2026-03-30T09:59:46.528974",
-  "updatedAt": "2026-03-30T10:23:55.285793"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

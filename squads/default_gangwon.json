@@ -44,6 +44,14 @@
       "dob": "2004/03/16"
     },
     {
+      "number": 71,
+      "name": "강성윤",
+      "position": "DF",
+      "height": 188,
+      "weight": 81,
+      "dob": "2003/03/03"
+    },
+    {
       "number": 99,
       "name": "강준혁",
       "position": "DF",
@@ -68,6 +76,14 @@
       "dob": "2005/06/13"
     },
     {
+      "number": 37,
+      "name": "권석주",
+      "position": "DF",
+      "height": 180,
+      "weight": 73,
+      "dob": "2003/06/12"
+    },
+    {
       "number": 27,
       "name": "김도현",
       "position": "DF",
@@ -82,14 +98,6 @@
       "height": 198,
       "weight": 90,
       "dob": "1999/04/07"
-    },
-    {
-      "number": 34,
-      "name": "송준석",
-      "position": "DF",
-      "height": 171,
-      "weight": 67,
-      "dob": "2001/02/06"
     },
     {
       "number": 47,
@@ -132,12 +140,20 @@
       "dob": "2006/07/03"
     },
     {
-      "number": 20,
-      "name": "조현태",
+      "number": 29,
+      "name": "최재혁",
       "position": "DF",
-      "height": 187,
-      "weight": 78,
-      "dob": "2004/10/27"
+      "height": 179,
+      "weight": 77,
+      "dob": "2009/11/04"
+    },
+    {
+      "number": 5,
+      "name": "카림",
+      "position": "DF",
+      "height": 180,
+      "weight": 72,
+      "dob": "1996/10/21"
     },
     {
       "number": 33,
@@ -172,12 +188,28 @@
       "dob": "1997/06/11"
     },
     {
+      "number": 61,
+      "name": "김슬기",
+      "position": "MF",
+      "height": 186,
+      "weight": 78,
+      "dob": "2007/02/20"
+    },
+    {
       "number": 46,
       "name": "김어진",
       "position": "MF",
       "height": 168,
       "weight": 62,
       "dob": "2007/04/10"
+    },
+    {
+      "number": 75,
+      "name": "김이석",
+      "position": "MF",
+      "height": 180,
+      "weight": 74,
+      "dob": "1998/06/19"
     },
     {
       "number": 42,
@@ -242,6 +274,14 @@
       "height": 179,
       "weight": 74,
       "dob": "1997/02/08"
+    },
+    {
+      "number": 88,
+      "name": "황문기",
+      "position": "MF",
+      "height": 176,
+      "weight": 70,
+      "dob": "1996/12/08"
     },
     {
       "number": 66,
@@ -316,6 +356,14 @@
       "dob": "2002/04/16"
     },
     {
+      "number": 70,
+      "name": "제시",
+      "position": "FW",
+      "height": 174,
+      "weight": 67,
+      "dob": "1996/07/14"
+    },
+    {
       "number": 26,
       "name": "조원우",
       "position": "FW",
@@ -349,5 +397,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

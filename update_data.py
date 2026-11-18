@@ -10,6 +10,7 @@ STEP 0  K리그 공식 API → kleague_results_2026.json 갱신
 STEP 1  events 테이블 동기화 (synthetic 90xxxxxx 생성될 수 있음)
 STEP 2  synthetic → SofaScore 실제 ID 교체
 STEP 29 SofaScore 재생성 경기 ID 감지·교체 (구 ID 404 → 새 ID, crawlers/remap_event_ids.py)
+STEP 30 내장 스쿼드 동기화 (공식 선수 JSON → squads/default_*·{팀}_2026, crawlers/sync_squads.py)
 STEP 3  최근 N일 라인업 수집 (K1+K2)
 STEP 4  K1 mps 백필 (양 팀 양 선수)
 STEP 5  K2 mps 백필
@@ -173,6 +174,9 @@ def main():
             [PYTHON, str(CRAWLERS/"fill_player_master.py")]),
         (12, "K리그 포털 JSON 갱신",
             [PYTHON, str(CRAWLERS/"crawl_kleague.py")]),
+        # STEP 12 가 갱신한 공식 선수 JSON → 내장 스쿼드(default_*·{팀}_2026) 동기화. 사용자 저장 스쿼드는 불변.
+        (30, "내장 스쿼드 동기화 — 공식 선수 JSON(이적·등번호) 반영",
+            [PYTHON, str(CRAWLERS/"sync_squads.py"), "--apply"]),
         (13, "K리그 포털 → 신체정보 + name_ko 백필",
             [PYTHON, str(CRAWLERS/"fill_korean_names.py")]),
         (14, f"avg_positions + shotmap (최근 {args.days}일)",

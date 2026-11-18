@@ -84,6 +84,14 @@
       "dob": "2005/04/09"
     },
     {
+      "number": 2,
+      "name": "아하도프",
+      "position": "DF",
+      "height": 189,
+      "weight": 71,
+      "dob": "2004/12/31"
+    },
+    {
       "number": 11,
       "name": "안현범",
       "position": "DF",
@@ -116,28 +124,20 @@
       "dob": "2001/07/19"
     },
     {
+      "number": 3,
+      "name": "조동재",
+      "position": "DF",
+      "height": 180,
+      "weight": 74,
+      "dob": "2003/05/16"
+    },
+    {
       "number": 44,
       "name": "최동렬",
       "position": "DF",
       "height": 184,
       "weight": 74,
       "dob": "2004/11/21"
-    },
-    {
-      "number": 22,
-      "name": "최예훈",
-      "position": "DF",
-      "height": 180,
-      "weight": 73,
-      "dob": "2003/08/19"
-    },
-    {
-      "number": 19,
-      "name": "홍욱현",
-      "position": "DF",
-      "height": 188,
-      "weight": 74,
-      "dob": "2004/01/06"
     },
     {
       "number": 72,
@@ -196,6 +196,14 @@
       "dob": "1996/07/16"
     },
     {
+      "number": 80,
+      "name": "구템베르그",
+      "position": "FW",
+      "height": 168,
+      "weight": 62,
+      "dob": "2000/08/28"
+    },
+    {
       "number": 9,
       "name": "김찬",
       "position": "FW",
@@ -237,5 +245,5 @@
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }

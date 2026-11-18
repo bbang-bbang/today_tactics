@@ -20,6 +20,14 @@
       "dob": "1999/07/22"
     },
     {
+      "number": 25,
+      "name": "양승민",
+      "position": "GK",
+      "height": 193,
+      "weight": 82,
+      "dob": "2008/04/02"
+    },
+    {
       "number": 18,
       "name": "엄예훈",
       "position": "GK",
@@ -76,28 +84,12 @@
       "dob": "2000/10/11"
     },
     {
-      "number": 4,
-      "name": "박진영",
-      "position": "DF",
-      "height": 188,
-      "weight": 85,
-      "dob": "2002/05/13"
-    },
-    {
       "number": 23,
       "name": "배서준",
       "position": "DF",
       "height": 173,
       "weight": 63,
       "dob": "2003/12/11"
-    },
-    {
-      "number": 77,
-      "name": "배진우",
-      "position": "DF",
-      "height": 185,
-      "weight": 74,
-      "dob": "2002/01/23"
     },
     {
       "number": 33,
@@ -130,6 +122,14 @@
       "height": 178,
       "weight": 73,
       "dob": "2002/07/25"
+    },
+    {
+      "number": 38,
+      "name": "카이오",
+      "position": "DF",
+      "height": 192,
+      "weight": 89,
+      "dob": "1998/03/14"
     },
     {
       "number": 15,
@@ -244,22 +244,6 @@
       "dob": "2000/03/13"
     },
     {
-      "number": 11,
-      "name": "변경준",
-      "position": "FW",
-      "height": 181,
-      "weight": 70,
-      "dob": "2002/04/08"
-    },
-    {
-      "number": 9,
-      "name": "아이데일",
-      "position": "FW",
-      "height": 188,
-      "weight": 86,
-      "dob": "1999/08/01"
-    },
-    {
       "number": 70,
       "name": "안주완",
       "position": "FW",
@@ -282,8 +266,16 @@
       "height": 176,
       "weight": 70,
       "dob": "2004/06/02"
+    },
+    {
+      "number": 77,
+      "name": "홍석준",
+      "position": "FW",
+      "height": 173,
+      "weight": 67,
+      "dob": "2004/06/02"
     }
   ],
   "createdAt": "2026-03-31T09:19:42.701970",
-  "updatedAt": "2026-03-31T09:19:42.701970"
+  "updatedAt": "2026-11-19T00:03:18.032821"
 }
