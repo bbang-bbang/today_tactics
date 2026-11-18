@@ -7,7 +7,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     "use strict";
     const root = () => document.getElementById("ws-team-recruit");
     let _teams = null, _team = null, _req = 0;
-    const _f = { scope: "all", max_age: "", min_minutes: "900" };
+    const _f = { scope: "all", max_age: "", min_minutes: "900", real: "1" };   // real: 해외 후보 현실성 필터(1=상위 구단 제외)
     // 추천 방식: position(약한 포지션 보강) · style(약한 플레이 지표 보강, 포지션 무관) · similar(고른 선수와 비슷한 플레이)
     let _mode = "position", _player = null, _squad = [];
     const MODES = [["position", "포지션 보강"], ["style", "플레이 보강"], ["similar", "비슷한 선수"]];
@@ -32,6 +32,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                 ${sel("rc-scope", "후보 리그", _f.scope, [["all", "K1·K2 전체"], ["same", "같은 리그만"], ["k1", "K1만"], ["k2", "K2만"]])}
                 ${sel("rc-age", "최대 나이", _f.max_age, [["", "제한 없음"], ["23", "23세 이하"], ["25", "25세 이하"], ["28", "28세 이하"], ["31", "31세 이하"]])}
                 ${sel("rc-mins", "최소 출전", _f.min_minutes, [["900", "900분+"], ["1350", "1350분+"], ["1800", "1800분+"]])}
+                ${sel("rc-real", "해외 후보", _f.real, [["1", "현실적 후보만"], ["0", "상위 구단 포함"]])}
             </div>
         </div>
         <div class="rc-modes" role="tablist" aria-label="추천 방식">
@@ -127,7 +128,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <td class="rc-rank">${i + 1}</td>
             <td><span class="rc-name">${ttEsc(c.name)}</span><span class="rc-sub">${ttEsc(c.nationality || "")}${c.height ? " · " + c.height + "cm" : ""}</span></td>
             <td>${ttEsc(c.team || "")} <span class="rc-lg" title="${ttEsc(c.league)}">${ttEsc(c.country || "")} ${OS_TIER[c.tier] || ""}</span>
-                <span class="rc-sub">${ttEsc(c.league)}</span></td>
+                <span class="rc-sub">${ttEsc(c.league)}${c.team_rank ? ` · 팀 ${c.team_rank}/${c.team_n}위` : ""}</span></td>
             <td class="rc-num">${c.age ?? "-"}</td>
             <td class="rc-num">${c.mins.toLocaleString()}<span class="rc-muted">분</span></td>
             <td class="rc-num">${c.goals}·${c.assists}</td>
@@ -139,7 +140,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             ${keys.map(k => `<th scope="col" title="같은 리그·같은 포지션 중 백분위">${ttEsc(d.metric_labels[k])}</th>`).join("")}
             <th scope="col" title="리그 내 종합 백분위(0~100)">종합</th><th scope="col" title="종합 × 리그 수준 추정 계수 — 참고용">보정</th></tr></thead>
             <tbody>${rows}</tbody></table>
-            <p class="rc-pool rc-muted">후보 ${d.pool_size}명 중 상위 ${d.candidates.length}명 · 보정 점수는 추정 계수 적용(검증 전, 참고용)</p>
+            <p class="rc-pool rc-muted">후보 ${d.pool_size}명 중 상위 ${d.candidates.length}명${d.filters.realistic ? ` · 상위 구단 소속 ${d.excluded_top_clubs}명 제외` : " · 상위 구단 포함"} · 보정 점수는 추정 계수 적용(검증 전, 참고용)</p>
             <details class="rc-notes"><summary>해외 후보 기준</summary><ul>${d.notes.map(x => `<li>${ttEsc(x)}</li>`).join("")}</ul></details>`;
     }
     function loadOverseas(btn) {
@@ -150,7 +151,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         }
         btn.setAttribute("aria-expanded", "true");
         box.innerHTML = `<div class="rc-loading" role="status">해외 후보 분석 중...</div>`;
-        const q = new URLSearchParams({ pos: btn.dataset.rcOs, min_minutes: _f.min_minutes, limit: "10" });
+        const q = new URLSearchParams({ pos: btn.dataset.rcOs, min_minutes: _f.min_minutes, limit: "10", realistic: _f.real });
         if (_f.max_age) q.set("max_age", _f.max_age);
         if (btn.dataset.rcFocus) q.set("focus", btn.dataset.rcFocus);
         fetch(`/api/overseas-recruit?${q}`).then(r => r.json().then(j => ({ ok: r.ok, j })))
@@ -252,6 +253,11 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             else if (t.id === "rc-scope") _f.scope = t.value;
             else if (t.id === "rc-age") _f.max_age = t.value;
             else if (t.id === "rc-mins") _f.min_minutes = t.value;
+            else if (t.id === "rc-real") {      // 해외 후보에만 적용 — 열려 있는 해외 표만 다시 불러온다(국내 추천 재조회 불필요)
+                _f.real = t.value;
+                el.querySelectorAll('[data-rc-os][aria-expanded="true"]').forEach(b => { b.setAttribute("aria-expanded", "false"); loadOverseas(b); });
+                return;
+            }
             else if (t.id === "rc-player") _player = parseInt(t.value, 10);
             else return;
             load();

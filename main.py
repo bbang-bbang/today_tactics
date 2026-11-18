@@ -7736,14 +7736,31 @@ def _overseas_rows(min_minutes):
             continue
         try:
             # 시즌 초반 리그(유럽 2026/27은 아직 10여 경기)는 고정 900분이면 표본이 거의 없어, 그 리그 최다 출전 시간의 50%로 하향
+            # 소속 팀 리그 순위(현실성 필터용) — league_standings 최신 시즌, 5경기 미만이면 순위 무의미라 제외
+            ranks = {}
+            try:
+                srows = conn.execute("SELECT tournament_id, season_id, team_id, position, matches FROM league_standings "
+                                     "WHERE tournament_id IN (" + ph + ") AND matches > 0", tids).fetchall()
+                latest = {}
+                for tid_, sea_, *_r in srows:
+                    latest[tid_] = max(latest.get(tid_, 0), sea_ or 0)
+                n_by_t = {}
+                for tid_, sea_, *_r in srows:
+                    if (sea_ or 0) == latest[tid_]:
+                        n_by_t[tid_] = n_by_t.get(tid_, 0) + 1
+                for tid_, sea_, team_id_, pos_, mt_ in srows:
+                    if (sea_ or 0) == latest[tid_] and pos_ and (mt_ or 0) >= 5:
+                        ranks[team_id_] = (pos_, n_by_t[tid_])
+            except sqlite3.Error:
+                ranks = {}
             lm = (conn.execute("SELECT MAX(minutes_played) FROM player_stats WHERE tournament_id IN (" + ph + ")", tids).fetchone() or [0])[0] or 0
             thr = min(min_minutes, max(450, int(lm * 0.5)))
-            q = ("SELECT p.id, p.name, p.position, p.height, p.birth_date, p.nationality, t.name, ps.appearances, ps.minutes_played, ps.rating, "
+            q = ("SELECT p.id, p.name, p.position, p.height, p.birth_date, p.nationality, t.name, p.team_id, ps.appearances, ps.minutes_played, ps.rating, "
                  "ps.goals, ps.assists, ps.shots_on_target, ps.key_passes, ps.successful_dribbles, ps.tackles, ps.interceptions, "
                  "ps.accurate_passes_pct, ps.total_passes, ps.saves, ps.goals_conceded "
                  "FROM player_stats ps JOIN players p ON p.id = ps.player_id LEFT JOIN teams t ON t.id = p.team_id "
                  "WHERE ps.tournament_id IN (" + ph + ") AND COALESCE(ps.minutes_played,0) >= ?")   # ph 는 '?' 자리표시자만, 값은 바인딩
-            for (pid, name, pos, h, bd, nat, team, apps, mins, rating, g, a, sot, kp, dr, tk, ic, pacc, tp,
+            for (pid, name, pos, h, bd, nat, team, team_id, apps, mins, rating, g, a, sot, kp, dr, tk, ic, pacc, tp,
                  sv, gc) in conn.execute(q, (*tids, thr)):
                 if pos not in ("G", "D", "M", "F"):
                     continue
@@ -7764,7 +7781,8 @@ def _overseas_rows(min_minutes):
                 rows.append({"id": f"{code}:{pid}", "name": name or "", "team": team or "", "league_code": code,
                              "league": cfg["label"], "country": cfg.get("country"), "tier": tier, "factor": factor,
                              "pos": pos, "age": age, "height": h, "nationality": nat, "apps": apps or 0, "mins": mins,
-                             "rating": rating, "goals": g or 0, "assists": a or 0, "m": m})
+                             "rating": rating, "goals": g or 0, "assists": a or 0, "m": m,
+                             "team_rank": (ranks.get(team_id) or (None, None))[0], "team_n": (ranks.get(team_id) or (None, None))[1]})
         except sqlite3.Error:
             pass
         finally:
@@ -7788,6 +7806,7 @@ def overseas_recruit():
     except ValueError:
         return jsonify({"error": "invalid filter"}), 400
     focus = [m for m in (request.args.get("focus") or "").split(",") if m in _OS_WEIGHTS[pos]][:3]
+    realistic = request.args.get("realistic", "1") != "0"     # 기본 ON — 상위권 구단 주전 제외
 
     rows = [r for r in _overseas_rows(min_mins) if r["pos"] == pos]
     by_lg = {}
@@ -7813,6 +7832,16 @@ def overseas_recruit():
             r["raw"] = num / den if den >= 0.5 else None
     cands = [r for r in rows if r.get("raw") is not None and (tier is None or r["tier"] == tier)
              and (not max_age or (r["age"] is not None and r["age"] <= max_age))]
+    # 현실성: 1·2부에서 소속 팀이 순위 상위 1/3이면 K리그가 영입하기 어려운 선수로 보고 제외(몸값·계약 데이터가 없어 순위로 근사)
+    excluded_top = 0
+    if realistic:
+        keep = []
+        for r in cands:
+            if r["tier"] <= 2 and r.get("team_rank") and r["team_rank"] <= -(-r["team_n"] // 3):
+                excluded_top += 1
+            else:
+                keep.append(r)
+        cands = keep
     for r in cands:
         fv = [r["pcts"][k] for k in focus if k in r["pcts"]]
         base = 0.5 * r["raw"] + 0.5 * (sum(fv) / len(fv)) if fv else r["raw"]
@@ -7821,11 +7850,13 @@ def overseas_recruit():
     return jsonify({
         "pos": pos, "pool_size": len(cands), "leagues": sorted({r["league_code"] for r in rows}),
         "metric_labels": {k: _OS_METRICS[k] for k in weights},
-        "filters": {"min_minutes": min_mins, "max_age": max_age, "tier": tier, "focus": focus},
+        "filters": {"min_minutes": min_mins, "max_age": max_age, "tier": tier, "focus": focus, "realistic": realistic},
+        "excluded_top_clubs": excluded_top,
         "candidates": [{
             "id": r["id"], "name": r["name"], "team": r["team"], "league": r["league"], "league_code": r["league_code"],
             "country": r["country"], "tier": r["tier"], "age": r["age"], "height": r["height"], "nationality": r["nationality"],
             "apps": r["apps"], "mins": r["mins"], "goals": r["goals"], "assists": r["assists"],
+            "team_rank": r.get("team_rank"), "team_n": r.get("team_n"),
             "raw": round(r["raw"], 1), "adj": round(r["adj"], 1), "factor": r["factor"],
             "pcts": {k: round(v) for k, v in r["pcts"].items()},
             "stats": {k: (round(v, 2) if v is not None else None) for k, v in r["m"].items() if k in weights},
@@ -7835,6 +7866,8 @@ def overseas_recruit():
             "보정(adj) = raw × 리그 수준 계수(1부 1.0 · 2부 0.85 · 3부 0.75, 브라질은 한 단계 낮게) — 추정치이며 K리그 이적 실적으로 검증되지 않음. 참고용",
             "API-Football 시즌 누적 기록 기반 — xG·몸값·경기별 데이터·세부 포지션 없음. 평점은 SofaScore와 산출 방식이 달라 점수에서 제외",
             f"출전 {min_mins}분 이상(시즌 초반 리그는 그 리그 최다 출전의 50%로 하향) · 리그·포지션별 비교군 {_OS_MIN_COHORT}명 미만이면 해당 지표 제외",
+            ("현실적 후보만: 1·2부에서 소속 팀이 리그 순위 상위 1/3(5경기 이상 치른 리그)인 선수 " + str(excluded_top) + "명 제외 — 상위 구단 주전은 K리그 영입이 어렵다고 보는 근사(몸값·계약 정보 없음). 3부·순위 미수집 리그는 제외 없음")
+            if realistic else "전체 보기: 상위 구단 선수도 포함 — 실제 영입 가능성과 무관하게 기록만으로 정렬",
         ],
     })
 
