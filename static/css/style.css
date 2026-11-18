@@ -10410,7 +10410,9 @@ body:not([data-ws="tactics"]):not([data-ws="predict"]) #banner-matchup {
 .mc-change:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* 팀 탭 심화 인사이트 컨테이너 — hidden 클래스가 display 를 끄도록 (모드 전환 시 단일 팀 분석과 겹치지 않게) */
-#ws-team-insights.hidden { display: none; }
+#ws-team-insights.hidden,
+#ws-team-recruit.hidden,
+#ws-team-review.hidden { display: none; }  /* 영입 추천·시즌 리뷰도 동일 — 없으면 모드 전환 시 이전 내용이 남아 새 모드가 아래에 붙음 */
 
 /* ═══════════════════════════════════════════════════════
    매치 선택 헤더 — 흐릿한 보조 라벨 → 눈에 띄는 바 (2026-11-07)
