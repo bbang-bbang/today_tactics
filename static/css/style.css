@@ -8669,6 +8669,8 @@ body.pr-expanded-lock {
 .rc-notes summary:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
 .rc-notes ul { margin: 6px 0 0 16px; padding: 0; }
 @media (max-width: 1100px) { .rc-ctls { margin-left: 0; } .rc-table .rc-sub { display: none; } }
+/* 좁은 화면: 영입 추천 표가 페이지 가로폭을 밀어내지 않도록 표 자체를 가로 스크롤 */
+@media (max-width: 700px) { .rc-table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; } }
 
 /* ── 시즌 리뷰 (팀 탭) ── */
 .sr-wrap { padding: 4px 8px 16px; color: #e3eaff; font-size: 12px; line-height: 1.5; }
