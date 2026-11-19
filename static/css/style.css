@@ -10162,6 +10162,8 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .gd-open-btn:active { transform: scale(0.97); }
 .gd-open-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .gd-open-btn + #user-menu { margin-left: 10px; }
+/* 폰 폭: 툴바 항목(제목·배지·읽는 법·사용자)이 한 줄에 못 들어가 페이지가 가로로 밀리던 문제 → 줄바꿈 */
+@media (max-width: 480px) { #toolbar { flex-wrap: wrap; row-gap: 4px; } }
 
 /* ── 신규 인사이트 4종: 미니 막대 · 2열 그리드 ───────────────── */
 .ins-rs-grid-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
