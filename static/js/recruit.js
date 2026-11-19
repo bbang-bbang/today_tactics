@@ -135,7 +135,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <td class="rc-num">${c.goals}·${c.assists}</td>
             ${keys.map(k => `<td class="rc-num" title="${ttEsc(d.metric_labels[k])}: ${c.stats[k] ?? "-"}">${bar(c.pcts[k])}${c.pcts[k] ?? "-"}</td>`).join("")}
             <td class="rc-num">${c.raw}</td>
-            <td class="rc-num rc-fit" title="리그 내 점수 ${c.raw} × 리그 수준 계수 ${c.factor} (추정)"><b>${c.adj}</b></td></tr>`).join("");
+            ${c.factor === 1 || c.adj === c.raw
+                ? `<td class="rc-num rc-muted" title="리그 수준 보정 없음(계수 1.0) — 종합과 같은 값">–</td>`
+                : `<td class="rc-num rc-fit" title="리그 내 점수 ${c.raw} × 리그 수준 계수 ${c.factor} (추정)"><b>${c.adj}</b></td>`}</tr>`).join("");
         return `<table class="rc-table"><thead><tr><th scope="col">#</th><th scope="col">후보</th><th scope="col">소속</th><th scope="col">나이</th>
             <th scope="col">출전</th><th scope="col">골·도움</th>
             ${keys.map(k => `<th scope="col" title="같은 리그·같은 포지션 중 백분위">${ttEsc(d.metric_labels[k])}</th>`).join("")}
