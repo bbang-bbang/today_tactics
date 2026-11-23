@@ -3,18 +3,38 @@
     // ── 온보딩 오버레이 ──────────────────────────────────────
     var overlay  = document.getElementById('onboarding-overlay');
     var startBtn = document.getElementById('ob-start-btn');
+    // localStorage 는 사생활 보호 모드·차단 시 throw — 실패해도 화면은 동작해야 함
+    function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+    function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+    function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+    var obOpener = null;
+    function obOpen() { return overlay.style.display !== 'none' && overlay.classList.contains('ob-visible'); }
     function showOnboarding() {
+        obOpener = document.activeElement;
         overlay.style.display = '';
-        requestAnimationFrame(function () { overlay.classList.add('ob-visible'); });
+        requestAnimationFrame(function () { overlay.classList.add('ob-visible'); startBtn.focus(); });
     }
     function hideOnboarding() {
         overlay.classList.remove('ob-visible');
         overlay.classList.add('ob-hiding');
         setTimeout(function () { overlay.style.display = 'none'; overlay.classList.remove('ob-hiding'); }, 300);
-        localStorage.setItem('tt_onboarded', '1');
+        lsSet('tt_onboarded', '1');
+        if (obOpener && obOpener.focus && obOpener !== document.body) obOpener.focus();
+        obOpener = null;
     }
-    if (!localStorage.getItem('tt_onboarded')) { showOnboarding(); }
+    if (!lsGet('tt_onboarded')) { showOnboarding(); }
     startBtn.addEventListener('click', hideOnboarding);
+    // aria-modal 대화상자: Esc 로 닫고, Tab 이 뒤 화면으로 새지 않게 창 안에서 순환
+    overlay.addEventListener('keydown', function (e) {
+        if (!obOpen()) return;
+        if (e.key === 'Escape') { e.preventDefault(); hideOnboarding(); return; }
+        if (e.key !== 'Tab') return;
+        var f = overlay.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        if (!f.length) return;
+        var first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
     // "다시 보기" 링크를 헤더 사용자 영역에 동적 추가
     var um = document.getElementById('user-menu');
     if (um) {
@@ -23,7 +43,7 @@
         resetLink.textContent = '도움말';
         resetLink.title = '사용법 다시 보기';
         resetLink.addEventListener('click', function () {
-            localStorage.removeItem('tt_onboarded');
+            lsDel('tt_onboarded');
             showOnboarding();
         });
         um.appendChild(resetLink);

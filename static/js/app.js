@@ -1683,7 +1683,7 @@ function ttSeason() { return (document.body && document.body.dataset.season) || 
         container.innerHTML = "";
         const teamPlayers = state.players.filter((p) => p.team === side);
         if (teamPlayers.length === 0) {
-            container.innerHTML = '<div style="color:#555;font-size:0.72rem;padding:8px;text-align:center">선수 없음</div>';
+            container.innerHTML = '<div style="color:var(--text-muted);font-size:0.75rem;padding:8px;text-align:center">선수 없음</div>';
             return;
         }
         for (const p of teamPlayers) {

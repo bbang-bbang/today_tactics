@@ -3943,7 +3943,7 @@ body {
     margin-bottom: 10px;
 }
 .ksb-title { font-size: 0.78rem; font-weight: 700; color: #4ea4f8; text-transform: uppercase; letter-spacing: 0.06em; }
-.ksb-sub   { font-size: 0.68rem; color: #3a5060; }
+.ksb-sub   { font-size: 0.68rem; color: var(--text-muted); }
 
 /* 라운드 탭 */
 .ksb-round-tabs {
@@ -3956,7 +3956,7 @@ body {
     position: relative;
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.08);
-    color: #5a7a8a;
+    color: var(--text-muted);
     border-radius: 5px;
     font-size: 0.7rem;
     padding: 3px 8px;
@@ -3969,8 +3969,8 @@ body {
 }
 .ksb-round-btn:hover { background: rgba(78,164,248,0.1); color: #9ab; border-color: rgba(78,164,248,0.25); }
 .ksb-round-btn.active { background: rgba(78,164,248,0.18); border-color: rgba(78,164,248,0.5); color: #4ea4f8; font-weight: 700; }
-.ksb-round-done { font-size: 0.6rem; color: #3a5060; }
-.ksb-round-btn.active .ksb-round-done { color: #4a7a9a; }
+.ksb-round-done { font-size: 0.6rem; color: var(--text-muted); }
+.ksb-round-btn.active .ksb-round-done { color: #9ec9f0; }
 /* 즐겨찾기 매치 보유 라운드 — 우상단 ★ 인디케이터 */
 .ksb-round-btn.ksb-round-fav::after {
     content: "★";
@@ -5841,14 +5841,14 @@ body {
 .ld-year-filter { display: flex; flex-direction: column; gap: 6px; }
 .ld-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
 .ld-filter-label {
-    color: #5a7a8a; font-size: 0.68rem; font-weight: 700;
+    color: var(--text-muted); font-size: 0.68rem; font-weight: 700;
     letter-spacing: 0.5px; min-width: 32px;
 }
 .ld-year-btn,
 .ld-league-btn {
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.1);
-    color: #667; border-radius: 5px; font-size: 0.72rem;
+    color: var(--text-muted); border-radius: 5px; font-size: 0.72rem;
     padding: 3px 10px; cursor: pointer; transition: all 0.15s;
 }
 .ld-year-btn:hover { color: #aac; border-color: rgba(78,164,248,0.4); }
@@ -6250,10 +6250,10 @@ body.pr-expanded-lock {
 .pr-official-note b { color:#cfe4ff; }
 
 .pr-loading, .pr-empty {
-    text-align:center; color:#4a6080; padding:32px; font-size:0.9rem;
+    text-align:center; color:var(--text-muted); padding:32px; font-size:0.9rem;
 }
 .pr-empty strong, .pr-empty b { color:#4ea4f8; }
-.pr-empty-sub { display:inline-block; margin-top:8px; color:#3a506b; font-size:0.8rem; line-height:1.5; }
+.pr-empty-sub { display:inline-block; margin-top:8px; color:var(--text-muted); font-size:0.8rem; line-height:1.5; }
 
 /* 카드 */
 .pr-card {
@@ -6736,10 +6736,11 @@ body.pr-expanded-lock {
 .player-drawer {
   position: fixed; top: 0; right: -520px; width: 500px; height: 100vh;
   background: #0d1526; border-left: 1px solid rgba(100,160,255,0.2);
-  z-index: 901; transition: right 0.3s ease; overflow-y: auto;
+  z-index: 901; transition: right 0.3s ease, visibility 0s linear 0.3s; overflow-y: auto;
   box-shadow: -8px 0 32px rgba(0,0,0,0.5);
+  visibility: hidden;   /* 닫힘 상태: 화면 밖이어도 Tab 포커스·스크린리더에 잡히지 않게 (닫는 애니메이션 뒤 숨김) */
 }
-.player-drawer.open { right: 0; }
+.player-drawer.open { right: 0; visibility: visible; transition: right 0.3s ease, visibility 0s; }
 
 .drawer-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -8559,7 +8560,7 @@ body.pr-expanded-lock {
 .kmc-fav-btn {
     background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.55);
     font-size: 16px;
     cursor: pointer;
     padding: 0 4px;
@@ -8995,6 +8996,7 @@ body.pr-expanded-lock {
     transition: border-color var(--trans-fast);
 }
 .k2-search-input:focus { border-color: var(--accent); }
+.k2-search-input:focus-visible { box-shadow: 0 0 0 2px var(--accent); }   /* outline:none 대체 — 키보드 포커스 링 */
 .k2-search-input::placeholder { color: var(--text-faint); }
 
 /* ── 4. 활동량 지수 툴팁 ── */
