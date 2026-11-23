@@ -340,7 +340,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   };
 
   function posLabel(pos) {
-    return { F: '공', M: '미', D: '수', G: '골' }[pos] || pos || '-';
+    // 미지의 값은 API-Football 원문이 그대로 오므로 이스케이프 (innerHTML 로 들어감)
+    return { F: '공', M: '미', D: '수', G: '골' }[pos] || ttEsc(pos || '-');
   }
 
   async function renderTopPerformers(code, qs) {

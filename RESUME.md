@@ -20,6 +20,11 @@
   - **P7 보안**: 이번 세션 미점검 — `collect_apifootball_lineups.py` API 키·응답 검증, 가비아 방화벽 SSH 화이트리스트(백로그). (`/api/cache-invalidate`는 로컬/`UPDATE_SECRET` 한정으로 확인됨)
   - **QA/프로세스**: 6인 관점 체크·최종 컨펌(C1·C2) 정식 수행 · 라인업 수집기 크론 편입 여부 결정.
 
+## 0-00000000-a. ✅ 2026-11-23 — 11/23 크론 점검 완료
+- ✅ `update_data.py --days 14` 1947s 완료(실패 STEP 3 SofaScore 403뿐·대체 보완) · 11/21~22 14경기(K1 6·K2 8) 전부 events·라인업 복원(STEP 23 560행)·공식 선수 기록(STEP 27 14/14) · STEP 21 대상 0(득점·카드·교체 이미 채움 — 감사 K1·K2 공백 0일) · STEP 29 교체 쌍 없음 · 패스 8/14(미공개 6 재시도) · 공식 히트맵 미공개 10(약 1주 뒤) · 중복 이벤트 0그룹 · 서버 HEAD=7ef65d9 · `qa_check` **192/192** · `/health` 200 · 디스크 22%.
+- ⚠ **K1 SofaScore 선수 스탯 빈 행**: K1 6경기 mps 40행씩 들어갔지만 `minutes_played`·`rating` 전부 NULL(K2는 정상). 감사에서 K1 평점·슈팅맵·평균 위치·히트맵 '마지막 11/08'로 보이는 원인. `backfill_k1_mps.py` 대상 조건이 `minutes_played>0` 기준이라 **다음 월(11/30) 크론에서 자동 재시도** — 11/30에도 비면 SofaScore K1 스탯 미제공으로 보고 원인 조사.
+- 참고: `crawlers/dedupe_events.py`는 정리됨(`ARCHIVED.md`) — 중복 점검은 events (home, away, KST 날짜) 그룹 SQL로 대체.
+
 ## 0-0000000. ✅ 2026-11-18 — 11/16 크론 점검 완료
 - ✅ 11/16(월)·11/17(화) 크론 정상: 연도 자동 전환(`update_results_2026.py` 2026 K1·K2 done) · STEP 29 교체할 쌍 없음 · 11/17 `--official-only` 31.4s '모든 STEP 정상' · 해외 2·3부 크론 정상(segunda 10·brasileirob 7경기) · `/health` 200 · 서버 HEAD=로컬. 실패는 SofaScore 403(STEP 3 라인업·히트맵)뿐으로 기존 알려진 증상. 공식 히트맵 3경기 미공개는 정상 범위(약 1주 뒤 공개).
 - ✅ 운영 `/home/rocky/players_pre_*_2026111*.db` 백업 4개(약 1.8GB) 삭제(사용자 승인). 디스크 25%→21%. 이제 `players_pre_*` 없음.

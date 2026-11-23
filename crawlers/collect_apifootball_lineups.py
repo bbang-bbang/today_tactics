@@ -46,12 +46,17 @@ def parse_grid(g):
 def label_team(formation, start_xi):
     """선발 11명 → [(player_dict, grid, slot_order, detail_pos)]. 정렬 근거: 줄 → 열(좌우 대칭이라 방향 무관).
     포메이션 줄 구성(1-4-2-3-1 등)과 grid 줄별 인원이 어긋나면 detail_pos=None(라벨 신뢰 불가)."""
+    if not isinstance(formation, str):
+        formation = None            # 비문자열(숫자·객체)이면 .strip() 에서 전체 실행이 죽지 않도록 라벨만 포기
     items = []
-    for x in start_xi or []:
-        p = (x or {}).get("player") or {}
+    for x in start_xi if isinstance(start_xi, list) else []:
+        p = (x or {}).get("player") if isinstance(x, dict) else None
+        if not isinstance(p, dict):
+            continue
         rc = parse_grid(p.get("grid"))
-        if p.get("id") and rc:
-            items.append((rc, p))
+        pid = f_int(p.get("id"))
+        if pid and pid > 0 and rc:
+            items.append((rc, {**p, "id": pid}))
     items.sort(key=lambda t: t[0])
     labels = detail_positions(formation) if len(items) == 11 else None
     if labels:
@@ -89,18 +94,28 @@ def collect(cli, code, apply):
         n_fx = n_rows = n_unlabeled = 0
         for i, f in enumerate(todo):
             fid = f["fixture"]["id"]
-            home_id = ((f.get("teams") or {}).get("home") or {}).get("id")
+            home_id = f_int(((f.get("teams") or {}).get("home") or {}).get("id"))
             resp = cli.get(f"/fixtures/lineups?fixture={fid}").get("response") or []
             rows = []
-            for side in resp:
-                team_id = (side.get("team") or {}).get("id")
-                for p, grid, slot, detail in label_team(side.get("formation"), side.get("startXI")):
+            sides = 0
+            for side in resp if isinstance(resp, list) else []:
+                if not isinstance(side, dict):
+                    continue
+                team_id = f_int((side.get("team") or {}).get("id"))
+                if not team_id:
+                    continue   # 팀 없는 행은 is_home 판정 불가 — 저장 안 함
+                labeled = label_team(side.get("formation"), side.get("startXI"))
+                if labeled:
+                    sides += 1
+                for p, grid, slot, detail in labeled:
                     if detail is None:
                         n_unlabeled += 1
-                    rows.append((fid, p["id"], team_id, int(team_id == home_id), 1, p.get("pos"),
+                    pos = p.get("pos")
+                    rows.append((fid, p["id"], team_id, int(team_id == home_id), 1,
+                                 pos if isinstance(pos, str) and len(pos) <= 3 else None,
                                  grid, slot, f_int(p.get("number")), detail))
-            if not rows:
-                continue   # 라인업 미제공 — 다음 실행에서 재시도
+            if sides < 2:
+                continue   # 라인업 미제공·한쪽만 제공 — 저장하면 '이미 받은 경기'로 굳어 재시도가 막히므로 다음 실행으로
             n_fx += 1
             n_rows += len(rows)
             if not apply:
