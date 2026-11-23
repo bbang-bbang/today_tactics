@@ -95,8 +95,9 @@ def parse_players(html, portal_team_id):
         r'<h1 class="club-playerPosition-title">(\w+)</h1>(.*?)(?=<h1 class="club-playerPosition-title">|\Z)',
         re.DOTALL
     )
-    player_name_pattern = re.compile(r'<li class="club-playerlist-nm-k">(\d+)\.\s*([^<]+)</li>')
-    player_info_pattern = re.compile(r'<li class="club-playerlist-nm-e">([^<]+)</li>')
+    # 2026-11 포털 마크업 변경: li 에 inline style 추가 + 이름 뒤 국기 <span class="fi ..."> → 속성·공백·후행 태그 허용
+    player_name_pattern = re.compile(r'<li class="club-playerlist-nm-k"[^>]*>\s*(\d+)\.\s*([^<]+?)\s*<')
+    player_info_pattern = re.compile(r'<li class="club-playerlist-nm-e"[^>]*>\s*([^<]+?)\s*<')
 
     for pos_match in pos_pattern.finditer(html):
         pos = pos_match.group(1)
@@ -175,6 +176,10 @@ def main():
         time.sleep(0.3)
 
     output_file = os.path.join(BASE_DIR, 'data', 'kleague_players_2026.json')
+    # 포털 장애·마크업 변경으로 대부분 실패하면 기존 파일을 빈/부분 결과로 덮어쓰지 않는다 (2026-11-23 '{}' 덮어쓰기 사고)
+    if len(all_teams_data) < len(all_team_map) * 0.8:
+        print(f"\n[중단] {len(all_teams_data)}/{len(all_team_map)}팀만 수집 — 기존 {output_file} 유지 (파싱 실패 의심)", flush=True)
+        raise SystemExit(2)
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(all_teams_data, f, ensure_ascii=False, indent=2)
