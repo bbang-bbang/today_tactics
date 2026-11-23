@@ -34,7 +34,9 @@
   - 결론: 계수 변경 안 함(스탯 공식 = Red, 근거 부족). 앱 문구 '추정치·미검증' 유지가 맞음. 개선 후보(사용자 결정): ① 수비 볼륨 지표를 팀 점유/실점 맥락으로 보정 ② 1월 이적시장 뒤 유럽 1↔2부 표본으로 재추정.
 
 - ♿ **UI 접근성 점검(P6, 로컬 Playwright 1280·375 · 6개 탭 + 팀 5모드, Chromium·Firefox)**: 이름 없는 컨트롤 0 · 375px 가로 스크롤 0 · 탭 목록 화살표 키 동작 · 콘솔 에러 0. 수정: ① 온보딩 대화상자 — 열릴 때 포커스 이동·Tab 창 안 순환·Esc 닫기·포커스 복귀·localStorage try/catch(`onboarding.js?v=2`) ② 히트맵 검색창 포커스 링 ③ 닫힌 선수 서랍 `visibility:hidden`(화면 밖 Tab 포커스 차단) ④ 대비 4.5:1 미달 → `--text-muted`: 라운드 탭·`ksb-sub`·`ld-*` 필터·`pr-empty`·'선수 없음', 즐겨찾기 ☆ 0.3→0.55 (`style.css?v=140`, `app.js?v=22`).
-  - ⏳ 사용자 결정(Red — 전역 타이포·브랜드 색): **12px 미만 글자 약 900개**(최소 8.6px — 심화 탭 `ins-tl-*`·라운드 탭 `ksb-round-done` 9.6px 등, CLAUDE.md U5 최소 12px 위반) · 활성 탭 흰 글자 on `#e94560` 3.8:1(브랜드 빨강). 오탐: `kit-toggle-btn`(유니폼 색 배경)·`action-btn`·구분 기호(`ssb-divider`·`rc-sep` 장식).
+  - ✅ (사용자 위임으로 처리) **12px 미만 글자 일괄 정리**: `style.css` rem/px 선언 385개 → 12px(0.75rem). 화면 10개 × 1280·375 전후 측정 — 새 잘림 0·가로 넘침 0(Chromium·Firefox), 폰 폭 전술판 +148px·예측 +163px(라운드 탭 줄바꿈). 남은 12px 미만 = 전술판 HUD 한 글자 배지(`fhud-chip-letter`·`kit-toggle-btn`, em 단위) — 원형 배지라 의도적 예외.
+  - ✅ **`--accent-strong: #c9304b`** 신설(흰 글자 5.3:1) — 흰 글자를 올리는 빨강 배경 4곳(활성 상단 탭·팀 선택 hover·배지·매치 스트립 hover)만 교체, `--accent` 자체는 그대로. `ssb-sub`·`flow-step` 흰색 0.4→0.6. `style.css?v=142`.
+  - 남은 경계값(무시): `league-tab-btn` 4.38 · 빨강 h2 4.46(큰 글자) · 오탐 `kit-toggle-btn`(유니폼 색)·`action-btn`·장식 구분 기호.
 
 ## 0-0000000. ✅ 2026-11-18 — 11/16 크론 점검 완료
 - ✅ 11/16(월)·11/17(화) 크론 정상: 연도 자동 전환(`update_results_2026.py` 2026 K1·K2 done) · STEP 29 교체할 쌍 없음 · 11/17 `--official-only` 31.4s '모든 STEP 정상' · 해외 2·3부 크론 정상(segunda 10·brasileirob 7경기) · `/health` 200 · 서버 HEAD=로컬. 실패는 SofaScore 403(STEP 3 라인업·히트맵)뿐으로 기존 알려진 증상. 공식 히트맵 3경기 미공개는 정상 범위(약 1주 뒤 공개).
