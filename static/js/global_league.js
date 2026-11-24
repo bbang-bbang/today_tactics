@@ -75,13 +75,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
           </div>
         </div>
         <div class="gl-league-head" id="gl-league-head" aria-live="polite"></div>
-        <div class="gl-section-tabs" id="gl-section-tabs" role="tablist">
-          ${['standings','team-rankings','top-performers','players'].map(s =>
-            `<button type="button" role="tab" aria-selected="${GL.activeSection===s}" class="gl-sec-btn${GL.activeSection===s?' active':''}" data-sec="${s}">
-              ${sectionLabel(s)}
-            </button>`
-          ).join('')}
-        </div>
+        <div class="gl-section-tabs" id="gl-section-tabs" role="tablist"></div>
         <div id="gl-content" class="gl-content">
           <div class="gl-loading">로딩 중…</div>
         </div>
@@ -124,17 +118,29 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       loadSection();
     });
 
-    document.querySelectorAll('.gl-sec-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        GL.activeSection = btn.dataset.sec;
-        document.querySelectorAll('.gl-sec-btn').forEach(b => {
-          b.classList.toggle('active', b === btn);
-          b.setAttribute('aria-selected', String(b === btn));
-        });
-        loadSection();
-      });
+    document.getElementById('gl-section-tabs').addEventListener('click', e => {
+      const btn = e.target.closest('.gl-sec-btn');
+      if (!btn) return;
+      GL.activeSection = btn.dataset.sec;
+      renderSectionTabs();
+      loadSection();
     });
+    renderSectionTabs();
     renderLeagueHead();
+  }
+
+  /* 섹션 탭 — '팀 슈팅·진형'은 SofaScore 슈팅맵이 있는 리그만(현재 J1, 2026-11-24) */
+  function sectionsFor(code) {
+    const l = GL.leagues.find(x => x.code === code);
+    return ['standings', 'team-rankings', 'top-performers', 'players'].concat(l && l.hasShotmap ? ['team-tactics'] : []);
+  }
+  function renderSectionTabs() {
+    const wrap = document.getElementById('gl-section-tabs');
+    if (!wrap) return;
+    const secs = sectionsFor(GL.activeLeague);
+    if (!secs.includes(GL.activeSection)) GL.activeSection = 'standings';
+    wrap.innerHTML = secs.map(s =>
+      `<button type="button" role="tab" aria-selected="${GL.activeSection === s}" class="gl-sec-btn${GL.activeSection === s ? ' active' : ''}" data-sec="${s}">${sectionLabel(s)}</button>`).join('');
   }
 
   /* 선택 리그 머리말 — 국기·리그명·티어·시즌 + 데이터 출처/한계 */
@@ -150,11 +156,14 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       <span class="gl-lh-chip">${ttEsc(season ? season.label : GL.activeYear)} 시즌</span>
       <span class="gl-lh-note">${l.standingsOnly
         ? '순위표만 제공되는 리그'
-        : '출처 API-Football · 시즌 누적 기록 (xG·히트맵 미제공)'}</span>`;
+        : l.hasShotmap
+          ? '출처 API-Football(기록) · SofaScore(슈팅 좌표·xG·평균 위치) · 히트맵 미제공'
+          : '출처 API-Football · 시즌 누적 기록 (xG·히트맵 미제공)'}</span>`;
   }
 
   function sectionLabel(s) {
-    return { standings: '📋 순위표', 'team-rankings': '📊 팀 지표', 'top-performers': '⭐ TOP 퍼포머', players: '🔎 선수 탐색' }[s] || s;
+    return { standings: '📋 순위표', 'team-rankings': '📊 팀 지표', 'top-performers': '⭐ TOP 퍼포머', players: '🔎 선수 탐색',
+             'team-tactics': '🎯 팀 슈팅·진형' }[s] || s;
   }
 
   /* ── 리그 전환 ────────────────────────────────────── */
@@ -169,6 +178,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       b.classList.toggle('active', b.dataset.code === code);
       b.setAttribute('aria-pressed', String(b.dataset.code === code));
     });
+    renderSectionTabs();
     renderLeagueHead();
     await loadSection();
   }
@@ -196,6 +206,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         case 'team-rankings':  await renderTeamRankings(code, qs);   break;
         case 'top-performers': await renderTopPerformers(code, qs);  break;
         case 'players':        await renderPlayerExplorer(code, qs); break;
+        case 'team-tactics':   await renderTeamTactics(code, qs);    break;
       }
     } catch (e) {
       content.innerHTML = `<div class="gl-error">데이터 로드 실패: ${ttEsc(e.message)}</div>`;
@@ -797,6 +808,99 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       </div>`;
     box.querySelectorAll('.gl-px-card').forEach(b => b.addEventListener('click', () =>
       openPlayerMatches(code, b.dataset.pid, b)));
+  }
+
+  /* ── 팀 슈팅·진형 (SofaScore 슈팅맵·평균 위치, 2026-11-24) ──────────────
+   * /api/league/<code>/team-shotmap(side=for|against) · team-shape.
+   * 좌표: 슈팅 x = 골라인에서의 거리(0~100, 작을수록 골문 가까움), y = 폭(0~100) / 평균 위치 x = 자기 골문→상대 골문, y = 폭. */
+  const SHOT_COL = { goal: '#22c55e', save: '#60a5fa', miss: '#94a3b8', post: '#f59e0b', block: '#a78bfa' };
+  const SHOT_LBL = { goal: '골', save: '선방', miss: '빗나감', post: '골대', block: '막힘' };
+  async function renderTeamTactics(code, qs) {
+    const content = document.getElementById('gl-content');
+    if (!GL.tacTeams || GL.tacTeamsCode !== code) {
+      GL.tacTeams = await (await fetch(`/api/league/${encodeURIComponent(code)}/teams`)).json();
+      GL.tacTeamsCode = code;
+    }
+    const teams = GL.tacTeams || [];
+    if (!teams.length) { content.innerHTML = noDataHtml('팀 슈팅·진형', code); return; }
+    if (!GL.tacTeam || !teams.some(t => t.id === GL.tacTeam)) GL.tacTeam = teams[0].id;
+    GL.tacSide = GL.tacSide || 'for';
+    content.innerHTML = `<div class="gl-tac">
+      <div class="gl-tac-ctl">
+        <label class="gl-label" for="gl-tac-team">팀</label>
+        <select id="gl-tac-team" class="gl-select">${teams.map(t => `<option value="${t.id}"${t.id === GL.tacTeam ? ' selected' : ''}>${ttEsc(t.name)}</option>`).join('')}</select>
+        <div class="gl-tac-side" role="group" aria-label="슈팅 구분">
+          ${[['for', '공격 슈팅'], ['against', '허용 슈팅']].map(([k, l]) => `<button type="button" class="gl-sec-btn${GL.tacSide === k ? ' active' : ''}" data-side="${k}" aria-pressed="${GL.tacSide === k}">${l}</button>`).join('')}
+        </div>
+      </div>
+      <div id="gl-tac-body" aria-live="polite"><div class="gl-loading">로딩 중…</div></div>
+      <p class="gl-empty-sub">출처: SofaScore 경기별 슈팅 좌표·xG·평균 위치. 일부 선수는 이름 연결이 안 돼 평균 위치에서 빠질 수 있습니다.</p>
+    </div>`;
+    content.querySelector('#gl-tac-team').addEventListener('change', e => { GL.tacTeam = parseInt(e.target.value, 10); drawTeamTactics(code, qs); });
+    content.querySelector('.gl-tac-side').addEventListener('click', e => {
+      const b = e.target.closest('[data-side]'); if (!b) return;
+      GL.tacSide = b.dataset.side;
+      content.querySelectorAll('.gl-tac-side [data-side]').forEach(x => { const on = x.dataset.side === GL.tacSide; x.classList.toggle('active', on); x.setAttribute('aria-pressed', String(on)); });
+      drawTeamTactics(code, qs);
+    });
+    await drawTeamTactics(code, qs);
+  }
+  async function drawTeamTactics(code, qs) {
+    const body = document.getElementById('gl-tac-body'); if (!body) return;
+    const req = (GL.tacReq = (GL.tacReq || 0) + 1);
+    body.innerHTML = '<div class="gl-loading">로딩 중…</div>';
+    const base = `/api/league/${encodeURIComponent(code)}`;
+    let sm, sh;
+    try {
+      [sm, sh] = await Promise.all([
+        fetch(`${base}/team-shotmap${qs}&teamId=${encodeURIComponent(GL.tacTeam)}&side=${GL.tacSide}`).then(r => r.json()),
+        fetch(`${base}/team-shape${qs}&teamId=${encodeURIComponent(GL.tacTeam)}`).then(r => r.json()),
+      ]);
+    } catch (e) {
+      if (req === GL.tacReq) body.innerHTML = `<div class="gl-error">데이터 로드 실패</div>`;
+      return;
+    }
+    if (req !== GL.tacReq) return;                       // 늦게 온 응답 무시
+    const s = sm.summary || {}, shots = sm.shots || [];
+    const ps = sh.players || [];
+    if (!shots.length && !ps.length) { body.innerHTML = noDataHtml('팀 슈팅·진형', code); return; }
+    const num = v => (typeof v === 'number' && isFinite(v) ? v : null);
+    const W = 340, H = 260;
+    const X = v => 10 + (Math.min(100, Math.max(0, v)) / 100) * (W - 20);
+    const Y = v => 10 + (Math.min(50, Math.max(0, v)) / 50) * (H - 20);   // 골문에서 하프라인까지(0~50)
+    const dots = shots.filter(p => num(p.x) != null && num(p.y) != null)
+      .sort((a, b) => (a.outcome === 'goal') - (b.outcome === 'goal')).map(p => {
+        const r = Math.max(3, Math.min(12, 3 + Math.sqrt(num(p.xg) || 0) * 18));
+        const goal = p.outcome === 'goal';
+        return `<circle cx="${X(p.y).toFixed(1)}" cy="${Y(p.x).toFixed(1)}" r="${r.toFixed(1)}" fill="${SHOT_COL[p.outcome] || '#94a3b8'}" fill-opacity="${goal ? 1 : 0.7}"${goal ? ' stroke="#fff" stroke-width="1.5"' : ''}><title>${ttEsc(p.name || '')} ${num(p.minute) != null ? p.minute + "'" : ''} · ${ttEsc(SHOT_LBL[p.outcome] || p.outcome || '')} · xG ${num(p.xg) != null ? p.xg.toFixed(2) : '-'}</title></circle>`;
+      }).join('');
+    const line = 'rgba(255,255,255,.35)';
+    const pitchHalf = `<rect x="10" y="10" width="${W - 20}" height="${H - 20}" fill="#163d1c" stroke="${line}"/>
+      <rect x="${X(21.1)}" y="10" width="${(X(78.9) - X(21.1)).toFixed(1)}" height="${(Y(16.5) - 10).toFixed(1)}" fill="none" stroke="${line}"/>
+      <rect x="${X(36.8)}" y="10" width="${(X(63.2) - X(36.8)).toFixed(1)}" height="${(Y(5.5) - 10).toFixed(1)}" fill="none" stroke="${line}"/>
+      <line x1="${X(44.6)}" y1="10" x2="${X(55.4)}" y2="10" stroke="#fff" stroke-width="3"/>`;
+    const counts = {}; shots.forEach(p => { counts[p.outcome] = (counts[p.outcome] || 0) + 1; });
+    const legend = Object.keys(SHOT_LBL).filter(k => counts[k]).map(k => `<span class="gl-tac-leg"><i style="background:${SHOT_COL[k]}"></i>${SHOT_LBL[k]} ${counts[k]}</span>`).join('');
+    const FW = 340, FH = 220;
+    const fx = v => 10 + (Math.min(100, Math.max(0, v)) / 100) * (FW - 20), fy = v => 10 + (Math.min(100, Math.max(0, v)) / 100) * (FH - 20);
+    const shape = ps.filter(p => num(p.x) != null && num(p.y) != null).map(p => `<g><circle cx="${fx(p.x).toFixed(1)}" cy="${fy(p.y).toFixed(1)}" r="9" fill="#2563eb" stroke="#fff" stroke-width="1"><title>${ttEsc(p.name)} · ${num(p.games) || 0}경기</title></circle>
+        <text x="${fx(p.x).toFixed(1)}" y="${(fy(p.y) + 21).toFixed(1)}" text-anchor="middle" font-size="12" fill="#e2e8f0">${ttEsc(String(p.name || '').split(' ').pop())}</text></g>`).join('');
+    const sum = sh.summary || {};
+    const kp = (l, v) => `<span>${l} <b>${v == null ? '-' : ttEsc(v)}</b></span>`;
+    body.innerHTML = `<div class="gl-tac-grid">
+      <section class="gl-tac-card" aria-label="${GL.tacSide === 'for' ? '공격' : '허용'} 슈팅맵">
+        <h4>${GL.tacSide === 'for' ? '공격 슈팅' : '허용 슈팅'} <span class="gl-muted">${num(s.games) || 0}경기</span></h4>
+        <div class="gl-tac-kpis">${kp('슈팅', s.shots)}${kp('골', s.goals)}${kp('xG', s.xg)}${kp('경기당 xG', s.xgPerGame)}${kp('골−xG', s.efficiency)}</div>
+        <svg viewBox="0 0 ${W} ${H}" class="gl-tac-svg" role="img" aria-label="슈팅 ${num(s.shots) || 0}개, 골 ${num(s.goals) || 0}, xG ${num(s.xg) ?? '-'}">${pitchHalf}${dots}</svg>
+        <div class="gl-tac-legs">${legend}<span class="gl-muted">원 크기 = xG · 점에 마우스를 올리면 선수·시간</span></div>
+      </section>
+      <section class="gl-tac-card" aria-label="선발 평균 위치">
+        <h4>선발 평균 위치 <span class="gl-muted">2경기 이상 · 공격 방향 →</span></h4>
+        ${ps.length ? `<svg viewBox="0 0 ${FW} ${FH}" class="gl-tac-svg" role="img" aria-label="선발 ${ps.length}명 평균 위치">
+          <rect x="10" y="10" width="${FW - 20}" height="${FH - 20}" fill="#163d1c" stroke="${line}"/>
+          <line x1="${FW / 2}" y1="10" x2="${FW / 2}" y2="${FH - 10}" stroke="${line}"/>${shape}</svg>
+          <p class="gl-muted">평균 위치 무게중심 ${num(sum.centroidX) ?? '-'} (리그 평균 ${num(sum.leagueCentroidX) ?? '-'}) — 클수록 높은 위치에서 경기</p>` : '<p class="gl-muted">평균 위치 데이터 없음</p>'}
+      </section></div>`;
   }
 
   /* ── 데이터 없음 안내 ─────────────────────────────── */

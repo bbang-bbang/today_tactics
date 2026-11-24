@@ -8979,3 +8979,16 @@ body.match-strip-collapsed .flow-section-head .flow-hint { display: none; }
 /* 좁은 화면(<=1100px)은 .rc-table .rc-sub 를 숨기지만, 포메이션 줄(⚠ 포함)은 표 위 '우리 팀 주 포메이션' 줄과 짝이라 유지 */
 @media (max-width: 1100px) { .rc-table .rc-sub.rc-os-form { display: block; } }
 .rc-os-season { color: var(--warn-fg); font-weight: 600; }   /* 지난 시즌 기록 후보(예: J2 2025) 표시 */
+
+/* 해외리그 — 팀 슈팅·진형 (2026-11-24, SofaScore 슈팅맵·평균 위치) */
+.gl-tac-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.gl-tac-side { display: flex; gap: 6px; }
+.gl-tac-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.gl-tac-card { padding: 12px; border-radius: 8px; background: rgba(15, 25, 45, 0.45); border: 1px solid rgba(255, 255, 255, 0.07); min-width: 0; }
+.gl-tac-card h4 { margin: 0 0 8px; font-size: 14px; color: var(--text-primary); }
+.gl-tac-kpis { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.gl-tac-kpis b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.gl-tac-svg { width: 100%; height: auto; display: block; border-radius: 6px; }
+.gl-tac-legs { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 12px; color: var(--text-primary); }
+.gl-tac-leg i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+.gl-muted { color: var(--text-muted); font-size: 12px; font-weight: 400; }

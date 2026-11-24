@@ -722,6 +722,22 @@ def get_leagues():
         except sqlite3.Error:
             return False
 
+    def has_shotmap(code):
+        """SofaScore 슈팅맵·평균 위치가 있는 해외 리그(현재 J1, collect_sofascore_overseas.py) — '팀 슈팅·진형' 섹션 노출."""
+        if code == "kleague":
+            return False
+        path = _league_db_path(code)
+        if not os.path.exists(path):
+            return False
+        try:
+            c = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            try:
+                return c.execute("SELECT 1 FROM match_shotmap LIMIT 1").fetchone() is not None
+            finally:
+                c.close()
+        except sqlite3.Error:
+            return False
+
     return jsonify([
         {
             "code":  code,
@@ -732,6 +748,7 @@ def get_leagues():
             "country": cfg.get("country"),
             "tier": cfg.get("tier", 1),
             "standingsOnly": bool(cfg.get("standings_only")),
+            "hasShotmap": has_shotmap(code),
         }
         for code, cfg in LEAGUE_REGISTRY.items() if has_data(code)
     ])
@@ -14941,8 +14958,10 @@ def league_team_shape(code):
     year    = request.args.get("year")
     if not team_id:
         return jsonify({"error": "teamId required"}), 400
-    year_cond = "AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?" if year else ""
-    yp = [year] if year else []
+    # 시즌 = 리그 DB season_id (2026/27 처럼 두 해에 걸친 시즌을 달력 연도로 자르지 않음, 2026-11-24)
+    sid = _league_season_id(cfg, year)
+    year_cond = "AND e.season_id = ?" if sid is not None else ""
+    yp = [sid] if sid is not None else []
 
     with get_league_db(code) as conn:
         tids = [t["id"] for t in cfg["tournaments"]]
@@ -15016,8 +15035,11 @@ def league_team_shotmap(code):
     side    = request.args.get("side", "for")  # for=공격, against=수비
     if not team_id:
         return jsonify({"error": "teamId required"}), 400
-    year_cond = "AND strftime('%Y', datetime(e.date_ts,'unixepoch','localtime')) = ?" if year else ""
-    yp = [year] if year else []
+    if side not in ("for", "against"):
+        return jsonify({"error": "invalid side"}), 400
+    sid = _league_season_id(cfg, year)     # 시즌 = 리그 DB season_id (달력 연도 아님)
+    year_cond = "AND e.season_id = ?" if sid is not None else ""
+    yp = [sid] if sid is not None else []
 
     with get_league_db(code) as conn:
         tids = [t["id"] for t in cfg["tournaments"]]
