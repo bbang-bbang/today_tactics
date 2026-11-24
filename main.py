@@ -7734,7 +7734,17 @@ _OS_MIN_SHARE = 0.5
 
 
 def _overseas_rows(min_minutes):
-    """해외 리그 DB 전체 → 선수 행 리스트(90분 환산 지표 포함). 읽기 전용 연결."""
+    """해외 리그 DB 전체 → 선수 행 리스트(90분 환산 지표 포함). 읽기 전용 연결.
+    10분 메모이즈(_PRED_CACHE — 캐시 세대 바뀌면 비워짐). 호출부가 행에 pcts·raw·adj 를 대입하므로 행은 복사본으로 준다."""
+    key = ("overseas_rows", min_minutes)
+    hit = _pcache_get(key)
+    if hit is None:
+        hit = _overseas_rows_uncached(min_minutes)
+        _pcache_set(key, hit)
+    return [dict(r) for r in hit]
+
+
+def _overseas_rows_uncached(min_minutes):
     rows = []
     for code, cfg in LEAGUE_REGISTRY.items():
         if code == "kleague":
