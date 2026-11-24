@@ -12,6 +12,7 @@
 - 참고: 시즌 중이라 최소 출전 기준이 리그 최대 출전의 절반으로 낮아져 450~900분 후보가 보일 수 있음(`main.py` `_overseas_rows`, 설계). 라인업 수집기는 `update_data.py`에 편입돼 있지 않고 이번엔 수동 실행(서버 crontab 등록 여부는 미확인) — 새 경기 라벨이 필요하면 `--league all --apply`로 재실행.
 - ✅ **11/20 UI·QA 후속(운영 배포·확인 완료, 서버 HEAD 24a3e17)**: afb8dfb 해외 후보 '보정' 열 — 계수 1.0이면 종합과 중복 대신 '–' · f5e40bf 영입 추천 표 700px 이하 가로 스크롤(`style.css?v=138`) · 24a3e17 툴바 480px 이하 줄바꿈으로 폰 폭 오버플로 해소(`?v=139`) + `qa_check.py` 포메이션 표본 상한 34→38(시즌 말 35경기는 정상). 서버 `qa_check.py` **192/192 PASS**. 1280px Chromium·Firefox·WebKit 동일·콘솔 에러 없음.
 - ✅ **11/24 영입 후보 목록**(☆ 담기·비교 패널·CSV, `recruit_shortlist.js`, localStorage 팀별 10명) — 설계 `docs/superpowers/specs/2026-11-24-recruit-shortlist-design.md`. ✅ 2단계 해외 후보 포메이션 사실 표시(`overseas_formation.py` — 선발 grid 로 포메이션 복원, `/api/overseas-recruit?team=` → `team_formation`·`fam_match`, 점수 불변). 운영 값 확인은 배포 후 `/api/overseas-recruit?pos=W&team=bucheon`.
+- ✅ **11/24 정리**: 1회성 분석 스크립트 6개·탐색 PNG 14개(analysis/ARCHIVED.md) · style.css 안 쓰는 규칙 332개 제거(359→321KB, 화면 10×폭 2 계산 스타일 전후 동일, `analysis/audit_unused_css.py`) · 후보 목록 BOM/team=null/☆ 라벨.
 - ⏭ **다음**: 11/23 크론 점검(위 11/18 항목) + **전문가별 잔여 작업(11/21 진행 예정)**:
   - **P1·P5 감독/코치**: 해외 후보 전술 맥락(포메이션 적합도) · 후보 저장·비교·내보내기 여부 점검.
   - **P2 팬**: 해외 후보 이름·국적 한글화/병기 — 한글명 출처가 없어 오기 위험, **데이터 출처부터 결정** · 엠블럼/사진.
