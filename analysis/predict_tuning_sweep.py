@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 미탐색 매개변수 스윕 (READ-ONLY): decay / shrinkage_k / SOS.
+※ 남겨 둔 이유(2026-11-24 정리): 예측 K1 2024 기준선 미달(backlog 보류) 재검토 때 첫 도구.
 _predict_core를 직접 호출(decay·apply_sos 인자) + shrinkage_k는 _league_coefs monkeypatch.
 과적합 경계: in-sample 최대 hit이 아니라 양 리그 + brier 동반 개선만 채택 권고.
 
