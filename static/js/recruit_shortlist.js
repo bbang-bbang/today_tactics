@@ -67,6 +67,12 @@
         try { storage.setItem(KEY, JSON.stringify(all)); return true; } catch (_) { return false; }
     }
 
+    // 버튼이 가리키는 표 스냅샷 행 — 인덱스와 버튼의 id 가 일치할 때만(늦게 온 응답이 행 배열을 바꾼 경우 방어)
+    function pick(rows, idx, id) {
+        const e = Array.isArray(rows) ? rows[idx] : null;
+        return e && entryId(e) === id ? e : null;
+    }
+
     function list(storage, team) { return load(storage)[team] || []; }
     function has(storage, team, id) { return list(storage, team).some(e => entryId(e) === id); }
 
@@ -149,7 +155,7 @@
                 <button type="button" class="rc-sl-act rc-sl-act--danger" data-sl-clear>모두 비우기</button></div>`;
     }
 
-    const api = { KEY, MAX, entryId, sanitize, load, save, list, has, add, remove, clear, csvCell, toCsv, csvName, panelHtml };
+    const api = { KEY, MAX, entryId, pick, sanitize, load, save, list, has, add, remove, clear, csvCell, toCsv, csvName, panelHtml };
     if (root) root.ttShortlist = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : null);

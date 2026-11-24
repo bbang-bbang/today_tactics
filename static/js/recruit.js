@@ -207,7 +207,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         if (_f.max_age) q.set("max_age", _f.max_age);
         if (btn.dataset.rcFocus) q.set("focus", btn.dataset.rcFocus);
         fetch(`/api/overseas-recruit?${q}`).then(r => r.json().then(j => ({ ok: r.ok, j })))
-            .then(({ ok, j }) => { if (!ok) throw new Error(j.error || "overseas"); box.innerHTML = osHtml(j, btn.dataset.rcOs); })
+            .then(({ ok, j }) => { if (!box.isConnected) return;   // 화면을 다시 그린 뒤 늦게 온 응답 — 옛 표·_rows 를 덮지 않음
+                if (!ok) throw new Error(j.error || "overseas"); box.innerHTML = osHtml(j, btn.dataset.rcOs); })
             .catch(err => { console.error("[해외 후보 실패]", err);
                 box.innerHTML = `<div class="rc-error" role="alert">해외 후보를 불러오지 못했습니다.</div>`; });
     }
@@ -345,7 +346,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         if (!SL()) return false;
         const add = e.target.closest("[data-sl-add]");
         if (add) {
-            const entry = (_rows[add.dataset.slTbl] || [])[parseInt(add.dataset.slAdd, 10)];
+            const entry = SL().pick(_rows[add.dataset.slTbl], parseInt(add.dataset.slAdd, 10), add.dataset.slId);
             if (!entry) return true;
             const id = SL().entryId(entry);
             if (SL().has(store(), _team, id)) {

@@ -123,3 +123,11 @@ test("panelHtml_saved_line_without_mode", () => {
   const h = SL.panelHtml([{ src: "os", name: "A", team: "T", metrics: [] }], esc);
   assert.doesNotMatch(h, /rc-sl-saved rc-muted">\s*·/);
 });
+
+test("pick_rejects_stale_index", () => {
+  const rows = [kr(1), kr(2)];
+  assert.equal(SL.pick(rows, 1, "kr:2").name, "선수2");
+  assert.equal(SL.pick(rows, 0, "kr:2"), null);   // 늦게 온 응답이 _rows 를 바꿔 인덱스가 어긋난 경우
+  assert.equal(SL.pick(undefined, 0, "kr:1"), null);
+  assert.equal(SL.pick(rows, 5, "kr:1"), null);
+});
