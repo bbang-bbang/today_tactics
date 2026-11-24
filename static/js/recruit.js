@@ -27,7 +27,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         if (!SL()) return "";
         const id = SL().entryId(entry), on = SL().has(store(), _team, id);
         return `<button type="button" class="rc-star${on ? " is-on" : ""}" data-sl-add="${idx}" data-sl-tbl="${ttEsc(tbl)}" data-sl-id="${ttEsc(id)}"
-            aria-pressed="${on}" aria-label="후보 목록에 담기: ${ttEsc(entry.name)}">${on ? "★" : "☆"}</button>`;
+            aria-pressed="${on}" aria-label="후보 목록: ${ttEsc(entry.name)}" title="${on ? "후보 목록에서 빼기" : "후보 목록에 담기"}">${on ? "★" : "☆"}</button>`;
     }
     function keep(tbl, entries) { _rows[tbl] = entries; return entries; }
     function slCount() { return SL() ? SL().list(store(), _team).length : 0; }
@@ -39,6 +39,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         document.querySelectorAll("#ws-team-recruit [data-sl-id]").forEach(b => {
             const on = SL().has(store(), _team, b.dataset.slId);
             b.classList.toggle("is-on", on); b.setAttribute("aria-pressed", on); b.textContent = on ? "★" : "☆";
+            b.title = on ? "후보 목록에서 빼기" : "후보 목록에 담기";
         });
     }
     function slMsg(text) {
@@ -214,7 +215,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         }
         btn.setAttribute("aria-expanded", "true");
         box.innerHTML = `<div class="rc-loading" role="status">해외 후보 분석 중...</div>`;
-        const q = new URLSearchParams({ pos: btn.dataset.rcOs, min_minutes: _f.min_minutes, limit: "10", realistic: _f.real, team: _team });
+        const q = new URLSearchParams({ pos: btn.dataset.rcOs, min_minutes: _f.min_minutes, limit: "10", realistic: _f.real });
+        if (_team) q.set("team", _team);      // 팀 미선택이면 team=null 문자열을 보내지 않음(캐시 키 낭비)
         if (_f.max_age) q.set("max_age", _f.max_age);
         if (btn.dataset.rcFocus) q.set("focus", btn.dataset.rcFocus);
         fetch(`/api/overseas-recruit?${q}`).then(r => r.json().then(j => ({ ok: r.ok, j })))

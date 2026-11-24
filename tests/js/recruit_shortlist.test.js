@@ -131,3 +131,9 @@ test("pick_rejects_stale_index", () => {
   assert.equal(SL.pick(undefined, 0, "kr:1"), null);
   assert.equal(SL.pick(rows, 5, "kr:1"), null);
 });
+
+test("source_has_no_literal_bom", () => {
+  // 보이지 않는 BOM 문자가 소스에 그대로 있으면 편집기·포매터가 지워도 눈치채기 어렵다 → \uFEFF 이스케이프로 둔다
+  const src = require("node:fs").readFileSync(require.resolve("../../static/js/recruit_shortlist.js"), "utf8");
+  assert.equal(src.includes("\uFEFF"), false);
+});

@@ -115,7 +115,7 @@
             (e.metrics || []).map(m => `${m.label}:${m.pct == null ? "-" : m.pct}`).join(";"),
             MODE_LBL[e.mode] || e.mode, e.saved,
         ]));
-        return "﻿" + rows.map(r => r.map(csvCell).join(",")).join("\r\n");
+        return "\uFEFF" + rows.map(r => r.map(csvCell).join(",")).join("\r\n");
     }
     function csvName(teamName, date) {
         const t = String(teamName || "팀").replace(/[\/\\:*?"<>|]/g, "_");
