@@ -37,6 +37,10 @@
 - J2 이번 시즌 /players 6명 → 2025 풀시즌 916명 수집(47호출), 영입 후보에 '2025 시즌 기록' 표시. 해외 후보 선수 기록·포메이션을 리그별 기록 시즌으로 한정.
 - 사용자 제보: 라운드별 순위 추이에서 꼴찌가 1로 표시 → TERA 기본 툴팁이 뒤집힌 y(팀 수+1-순위)를 그대로 보여 준 것. 차트별 onTooltip 플러그인으로 실제 순위 표시, 가로 십자선 끔.
 
+### 7. J1 SofaScore 슈팅맵·평균 위치 1단계 (362635f) · 대체 소스 조사
+- 수집기(`collect_sofascore_overseas.py`, 경기·선수 번호 매칭)·서버 반영(`import_overseas_extras.py`)·해외리그 탭 '팀 슈팅·진형'(데이터 있을 때만 노출) 배포. 첫 확인 6요청은 200이었으나 이후 로컬도 API 403 → 우회하지 않고 중단, 다음 날 1회 재확인 예정.
+- 대체 소스: API-Football `/fixtures/statistics`에 J1 경기별 팀 xG 확인(정식). Hudl StatsBomb 2024 무료 데이터는 과거 시즌용. FBref·FotMob·Football LAB은 이용 조건상 부적합.
+
 ### 검증
 - node 141/141 · qa_check 193/193 · 브라우저(Chromium·Firefox × 1280·375) 76/76 · 20/20 · 4/4 · 운영 HEAD 동기화.
 

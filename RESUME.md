@@ -19,6 +19,7 @@
   2) `python crawlers/collect_sofascore_overseas.py --league jleague1 --db <사본>` (dry-run: 매칭 수 확인) → `--apply` (종료 ~150경기 × 2요청, 1.5초 간격 ≈ 8분)
   3) 사본을 서버 `/home/rocky/jleague1_extras.db` 로 올려 `venv/bin/python crawlers/import_overseas_extras.py --src /home/rocky/jleague1_extras.db --dst /opt/today_tactics/jleague1.db --apply --backup-dir /home/rocky` → 캐시 무효화
   → 해외리그 탭 J1에 '🎯 팀 슈팅·진형' 섹션이 자동으로 나타남(`hasShotmap`). 2단계(선수 히트맵 ~4,200요청)는 1단계 결과 보고 결정.
+- 💭 **J리그 xG 대체 소스 조사(11/24)**: ① **API-Football `/fixtures/statistics`에 J1 경기별 팀 xG 있음**(확인: 감바 0.97 vs 오카야마 0.68, 슈팅·박스 안 슈팅·점유율 포함) — 시즌 150호출·주 10호출, 정식 계약 범위 → 다음 작업 후보(J1 xG 운 보정 등). ② Hudl StatsBomb 무료 J1 2024 이벤트 데이터(슈팅 좌표·xG·압박) — 과거 시즌만, 라이선스 확인 필요. ③ FBref(Opta 고급 데이터 철수·스크랩 데이터로 도구 제작은 허락 필요)·FotMob(자동 수집 불가)·Football LAB(웹 서비스 이용은 문의 필요)은 부적합. SofaScore 우회(TLS 위장·쿠키 이식·IP 변경)는 하지 않기로 함.
 - ✅ **기존 버그 수정(계수)**: `'brasileirao'.startswith('brasileiro')`가 거짓이라 브라질 1부 후보에 유럽 1.0이 적용되던 것 → 설계대로 0.90(`_os_league_factor`). 순위표만 리그는 해외 후보 표본에서 제외(`_os_rows_league_ok`).
 - ✅ **기존 버그 수정**: 경기 후 요약 카드 '순위 변동' 줄이 영입 표 `.rc-rank{width:22px}`에 걸려 22px로 찌그러지던 것 → 영입 쪽 `.rc-idx`로 분리(538px).
 - ⏳ **남은 일(날짜 대기)**: 11/30 크론 — K1 mps `minutes_played`·`rating` NULL 재시도 결과(비면 원인 조사) · 12/1 08:30 라인업 크론 첫 실행(`/var/log/today_tactics/apifootball.log`) · K2(11/29)·K1(12/6) 종료 후 리그 총평 '최종'·PO 일정 · 승강 PO 후 TEAMS(Red) · ~~2027 전: 해외 포메이션 집계 최신 시즌 한정~~ ✅ 11/24 선반영.
