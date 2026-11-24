@@ -7867,7 +7867,7 @@ def overseas_recruit():
     team_info = next((t for t in TEAMS if t["id"] == team_slug and t.get("league") in ("K1", "K2")), None)
     if team_info and team_info.get("sofascore_id") and os.path.exists(DB_PATH):
         main_f = _brief_formations(team_info["sofascore_id"], 410 if team_info["league"] == "K1" else 777,
-                                   str(_current_season()))["main"]
+                                   _current_season())["main"]
         if main_f and _formation_family(main_f["formation"]):
             team_formation = {**main_f, "family": _formation_family(main_f["formation"])}
     team_fam = team_formation["family"] if team_formation else None

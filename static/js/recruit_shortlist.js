@@ -9,7 +9,8 @@
     const MAX = 10;
     const STR_MAX = 120;
     const NUMS = ["age", "mins", "goals", "assists", "score", "fit"];
-    const STRS = ["team", "league", "detail", "fitLabel", "mode", "saved"];
+    const STRS = ["team", "league", "detail", "fitLabel", "saved"];
+    const MODES = ["position", "style", "similar"];
 
     function str(v) { return typeof v === "string" ? v.slice(0, STR_MAX) : ""; }
     function num(v) {
@@ -34,6 +35,7 @@
             e.player_id = pid;
         }
         STRS.forEach(k => { e[k] = str(raw[k]); });
+        e.mode = MODES.includes(raw.mode) ? raw.mode : "";
         NUMS.forEach(k => { e[k] = num(raw[k]); });
         e.metrics = (Array.isArray(raw.metrics) ? raw.metrics : [])
             .filter(m => m && typeof m === "object" && typeof m.label === "string" && m.label)
@@ -48,7 +50,7 @@
         if (!obj || typeof obj !== "object" || Array.isArray(obj)) return {};
         const out = {};
         Object.keys(obj).forEach(team => {
-            if (!Array.isArray(obj[team])) return;
+            if (team === "__proto__" || !Array.isArray(obj[team])) return;
             const seen = new Set();
             const list = [];
             obj[team].forEach(r => {
@@ -75,6 +77,8 @@
 
     function list(storage, team) { return load(storage)[team] || []; }
     function has(storage, team, id) { return list(storage, team).some(e => entryId(e) === id); }
+    // 표 한 번 그릴 때 행마다 localStorage 를 다시 읽지 않도록 담긴 id 집합을 한 번에
+    function idSet(storage, team) { return new Set(list(storage, team).map(entryId)); }
 
     function add(storage, team, entry) {
         const e = sanitize(entry);
@@ -84,7 +88,7 @@
         if (cur.some(x => entryId(x) === entryId(e))) return "exists";
         if (cur.length >= MAX) return "full";
         all[team] = cur.concat([e]);
-        return save(storage, all) ? "added" : "invalid";
+        return save(storage, all) ? "added" : "nostore";
     }
 
     function remove(storage, team, id) {
@@ -106,7 +110,7 @@
         if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
         return `"${s.replace(/"/g, '""')}"`;
     }
-    const HEAD = ["구분", "이름", "소속", "리그", "나이", "출전", "골", "도움", "세부 포지션", "점수 이름", "점수", "지표", "추천 방식", "담은 날짜"];
+    const HEAD = ["구분", "이름", "소속", "리그", "나이", "출전", "골", "도움", "포지션·포메이션", "점수 이름", "점수", "지표", "추천 방식", "담은 날짜"];
     const MODE_LBL = { position: "포지션 보강", style: "플레이 보강", similar: "비슷한 선수" };
     function toCsv(entries) {
         const rows = [HEAD].concat(entries.map(e => [
@@ -155,7 +159,7 @@
                 <button type="button" class="rc-sl-act rc-sl-act--danger" data-sl-clear>모두 비우기</button></div>`;
     }
 
-    const api = { KEY, MAX, entryId, pick, sanitize, load, save, list, has, add, remove, clear, csvCell, toCsv, csvName, panelHtml };
+    const api = { KEY, MAX, entryId, pick, sanitize, load, save, list, has, idSet, add, remove, clear, csvCell, toCsv, csvName, panelHtml };
     if (root) root.ttShortlist = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : null);

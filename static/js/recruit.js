@@ -23,21 +23,24 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const d = new Date(), p = (n) => String(n).padStart(2, "0");
         return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
     }
+    let _onIds = null;      // 표를 그리는 동안 담긴 id 집합(행마다 localStorage 재파싱 방지) — keep() 첫 호출에서 채움
     function starBtn(tbl, idx, entry) {
         if (!SL()) return "";
-        const id = SL().entryId(entry), on = SL().has(store(), _team, id);
+        if (!_onIds) _onIds = SL().idSet(store(), _team);
+        const id = SL().entryId(entry), on = _onIds.has(id);
         return `<button type="button" class="rc-star${on ? " is-on" : ""}" data-sl-add="${idx}" data-sl-tbl="${ttEsc(tbl)}" data-sl-id="${ttEsc(id)}"
             aria-pressed="${on}" aria-label="후보 목록: ${ttEsc(entry.name)}" title="${on ? "후보 목록에서 빼기" : "후보 목록에 담기"}">${on ? "★" : "☆"}</button>`;
     }
-    function keep(tbl, entries) { _rows[tbl] = entries; return entries; }
+    function keep(tbl, entries) { _rows[tbl] = entries; _onIds = null; return entries; }
     function slCount() { return SL() ? SL().list(store(), _team).length : 0; }
     function refreshShortlist() {
         const btn = document.getElementById("rc-sl-btn"), panel = document.getElementById("rc-sl-panel");
         if (!btn || !panel || !SL()) return;
         btn.querySelector(".rc-sl-n").textContent = slCount();
         if (!panel.hidden) panel.innerHTML = SL().panelHtml(SL().list(store(), _team), ttEsc);
+        const ids = SL().idSet(store(), _team);
         document.querySelectorAll("#ws-team-recruit [data-sl-id]").forEach(b => {
-            const on = SL().has(store(), _team, b.dataset.slId);
+            const on = ids.has(b.dataset.slId);
             b.classList.toggle("is-on", on); b.setAttribute("aria-pressed", on); b.textContent = on ? "★" : "☆";
             b.title = on ? "후보 목록에서 빼기" : "후보 목록에 담기";
         });
@@ -130,7 +133,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             age: c.age, mins: c.mins, goals: c.goals, assists: c.assists, detail: n.label, score: c.score, fitLabel: "적합도", fit: c.fit,
             metrics: n.weak_metrics.map(w => ({ label: w.label, pct: c.focus_pcts[w.key] })), mode: "position", saved: today() })));
         const rows = n.candidates.map((c, i) => `<tr>
-                <td class="rc-rank">${starBtn(tbl, i, ents[i])}${i + 1}</td>
+                <td class="rc-idx">${starBtn(tbl, i, ents[i])}${i + 1}</td>
                 <td><button type="button" class="rc-plink rc-name" data-rc-player="${c.player_id}">${ttEsc(c.name)}</button>
                     <span class="rc-sub">${ttEsc(c.nationality || "")}${c.height ? " · " + c.height + "cm" : ""}${c.foot ? " · " + ttEsc(({ Right: "오른발", Left: "왼발", Both: "양발" })[c.foot] || c.foot) : ""}${c.detail_est ? " · 포지션 추정" : ""}</span></td>
                 <td>${ttEsc(c.team || "")} <span class="rc-lg rc-lg-${ttEsc(c.league)}">${ttEsc(c.league)}</span>${k1EquivHtml(c)}</td>
@@ -168,7 +171,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     function osFormText(c) {
         if (!c.formation_main) return "";
         const m = c.fam_match;
-        const fam = m ? (m.n ? `${m.family} 선발 ${m.n}/${m.tot}` : `⚠ ${m.family} 선발 경험 없음`) : "";
+        const fam = m ? (m.n ? `${m.family} ${m.n}/${m.tot}경기` : `⚠ ${m.family} 선발 경험 없음`) : "";
         return `${c.formation_main} 위주${fam ? " · " + fam : ""}`;
     }
     function osHtml(d, group) {
@@ -183,9 +186,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                 metrics: keys.map(k => ({ label: d.metric_labels[k], pct: c.pcts[k] })), mode: "position", saved: today() };
         }));
         const rows = d.candidates.map((c, i) => `<tr>
-            <td class="rc-rank">${starBtn(tbl, i, ents[i])}${i + 1}</td>
+            <td class="rc-idx">${starBtn(tbl, i, ents[i])}${i + 1}</td>
             <td><span class="rc-name">${ttEsc(c.name)}</span><span class="rc-sub">${ttEsc(c.nationality || "")}${c.height ? " · " + c.height + "cm" : ""}${c.detail && OS_DETAIL[c.detail] ? ` · ${OS_DETAIL[c.detail]}${c.starts ? ` (선발 ${c.starts})` : ""}` : ""}</span>${osFormText(c)
-                ? `<span class="rc-sub rc-os-form${c.fam_match && !c.fam_match.n ? " is-miss" : ""}">${ttEsc(osFormText(c))}</span>` : ""}</td>
+                ? `<span class="rc-sub rc-os-form${c.fam_match && !c.fam_match.n ? " is-miss" : ""}"${c.fam_match ? ` title="포메이션을 확인할 수 있는 선발 ${c.fam_match.tot}경기 중 ${ttEsc(c.fam_match.family)} 계열 ${c.fam_match.n}경기 — 세부 포지션 '선발 N'과는 집계 기준이 다를 수 있음"` : ""}>${ttEsc(osFormText(c))}</span>` : ""}</td>
             <td>${ttEsc(c.team || "")} <span class="rc-lg" title="${ttEsc(c.league)}">${ttEsc(c.country || "")} ${OS_TIER[c.tier] || ""}</span>
                 <span class="rc-sub">${ttEsc(c.league)}${c.team_rank ? ` · 팀 ${c.team_rank}/${c.team_n}위` : ""}</span></td>
             <td class="rc-num">${c.age ?? "-"}</td>
@@ -233,7 +236,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             age: c.age, mins: c.mins, goals: c.goals, assists: c.assists, detail: c.pos || "", score: c.score, fitLabel: scoreLabel, fit: c[scoreKey],
             metrics: cols.map(([k, l]) => ({ label: l, pct: (c.focus_pcts || c.profile || {})[k] })), mode: tbl, saved: today() })));
         const rows = cands.map((c, i) => `<tr>
-            <td class="rc-rank">${starBtn(tbl, i, ents[i])}${i + 1}</td>
+            <td class="rc-idx">${starBtn(tbl, i, ents[i])}${i + 1}</td>
             <td><button type="button" class="rc-plink rc-name" data-rc-player="${c.player_id}">${ttEsc(c.name)}</button>
                 <span class="rc-sub">${ttEsc(c.pos || "")}${c.nationality ? " · " + ttEsc(c.nationality) : ""}${c.height ? " · " + c.height + "cm" : ""}</span></td>
             <td>${ttEsc(c.team || "")} <span class="rc-lg rc-lg-${ttEsc(c.league)}">${ttEsc(c.league)}</span>${k1EquivHtml(c)}</td>
@@ -371,7 +374,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             refreshShortlist();
             slMsg(r === "full" ? `후보는 팀당 ${SL().MAX}명까지 담을 수 있습니다. 목록에서 빼고 다시 담아 주세요.`
                 : r === "added" ? `${entry.name} — 후보 목록에 담았습니다.`
-                : r === "invalid" ? "이 브라우저에서는 후보 목록을 저장할 수 없습니다." : "");
+                : r === "nostore" ? "이 브라우저에서는 후보 목록을 저장할 수 없습니다(사생활 보호 모드·저장 공간 부족 등)."
+                : r === "invalid" ? "이 후보는 정보가 부족해 담을 수 없습니다." : "");
             return true;
         }
         if (e.target.closest("#rc-sl-btn")) {

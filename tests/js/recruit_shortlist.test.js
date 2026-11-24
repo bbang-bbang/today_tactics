@@ -95,7 +95,7 @@ test("toCsv_bom_header", () => {
   const csv = SL.toCsv([e, os("=HYPERLINK(1)")]);
   assert.equal(csv[0], "﻿");
   const lines = csv.slice(1).split("\r\n");
-  assert.equal(lines[0], ["구분", "이름", "소속", "리그", "나이", "출전", "골", "도움", "세부 포지션", "점수 이름", "점수", "지표", "추천 방식", "담은 날짜"].map(x => `"${x}"`).join(","));
+  assert.equal(lines[0], ["구분", "이름", "소속", "리그", "나이", "출전", "골", "도움", "포지션·포메이션", "점수 이름", "점수", "지표", "추천 방식", "담은 날짜"].map(x => `"${x}"`).join(","));
   assert.match(lines[1], /"키패스:81;태클:60"/);
   assert.match(lines[1], /^"국내"/);
   assert.match(lines[2], /^"해외","'=HYPERLINK\(1\)"/);
@@ -136,4 +136,35 @@ test("source_has_no_literal_bom", () => {
   // 보이지 않는 BOM 문자가 소스에 그대로 있으면 편집기·포매터가 지워도 눈치채기 어렵다 → \uFEFF 이스케이프로 둔다
   const src = require("node:fs").readFileSync(require.resolve("../../static/js/recruit_shortlist.js"), "utf8");
   assert.equal(src.includes("\uFEFF"), false);
+});
+
+test("add_reports_nostore_separately", () => {
+  const st = { getItem: () => null, setItem() { throw new Error("quota"); } };
+  assert.equal(SL.add(st, "suwon", kr(1)), "nostore");
+  assert.equal(SL.add(st, "suwon", { src: "kr", name: "a" }), "invalid");
+});
+
+test("sanitize_mode_whitelist", () => {
+  assert.equal(SL.sanitize({ src: "os", name: "A", mode: "constructor" }).mode, "");
+  assert.equal(SL.sanitize({ src: "os", name: "A", mode: "style" }).mode, "style");
+  const h = SL.panelHtml([SL.sanitize({ src: "os", name: "A", mode: "toString" })], esc);
+  assert.doesNotMatch(h, /native code|function/);
+});
+
+test("load_ignores_proto_team_key", () => {
+  const all = SL.load(fakeStorage('{"__proto__":[{"src":"os","name":"A"}],"suwon":[]}'));
+  assert.equal(Object.getPrototypeOf(all) === null || Object.getPrototypeOf(all) === Object.prototype, true);
+  assert.equal(Object.prototype.hasOwnProperty.call(all, "__proto__"), false);
+  assert.equal(all.suwon.length, 0);
+});
+
+test("idSet_matches_list", () => {
+  const st = fakeStorage();
+  SL.add(st, "suwon", kr(1)); SL.add(st, "suwon", os("A"));
+  const s = SL.idSet(st, "suwon");
+  assert.equal(s.has("kr:1") && s.has("os:A|Leeds") && s.size === 2, true);
+});
+
+test("csv_header_position_column", () => {
+  assert.match(SL.toCsv([]).split("\r\n")[0], /"포지션·포메이션"/);
 });
