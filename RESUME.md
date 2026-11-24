@@ -1,24 +1,33 @@
 # RESUME — 다른 PC / 새 세션에서 작업 재개 가이드
 
 > 이 파일 + `checklist/work-log-*.md` + git 커밋 기록만 보고 작업을 이어갈 수 있도록 정리.
-> 최종 갱신: 2026-11-20 (UI·QA 후속 + 전문가별 잔여 작업) · 2026-11-19 (해외 후보 현실성 필터·세부 포지션) · 2026-11-18 (11/16 크론 점검 완료) · 2026-11-15 (시즌 마감 대기 — 남은 작업 일정표) · 2026-11-12 (해외 하위 리그·해외 후보) · 2026-11-09 (11/9 크론 점검 → `checklist/work-log-2026-11-09.md`) · 2026-11-07 (11/7 레이아웃 개편 → `checklist/work-log-2026-11-07.md`) · 이전: 2026-11-06 00:50 (11/5~11/6 작업 상세 → `checklist/work-log-2026-11-05.md` · 그 앞 → `work-log-2026-11-04.md`·`work-log-2026-11-03.md` · `checklist/backlog.md` P1 'SofaScore 수집 중단')
+> 최종 갱신: 2026-11-24 (영입 후보 목록·해외 후보 포메이션·CSS 정리·라인업 크론) · 2026-11-20 (UI·QA 후속 + 전문가별 잔여 작업) · 2026-11-19 (해외 후보 현실성 필터·세부 포지션) · 2026-11-18 (11/16 크론 점검 완료) · 2026-11-15 (시즌 마감 대기 — 남은 작업 일정표) · 2026-11-12 (해외 하위 리그·해외 후보) · 2026-11-09 (11/9 크론 점검 → `checklist/work-log-2026-11-09.md`) · 2026-11-07 (11/7 레이아웃 개편 → `checklist/work-log-2026-11-07.md`) · 이전: 2026-11-06 00:50 (11/5~11/6 작업 상세 → `checklist/work-log-2026-11-05.md` · 그 앞 → `work-log-2026-11-04.md`·`work-log-2026-11-03.md` · `checklist/backlog.md` P1 'SofaScore 수집 중단')
 
 ---
 
-## 0-00000000. ✅ 2026-11-19 — 해외 후보 현실성 필터 · 세부 포지션 (최신)
+## 0-000000000. ✅ 2026-11-24 — 영입 후보 목록 · 해외 후보 포메이션 · 정리 (최신)
+**모두 운영 배포·확인 완료(서버 HEAD = 로컬 main).** 상세 → `checklist/history.md` 2026-11-24.
+- ✅ **라인업 수집기 크론 등록**(서버 crontab 월 08:30, `collect_apifootball_lineups.py --league all --apply --max-calls 600`) — 첫 실행 12/1. 운영 `kleague_players_2026.json` 177KB 정상(11/23 STEP 12 빈 파일 덮어쓰기는 6aaae46로 차단).
+- ✅ **영입 후보 목록**(P1·P5): 모든 후보 표 ☆ 담기 → 팀별 localStorage(최대 10) → `★ 후보 목록 (N)` 비교 패널(국내/해외 구역 분리) → CSV(BOM·수식 인젝션 방어). `static/js/recruit_shortlist.js`(순수 로직, `tests/js/recruit_shortlist.test.js`). 설계·계획 `docs/superpowers/{specs,plans}/2026-11-24-recruit-shortlist*`.
+- ✅ **해외 후보 포메이션 사실 표시**(P1·P5, 점수 불변): `overseas_formation.py`가 해외 DB `match_lineups.formation_slot` grid로 포메이션 복원 → `/api/overseas-recruit?team=<slug>` 가 `team_formation`·후보 `formation_main`·`fam_match`. 화면 `4-3-3 위주 · 3백 2/18경기`, 0이면 `⚠ 3백 선발 경험 없음`. `_overseas_rows` 10분 메모이즈(_PRED_CACHE). 운영 확인: 부천(3-4-3) 윙어 후보 ⚠, 수원(4-4-2) 대비 결과 정상, 응답 ≤0.2s. 검증 `analysis/verify_overseas_formation.py`·`verify_overseas_rows_cache.py`.
+- ✅ **정리**: 1회성 분석 스크립트 6개·탐색 PNG 14개(`analysis/ARCHIVED.md`) · `style.css` 미사용 규칙 332개 제거 359→321KB(10화면×1280·375 계산 스타일 전후 동일, 도구 `analysis/audit_unused_css.py`) · `.gitignore` SQLite 임시 파일.
+- ✅ **기존 버그 수정**: 경기 후 요약 카드 '순위 변동' 줄이 영입 표 `.rc-rank{width:22px}`에 걸려 22px로 찌그러지던 것 → 영입 쪽 `.rc-idx`로 분리(538px).
+- ⏳ **남은 일(날짜 대기)**: 11/30 크론 — K1 mps `minutes_played`·`rating` NULL 재시도 결과(비면 원인 조사) · 12/1 08:30 라인업 크론 첫 실행(`/var/log/today_tactics/apifootball.log`) · K2(11/29)·K1(12/6) 종료 후 리그 총평 '최종'·PO 일정 · 승강 PO 후 TEAMS(Red) · **2027 전: 해외 포메이션 집계를 최신 시즌 경기로 한정**(지금은 DB 전 시즌 합산).
+- 💭 **사용자 결정 대기**: 해외 선수 한글 이름 출처 · K1 2020~2025 히트맵 백필(운영 대량 쓰기) · 해외 보정 계수 재추정(1월 이적시장 뒤).
+- 보류: 예측 K1 2024 기준선 미달(`analysis/predict_tuning_sweep.py`) · CSS 같은 선택자 중복 정의 23곳(덮어쓰기 순서 의존이라 보류) · 하위 리그 선발 ID 누락 경기는 포메이션 집계 제외(안전 방향).
+
+## 0-00000000. ✅ 2026-11-19 — 해외 후보 현실성 필터 · 세부 포지션
 - ✅ 커밋·푸시(운영 배포됨): 34a83da 여름 이적 반영 스쿼드 동기화(update_data STEP 30) · 858b407 팀 탭 모드 전환 잔상 수정 · e36bc5c **해외 후보 현실성 필터**(1·2부 상위 1/3 구단 소속 제외, 기본 ON, 팀 순위 표시) · cf71112 `crawlers/collect_apifootball_lineups.py`(선발 라인업 → `match_lineups.detail_pos`) · 5baf778 해외 후보 **세부 포지션**(GK·CB·FB·DM·CM·AM·W·ST).
 - ✅ 운영 라인업 수집 완료(11/19 00:31~, 로그 `/home/rocky/lineups_20261119.log`): 14개 리그 경기 81~369건·선발 1,782~7,744행, 총 API 호출 2,176(일일 잔여 약 5,400). 라벨 불가(포메이션/grid 불일치) 행은 세리에B 100·리그2 88·브라질B 143 등 일부 — 의도적 제외. 브라질 세리에C는 순위표만 수집이라 건너뜀.
 - ✅ 캐시 무효화(`.cache_generation` touch + `/api/cache-invalidate`) 후 운영 화면 확인: 영입 추천 → 해외 후보에 '골키퍼 (선발 N)'·팀 순위 표시, 콘솔 에러 없음. CB 등은 API 응답으로만 확인(화면은 GK만).
 - 참고: 시즌 중이라 최소 출전 기준이 리그 최대 출전의 절반으로 낮아져 450~900분 후보가 보일 수 있음(`main.py` `_overseas_rows`, 설계). 라인업 수집기는 `update_data.py`에 편입돼 있지 않고 이번엔 수동 실행(서버 crontab 등록 여부는 미확인) — 새 경기 라벨이 필요하면 `--league all --apply`로 재실행.
 - ✅ **11/20 UI·QA 후속(운영 배포·확인 완료, 서버 HEAD 24a3e17)**: afb8dfb 해외 후보 '보정' 열 — 계수 1.0이면 종합과 중복 대신 '–' · f5e40bf 영입 추천 표 700px 이하 가로 스크롤(`style.css?v=138`) · 24a3e17 툴바 480px 이하 줄바꿈으로 폰 폭 오버플로 해소(`?v=139`) + `qa_check.py` 포메이션 표본 상한 34→38(시즌 말 35경기는 정상). 서버 `qa_check.py` **192/192 PASS**. 1280px Chromium·Firefox·WebKit 동일·콘솔 에러 없음.
-- ✅ **11/24 영입 후보 목록**(☆ 담기·비교 패널·CSV, `recruit_shortlist.js`, localStorage 팀별 10명) — 설계 `docs/superpowers/specs/2026-11-24-recruit-shortlist-design.md`. ✅ 2단계 해외 후보 포메이션 사실 표시(`overseas_formation.py` — 선발 grid 로 포메이션 복원, `/api/overseas-recruit?team=` → `team_formation`·`fam_match`, 점수 불변). 운영 값 확인은 배포 후 `/api/overseas-recruit?pos=W&team=bucheon`.
-- ✅ **11/24 정리**: 1회성 분석 스크립트 6개·탐색 PNG 14개(analysis/ARCHIVED.md) · style.css 안 쓰는 규칙 332개 제거(359→321KB, 화면 10×폭 2 계산 스타일 전후 동일, `analysis/audit_unused_css.py`) · 후보 목록 BOM/team=null/☆ 라벨.
 - ⏭ **다음**: 11/23 크론 점검(위 11/18 항목) + **전문가별 잔여 작업(11/21 진행 예정)**:
-  - **P1·P5 감독/코치**: 해외 후보 전술 맥락(포메이션 적합도) · 후보 저장·비교·내보내기 여부 점검.
+  - ~~**P1·P5 감독/코치**: 해외 후보 전술 맥락(포메이션 적합도) · 후보 저장·비교·내보내기~~ ✅ 11/24.
   - **P2 팬**: 해외 후보 이름·국적 한글화/병기 — 한글명 출처가 없어 오기 위험, **데이터 출처부터 결정** · 엠블럼/사진.
   - **P3 선수**: 해외 후보 동선/히트맵 대체 수단 · K1 과거 시즌 히트맵 백필(운영 DB 대량 쓰기, 사용자 확인).
   - **P4 분석가**: 리그 보정 계수 검증(현재 추정) · 시즌 중 최소 출전 기준(리그 최대의 절반) 혼재 표시 · 예측 K1 2024 기준선 미달(보류 중).
-  - **P6 UI**: 실제 키보드 탐색·ARIA 동작 확인 · 남은 모바일 점검(영입 추천 외 화면).
+  - **P6 UI**: ✅ 11/23 키보드·ARIA·375px 점검 완료(아래 0-00000000-a).
   - **P7 보안**: 이번 세션 미점검 — `collect_apifootball_lineups.py` API 키·응답 검증, 가비아 방화벽 SSH 화이트리스트(백로그). (`/api/cache-invalidate`는 로컬/`UPDATE_SECRET` 한정으로 확인됨)
   - **QA/프로세스**: 6인 관점 체크·최종 컨펌(C1·C2) 정식 수행 · 라인업 수집기 크론 편입 ✅(11/24).
 
