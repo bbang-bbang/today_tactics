@@ -39,6 +39,9 @@ for code, api_id, season, tier in (("jleague1", 98, 2027, 1), ("jleague2", 99, 2
     check(f"{code} 수집기 표 일치", ca.LEAGUES.get(code) == (api_id, season, api_id, True), str(ca.LEAGUES.get(code)))
 check("J2 경기별 선수 기록 미제공 → matches 건너뜀", "jleague2" in ca.NO_MATCH_STATS)
 check("J1 은 경기별 기록 수집(lower 묶음)", "jleague1" in ca.LOWER_LEAGUES)
+import collect_apifootball_lineups as cal  # noqa: E402
+check("라인업 수집: J2 포함(경기별 기록 없어도 라인업 coverage 있음)", cal.lineup_supported("jleague2"))
+check("라인업 수집: 순위표만 리그(브라질 3부) 제외 유지", not cal.lineup_supported("brasileiroc"))
 check("J1 계수 0.85", main._os_league_factor("jleague1", 1) == 0.85)
 check("J2 계수 0.75", main._os_league_factor("jleague2", 2) == 0.75)
 check("유럽 1부 계수 불변 1.0", main._os_league_factor("epl", 1) == 1.0)

@@ -29,7 +29,7 @@ except Exception:
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "crawlers"))
 from collect_apifootball import (   # noqa: E402
-    LEAGUES, DB_FILES, FINISHED, NO_MATCH_STATS, ALIASES, Client, load_key, f_int,
+    LEAGUES, DB_FILES, FINISHED, ALIASES, Client, load_key, f_int,
 )
 from backfill_detail_positions import detail_positions   # noqa: E402
 
@@ -75,9 +75,15 @@ def label_team(formation, start_xi):
     return out
 
 
+def lineup_supported(code):
+    """선수 기록을 수집하는 리그면 라인업도 받는다. 경기별 선수 기록이 없는 리그(NO_MATCH_STATS, 예: J2)도
+    /fixtures/lineups coverage 는 있어 포함(2026-11-24). 순위표만 수집하는 리그(with_players=False)는 제외."""
+    return bool(LEAGUES[code][3])
+
+
 def collect(cli, code, apply):
     lid, season, _tid, with_players = LEAGUES[code]
-    if not with_players or code in NO_MATCH_STATS:
+    if not lineup_supported(code):
         print(f"  [{code}] 건너뜀 (순위표만 수집하는 리그)", flush=True)
         return
     db = ROOT / DB_FILES[code]
