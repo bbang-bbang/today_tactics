@@ -190,7 +190,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <td><span class="rc-name">${ttEsc(c.name)}</span><span class="rc-sub">${ttEsc(c.nationality || "")}${c.height ? " · " + c.height + "cm" : ""}${c.detail && OS_DETAIL[c.detail] ? ` · ${OS_DETAIL[c.detail]}${c.starts ? ` (선발 ${c.starts})` : ""}` : ""}</span>${osFormText(c)
                 ? `<span class="rc-sub rc-os-form${c.fam_match && !c.fam_match.n ? " is-miss" : ""}"${c.fam_match ? ` title="포메이션을 확인할 수 있는 선발 ${c.fam_match.tot}경기 중 ${ttEsc(c.fam_match.family)} 계열 ${c.fam_match.n}경기 — 세부 포지션 '선발 N'과는 집계 기준이 다를 수 있음"` : ""}>${ttEsc(osFormText(c))}</span>` : ""}</td>
             <td>${ttEsc(c.team || "")} <span class="rc-lg" title="${ttEsc(c.league)}">${ttEsc(c.country || "")} ${OS_TIER[c.tier] || ""}</span>
-                <span class="rc-sub">${ttEsc(c.league)}${c.team_rank ? ` · 팀 ${c.team_rank}/${c.team_n}위` : ""}</span></td>
+                <span class="rc-sub">${ttEsc(c.league)}${c.season_label ? ` · <b class="rc-os-season">${ttEsc(c.season_label)}</b>` : ""}${c.team_rank ? ` · 팀 ${c.team_rank}/${c.team_n}위` : ""}</span></td>
             <td class="rc-num">${c.age ?? "-"}</td>
             <td class="rc-num">${c.mins.toLocaleString()}<span class="rc-muted">분</span></td>
             <td class="rc-num">${c.goals}·${c.assists}</td>

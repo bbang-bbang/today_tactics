@@ -317,6 +317,8 @@ for _args in (
 # J2 는 coverage 표시와 달리 운영 수집 결과 선수 6명·라인업 7/180경기뿐(2026-11-24) → 순위표만 제공.
 _register_lower_league("jleague1", "일본", "🇯🇵", 1, "J1 League", 98, season_id=2027)
 _register_lower_league("jleague2", "일본", "🇯🇵", 2, "J2 League", 99, standings_only=True, season_id=2026)
+# 해외리그 탭은 순위표만, 영입 추천 해외 후보는 직전 풀시즌(2025, 2~12월) 선수 기록으로(collect_apifootball.PLAYER_SEASON)
+LEAGUE_REGISTRY["jleague2"].update({"recruit_stats_season": 2025, "recruit_stats_label": "2025 시즌 기록"})
 
 _VALID_LEAGUE_CODES = set(LEAGUE_REGISTRY.keys())
 
@@ -7760,9 +7762,19 @@ def _overseas_rows(min_minutes):
 
 
 def _os_rows_league_ok(code):
-    """해외 후보 표본에 넣을 리그 — K리그·순위표만 제공 리그(선수 기록 부실: 브라질 3부·J2 등)는 제외."""
+    """해외 후보 표본에 넣을 리그 — K리그·순위표만 제공 리그(선수 기록 부실: 브라질 3부 등)는 제외.
+    단 지난 시즌 선수 기록을 지정한 리그(recruit_stats_season, 예: J2 2025)는 포함."""
     cfg = LEAGUE_REGISTRY.get(code) or {}
-    return code != "kleague" and bool(cfg) and not cfg.get("standings_only")
+    return code != "kleague" and bool(cfg) and (not cfg.get("standings_only") or bool(cfg.get("recruit_stats_season")))
+
+
+def _os_stats_season(code):
+    """해외 후보에 쓰는 선수 기록 시즌(DB season_id) — 지정값(recruit_stats_season) 또는 현재 시즌(season_ids 최신)."""
+    cfg = LEAGUE_REGISTRY.get(code) or {}
+    if cfg.get("recruit_stats_season"):
+        return cfg["recruit_stats_season"]
+    sids = cfg.get("season_ids") or {}
+    return sids[max(sids)] if sids else None
 
 
 def _overseas_rows_uncached(min_minutes):
@@ -7816,22 +7828,27 @@ def _overseas_rows_uncached(min_minutes):
                         detail_by_pid[pid_] = (g_, tot_)
             except sqlite3.Error:
                 detail_by_pid = {}
-            # 선발 경기의 팀 포메이션(grid 줄별 인원으로 복원, overseas_formation.py) — 사실 표시용, 점수 미반영
+            # 선발 경기의 팀 포메이션(grid 줄별 인원으로 복원, overseas_formation.py) — 사실 표시용, 점수 미반영.
+            # 선수 기록과 같은 시즌 경기만(events.season_id) — 시즌이 바뀌어도 지난 시즌 소속팀 경기가 섞이지 않게
             try:
                 form_by_pid = _os_player_formations(conn.execute(
-                    "SELECT event_id, is_home, player_id, formation_slot FROM match_lineups "
-                    "WHERE is_starter=1 AND formation_slot IS NOT NULL"))
+                    "SELECT ml.event_id, ml.is_home, ml.player_id, ml.formation_slot FROM match_lineups ml "
+                    "JOIN events e ON e.id = ml.event_id "
+                    "WHERE ml.is_starter=1 AND ml.formation_slot IS NOT NULL AND e.season_id = ?", (_os_stats_season(code),)))
             except sqlite3.Error:
                 form_by_pid = {}
-            lm = (conn.execute("SELECT MAX(minutes_played) FROM player_stats WHERE tournament_id IN (" + ph + ")", tids).fetchone() or [0])[0] or 0
+            stats_season = _os_stats_season(code)
+            lm = (conn.execute("SELECT MAX(minutes_played) FROM player_stats WHERE tournament_id IN (" + ph + ") AND season_id = ?",
+                               (*tids, stats_season)).fetchone() or [0])[0] or 0
             thr = min(min_minutes, max(450, int(lm * 0.5)))
             q = ("SELECT p.id, p.name, p.position, p.height, p.birth_date, p.nationality, t.name, p.team_id, ps.appearances, ps.minutes_played, ps.rating, "
                  "ps.goals, ps.assists, ps.shots_on_target, ps.key_passes, ps.successful_dribbles, ps.tackles, ps.interceptions, "
                  "ps.accurate_passes_pct, ps.total_passes, ps.saves, ps.goals_conceded "
                  "FROM player_stats ps JOIN players p ON p.id = ps.player_id LEFT JOIN teams t ON t.id = p.team_id "
-                 "WHERE ps.tournament_id IN (" + ph + ") AND COALESCE(ps.minutes_played,0) >= ?")   # ph 는 '?' 자리표시자만, 값은 바인딩
+                 "WHERE ps.tournament_id IN (" + ph + ") AND ps.season_id = ? AND COALESCE(ps.minutes_played,0) >= ?")   # ph 는 '?' 자리표시자만, 값은 바인딩
+            season_lbl = cfg.get("recruit_stats_label")      # 지난 시즌 기록이면 화면에 표시(예: J2 '2025 시즌 기록')
             for (pid, name, pos, h, bd, nat, team, team_id, apps, mins, rating, g, a, sot, kp, dr, tk, ic, pacc, tp,
-                 sv, gc) in conn.execute(q, (*tids, thr)):
+                 sv, gc) in conn.execute(q, (*tids, stats_season, thr)):
                 if pos not in ("G", "D", "M", "F"):
                     continue
                 n90 = mins / 90.0
@@ -7855,6 +7872,7 @@ def _overseas_rows_uncached(min_minutes):
                              "detail": "GK" if pos == "G" else (detail_by_pid.get(pid) or (None, 0))[0],
                              "starts": (detail_by_pid.get(pid) or (None, 0))[1],
                              "team_rank": (ranks.get(team_id) or (None, None))[0], "team_n": (ranks.get(team_id) or (None, None))[1],
+                             "season_label": season_lbl,
                              "formation_main": (form_by_pid.get(pid) or {}).get("main"),
                              "fam_starts": (form_by_pid.get(pid) or {}).get("fam") or {}})
         except sqlite3.Error:
@@ -7965,6 +7983,7 @@ def overseas_recruit():
             "detail": r.get("detail"), "starts": r.get("starts"),
             "apps": r["apps"], "mins": r["mins"], "goals": r["goals"], "assists": r["assists"],
             "team_rank": r.get("team_rank"), "team_n": r.get("team_n"),
+            "season_label": r.get("season_label"),
             "formation_main": r.get("formation_main"), "fam_starts": r.get("fam_starts") or {},
             "fam_match": ({"n": (r.get("fam_starts") or {}).get(team_fam, 0), "tot": sum((r.get("fam_starts") or {}).values()),
                            "family": team_fam} if team_fam and r.get("fam_starts") else None),

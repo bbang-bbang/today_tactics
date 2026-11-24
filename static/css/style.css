@@ -8978,3 +8978,4 @@ body.match-strip-collapsed .flow-section-head .flow-hint { display: none; }
 .rc-os-form.is-miss { color: var(--warn-fg); }
 /* 좁은 화면(<=1100px)은 .rc-table .rc-sub 를 숨기지만, 포메이션 줄(⚠ 포함)은 표 위 '우리 팀 주 포메이션' 줄과 짝이라 유지 */
 @media (max-width: 1100px) { .rc-table .rc-sub.rc-os-form { display: block; } }
+.rc-os-season { color: var(--warn-fg); font-weight: 600; }   /* 지난 시즌 기록 후보(예: J2 2025) 표시 */

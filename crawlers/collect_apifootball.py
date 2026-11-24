@@ -64,9 +64,12 @@ LEAGUES = {
     "brasileiroc":  (75, 2026, 75, False),   # /players가 29명·출전시간 없음 → 순위표만
     # ── 일본 (2026-11-24) — 2026-27 추춘제. API 시즌 표기: J1 = 종료 연도 2027, J2 = 시작 연도 2026 ──
     "jleague1":     (98, 2027, 98, True),
-    "jleague2":     (99, 2026, 99, False),   # coverage 표시와 달리 /players 6명·라인업 7/180경기(2026-11-24) → 순위표만
+    "jleague2":     (99, 2026, 99, True),    # 이번 시즌 /players 6명·라인업 7/180경기(2026-11-24) → 선수 기록은 PLAYER_SEASON(2025)
 }
 DB_FILES = {code: f"{code}.db" for code in LEAGUES}
+# 이번 시즌 선수 기록이 아직 비어 있는 리그 → 직전 풀시즌 선수 기록을 받는다(순위표는 LEAGUES 시즌). 2026-11-24
+# J2: 2026-27 추춘제 첫 시즌 기록 미제공, 2025 시즌(2~12월)은 약 920명 제공. main.LEAGUE_REGISTRY recruit_stats_season 과 일치.
+PLAYER_SEASON = {"jleague2": 2025}
 POS = {"Goalkeeper": "G", "Defender": "D", "Midfielder": "M", "Attacker": "F"}
 
 
@@ -145,10 +148,11 @@ def collect(cli, code, apply):
     rows = groups[0] if groups else []
     print(f"  standings: {len(rows)}팀 (호출 {cli.calls} · 오늘 남은 {cli.remaining})", flush=True)
 
-    # 2) 선수 시즌 기록 (페이지)
+    # 2) 선수 시즌 기록 (페이지) — PLAYER_SEASON 지정 리그는 그 시즌
+    pseason = PLAYER_SEASON.get(code, season)
     players, page, total = [], 1, 1
     while with_players and page <= total:
-        d = cli.get(f"/players?league={lid}&season={season}&page={page}")
+        d = cli.get(f"/players?league={lid}&season={pseason}&page={page}")
         total = (d.get("paging") or {}).get("total") or 1
         players += d.get("response") or []
         page += 1
@@ -197,12 +201,12 @@ def collect(cli, code, apply):
                             successful_dribbles, tackles, interceptions, yellow_cards, red_cards, saves, goals_conceded,
                             was_fouled, fouls, raw_json)
                             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                         (p["id"], tid, season, f_int(gm.get("appearences")), f_int(gm.get("minutes")), f_float(gm.get("rating")),
+                         (p["id"], tid, pseason, f_int(gm.get("appearences")), f_int(gm.get("minutes")), f_float(gm.get("rating")),
                           f_int(gl.get("total")) or 0, f_int(gl.get("assists")) or 0, f_int(sh.get("total")), f_int(sh.get("on")),
                           tot_pass, None, acc_pct, f_int(ps.get("key")), f_int(dr.get("success")), f_int(tk.get("total")),
                           f_int(tk.get("interceptions")), f_int(cd.get("yellow")), f_int(cd.get("red")), f_int(gl.get("saves")),
                           f_int(gl.get("conceded")), f_int(fo.get("drawn")), f_int(fo.get("committed")),
-                          json.dumps({"source": "api-football", "season": season, "team": team.get("name")}, ensure_ascii=False)))
+                          json.dumps({"source": "api-football", "season": pseason, "team": team.get("name")}, ensure_ascii=False)))
             n_ps += 1
     conn.close()
     print(f"  저장: 팀 {len(rows)} · 선수 기록 {n_ps}", flush=True)
