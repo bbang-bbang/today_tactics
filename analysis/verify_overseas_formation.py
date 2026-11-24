@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """overseas_formation.py 단위 검증 (읽기 전용, 합성 데이터). 실행: python analysis/verify_overseas_formation.py"""
 import sys
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
