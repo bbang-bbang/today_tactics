@@ -10459,3 +10459,51 @@ body.match-strip-collapsed .flow-section-head .flow-hint { display: none; }
 .rc-os-btn:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
 .rc-os-btn[aria-expanded="true"] { background: #2563eb; border-color: #2563eb; color: #fff; }
 .rc-os { margin-top: 8px; overflow-x: auto; }
+
+/* 영입 추천 — 후보 목록(숏리스트) (2026-11-24, recruit_shortlist.js) */
+/* .rc-rank 는 경기 리포트(4854행)에서 grid 로도 쓰여 표 칸에 번지던 것 — 표 안에서는 칸으로 되돌림 */
+.rc-table td.rc-rank { display: table-cell; width: auto; white-space: nowrap; }
+.rc-star { background: none; border: 0; padding: 2px 4px; margin-right: 4px; border-radius: 4px; font-size: 16px; line-height: 1;
+  color: var(--text-muted); cursor: pointer; vertical-align: middle; transition: color .15s ease-in-out, transform .15s ease-in-out; }
+.rc-star:hover { color: var(--warn-fg); background: var(--warn-bg); }
+.rc-star:active { transform: scale(0.9); }
+.rc-star:focus-visible { outline: 2px solid #60a5fa; outline-offset: 1px; }
+.rc-star.is-on { color: var(--warn-fg); }
+.rc-sl-btn { margin-left: auto; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--warn-border); background: var(--warn-bg);
+  color: var(--warn-fg); font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s ease-in-out; }
+.rc-sl-btn:hover { background: var(--warn-bg-hi); }
+.rc-sl-btn:active { transform: translateY(1px); }
+.rc-sl-btn:focus-visible { outline: 2px solid var(--warn-fg); outline-offset: 2px; }
+.rc-sl-btn[aria-expanded="true"] { background: var(--warn-bg-hi); border-color: var(--warn-fg); }
+.rc-sl-msg { min-height: 0; margin: 0 0 6px; font-size: 12px; color: var(--warn-fg); }
+.rc-sl-msg:empty { display: none; }
+.rc-sl-panel { margin: 0 0 12px; padding: 12px; border-radius: 8px; border: 1px solid var(--warn-border); background: rgba(15, 25, 45, 0.6); }
+.rc-sl-sec + .rc-sl-sec { margin-top: 14px; }
+.rc-sl-sec h4 { margin: 0 0 8px; font-size: 14px; color: var(--text-primary); }
+.rc-sl-note { margin: -2px 0 8px; font-size: 12px; color: var(--text-muted); }
+.rc-sl-cards { display: flex; flex-wrap: wrap; gap: 10px; }
+.rc-sl-card { flex: 1 1 200px; max-width: 280px; min-width: 0; padding: 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08); font-size: 12px; line-height: 1.5; }
+.rc-sl-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+.rc-sl-name { font-size: 14px; color: var(--text-primary); overflow-wrap: anywhere; }
+.rc-sl-x { background: none; border: 0; color: var(--text-muted); font-size: 13px; padding: 2px 5px; border-radius: 4px; cursor: pointer; }
+.rc-sl-x:hover { color: #fca5a5; background: rgba(248, 113, 113, 0.12); }
+.rc-sl-x:active { transform: scale(0.92); }
+.rc-sl-x:focus-visible { outline: 2px solid #60a5fa; outline-offset: 1px; }
+.rc-sl-facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 10px; margin: 8px 0; }
+.rc-sl-facts div { display: flex; justify-content: space-between; gap: 6px; }
+.rc-sl-facts dt { color: var(--text-muted); }
+.rc-sl-facts dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.rc-sl-metrics { list-style: none; margin: 0 0 6px; padding: 0; }
+.rc-sl-metrics li { display: grid; grid-template-columns: minmax(0, 1fr) 60px 28px; align-items: center; gap: 6px; }
+.rc-sl-metrics li b { text-align: right; font-variant-numeric: tabular-nums; }
+.rc-sl-saved { font-size: 12px; }
+.rc-sl-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.rc-sl-act { padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(96, 165, 250, 0.5); background: rgba(37, 99, 235, 0.12);
+  color: #bfdbfe; font-size: 13px; cursor: pointer; transition: background .15s ease-in-out; }
+.rc-sl-act:hover { background: rgba(37, 99, 235, 0.25); }
+.rc-sl-act:active { transform: translateY(1px); }
+.rc-sl-act:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.rc-sl-act--danger { border-color: rgba(248, 113, 113, 0.45); background: rgba(248, 113, 113, 0.08); color: #fecaca; }
+.rc-sl-act--danger:hover { background: rgba(248, 113, 113, 0.18); }
+@media (max-width: 480px) { .rc-sl-btn { margin-left: 0; } .rc-sl-card { max-width: none; } }

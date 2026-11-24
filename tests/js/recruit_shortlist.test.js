@@ -118,3 +118,8 @@ test("panelHtml_escapes_and_splits", () => {
   assert.doesNotMatch(SL.panelHtml([kr(2)], esc), /직접 비교하지 마세요/);
   assert.match(SL.panelHtml([], esc), /담은 후보가 없습니다/);
 });
+
+test("panelHtml_saved_line_without_mode", () => {
+  const h = SL.panelHtml([{ src: "os", name: "A", team: "T", metrics: [] }], esc);
+  assert.doesNotMatch(h, /rc-sl-saved rc-muted">\s*·/);
+});

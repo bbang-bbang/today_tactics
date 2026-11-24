@@ -148,7 +148,7 @@
             if (ana) ana.classList.add("hidden");
             if (cmp) cmp.classList.add("hidden");
             const sel = $("ta-team-select");
-            lazyLoadSeq(["recruit"]).then(() => {
+            lazyLoadSeq(["recruit_shortlist", "recruit"]).then(() => {
                 if (_current === "team" && _teamMode === "recruit" && window.ttRecruit) window.ttRecruit.show(sel && sel.value);
             }).catch(lazyFail);
         } else if (mode === "insights") {

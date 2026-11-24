@@ -134,7 +134,7 @@
                 <div><dt>${esc(e.fitLabel || "점수")}</dt><dd><b>${v(e.fit)}</b></dd></div>
             </dl>
             ${metrics ? `<ul class="rc-sl-metrics">${metrics}</ul>` : ""}
-            <div class="rc-sl-saved rc-muted">${esc(MODE_LBL[e.mode] || e.mode)} · 담은 날짜 ${esc(e.saved)}</div>
+            <div class="rc-sl-saved rc-muted">${[MODE_LBL[e.mode] || e.mode, e.saved ? "담은 날짜 " + e.saved : ""].filter(Boolean).map(esc).join(" · ")}</div>
         </article>`;
     }
     function panelHtml(entries, esc) {
