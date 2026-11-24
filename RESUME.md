@@ -14,6 +14,11 @@
 - ✅ **일본 J리그 추가**(768f7a6 등): J1(API 98, 시즌 표기 2027 = 2026-08~2027-06) 순위·선수 606·경기 150·라인업 150(라벨 실패 0) 운영 수집 → 해외리그 탭·영입 추천 해외 후보에 포함(추정 계수 J1 0.85). J2(API 99)는 coverage 표시와 달리 선수 6명·라인업 7/180경기라 **순위표만**. 크론: 월 06:30 `--league all`(J1·J2 시즌) · 07:30 루프에 `jleague1` 추가(경기별, 서버 crontab 백업 `/home/rocky/crontab_backup_20261124.txt`) · 08:30 라인업 `all`(J1). 검증 `analysis/verify_jleague_registry.py`. ⚠ 2027-28부터 J1 API 시즌 표기 2028 → `season_ids`·수집기 시즌 갱신 필요.
 - ✅ **J2 영입 후보 = 2025 시즌 기록**(b205cf7): 이번 시즌 선수 기록 미제공 → 수집기 `PLAYER_SEASON={"jleague2": 2025}`로 916명, 해외리그 탭은 순위표만. 해외 후보 선수 기록·포메이션을 리그별 기록 시즌(`_os_stats_season`, events.season_id)으로 한정(2027 전 할 일 선반영). ⚠ J2는 라인업이 없어 세부 포지션(ST·W·CB…) 라벨이 없음 → 세부 포지션 추천엔 안 나오고 GK·대분류에서만 후보.
 - ✅ **라운드별 순위 추이 툴팁 수정**(e1c7d3d, 사용자 제보): 꼴찌가 '1'로 보이던 것(뒤집힌 y 표시) → 실제 순위 툴팁 + 가로 십자선 끔.
+- ⏳ **J1 SofaScore 슈팅맵·xG·평균 위치(1단계) — 코드 배포됨, 수집 대기**(362635f): 11/24 로컬에서 확인 요청 6회는 200이었으나 이후 로컬도 403 → 우회하지 않고 중단. 차단이 풀리면(로컬 PC에서):
+  1) 서버 스냅샷 받기: `ssh ... "sqlite3 /opt/today_tactics/jleague1.db '.backup /home/rocky/jleague1_snap.db'"` → `scp` 로 로컬
+  2) `python crawlers/collect_sofascore_overseas.py --league jleague1 --db <사본>` (dry-run: 매칭 수 확인) → `--apply` (종료 ~150경기 × 2요청, 1.5초 간격 ≈ 8분)
+  3) 사본을 서버 `/home/rocky/jleague1_extras.db` 로 올려 `venv/bin/python crawlers/import_overseas_extras.py --src /home/rocky/jleague1_extras.db --dst /opt/today_tactics/jleague1.db --apply --backup-dir /home/rocky` → 캐시 무효화
+  → 해외리그 탭 J1에 '🎯 팀 슈팅·진형' 섹션이 자동으로 나타남(`hasShotmap`). 2단계(선수 히트맵 ~4,200요청)는 1단계 결과 보고 결정.
 - ✅ **기존 버그 수정(계수)**: `'brasileirao'.startswith('brasileiro')`가 거짓이라 브라질 1부 후보에 유럽 1.0이 적용되던 것 → 설계대로 0.90(`_os_league_factor`). 순위표만 리그는 해외 후보 표본에서 제외(`_os_rows_league_ok`).
 - ✅ **기존 버그 수정**: 경기 후 요약 카드 '순위 변동' 줄이 영입 표 `.rc-rank{width:22px}`에 걸려 22px로 찌그러지던 것 → 영입 쪽 `.rc-idx`로 분리(538px).
 - ⏳ **남은 일(날짜 대기)**: 11/30 크론 — K1 mps `minutes_played`·`rating` NULL 재시도 결과(비면 원인 조사) · 12/1 08:30 라인업 크론 첫 실행(`/var/log/today_tactics/apifootball.log`) · K2(11/29)·K1(12/6) 종료 후 리그 총평 '최종'·PO 일정 · 승강 PO 후 TEAMS(Red) · ~~2027 전: 해외 포메이션 집계 최신 시즌 한정~~ ✅ 11/24 선반영.
