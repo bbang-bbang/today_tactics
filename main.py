@@ -180,6 +180,7 @@ def invalidate_api_cache():
         _cache_gen_seen = gen   # 자기 자신이 방금 데운 캐시를 다시 비우지 않도록
 
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+from overseas_formation import player_formations as _os_player_formations, formation_family as _formation_family
 from authlib.integrations.flask_client import OAuth
 
 app = Flask(__name__)
@@ -7784,6 +7785,13 @@ def _overseas_rows(min_minutes):
                         detail_by_pid[pid_] = (g_, tot_)
             except sqlite3.Error:
                 detail_by_pid = {}
+            # 선발 경기의 팀 포메이션(grid 줄별 인원으로 복원, overseas_formation.py) — 사실 표시용, 점수 미반영
+            try:
+                form_by_pid = _os_player_formations(conn.execute(
+                    "SELECT event_id, is_home, player_id, formation_slot FROM match_lineups "
+                    "WHERE is_starter=1 AND formation_slot IS NOT NULL"))
+            except sqlite3.Error:
+                form_by_pid = {}
             lm = (conn.execute("SELECT MAX(minutes_played) FROM player_stats WHERE tournament_id IN (" + ph + ")", tids).fetchone() or [0])[0] or 0
             thr = min(min_minutes, max(450, int(lm * 0.5)))
             q = ("SELECT p.id, p.name, p.position, p.height, p.birth_date, p.nationality, t.name, p.team_id, ps.appearances, ps.minutes_played, ps.rating, "
@@ -7815,7 +7823,9 @@ def _overseas_rows(min_minutes):
                              "rating": rating, "goals": g or 0, "assists": a or 0, "m": m,
                              "detail": "GK" if pos == "G" else (detail_by_pid.get(pid) or (None, 0))[0],
                              "starts": (detail_by_pid.get(pid) or (None, 0))[1],
-                             "team_rank": (ranks.get(team_id) or (None, None))[0], "team_n": (ranks.get(team_id) or (None, None))[1]})
+                             "team_rank": (ranks.get(team_id) or (None, None))[0], "team_n": (ranks.get(team_id) or (None, None))[1],
+                             "formation_main": (form_by_pid.get(pid) or {}).get("main"),
+                             "fam_starts": (form_by_pid.get(pid) or {}).get("fam") or {}})
         except sqlite3.Error:
             pass
         finally:
@@ -7841,6 +7851,16 @@ def overseas_recruit():
     except ValueError:
         return jsonify({"error": "invalid filter"}), 400
     realistic = request.args.get("realistic", "1") != "0"     # 기본 ON — 상위권 구단 주전 제외
+    # 우리 팀 주 포메이션(선택) — K1·K2 팀 slug 만 인정, 그 외 값은 무시
+    team_formation = None
+    team_slug = request.args.get("team") or ""
+    team_info = next((t for t in TEAMS if t["id"] == team_slug and t.get("league") in ("K1", "K2")), None)
+    if team_info and team_info.get("sofascore_id") and os.path.exists(DB_PATH):
+        main_f = _brief_formations(team_info["sofascore_id"], 410 if team_info["league"] == "K1" else 777,
+                                   str(_current_season()))["main"]
+        if main_f and _formation_family(main_f["formation"]):
+            team_formation = {**main_f, "family": _formation_family(main_f["formation"])}
+    team_fam = team_formation["family"] if team_formation else None
 
     all_rows = _overseas_rows(min_mins)
     fallback = False
@@ -7907,12 +7927,16 @@ def overseas_recruit():
         "metric_labels": {k: _OS_METRICS[k] for k in weights},
         "filters": {"min_minutes": min_mins, "max_age": max_age, "tier": tier, "focus": focus, "realistic": realistic},
         "excluded_top_clubs": excluded_top,
+        "team_formation": team_formation,
         "candidates": [{
             "id": r["id"], "name": r["name"], "team": r["team"], "league": r["league"], "league_code": r["league_code"],
             "country": r["country"], "tier": r["tier"], "age": r["age"], "height": r["height"], "nationality": r["nationality"],
             "detail": r.get("detail"), "starts": r.get("starts"),
             "apps": r["apps"], "mins": r["mins"], "goals": r["goals"], "assists": r["assists"],
             "team_rank": r.get("team_rank"), "team_n": r.get("team_n"),
+            "formation_main": r.get("formation_main"), "fam_starts": r.get("fam_starts") or {},
+            "fam_match": ({"n": (r.get("fam_starts") or {}).get(team_fam, 0), "tot": sum((r.get("fam_starts") or {}).values()),
+                           "family": team_fam} if team_fam and r.get("fam_starts") else None),
             "raw": round(r["raw"], 1), "adj": round(r["adj"], 1), "factor": r["factor"],
             "pcts": {k: round(v) for k, v in r["pcts"].items()},
             "stats": {k: (round(v, 2) if v is not None else None) for k, v in r["m"].items() if k in weights},
@@ -7926,6 +7950,7 @@ def overseas_recruit():
             ("점수(raw) = 같은 리그·같은 세부 포지션 선수 중 90분 환산 지표 백분위의 가중 합(비교군 12명 미만 리그는 같은 티어 리그끼리 합산)"
              if detail else "점수(raw) = 같은 리그·같은 포지션(G/D/M/F) 선수 중 90분 환산 지표 백분위의 가중 합 — 리그 내 위치"),
             "보정(adj) = raw × 리그 수준 계수(1부 1.0 · 2부 0.85 · 3부 0.75, 브라질은 한 단계 낮게) — 추정치이며 K리그 이적 실적으로 검증되지 않음. 참고용",
+            "포메이션 = 선발로 나선 경기의 팀 포메이션(라인업 grid로 복원) — 사실 표시만, 점수·순위에 반영하지 않음. 3백 = 수비 줄 3·5명, 4백 = 4명",
             "API-Football 시즌 누적 기록 기반 — xG·몸값·걷어내기·제공권·크로스 없음. 평점은 SofaScore와 산출 방식이 달라 점수에서 제외",
             f"출전 {min_mins}분 이상(시즌 초반 리그는 그 리그 최다 출전의 50%로 하향) · 비교군 {min_c}명 미만이면 해당 지표 제외",
             ("현실적 후보만: 1·2부에서 소속 팀이 리그 순위 상위 1/3(5경기 이상 치른 리그)인 선수 " + str(excluded_top) + "명 제외 — 상위 구단 주전은 K리그 영입이 어렵다고 보는 근사(몸값·계약 정보 없음). 3부·순위 미수집 리그는 제외 없음")

@@ -10507,3 +10507,8 @@ body.match-strip-collapsed .flow-section-head .flow-hint { display: none; }
 .rc-sl-act--danger { border-color: rgba(248, 113, 113, 0.45); background: rgba(248, 113, 113, 0.08); color: #fecaca; }
 .rc-sl-act--danger:hover { background: rgba(248, 113, 113, 0.18); }
 @media (max-width: 480px) { .rc-sl-btn { margin-left: 0; } .rc-sl-card { max-width: none; } }
+
+/* 해외 후보 — 포메이션 사실 표시 (2026-11-24) */
+.rc-os-team { margin: 8px 0 0; font-size: 12px; color: var(--text-primary); }
+.rc-os-form { color: var(--text-muted); }
+.rc-os-form.is-miss { color: var(--warn-fg); }

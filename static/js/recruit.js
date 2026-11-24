@@ -163,6 +163,13 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     const OS_FOCUS = { goals90: "goals90", atk90: "assists90", create: "kp90", def: "def90", pass_acc: "pass_acc", duel: "dribble90" };
     const OS_TIER = { 1: "1부", 2: "2부", 3: "3부" };
     const OS_DETAIL = { GK: "골키퍼", CB: "센터백", FB: "풀백·윙백", DM: "수비형 MF", CM: "중앙 MF", AM: "공격형 MF", W: "윙어", ST: "스트라이커" };
+    // 포메이션 사실 표시(점수 미반영) — '4-3-3 위주 · 3백 선발 2/18', 우리 팀 계열 선발 0이면 ⚠ 문구
+    function osFormText(c) {
+        if (!c.formation_main) return "";
+        const m = c.fam_match;
+        const fam = m ? (m.n ? `${m.family} 선발 ${m.n}/${m.tot}` : `⚠ ${m.family} 선발 경험 없음`) : "";
+        return `${c.formation_main} 위주${fam ? " · " + fam : ""}`;
+    }
     function osHtml(d, group) {
         if (!d.candidates.length) return `<p class="rc-empty">해외 후보가 없습니다 — 데이터가 수집된 리그가 없거나 필터가 너무 좁습니다.</p>`;
         const keys = Object.keys(d.metric_labels);
@@ -170,13 +177,14 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const ents = keep(tbl, d.candidates.map(c => {
             const noAdj = c.factor === 1 || c.adj === c.raw;
             return { src: "os", name: c.name, team: c.team, league: c.league, age: c.age, mins: c.mins,
-                goals: c.goals, assists: c.assists, detail: OS_DETAIL[c.detail] || "", score: c.raw,
+                goals: c.goals, assists: c.assists, detail: [OS_DETAIL[c.detail], c.formation_main ? c.formation_main + " 위주" : ""].filter(Boolean).join(" · "), score: c.raw,
                 fitLabel: noAdj ? "종합" : "보정", fit: noAdj ? c.raw : c.adj,
                 metrics: keys.map(k => ({ label: d.metric_labels[k], pct: c.pcts[k] })), mode: "position", saved: today() };
         }));
         const rows = d.candidates.map((c, i) => `<tr>
             <td class="rc-rank">${starBtn(tbl, i, ents[i])}${i + 1}</td>
-            <td><span class="rc-name">${ttEsc(c.name)}</span><span class="rc-sub">${ttEsc(c.nationality || "")}${c.height ? " · " + c.height + "cm" : ""}${c.detail && OS_DETAIL[c.detail] ? ` · ${OS_DETAIL[c.detail]}${c.starts ? ` (선발 ${c.starts})` : ""}` : ""}</span></td>
+            <td><span class="rc-name">${ttEsc(c.name)}</span><span class="rc-sub">${ttEsc(c.nationality || "")}${c.height ? " · " + c.height + "cm" : ""}${c.detail && OS_DETAIL[c.detail] ? ` · ${OS_DETAIL[c.detail]}${c.starts ? ` (선발 ${c.starts})` : ""}` : ""}</span>${osFormText(c)
+                ? `<span class="rc-sub rc-os-form${c.fam_match && !c.fam_match.n ? " is-miss" : ""}">${ttEsc(osFormText(c))}</span>` : ""}</td>
             <td>${ttEsc(c.team || "")} <span class="rc-lg" title="${ttEsc(c.league)}">${ttEsc(c.country || "")} ${OS_TIER[c.tier] || ""}</span>
                 <span class="rc-sub">${ttEsc(c.league)}${c.team_rank ? ` · 팀 ${c.team_rank}/${c.team_n}위` : ""}</span></td>
             <td class="rc-num">${c.age ?? "-"}</td>
@@ -187,7 +195,10 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             ${c.factor === 1 || c.adj === c.raw
                 ? `<td class="rc-num rc-muted" title="리그 수준 보정 없음(계수 1.0) — 종합과 같은 값">–</td>`
                 : `<td class="rc-num rc-fit" title="리그 내 점수 ${c.raw} × 리그 수준 계수 ${c.factor} (추정)"><b>${c.adj}</b></td>`}</tr>`).join("");
-        return `<table class="rc-table"><thead><tr><th scope="col" title="☆ 후보 목록에 담기">#</th><th scope="col">후보</th><th scope="col">소속</th><th scope="col">나이</th>
+        const tf = d.team_formation;
+        const tfLine = tf ? `<p class="rc-os-team">우리 팀 주 포메이션 <b>${ttEsc(tf.formation)}</b> <span class="rc-muted">(${ttEsc(tf.family)}, ${tf.of}경기 중 ${tf.games})</span>
+            <span class="rc-muted">— 후보 포메이션은 사실 표시만, 점수에 반영하지 않음</span></p>` : "";
+        return `${tfLine}<table class="rc-table"><thead><tr><th scope="col" title="☆ 후보 목록에 담기">#</th><th scope="col">후보</th><th scope="col">소속</th><th scope="col">나이</th>
             <th scope="col">출전</th><th scope="col">골·도움</th>
             ${keys.map(k => `<th scope="col" title="같은 리그·같은 포지션 중 백분위">${ttEsc(d.metric_labels[k])}</th>`).join("")}
             <th scope="col" title="리그 내 종합 백분위(0~100)">종합</th><th scope="col" title="종합 × 리그 수준 추정 계수 — 참고용">보정</th></tr></thead>
@@ -203,7 +214,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         }
         btn.setAttribute("aria-expanded", "true");
         box.innerHTML = `<div class="rc-loading" role="status">해외 후보 분석 중...</div>`;
-        const q = new URLSearchParams({ pos: btn.dataset.rcOs, min_minutes: _f.min_minutes, limit: "10", realistic: _f.real });
+        const q = new URLSearchParams({ pos: btn.dataset.rcOs, min_minutes: _f.min_minutes, limit: "10", realistic: _f.real, team: _team });
         if (_f.max_age) q.set("max_age", _f.max_age);
         if (btn.dataset.rcFocus) q.set("focus", btn.dataset.rcFocus);
         fetch(`/api/overseas-recruit?${q}`).then(r => r.json().then(j => ({ ok: r.ok, j })))

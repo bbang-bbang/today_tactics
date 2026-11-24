@@ -250,6 +250,14 @@ qa('스카우팅 요약: 시간대·선제골 결론은 리그 평균 근거 동
 qa('영입 추천 나이 필터·잘못된 입력', lambda: assert_(
     all((c['age'] or 99) <= 25 for n in get('/api/team-recruit?team=gwangju&max_age=25')['needs'] for c in n['candidates'])
     and _brief_status('/api/team-recruit?team=nope') == 404 and _brief_status('/api/team-recruit?team=suwon&scope=x') == 400))
+d_osf = get('/api/overseas-recruit?pos=W&team=suwon')
+qa('해외 후보 포메이션: 우리 팀 계열·후보 fam_match 는 사실 표시(점수 불변)', lambda: assert_(
+    'team_formation' in d_osf
+    and (d_osf['team_formation'] is None or d_osf['team_formation']['family'] in ('3백', '4백'))
+    and all('formation_main' in c and (c['fam_match'] is None or 0 <= c['fam_match']['n'] <= c['fam_match']['tot'])
+            for c in d_osf['candidates'])
+    and [c['adj'] for c in d_osf['candidates']] == [c['adj'] for c in get('/api/overseas-recruit?pos=W')['candidates']]
+    and get('/api/overseas-recruit?pos=W&team=../x')['team_formation'] is None))
 d_rs = get('/api/team-recruit?team=suwon&mode=style')
 qa('영입 추천 플레이 보강: 약점 지표는 리그 하위 절반·후보 다른 팀', lambda: assert_(
     d_rs['mode'] == 'style' and d_rs['weak_metrics']
