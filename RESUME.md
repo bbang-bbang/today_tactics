@@ -18,14 +18,14 @@
   - **P4 분석가**: 리그 보정 계수 검증(현재 추정) · 시즌 중 최소 출전 기준(리그 최대의 절반) 혼재 표시 · 예측 K1 2024 기준선 미달(보류 중).
   - **P6 UI**: 실제 키보드 탐색·ARIA 동작 확인 · 남은 모바일 점검(영입 추천 외 화면).
   - **P7 보안**: 이번 세션 미점검 — `collect_apifootball_lineups.py` API 키·응답 검증, 가비아 방화벽 SSH 화이트리스트(백로그). (`/api/cache-invalidate`는 로컬/`UPDATE_SECRET` 한정으로 확인됨)
-  - **QA/프로세스**: 6인 관점 체크·최종 컨펌(C1·C2) 정식 수행 · 라인업 수집기 크론 편입 여부 결정.
+  - **QA/프로세스**: 6인 관점 체크·최종 컨펌(C1·C2) 정식 수행 · 라인업 수집기 크론 편입 ✅(11/24).
 
 ## 0-00000000-a. ✅ 2026-11-23 — 11/23 크론 점검 완료
 - ✅ `update_data.py --days 14` 1947s 완료(실패 STEP 3 SofaScore 403뿐·대체 보완) · 11/21~22 14경기(K1 6·K2 8) 전부 events·라인업 복원(STEP 23 560행)·공식 선수 기록(STEP 27 14/14) · STEP 21 대상 0(득점·카드·교체 이미 채움 — 감사 K1·K2 공백 0일) · STEP 29 교체 쌍 없음 · 패스 8/14(미공개 6 재시도) · 공식 히트맵 미공개 10(약 1주 뒤) · 중복 이벤트 0그룹 · 서버 HEAD=7ef65d9 · `qa_check` **192/192** · `/health` 200 · 디스크 22%.
 - ⚠ **K1 SofaScore 선수 스탯 빈 행**: K1 6경기 mps 40행씩 들어갔지만 `minutes_played`·`rating` 전부 NULL(K2는 정상). 감사에서 K1 평점·슈팅맵·평균 위치·히트맵 '마지막 11/08'로 보이는 원인. `backfill_k1_mps.py` 대상 조건이 `minutes_played>0` 기준이라 **다음 월(11/30) 크론에서 자동 재시도** — 11/30에도 비면 SofaScore K1 스탯 미제공으로 보고 원인 조사.
 - 참고: `crawlers/dedupe_events.py`는 정리됨(`ARCHIVED.md`) — 중복 점검은 events (home, away, KST 날짜) 그룹 SQL로 대체.
 - ✅ 로컬 커밋(**미푸시 — 다음 배포에 같이**): 34f1f81 보안(라인업 수집 응답 검증·`posLabel` 이스케이프) · 8a99db4 **`ci_deploy.sh` reset 시 `data/*.json` 보존**. ⚠ 기존 스크립트는 배포마다 서버 `kleague_results_2026.json`·`kleague_players_2026.json`을 저장소 11/1 버전으로 되돌림(다음 크론까지 `/api/results` 과거 상태). 8a99db4를 **처음 배포하는 그 1회는 서버의 옛 스크립트로 돌므로** 푸시 직전 서버 JSON 2개를 `~/data_keep_YYYYMMDD/`에 복사 → 배포 후 되돌리고 `/api/cache-invalidate`. 그다음 배포부터는 자동.
-- ⏳ **라인업 수집기 크론 편입(사용자가 서버에서 `crontab -e`)** — 월 07:30 해외 경기 기록 뒤:
+- ✅ **라인업 수집기 크론 편입 완료(2026-11-24 서버 crontab 등록 확인)** — 월 08:30, 07:30 해외 경기 기록 뒤 (같은 날 운영 `kleague_players_2026.json` 177KB 정상 확인):
   `30 8 * * 1 cd /opt/today_tactics && venv/bin/python crawlers/collect_apifootball_lineups.py --league all --apply --max-calls 600 >> /var/log/today_tactics/apifootball.log 2>&1`
   근거(크론): 11/23 해외 수집 후 오늘 남은 호출 ≈6,930 · 주간 증분 ≈ 리그 14 일정 호출 + 새 경기 150~200 · 11/19 이후 2주 밀린 분도 600 이내. 순위표만 수집하는 리그는 호출 없이 건너뜀. 기본 `--reserve 500`.
 - 📊 **해외 리그 보정 계수 검증(P4)** — `analysis/verify_league_factors.py`(읽기 전용, 같은 API 선수 ID가 두 리그에 있는 시즌 중 이적 선수의 분당 생산 비율 + 부트스트랩 CI). 운영 DB 11/23: 겹침 31명 중 **브라질 1↔2부 23명만 의미**(유럽 쌍은 1~2명 — 1월 이적시장 뒤 재실행).
