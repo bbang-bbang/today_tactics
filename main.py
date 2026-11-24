@@ -314,9 +314,9 @@ for _args in (
 
 # 일본 J리그 (2026-11-24) — 2026-27부터 추춘제(8월~이듬해 5·6월). API-Football 시즌 표기가 리그마다 달라
 # J1 = 2027(종료 연도, 2026-08-07~2027-06-06), J2 = 2026(시작 연도, 2026-08-08~2027-05-23). 2026 상반기 특별 대회(J1 '2026')는 미수집.
-# J2 는 시즌 누적 선수 기록·라인업만 있고 경기별 선수 기록은 없음(API coverage, 2026-11-24 확인).
+# J2 는 coverage 표시와 달리 운영 수집 결과 선수 6명·라인업 7/180경기뿐(2026-11-24) → 순위표만 제공.
 _register_lower_league("jleague1", "일본", "🇯🇵", 1, "J1 League", 98, season_id=2027)
-_register_lower_league("jleague2", "일본", "🇯🇵", 2, "J2 League", 99, season_id=2026)
+_register_lower_league("jleague2", "일본", "🇯🇵", 2, "J2 League", 99, standings_only=True, season_id=2026)
 
 _VALID_LEAGUE_CODES = set(LEAGUE_REGISTRY.keys())
 
@@ -7759,10 +7759,16 @@ def _overseas_rows(min_minutes):
     return [dict(r) for r in hit]
 
 
+def _os_rows_league_ok(code):
+    """해외 후보 표본에 넣을 리그 — K리그·순위표만 제공 리그(선수 기록 부실: 브라질 3부·J2 등)는 제외."""
+    cfg = LEAGUE_REGISTRY.get(code) or {}
+    return code != "kleague" and bool(cfg) and not cfg.get("standings_only")
+
+
 def _overseas_rows_uncached(min_minutes):
     rows = []
     for code, cfg in LEAGUE_REGISTRY.items():
-        if code == "kleague":
+        if not _os_rows_league_ok(code):
             continue
         path = _league_db_path(code)
         if not os.path.exists(path):
