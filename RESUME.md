@@ -12,9 +12,11 @@
 - ✅ **해외 후보 포메이션 사실 표시**(P1·P5, 점수 불변): `overseas_formation.py`가 해외 DB `match_lineups.formation_slot` grid로 포메이션 복원 → `/api/overseas-recruit?team=<slug>` 가 `team_formation`·후보 `formation_main`·`fam_match`. 화면 `4-3-3 위주 · 3백 2/18경기`, 0이면 `⚠ 3백 선발 경험 없음`. `_overseas_rows` 10분 메모이즈(_PRED_CACHE). 운영 확인: 부천(3-4-3) 윙어 후보 ⚠, 수원(4-4-2) 대비 결과 정상, 응답 ≤0.2s. 검증 `analysis/verify_overseas_formation.py`·`verify_overseas_rows_cache.py`.
 - ✅ **정리**: 1회성 분석 스크립트 6개·탐색 PNG 14개(`analysis/ARCHIVED.md`) · `style.css` 미사용 규칙 332개 제거 359→321KB(10화면×1280·375 계산 스타일 전후 동일, 도구 `analysis/audit_unused_css.py`) · `.gitignore` SQLite 임시 파일.
 - ✅ **일본 J리그 추가**(768f7a6 등): J1(API 98, 시즌 표기 2027 = 2026-08~2027-06) 순위·선수 606·경기 150·라인업 150(라벨 실패 0) 운영 수집 → 해외리그 탭·영입 추천 해외 후보에 포함(추정 계수 J1 0.85). J2(API 99)는 coverage 표시와 달리 선수 6명·라인업 7/180경기라 **순위표만**. 크론: 월 06:30 `--league all`(J1·J2 시즌) · 07:30 루프에 `jleague1` 추가(경기별, 서버 crontab 백업 `/home/rocky/crontab_backup_20261124.txt`) · 08:30 라인업 `all`(J1). 검증 `analysis/verify_jleague_registry.py`. ⚠ 2027-28부터 J1 API 시즌 표기 2028 → `season_ids`·수집기 시즌 갱신 필요.
+- ✅ **J2 영입 후보 = 2025 시즌 기록**(b205cf7): 이번 시즌 선수 기록 미제공 → 수집기 `PLAYER_SEASON={"jleague2": 2025}`로 916명, 해외리그 탭은 순위표만. 해외 후보 선수 기록·포메이션을 리그별 기록 시즌(`_os_stats_season`, events.season_id)으로 한정(2027 전 할 일 선반영). ⚠ J2는 라인업이 없어 세부 포지션(ST·W·CB…) 라벨이 없음 → 세부 포지션 추천엔 안 나오고 GK·대분류에서만 후보.
+- ✅ **라운드별 순위 추이 툴팁 수정**(e1c7d3d, 사용자 제보): 꼴찌가 '1'로 보이던 것(뒤집힌 y 표시) → 실제 순위 툴팁 + 가로 십자선 끔.
 - ✅ **기존 버그 수정(계수)**: `'brasileirao'.startswith('brasileiro')`가 거짓이라 브라질 1부 후보에 유럽 1.0이 적용되던 것 → 설계대로 0.90(`_os_league_factor`). 순위표만 리그는 해외 후보 표본에서 제외(`_os_rows_league_ok`).
 - ✅ **기존 버그 수정**: 경기 후 요약 카드 '순위 변동' 줄이 영입 표 `.rc-rank{width:22px}`에 걸려 22px로 찌그러지던 것 → 영입 쪽 `.rc-idx`로 분리(538px).
-- ⏳ **남은 일(날짜 대기)**: 11/30 크론 — K1 mps `minutes_played`·`rating` NULL 재시도 결과(비면 원인 조사) · 12/1 08:30 라인업 크론 첫 실행(`/var/log/today_tactics/apifootball.log`) · K2(11/29)·K1(12/6) 종료 후 리그 총평 '최종'·PO 일정 · 승강 PO 후 TEAMS(Red) · **2027 전: 해외 포메이션 집계를 최신 시즌 경기로 한정**(지금은 DB 전 시즌 합산).
+- ⏳ **남은 일(날짜 대기)**: 11/30 크론 — K1 mps `minutes_played`·`rating` NULL 재시도 결과(비면 원인 조사) · 12/1 08:30 라인업 크론 첫 실행(`/var/log/today_tactics/apifootball.log`) · K2(11/29)·K1(12/6) 종료 후 리그 총평 '최종'·PO 일정 · 승강 PO 후 TEAMS(Red) · ~~2027 전: 해외 포메이션 집계 최신 시즌 한정~~ ✅ 11/24 선반영.
 - 💭 **사용자 결정 대기**: 해외 선수 한글 이름 출처 · K1 2020~2025 히트맵 백필(운영 대량 쓰기) · 해외 보정 계수 재추정(1월 이적시장 뒤).
 - 보류: 예측 K1 2024 기준선 미달(`analysis/predict_tuning_sweep.py`) · CSS 같은 선택자 중복 정의 23곳(덮어쓰기 순서 의존이라 보류) · 하위 리그 선발 ID 누락 경기는 포메이션 집계 제외(안전 방향).
 
