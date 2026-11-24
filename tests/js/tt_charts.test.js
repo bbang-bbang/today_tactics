@@ -374,3 +374,25 @@ test("paceLine_extra_series", () => {
   assert.equal(c.series[1].lineWidth, 3);
   assert.deepEqual(c.series[1].data, [{ y: 1 }, null]);
 });
+
+test("bump_tooltip_shows_real_rank", () => {
+  // y = nTeams+1-rank 로 뒤집어 그리므로 기본 툴팁은 꼴찌를 '1'로 보여 줬다(2026-11-24 사용자 제보) → 순위로 되돌려 표시
+  const c = P.bump({ rounds: [1, 2, 3], teams: [seoul, ulsan], nTeams: 12 });
+  const plug = (c.plugins || []).find((p) => typeof p.onTooltip === "function");
+  assert.ok(plug, "rank tooltip plugin");
+  const html = plug.onTooltip({ hitResult: { title: "R3", rows: [
+    { label: "<b>꼴찌</b>", value: 1, color: "#888" }, { label: "서울", value: 12, color: "#ef3744" }, { label: "울산", value: 11 } ] } });
+  const txt = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  assert.match(txt, /R3/);
+  assert.ok(txt.indexOf("서울 1위") >= 0 && txt.indexOf("울산 2위") > txt.indexOf("서울 1위"), txt);
+  assert.match(txt, /12위/);
+  assert.doesNotMatch(html, /<b>꼴찌/);          // 라벨 이스케이프
+  assert.equal(plug.onTooltip({ hitResult: null }), undefined);   // 데이터 없으면 기본 툴팁
+});
+
+test("bump_crosshair_no_inverted_y_label", () => {
+  // 가로 십자선 라벨도 뒤집힌 y(예: 6.2)를 보여 줘 혼란 → 순위 차트에선 가로선·y 라벨 끔(라운드 세로선은 유지)
+  const c = P.bump({ rounds: [1, 2], teams: [seoul], nTeams: 12 });
+  assert.equal(c.crosshair && c.crosshair.horizontal, false);
+  assert.notEqual(c.crosshair.vertical, false);
+});

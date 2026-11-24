@@ -250,6 +250,29 @@
   // 가로 막대 카테고리 라벨 폭: 가장 긴 라벨 글자 수 × 12px(+여백), 40~160px
   const labelW = (cats) => Math.max(40, Math.min(160, 8 + 12 * Math.max(0, ...cats.map((c) => String(c).length))));
 
+  // 툴팁: TERA 기본 툴팁은 뒤집힌 y(nTeams+1-rank)를 그대로 보여 줘 꼴찌가 '1'로 보였다(2026-11-24).
+  // 차트별 플러그인 onTooltip 으로 실제 순위로 되돌려 순위순으로 보여 준다. 데이터가 없으면 undefined → 기본 툴팁.
+  const escT = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  function rankTooltip(n) {
+    return {
+      name: "tt-rank-tooltip",
+      onTooltip(ctx) {
+        const hr = ctx && ctx.hitResult;
+        const rows = hr && Array.isArray(hr.rows) ? hr.rows.filter((r) => typeof r.value === "number") : [];
+        if (!rows.length) return undefined;
+        const items = rows.map((r) => ({ label: r.label, color: r.color, rank: Math.round(n + 1 - r.value) }))
+          .sort((a, b) => a.rank - b.rank);
+        const line = (it) => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">`
+          + (it.color ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${escT(it.color)}"></span>` : "")
+          + `<span style="color:${THEME.text};font-size:${THEME.fontSize}px">${escT(it.label)}</span>`
+          + `<span style="color:${THEME.text};font-size:${THEME.fontSize}px;font-weight:700;margin-left:auto">${it.rank}위</span></div>`;
+        return `<div style="font-family:${THEME.font};color:${THEME.text}">`
+          + `<div style="font-weight:700;font-size:${THEME.fontSize}px;margin-bottom:6px;color:${THEME.text}">${escT(hr.title)}</div>`
+          + items.map(line).join("") + `</div>`;
+      },
+    };
+  }
+
   // 순위 추이: y = nTeams+1-rank 로 뒤집어 1위가 위로 가게 그린다.
   function bump(o) {
     const teams = (o && o.teams) || [];
@@ -280,6 +303,8 @@
       legend: { enabled: false },
       annotations: labels,
       series,
+      plugins: [rankTooltip(n)],
+      crosshair: { horizontal: false },   // 가로선 y 라벨이 뒤집힌 값(nTeams+1-rank)을 보여 줘 끔 — 라운드 세로선만
       __nTeams: n,
       __aria: `라운드별 순위 추이, ${teams.length}개 팀, ${o.rounds.length}라운드`,
     };
