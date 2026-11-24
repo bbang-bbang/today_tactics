@@ -62,6 +62,9 @@ LEAGUES = {
     "ligue3":       (63, 2026, 63, False),
     "brasileirob":  (72, 2026, 72, True),
     "brasileiroc":  (75, 2026, 75, False),   # /players가 29명·출전시간 없음 → 순위표만
+    # ── 일본 (2026-11-24) — 2026-27 추춘제. API 시즌 표기: J1 = 종료 연도 2027, J2 = 시작 연도 2026 ──
+    "jleague1":     (98, 2027, 98, True),
+    "jleague2":     (99, 2026, 99, True),    # 시즌 선수 기록·라인업만(경기별 선수 기록 coverage 없음)
 }
 DB_FILES = {code: f"{code}.db" for code in LEAGUES}
 POS = {"Goalkeeper": "G", "Defender": "D", "Midfielder": "M", "Attacker": "F"}
@@ -208,7 +211,7 @@ def collect(cli, code, apply):
 FINISHED = ("FT", "AET", "PEN")
 TOP_LEAGUES = ["epl", "laliga", "bundesliga", "seriea", "ligue1", "brasileirao"]
 # 시즌 선수 기록은 있지만 경기별 선수 기록(coverage statistics_players)이 없는 리그 — 2026-11-13 표본 확인(선수 0명)
-NO_MATCH_STATS = {"brasileiroc"}
+NO_MATCH_STATS = {"brasileiroc", "jleague2"}
 # 경기별 기록까지 받는 하위 리그 (2026-11-13)
 LOWER_LEAGUES = [c for c, v in LEAGUES.items() if v[3] and c not in TOP_LEAGUES and c not in NO_MATCH_STATS]
 ALIASES = {"top": TOP_LEAGUES, "lower": LOWER_LEAGUES, "all": list(LEAGUES)}

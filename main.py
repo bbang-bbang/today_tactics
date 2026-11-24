@@ -272,14 +272,14 @@ LEAGUE_REGISTRY = {
 }
 
 
-def _register_lower_league(code, country, flag, tier, label, af_id, standings_only=False, calendar_year=False):
+def _register_lower_league(code, country, flag, tier, label, af_id, standings_only=False, calendar_year=False, season_id=2026):
     """2·3부 리그 등록 (2026-11-12). tournament_id = API-Football 리그 id(리그별 DB 파일이라 충돌 없음).
     standings_only=True → 순위표만 제공(API-Football 선수 기록 coverage 없음) — 팀 지표·TOP 퍼포머는 '데이터 없음' 안내.
     조가 나뉜 리그(스페인·이탈리아 3부)는 조마다 별도 코드(DB 1개씩)."""
     LEAGUE_REGISTRY[code] = {
         "db": f"{code}.db", "label": label, "flag": flag, "country": country, "tier": tier,
         "tournaments": [{"id": af_id, "name": label, "code": code.upper()[:6]}],
-        "season_ids": {2026: 2026},
+        "season_ids": {2026: season_id},   # 앱 시즌(시작 연도) → API-Football 시즌 표기(리그마다 다름 — J1은 종료 연도)
         **({"calendar_year": True} if calendar_year else {}),
         **({"standings_only": True} if standings_only else {}),
     }
@@ -311,6 +311,12 @@ for _args in (
 ):
     _register_lower_league(*_args[:6], standings_only=(len(_args) > 6 and _args[6]),
                            calendar_year=(len(_args) > 7 and _args[7]))
+
+# 일본 J리그 (2026-11-24) — 2026-27부터 추춘제(8월~이듬해 5·6월). API-Football 시즌 표기가 리그마다 달라
+# J1 = 2027(종료 연도, 2026-08-07~2027-06-06), J2 = 2026(시작 연도, 2026-08-08~2027-05-23). 2026 상반기 특별 대회(J1 '2026')는 미수집.
+# J2 는 시즌 누적 선수 기록·라인업만 있고 경기별 선수 기록은 없음(API coverage, 2026-11-24 확인).
+_register_lower_league("jleague1", "일본", "🇯🇵", 1, "J1 League", 98, season_id=2027)
+_register_lower_league("jleague2", "일본", "🇯🇵", 2, "J2 League", 99, season_id=2026)
 
 _VALID_LEAGUE_CODES = set(LEAGUE_REGISTRY.keys())
 
@@ -7704,6 +7710,15 @@ def team_recruit():
 # 보정 전 백분위(raw)와 보정 후(adj)를 항상 같이 낸다.
 _OS_LEAGUE_FACTOR = {1: 1.0, 2: 0.85, 3: 0.75}    # 티어별 추정 보정 (K리그 영입 후보 기준 — 근거 미검증)
 _OS_BRA_FACTOR = {1: 0.90, 2: 0.80, 3: 0.70}       # 브라질은 같은 티어 유럽보다 한 단계 낮게 가정
+_OS_FACTOR_BY_CODE = {"jleague1": 0.85, "jleague2": 0.75}   # 일본은 티어와 별도 추정(J1 ≈ 유럽 2부, J2 ≈ 유럽 3부) — 근거 미검증
+
+
+def _os_league_factor(code, tier):
+    """해외 리그 수준 추정 계수(참고용). 리그 개별 값 → 브라질 표 → 유럽 티어 표 순."""
+    if code in _OS_FACTOR_BY_CODE:
+        return _OS_FACTOR_BY_CODE[code]
+    # 'brasileirao'(1부)·'brasileirob'·'brasileiroc' 공통 접두어 = 'brasileir' (이전 'brasileiro' 판별은 1부를 놓쳐 유럽 1.0 이 적용됐음)
+    return (_OS_BRA_FACTOR if code.startswith("brasileir") else _OS_LEAGUE_FACTOR).get(tier, 0.7)
 _OS_GROUP_POS = {"ST": "F", "W": "F", "AM": "M", "CM": "M", "DM": "M", "FB": "D", "CB": "D", "GK": "G"}
 _OS_METRICS = {"goals90": "골/90", "assists90": "도움/90", "sot90": "유효슈팅/90", "kp90": "키패스/90",
                "dribble90": "드리블성공/90", "def90": "태클+인터셉트/90", "pass_acc": "패스 성공률(%)",
@@ -7753,7 +7768,7 @@ def _overseas_rows_uncached(min_minutes):
         if not os.path.exists(path):
             continue
         tier = cfg.get("tier", 1)
-        factor = (_OS_BRA_FACTOR if code.startswith("brasileiro") else _OS_LEAGUE_FACTOR).get(tier, 0.7)
+        factor = _os_league_factor(code, tier)
         tids = [t["id"] for t in cfg["tournaments"]]
         ph = ",".join("?" * len(tids))
         try:
@@ -7959,7 +7974,7 @@ def overseas_recruit():
               else "대분류(G/D/M/F) 기준 조회 — 센터백·풀백 등 세부 포지션이 섞임")),
             ("점수(raw) = 같은 리그·같은 세부 포지션 선수 중 90분 환산 지표 백분위의 가중 합(비교군 12명 미만 리그는 같은 티어 리그끼리 합산)"
              if detail else "점수(raw) = 같은 리그·같은 포지션(G/D/M/F) 선수 중 90분 환산 지표 백분위의 가중 합 — 리그 내 위치"),
-            "보정(adj) = raw × 리그 수준 계수(1부 1.0 · 2부 0.85 · 3부 0.75, 브라질은 한 단계 낮게) — 추정치이며 K리그 이적 실적으로 검증되지 않음. 참고용",
+            "보정(adj) = raw × 리그 수준 계수(1부 1.0 · 2부 0.85 · 3부 0.75, 브라질은 한 단계 낮게, 일본 J1 0.85 · J2 0.75) — 추정치이며 K리그 이적 실적으로 검증되지 않음. 참고용",
             "포메이션 = 선발로 나선 경기의 팀 포메이션(라인업 grid로 복원) — 사실 표시만, 점수·순위에 반영하지 않음. 3백 = 수비 줄 3·5명, 4백 = 4명",
             "API-Football 시즌 누적 기록 기반 — xG·몸값·걷어내기·제공권·크로스 없음. 평점은 SofaScore와 산출 방식이 달라 점수에서 제외",
             f"출전 {min_mins}분 이상(시즌 초반 리그는 그 리그 최다 출전의 50%로 하향) · 비교군 {min_c}명 미만이면 해당 지표 제외",

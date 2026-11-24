@@ -158,7 +158,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             ${table}
             <p class="rc-pool rc-muted">조건 충족 후보 ${n.pool_size}명 중 적합도 상위 ${n.candidates.length}명</p>
             <button type="button" class="rc-os-btn" data-rc-os="${ttEsc(n.group)}" data-rc-focus="${ttEsc(focusKeys.map(k => OS_FOCUS[k]).filter(Boolean).join(","))}"
-                aria-expanded="false">🌍 해외 후보 보기 <span class="rc-muted">(유럽 1~3부·브라질)</span></button>
+                aria-expanded="false">🌍 해외 후보 보기 <span class="rc-muted">(유럽 1~3부·브라질·일본)</span></button>
             <div class="rc-os" id="rc-os-${ttEsc(n.group)}" aria-live="polite"></div>
         </section>`;
     }
