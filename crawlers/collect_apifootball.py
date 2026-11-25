@@ -314,8 +314,9 @@ def collect_matches(cli, code, apply):
 
 
 # ── 경기별 팀 기록 (xG) — /fixtures/statistics, 2026-11-25 ──────────────────
-# coverage statistics_fixtures 가 있고 expected_goals 를 실제로 주는 리그만(표본 확인). 끝난 경기마다 1회(증분).
-TEAM_STATS_LEAGUES = {"jleague1"}
+# 경기별 기록을 받는 모든 리그(2026-11-25 전 리그 확장 — 리그당 표본 1경기 확인: 13개 리그 xG 제공, 3.Liga 는 xG 없이 슈팅·점유율만).
+# 끝난 경기마다 1회(증분). 순위표만(with_players=False)·지난 시즌 기록만(PLAYER_SEASON) 리그는 경기 데이터가 없어 제외.
+TEAM_STATS_LEAGUES = {c for c, v in LEAGUES.items() if v[3] and c not in NO_MATCH_STATS and c not in PLAYER_SEASON}
 _TS_KEYS = {"expected_goals": ("xg", "f"), "Total Shots": ("shots", "i"), "Shots on Goal": ("shots_on", "i"),
             "Shots insidebox": ("shots_inside", "i"), "Ball Possession": ("possession", "p"), "Passes %": ("pass_acc", "p"),
             "Corner Kicks": ("corners", "i")}

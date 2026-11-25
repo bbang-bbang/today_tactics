@@ -9,7 +9,7 @@ except Exception:
     pass
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "crawlers"))
-from collect_apifootball import parse_fixture_stats  # noqa: E402
+from collect_apifootball import parse_fixture_stats, TEAM_STATS_LEAGUES  # noqa: E402
 sys.path.insert(0, ROOT)
 from team_xg import team_xg_table  # noqa: E402
 
@@ -54,5 +54,7 @@ check("팀 20 xG 차(경기당)", t[20]["xg_diff"], -0.5)           # (2.0 − 3
 check("박스 안 슈팅 비율", t[10]["box_share"], 56.0)             # 14/25
 check("xG 없는 팀 → None", (t[30]["xg_games"], t[30]["xg_for"]), (0, None))
 check("정렬: xG 차 큰 순", [r["team_id"] for r in team_xg_table(games)][:2], [10, 20])
+check("팀 기록 수집 = 경기별 기록 있는 모든 리그(J1만 아님)", {"epl", "laliga", "brasileirao", "championship", "jleague1", "liga3"} <= TEAM_STATS_LEAGUES, True)
+check("순위표만·지난 시즌 기록 리그는 제외", ("brasileiroc" in TEAM_STATS_LEAGUES, "jleague2" in TEAM_STATS_LEAGUES, "seriec_a" in TEAM_STATS_LEAGUES), (False, False, False))
 print(f"\n{'OK' if not fails else 'FAIL'} — 실패 {fails}건")
 sys.exit(1 if fails else 0)
