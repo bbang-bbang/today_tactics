@@ -280,6 +280,10 @@ qa('팀 리포트(해외 공통): 공식 1위 팀·순위 흐름 마지막 = 경
     d_tr['official']['rank'] == 1 and len(d_tr['flow']) == d_tr['official']['played']
     and all(1 <= p['rank'] <= p['n'] for p in d_tr['flow']) and len(d_tr['players']) >= 5
     and d_tr['squad_value'] and d_tr['squad_value']['team_id'] == _tr_tid and len(d_tr['form']) == 5))
+d_xv = get('/api/overseas-xg-validation')
+qa('xG 예측력 검증: 구조·r 범위 [-1,1]·합산 팀 수 = 리그별 합', lambda: assert_(
+    isinstance(d_xv['leagues'], list) and d_xv['pooled']['n_teams'] == sum(l['n_teams'] for l in d_xv['leagues'])
+    and all(l[k] is None or -1 <= l[k] <= 1 for l in d_xv['leagues'] + [d_xv['pooled']] for k in ('r_pts', 'r_gd', 'r_xgd', 'r_xpts'))))
 qa('팀 리포트 입력 검증: 숫자 아님 400 · 없는 팀 404 · K리그 400', lambda: assert_(
     _brief_status('/api/league/epl/team-report?team_id=abc') == 400
     and _brief_status('/api/league/epl/team-report?team_id=99999999') == 404

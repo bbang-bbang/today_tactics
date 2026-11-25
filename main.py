@@ -182,6 +182,7 @@ def invalidate_api_cache():
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from overseas_formation import player_formations as _os_player_formations, formation_family as _formation_family
 from team_xg import team_xg_table as _team_xg_table, xg_coverage as _xg_coverage, XG_MIN_GAMES as _XG_MIN_GAMES
+from team_xg import half_split_predictiveness as _xg_predictiveness, validation_rows as _xg_validation_rows, _pearson as _xg_pearson
 from squad_value import squad_value_table as _squad_value_table
 from team_report import rank_flow as _rank_flow, recent_form as _recent_form, formation_summary as _formation_summary
 from authlib.integrations.flask_client import OAuth
@@ -15316,7 +15317,7 @@ def _team_xg_games(conn, tids, sid):
             SELECT t.event_id, t.team_id, t.is_home, t.xg, t.shots, t.shots_inside, t.possession,
                    CASE WHEN t.is_home = 1 THEN e.home_score ELSE e.away_score END,
                    CASE WHEN t.is_home = 1 THEN e.away_score ELSE e.home_score END,
-                   o.xg, o.shots
+                   o.xg, o.shots, e.date_ts
             FROM match_team_stats t
             JOIN events e ON e.id = t.event_id
             LEFT JOIN match_team_stats o ON o.event_id = t.event_id AND o.team_id != t.team_id
@@ -15324,6 +15325,45 @@ def _team_xg_games(conn, tids, sid):
         """, (*tids, *([sid] if sid is not None else []))).fetchall()
     except sqlite3.OperationalError:
         return []
+
+
+_XG_VALID_MIN_GAMES = 10      # 예측력 검증 — 전·후반기 각 5경기 이상
+
+
+@app.route("/api/overseas-xg-validation")
+@cached_response(ttl=3600)
+def overseas_xg_validation():
+    """xG 예측력 검증 (2026-11-25) — 팀 xG 가 있는 해외 전 리그 현재 시즌. 팀마다 전반기 지표(승점·득실차·xG 차·xPts, 경기당)와
+    후반기 경기당 승점의 상관계수 r. 리그별 + 전 리그 합산(리그 평균을 빼서 리그 간 수준 차이 제거)."""
+    per, pooled = [], []
+    for code, cfg in LEAGUE_REGISTRY.items():
+        if code == "kleague" or cfg.get("standings_only"):
+            continue
+        sids = cfg.get("season_ids") or {}
+        sid = sids[max(sids)] if sids else None
+        try:
+            with get_league_db(code) as conn:
+                games = _team_xg_games(conn, [t["id"] for t in cfg["tournaments"]], sid)
+        except sqlite3.Error:
+            continue
+        if not games:
+            continue
+        v = _xg_predictiveness(_xg_validation_rows(games), min_games=_XG_VALID_MIN_GAMES)
+        smp = v.pop("samples")
+        if v["n_teams"] >= 3:
+            per.append({"code": code, "label": cfg["label"], **v})
+            # 리그 내 평균을 빼서 합침 (리그별 득점 수준·승점 분포 차이 제거)
+            keys = ("pts", "gd", "xgd", "xpts", "ppg2")
+            mean = {k: sum(x[k] for x in smp) / len(smp) for k in keys}
+            pooled += [{k: x[k] - mean[k] for k in keys} for x in smp]
+    pool = {"n_teams": len(pooled), "n_leagues": len(per)}
+    for k in ("pts", "gd", "xgd", "xpts"):
+        r = _xg_pearson([x[k] for x in pooled], [x["ppg2"] for x in pooled])
+        pool["r_" + k] = round(r, 3) if r is not None else None
+    return jsonify({"leagues": per, "pooled": pool, "min_games": _XG_VALID_MIN_GAMES,
+                    "notes": ["팀마다 이번 시즌 경기를 날짜순 반으로 나눠, 전반기 경기당 지표가 후반기 경기당 승점과 얼마나 같이 움직이는지(Pearson r, 1 = 완벽)",
+                              f"경기 {_XG_VALID_MIN_GAMES}경기 이상·전반기 xG 3경기 이상 팀만 · 시즌 중반이라 표본이 작아 리그별 r 은 크게 흔들림 — 전 리그 합산을 기준으로 볼 것",
+                              "xG 는 공급자(API-Football) 모델 값 · xPts 는 독립 포아송 근사"]})
 
 
 @app.route("/api/league/<code>/team-report")
@@ -15429,6 +15469,8 @@ def league_team_xg(code):
         r["name"] = names.get(r["team_id"]) or str(r["team_id"])
     with_xg = [r for r in rows if r["xg_for"] is not None]
     cov = _xg_coverage(games)
+    val = _xg_predictiveness(_xg_validation_rows(games), min_games=_XG_VALID_MIN_GAMES)
+    val.pop("samples", None)
     over = max(with_xg, key=lambda r: r["g_minus_xg"], default=None)
     under = min(with_xg, key=lambda r: r["g_minus_xg"], default=None)
     return jsonify({
@@ -15436,6 +15478,7 @@ def league_team_xg(code):
         "games": len({g[0] for g in games}),
         "coverage": cov,
         "min_games": _XG_MIN_GAMES,
+        "validation": val,
         "highlights": {
             "best_xg_diff": with_xg[0]["name"] if with_xg else None,
             "over": {"name": over["name"], "value": over["g_minus_xg"]} if over else None,
@@ -15445,6 +15488,7 @@ def league_team_xg(code):
             "xG = API-Football 경기별 팀 기대득점(공급자 모델). 경기당 평균 — 표본이 적은 시즌 초반엔 득점−xG 가 운에 크게 흔들림",
             "득점−xG > 0 = 기대보다 많이 넣음(결정력 또는 운) · 실점−xGA < 0 = 기대보다 적게 먹음(골키퍼·수비 또는 운)",
             "박스 안 비율 = 전체 슈팅 중 페널티 박스 안 슈팅 비율",
+            "xPts(기대 승점) = 경기마다 양 팀 xG 로 승·무·패 확률(독립 포아송 근사)을 구해 3·P(승)+P(무) 합산 — 승점−xPts > 0 은 경기 내용보다 승점을 많이 챙김(운 또는 결정력)",
             f"xG 지표는 xG 가 있는 경기 {_XG_MIN_GAMES}경기 이상인 팀만 — 슈팅 5개 이상인데 xG 0 인 경기는 공급자 오류로 보고 제외",
         ],
     })

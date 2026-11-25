@@ -73,5 +73,38 @@ check("표본 미만 → xG 지표 None(경기 수는 유지)", (t3[10]["xg_for"
 check("제공률 = xG 정상 경기 / 전체 경기", xg_coverage(g2), {"games": 2, "xg_games": 1, "pct": 50.0})
 check("제공률 빈 입력", xg_coverage([]), {"games": 0, "xg_games": 0, "pct": None})
 check("10필드(상대 슈팅 없음)도 동작", xg_coverage(games)["games"], 3)
+
+# 2026-11-25 xG 활용: 기대 승점(xPts) · 전반기 지표 → 후반기 승점 예측력
+from team_xg import xpts, half_split_predictiveness  # noqa: E402
+check("xPts 0:0 = 무승부 확정 1점", round(xpts(0, 0), 3), 1.0)
+check("xPts 압도 → 3점 근처", xpts(4.0, 0.1) > 2.8, True)
+p_ab, p_ba = xpts(1.4, 0.9), xpts(0.9, 1.4)
+check("xPts 대칭: 강한 쪽이 더 큼", p_ab > p_ba, True)
+check("xPts 두 팀 합 = 3 − P(무) ∈ (2, 3)", 2 < p_ab + p_ba < 3, True)
+check("xPts None 입력 → None", xpts(None, 1.0), None)
+# rows = (team_id, date_ts, gf, ga, xg, xga). 팀 A~D: 전반기 xG 차 순서 = 후반기 승점 순서, 전반기 승점은 반대로 뒤섞음
+rows = []
+spec = {1: (0.3, 3, 0), 2: (0.1, 3, 1), 3: (-0.1, 1, 3), 4: (-0.3, 0, 3)}   # 전반 xgd, 전반 승리 수(=pts 섞기), 후반 승 수
+first_w = {1: 0, 2: 1, 3: 3, 4: 2}     # 전반 승리 수: 후반 성적과 반대 경향
+second_w = {1: 3, 2: 2, 3: 1, 4: 0}
+for t in spec:
+    for k in range(3):     # 전반 3경기
+        win = k < first_w[t]
+        rows.append((t, k, 1 if win else 0, 0 if win else 1, 1.0 + spec[t][0], 1.0))
+    for k in range(3):     # 후반 3경기
+        win = k < second_w[t]
+        rows.append((t, 10 + k, 1 if win else 0, 0 if win else 1, 1.0, 1.0))
+pr = half_split_predictiveness(rows, min_games=6)
+check("예측력: 팀 수", pr["n_teams"], 4)
+check("예측력: 전반 xG 차 → 후반 승점 r = 1", round(pr["r_xgd"], 2), 1.0)
+check("예측력: 전반 승점 → 후반 승점 r < 0 (이 합성에선 반대)", pr["r_pts"] < 0, True)
+check("예측력: 경기 수 부족 팀 제외", half_split_predictiveness(rows, min_games=7)["n_teams"], 0)
+check("예측력: 팀 3개 미만 → r None", half_split_predictiveness(rows[:12], min_games=6)["r_xgd"], None)
+# 팀 표에 기대 승점: xG 있는 경기 실제 승점 vs xPts
+tx = {r["team_id"]: r for r in team_xg_table(games)}
+check("팀 10 실제 승점(xG 경기)", tx[10]["pts_x"], 3)                  # 3-0 승, 0-2 패
+check("팀 10 xPts = 두 경기 xPts 합", tx[10]["xpts"], round(xpts(2.0, 0.5) + xpts(1.0, 1.5), 2))
+check("팀 10 승점−xPts", tx[10]["pts_minus_xpts"], round(3 - tx[10]["xpts"], 2))
+check("xG 없는 팀 → xPts None", tx[30]["xpts"], None)
 print(f"\n{'OK' if not fails else 'FAIL'} — 실패 {fails}건")
 sys.exit(1 if fails else 0)

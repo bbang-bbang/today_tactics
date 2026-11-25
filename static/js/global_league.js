@@ -879,6 +879,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         <td class="gl-num${cls(r.xg_diff, true)}"><b>${sgn(r.xg_diff)}</b></td>
         <td class="gl-num${cls(r.g_minus_xg, true)}">${sgn(r.g_minus_xg)}</td>
         <td class="gl-num${cls(r.ga_minus_xga, false)}">${sgn(r.ga_minus_xga)}</td>
+        <td class="gl-num">${r.xpts != null ? r.xpts.toFixed(1) : '-'} <span class="gl-muted">/ ${r.pts_x ?? '-'}</span></td>
+        <td class="gl-num${cls(r.pts_minus_xpts, true)}">${r.pts_minus_xpts != null ? (r.pts_minus_xpts > 0 ? '+' : '') + r.pts_minus_xpts.toFixed(1) : '-'}</td>
         <td class="gl-num">${r.shots_pg ?? '-'}</td><td class="gl-num">${r.box_share != null ? r.box_share + '%' : '-'}</td>
         <td class="gl-num">${r.possession != null ? r.possession + '%' : '-'}</td></tr>`).join('');
     content.innerHTML = `<div class="gl-xg">${lead}${covHtml}
@@ -887,11 +889,24 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         <thead><tr><th scope="col">#</th><th scope="col">팀</th><th scope="col" title="xG 있는 경기 수">경기</th>
           <th scope="col" title="경기당 기대득점">xG</th><th scope="col" title="경기당 허용 기대득점">xGA</th>
           <th scope="col" title="xG − xGA (경기당)">xG 차</th><th scope="col" title="득점 − xG (경기당): +면 기대보다 많이 넣음">득점−xG</th>
-          <th scope="col" title="실점 − xGA (경기당): −면 기대보다 적게 먹음">실점−xGA</th><th scope="col">슈팅/경기</th>
+          <th scope="col" title="실점 − xGA (경기당): −면 기대보다 적게 먹음">실점−xGA</th>
+          <th scope="col" title="기대 승점(xG 로 계산한 승·무·패 확률 합) / 실제 승점 — xG 있는 경기 합계">xPts / 승점</th>
+          <th scope="col" title="실제 승점 − 기대 승점: +면 경기 내용보다 승점을 많이 챙김(운 또는 결정력)">승점−xPts</th><th scope="col">슈팅/경기</th>
           <th scope="col" title="전체 슈팅 중 박스 안 슈팅">박스 안</th><th scope="col">점유율</th></tr></thead>
         <tbody>${body}</tbody></table></div>
+      <div id="gl-xi-slot"></div>
       <details class="gl-xg-notes"><summary>기준</summary><ul>${(d.notes || []).map(n => `<li>${ttEsc(n)}</li>`).join('')}</ul></details>
     </div>`;
+    // xG 예측력 검증 (2026-11-25) — 이 리그 + 전 리그 합산. 현재 시즌만(합산은 현재 시즌 기준)
+    if (window.ttXgInsight) {
+      const lg = GL.leagues.find(x => x.code === code);
+      const cur = String(GL.activeYear) === String(latestYear(code));
+      const pooled = cur ? await fetch('/api/overseas-xg-validation').then(r => r.ok ? r.json() : null).catch(() => null) : null;
+      const slot = document.getElementById('gl-xi-slot');
+      if (slot && GL.activeLeague === code && GL.activeSection === 'team-xg') {
+        slot.innerHTML = window.ttXgInsight.validHtml(d.validation, pooled && pooled.pooled, lg ? lg.label : code);
+      }
+    }
   }
 
   /* ── 팀 슈팅·진형 (SofaScore 슈팅맵·평균 위치, 2026-11-24) ──────────────
