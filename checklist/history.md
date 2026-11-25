@@ -41,6 +41,9 @@
 - 수집기(`collect_sofascore_overseas.py`, 경기·선수 번호 매칭)·서버 반영(`import_overseas_extras.py`)·해외리그 탭 '팀 슈팅·진형'(데이터 있을 때만 노출) 배포. 첫 확인 6요청은 200이었으나 이후 로컬도 API 403 → 우회하지 않고 중단, 다음 날 1회 재확인 예정.
 - 대체 소스: API-Football `/fixtures/statistics`에 J1 경기별 팀 xG 확인(정식). Hudl StatsBomb 2024 무료 데이터는 과거 시즌용. FBref·FotMob·Football LAB은 이용 조건상 부적합.
 
+### 8. J1 경기별 팀 xG (9f74048, 11/25)
+- API-Football `/fixtures/statistics` → `match_team_stats`(가산 테이블), `team_xg.py` 집계, 해외리그 탭 '팀 xG'. 운영 150경기 수집, xG 차 상위 = 실제 순위 상위로 상식 일치. 주간 크론은 사용자 등록 필요.
+
 ### 검증
 - node 141/141 · qa_check 193/193 · 브라우저(Chromium·Firefox × 1280·375) 76/76 · 20/20 · 4/4 · 운영 HEAD 동기화.
 
