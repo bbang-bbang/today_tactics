@@ -313,11 +313,84 @@ def collect_matches(cli, code, apply):
         conn.close()
 
 
+# ── 경기별 팀 기록 (xG) — /fixtures/statistics, 2026-11-25 ──────────────────
+# coverage statistics_fixtures 가 있고 expected_goals 를 실제로 주는 리그만(표본 확인). 끝난 경기마다 1회(증분).
+TEAM_STATS_LEAGUES = {"jleague1"}
+_TS_KEYS = {"expected_goals": ("xg", "f"), "Total Shots": ("shots", "i"), "Shots on Goal": ("shots_on", "i"),
+            "Shots insidebox": ("shots_inside", "i"), "Ball Possession": ("possession", "p"), "Passes %": ("pass_acc", "p"),
+            "Corner Kicks": ("corners", "i")}
+
+
+def parse_fixture_stats(event_id, resp, home_id):
+    """/fixtures/statistics 응답 → 팀별 행 dict. 값은 숫자 검증('69%'→69.0, 'abc'→None)."""
+    out = []
+    for side in resp if isinstance(resp, list) else []:
+        if not isinstance(side, dict):
+            continue
+        tid = f_int((side.get("team") or {}).get("id"))
+        if not tid:
+            continue
+        row = {"event_id": event_id, "team_id": tid, "is_home": int(tid == home_id)}
+        row.update({col: None for col, _k in _TS_KEYS.values()})
+        for s in side.get("statistics") or []:
+            key = _TS_KEYS.get((s or {}).get("type"))
+            if not key:
+                continue
+            col, kind = key
+            v = s.get("value")
+            if kind == "p":
+                v = f_float(str(v).rstrip("%")) if v is not None else None
+            elif kind == "f":
+                v = f_float(v)
+            else:
+                v = f_int(v)
+            row[col] = v
+        out.append(row)
+    return out
+
+
+def collect_team_stats(cli, code, apply):
+    if code not in TEAM_STATS_LEAGUES:
+        print(f"  [{code}] 팀 경기 기록: 건너뜀 (xG 제공 확인 리그 아님)", flush=True)
+        return
+    db = ROOT / DB_FILES[code]
+    if not db.exists():
+        print(f"  [{code}] DB 없음 — 건너뜀", flush=True)
+        return
+    conn = sqlite3.connect(db, timeout=60)
+    conn.executescript(SCHEMA_SQL)
+    try:
+        todo = conn.execute("""SELECT e.id, e.home_team_id FROM events e WHERE e.home_score IS NOT NULL
+                               AND NOT EXISTS (SELECT 1 FROM match_team_stats t WHERE t.event_id = e.id) ORDER BY e.date_ts""").fetchall()
+        print(f"  [{code}] 팀 경기 기록: 받을 경기 {len(todo)} (호출 누계 {cli.calls} · 오늘 남은 {cli.remaining})", flush=True)
+        if not apply:
+            if todo:
+                r = parse_fixture_stats(todo[0][0], cli.get(f"/fixtures/statistics?fixture={todo[0][0]}").get("response"), todo[0][1])
+                print(f"  (dry-run 표본 {todo[0][0]}: {r} · 저장 안 함)")
+            return
+        n = 0
+        for eid, home_id in todo:
+            rows = parse_fixture_stats(eid, cli.get(f"/fixtures/statistics?fixture={eid}").get("response"), home_id)
+            if len(rows) < 2:
+                continue        # 미제공 — 저장하지 않아 다음 실행에서 재시도
+            with conn:
+                conn.executemany("""INSERT OR REPLACE INTO match_team_stats (event_id, team_id, is_home, xg, shots, shots_on,
+                                    shots_inside, possession, pass_acc, corners) VALUES (:event_id, :team_id, :is_home, :xg, :shots,
+                                    :shots_on, :shots_inside, :possession, :pass_acc, :corners)""", rows)
+            n += 1
+            if n % 25 == 0:
+                print(f"    … {n}/{len(todo)}경기 (호출 누계 {cli.calls} · 오늘 남은 {cli.remaining})", flush=True)
+        print(f"  [{code}] 팀 경기 기록 저장: {n}경기", flush=True)
+    finally:
+        conn.close()
+
+
 def main():
     ap = argparse.ArgumentParser(description="API-Football 해외 리그 수집 (기본 dry-run)")
     ap.add_argument("--league", required=True, help=f"{', '.join(LEAGUES)} · top(1부 6개) · lower(경기별 기록 있는 2·3부) · all — 쉼표로 여러 개")
-    ap.add_argument("--part", choices=("season", "matches", "both"), default="season",
-                    help="season=순위표+시즌 누적(기본) · matches=경기 일정+경기별 선수 기록(증분) · both")
+    ap.add_argument("--part", choices=("season", "matches", "both", "teamstats"), default="season",
+                    help="season=순위표+시즌 누적(기본) · matches=경기 일정+경기별 선수 기록(증분) · both · "
+                         "teamstats=경기별 팀 기록·xG(증분, TEAM_STATS_LEAGUES 만)")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--max-calls", type=int, default=400,
                     help="이번 실행 최대 호출 수 (season all ≈700회 · matches 첫 수집 top ≈ 끝난 경기 수+6회)")
@@ -338,6 +411,8 @@ def main():
                 collect(cli, c, args.apply)
             if args.part in ("matches", "both"):
                 collect_matches(cli, c, args.apply)
+            if args.part == "teamstats":
+                collect_team_stats(cli, c, args.apply)
     except RuntimeError as e:
         print(f"[중단] {e}")
     print(f"\n총 호출 {cli.calls} · 오늘 남은 {cli.remaining}")

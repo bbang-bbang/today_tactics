@@ -8992,3 +8992,17 @@ body.match-strip-collapsed .flow-section-head .flow-hint { display: none; }
 .gl-tac-legs { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 12px; color: var(--text-primary); }
 .gl-tac-leg i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
 .gl-muted { color: var(--text-muted); font-size: 12px; font-weight: 400; }
+
+/* 해외리그 — 팀 xG (2026-11-25) */
+.gl-xg-lead { margin: 0 0 10px; font-size: 13px; color: var(--text-primary); line-height: 1.6; }
+.gl-xg-scroll { overflow-x: auto; }
+.gl-xg-table caption { caption-side: bottom; text-align: left; padding-top: 6px; }
+.gl-xg-table td.gl-num, .gl-xg-table th { text-align: right; font-variant-numeric: tabular-nums; }
+.gl-xg-table th:nth-child(2), .gl-xg-table td:nth-child(2) { text-align: left; }
+.gl-xg-rank { color: var(--text-muted); width: 24px; }
+.gl-xg-table td.gl-xg-pos { color: #4ade80; }
+.gl-xg-table td.gl-xg-neg { color: #f87171; }
+.gl-xg-notes { margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+.gl-xg-notes summary { cursor: pointer; }
+.gl-xg-notes summary:hover { color: var(--text-primary); }
+.gl-xg-notes summary:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }

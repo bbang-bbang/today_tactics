@@ -132,7 +132,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   /* 섹션 탭 — '팀 슈팅·진형'은 SofaScore 슈팅맵이 있는 리그만(현재 J1, 2026-11-24) */
   function sectionsFor(code) {
     const l = GL.leagues.find(x => x.code === code);
-    return ['standings', 'team-rankings', 'top-performers', 'players'].concat(l && l.hasShotmap ? ['team-tactics'] : []);
+    return ['standings', 'team-rankings', 'top-performers', 'players']
+      .concat(l && l.hasTeamXg ? ['team-xg'] : [])
+      .concat(l && l.hasShotmap ? ['team-tactics'] : []);
   }
   function renderSectionTabs() {
     const wrap = document.getElementById('gl-section-tabs');
@@ -158,12 +160,14 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         ? '순위표만 제공되는 리그'
         : l.hasShotmap
           ? '출처 API-Football(기록) · SofaScore(슈팅 좌표·xG·평균 위치) · 히트맵 미제공'
+          : l.hasTeamXg
+          ? '출처 API-Football · 시즌 누적 기록 + 경기별 팀 xG (슈팅 좌표·히트맵 미제공)'
           : '출처 API-Football · 시즌 누적 기록 (xG·히트맵 미제공)'}</span>`;
   }
 
   function sectionLabel(s) {
     return { standings: '📋 순위표', 'team-rankings': '📊 팀 지표', 'top-performers': '⭐ TOP 퍼포머', players: '🔎 선수 탐색',
-             'team-tactics': '🎯 팀 슈팅·진형' }[s] || s;
+             'team-xg': '📈 팀 xG', 'team-tactics': '🎯 팀 슈팅·진형' }[s] || s;
   }
 
   /* ── 리그 전환 ────────────────────────────────────── */
@@ -206,6 +210,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         case 'team-rankings':  await renderTeamRankings(code, qs);   break;
         case 'top-performers': await renderTopPerformers(code, qs);  break;
         case 'players':        await renderPlayerExplorer(code, qs); break;
+        case 'team-xg':        await renderTeamXg(code, qs);         break;
         case 'team-tactics':   await renderTeamTactics(code, qs);    break;
       }
     } catch (e) {
@@ -808,6 +813,40 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
       </div>`;
     box.querySelectorAll('.gl-px-card').forEach(b => b.addEventListener('click', () =>
       openPlayerMatches(code, b.dataset.pid, b)));
+  }
+
+  /* ── 팀 xG (API-Football 경기별 팀 기록, 2026-11-25) ─────────────────── */
+  async function renderTeamXg(code, qs) {
+    const content = document.getElementById('gl-content');
+    const d = await (await fetch(`/api/league/${encodeURIComponent(code)}/team-xg${qs}`)).json();
+    const rows = (d.teams || []).filter(r => r.xg_games);
+    if (!rows.length) { content.innerHTML = noDataHtml('팀 xG', code); return; }
+    const sgn = v => (v == null ? '-' : (v > 0 ? '+' : '') + v.toFixed(2));
+    const cls = (v, goodPositive) => (v == null || Math.abs(v) < 0.05 ? '' : ((v > 0) === goodPositive ? ' gl-xg-pos' : ' gl-xg-neg'));
+    const h = d.highlights || {};
+    const lead = `<p class="gl-xg-lead">경기 내용(xG 차) 1위 <b>${ttEsc(h.best_xg_diff || '-')}</b>`
+      + (h.over ? ` · 기대보다 많이 넣은 팀 <b>${ttEsc(h.over.name)}</b> (경기당 ${sgn(h.over.value)})` : '')
+      + (h.under ? ` · 기대보다 못 넣은 팀 <b>${ttEsc(h.under.name)}</b> (경기당 ${sgn(h.under.value)})` : '')
+      + ` <span class="gl-muted">— ${d.games || 0}경기 기준</span></p>`;
+    const body = rows.map((r, i) => `<tr>
+        <td class="gl-xg-rank">${i + 1}</td><td>${ttEsc(r.name)}</td><td class="gl-num">${r.xg_games}</td>
+        <td class="gl-num">${r.xg_for.toFixed(2)}</td><td class="gl-num">${r.xg_against.toFixed(2)}</td>
+        <td class="gl-num${cls(r.xg_diff, true)}"><b>${sgn(r.xg_diff)}</b></td>
+        <td class="gl-num${cls(r.g_minus_xg, true)}">${sgn(r.g_minus_xg)}</td>
+        <td class="gl-num${cls(r.ga_minus_xga, false)}">${sgn(r.ga_minus_xga)}</td>
+        <td class="gl-num">${r.shots_pg ?? '-'}</td><td class="gl-num">${r.box_share != null ? r.box_share + '%' : '-'}</td>
+        <td class="gl-num">${r.possession != null ? r.possession + '%' : '-'}</td></tr>`).join('');
+    content.innerHTML = `<div class="gl-xg">${lead}
+      <div class="gl-xg-scroll"><table class="gl-table gl-xg-table">
+        <caption class="gl-muted">경기당 평균 · xG 차 큰 순 · 초록/빨강은 좋음/나쁨 방향(부호 함께 표시)</caption>
+        <thead><tr><th scope="col">#</th><th scope="col">팀</th><th scope="col" title="xG 있는 경기 수">경기</th>
+          <th scope="col" title="경기당 기대득점">xG</th><th scope="col" title="경기당 허용 기대득점">xGA</th>
+          <th scope="col" title="xG − xGA (경기당)">xG 차</th><th scope="col" title="득점 − xG (경기당): +면 기대보다 많이 넣음">득점−xG</th>
+          <th scope="col" title="실점 − xGA (경기당): −면 기대보다 적게 먹음">실점−xGA</th><th scope="col">슈팅/경기</th>
+          <th scope="col" title="전체 슈팅 중 박스 안 슈팅">박스 안</th><th scope="col">점유율</th></tr></thead>
+        <tbody>${body}</tbody></table></div>
+      <details class="gl-xg-notes"><summary>기준</summary><ul>${(d.notes || []).map(n => `<li>${ttEsc(n)}</li>`).join('')}</ul></details>
+    </div>`;
   }
 
   /* ── 팀 슈팅·진형 (SofaScore 슈팅맵·평균 위치, 2026-11-24) ──────────────

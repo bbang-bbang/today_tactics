@@ -181,6 +181,7 @@ def invalidate_api_cache():
 
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from overseas_formation import player_formations as _os_player_formations, formation_family as _formation_family
+from team_xg import team_xg_table as _team_xg_table
 from authlib.integrations.flask_client import OAuth
 
 app = Flask(__name__)
@@ -722,6 +723,22 @@ def get_leagues():
         except sqlite3.Error:
             return False
 
+    def has_team_xg(code):
+        """경기별 팀 xG(API-Football /fixtures/statistics, match_team_stats)가 있는 해외 리그 — '팀 xG' 섹션 노출."""
+        if code == "kleague":
+            return False
+        path = _league_db_path(code)
+        if not os.path.exists(path):
+            return False
+        try:
+            c = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            try:
+                return c.execute("SELECT 1 FROM match_team_stats WHERE xg IS NOT NULL LIMIT 1").fetchone() is not None
+            finally:
+                c.close()
+        except sqlite3.Error:
+            return False
+
     def has_shotmap(code):
         """SofaScore 슈팅맵·평균 위치가 있는 해외 리그(현재 J1, collect_sofascore_overseas.py) — '팀 슈팅·진형' 섹션 노출."""
         if code == "kleague":
@@ -749,6 +766,7 @@ def get_leagues():
             "tier": cfg.get("tier", 1),
             "standingsOnly": bool(cfg.get("standings_only")),
             "hasShotmap": has_shotmap(code),
+            "hasTeamXg": has_team_xg(code),
         }
         for code, cfg in LEAGUE_REGISTRY.items() if has_data(code)
     ])
@@ -15087,6 +15105,55 @@ def league_team_shotmap(code):
             "games":      games,
             "efficiency": round(goals - total_xg, 2),
         },
+    })
+
+
+@app.route("/api/league/<code>/team-xg")
+@cached_response(ttl=1800)
+def league_team_xg(code):
+    """팀 xG 표 (2026-11-25) — API-Football 경기별 팀 기록(match_team_stats). 경기당 xG 득/실·차, 득점−xG, 실점−xGA,
+    슈팅·박스 안 비율·점유율. 시즌 = 리그 DB season_id."""
+    cfg, err = _validate_league(code)
+    if err:
+        return err
+    sid = _league_season_id(cfg, request.args.get("year"))
+    season_cond = "AND e.season_id = ?" if sid is not None else ""
+    with get_league_db(code) as conn:
+        tids = [t["id"] for t in cfg["tournaments"]]
+        ph = ",".join("?" * len(tids))          # '?' 자리표시자만, 값은 바인딩
+        try:
+            games = conn.execute(f"""
+                SELECT t.event_id, t.team_id, t.is_home, t.xg, t.shots, t.shots_inside, t.possession,
+                       CASE WHEN t.is_home = 1 THEN e.home_score ELSE e.away_score END,
+                       CASE WHEN t.is_home = 1 THEN e.away_score ELSE e.home_score END,
+                       o.xg
+                FROM match_team_stats t
+                JOIN events e ON e.id = t.event_id
+                LEFT JOIN match_team_stats o ON o.event_id = t.event_id AND o.team_id != t.team_id
+                WHERE e.tournament_id IN ({ph}) AND e.home_score IS NOT NULL {season_cond}
+            """, (*tids, *([sid] if sid is not None else []))).fetchall()
+            names = {r[0]: r[1] for r in conn.execute("SELECT id, name FROM teams")}
+        except sqlite3.OperationalError:          # 테이블 없는 리그(수집 전)
+            games, names = [], {}
+    rows = _team_xg_table(games)
+    for r in rows:
+        r["name"] = names.get(r["team_id"]) or str(r["team_id"])
+    with_xg = [r for r in rows if r["xg_games"]]
+    over = max(with_xg, key=lambda r: r["g_minus_xg"], default=None)
+    under = min(with_xg, key=lambda r: r["g_minus_xg"], default=None)
+    return jsonify({
+        "teams": rows,
+        "games": len({g[0] for g in games}),
+        "highlights": {
+            "best_xg_diff": with_xg[0]["name"] if with_xg else None,
+            "over": {"name": over["name"], "value": over["g_minus_xg"]} if over else None,
+            "under": {"name": under["name"], "value": under["g_minus_xg"]} if under else None,
+        },
+        "notes": [
+            "xG = API-Football 경기별 팀 기대득점(공급자 모델). 경기당 평균 — 표본이 적은 시즌 초반엔 득점−xG 가 운에 크게 흔들림",
+            "득점−xG > 0 = 기대보다 많이 넣음(결정력 또는 운) · 실점−xGA < 0 = 기대보다 적게 먹음(골키퍼·수비 또는 운)",
+            "박스 안 비율 = 전체 슈팅 중 페널티 박스 안 슈팅 비율",
+        ],
     })
 
 

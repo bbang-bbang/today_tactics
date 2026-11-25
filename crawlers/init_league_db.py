@@ -262,6 +262,21 @@ CREATE TABLE IF NOT EXISTS sub_events (
     UNIQUE(event_id, player_in)
 );
 
+-- 경기별 팀 기록 (API-Football /fixtures/statistics, 2026-11-25) — xG·슈팅·점유율
+CREATE TABLE IF NOT EXISTS match_team_stats (
+    event_id      INTEGER,
+    team_id       INTEGER,
+    is_home       INTEGER,
+    xg            REAL,
+    shots         INTEGER,
+    shots_on      INTEGER,
+    shots_inside  INTEGER,
+    possession    REAL,
+    pass_acc      REAL,
+    corners       INTEGER,
+    PRIMARY KEY (event_id, team_id)
+);
+
 -- 리그 순위표 (standings API 직접 저장)
 CREATE TABLE IF NOT EXISTS league_standings (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
