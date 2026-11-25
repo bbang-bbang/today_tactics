@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """새로 수집한 데이터 정합성·무결성 점검 (읽기 전용, 2026-11-25).
-대상: J1·J2 리그 DB(API-Football) · match_team_stats(팀 xG) · transfermarkt.db(시장가치·연결표).
+대상: J1·J2 리그 DB(API-Football) · 전 해외 리그 match_team_stats(팀 xG) · transfermarkt.db(시장가치·연결표).
 실행(서버): cd /opt/today_tactics && venv/bin/python analysis/audit_new_data.py
 결과: 항목마다 OK / WARN / FAIL + 수치. DB 는 mode=ro 로만 연다."""
 import os
@@ -27,6 +27,39 @@ def rep(level, area, label, detail=""):
 def ro(name):
     p = os.path.join(ROOT, name)
     return sqlite3.connect(f"file:{p}?mode=ro", uri=True) if os.path.exists(p) else None
+
+
+# ── 팀 xG (match_team_stats) — 리그 공통 ─────────────────────────────
+def audit_team_xg(c, A, fin):
+    """fin = 종료 경기 [(id, home, away, hs, as, ...)]. 경기별 팀 기록·xG 정합성 (2026-11-25 전 리그 확장)."""
+    ts = c.execute("SELECT event_id, team_id, is_home, xg, shots, shots_on, shots_inside, possession FROM match_team_stats").fetchall()
+    per = Counter(r[0] for r in ts)
+    rep("OK" if all(v == 2 for v in per.values()) and len(per) == len(fin) else "WARN", A, "팀 기록: 종료 경기마다 두 팀",
+        f"경기 {len(per)}/{len(fin)} · 2팀 아닌 경기 {sum(1 for v in per.values() if v != 2)}")
+    xnull = [r for r in ts if r[3] is None]
+    rep("OK" if len(xnull) <= len(ts) * 0.1 else "WARN", A, "xG 결측", f"{len(xnull)}/{len(ts)}행 ({len({r[0] for r in xnull})}경기) — 공급자 미제공")
+    one_side = [e for e, v in Counter(r[0] for r in xnull).items() if v == 1]
+    rep("OK" if not one_side else "WARN", A, "xG 한 팀만 있는 경기", f"{len(one_side)}")
+    bad = [r for r in ts if r[4] is not None and ((r[5] or 0) > r[4] or (r[6] or 0) > r[4])]
+    rep("OK" if not bad else "FAIL", A, "유효슈팅·박스 안 ≤ 전체 슈팅", f"위반 {len(bad)}")
+    xr = [r[3] for r in ts if r[3] is not None]
+    rep("OK" if xr and min(xr) >= 0 and max(xr) <= 7 else "WARN", A, "xG 범위", f"{min(xr):.2f}~{max(xr):.2f}" if xr else "-")
+    poss = defaultdict(float)
+    for r in ts:
+        if r[7] is not None:
+            poss[r[0]] += r[7]
+    pbad = [e for e, v in poss.items() if abs(v - 100) > 1.5]
+    rep("OK" if not pbad else "WARN", A, "두 팀 점유율 합 ≈ 100", f"벗어남 {len(pbad)}")
+    # xG 와 실제 득점 상관(상식 점검)
+    sc = {e[0]: (e[1], e[3], e[4]) for e in fin}
+    pairs = [(r[3], sc[r[0]][1] if r[1] == sc[r[0]][0] else sc[r[0]][2]) for r in ts if r[3] is not None and r[0] in sc]
+    if len(pairs) > 10:
+        n = len(pairs); mx = sum(p[0] for p in pairs) / n; my = sum(p[1] for p in pairs) / n
+        cov = sum((x - mx) * (y - my) for x, y in pairs); vx = sum((x - mx) ** 2 for x, _ in pairs); vy = sum((y - my) ** 2 for _, y in pairs)
+        r_ = cov / (vx * vy) ** 0.5 if vx and vy else 0
+        rep("OK" if r_ >= 0.3 else "WARN", A, "경기 xG ↔ 득점 상관", f"r={r_:.2f} · 평균 xG {mx:.2f} vs 득점 {my:.2f}")
+    glitch = [r for r in ts if r[3] == 0 and (r[4] or 0) >= 5]
+    rep("OK" if len(glitch) <= 5 else "WARN", A, "xG 0인데 슈팅 5개 이상(공급자 오류 — 집계에서 제외)", f"{len(glitch)}행")
 
 
 # ── J1 ──────────────────────────────────────────────────────────────
@@ -70,37 +103,27 @@ if c:
     rep("OK" if lu and okf / len(lu) >= 0.95 else "WARN", A, "라인업 선발 11명·포메이션 복원", f"11명 {n11}/{len(lu)} · 복원 {okf}/{len(lu)}")
     unl = c.execute("SELECT COUNT(*), SUM(detail_pos IS NULL) FROM match_lineups WHERE is_starter=1").fetchone()
     rep("OK" if (unl[1] or 0) <= unl[0] * 0.05 else "WARN", A, "세부 포지션 라벨", f"없음 {unl[1]}/{unl[0]}")
-    # 팀 xG
-    ts = c.execute("SELECT event_id, team_id, is_home, xg, shots, shots_on, shots_inside, possession FROM match_team_stats").fetchall()
-    per = Counter(r[0] for r in ts)
-    rep("OK" if all(v == 2 for v in per.values()) and len(per) == len(fin) else "WARN", A, "팀 기록: 종료 경기마다 두 팀",
-        f"경기 {len(per)}/{len(fin)} · 2팀 아닌 경기 {sum(1 for v in per.values() if v != 2)}")
-    xnull = [r for r in ts if r[3] is None]
-    rep("OK" if len(xnull) <= len(ts) * 0.1 else "WARN", A, "xG 결측", f"{len(xnull)}/{len(ts)}행 ({len({r[0] for r in xnull})}경기) — 공급자 미제공")
-    one_side = [e for e, v in Counter(r[0] for r in xnull).items() if v == 1]
-    rep("OK" if not one_side else "WARN", A, "xG 한 팀만 있는 경기", f"{len(one_side)}")
-    bad = [r for r in ts if r[4] is not None and ((r[5] or 0) > r[4] or (r[6] or 0) > r[4])]
-    rep("OK" if not bad else "FAIL", A, "유효슈팅·박스 안 ≤ 전체 슈팅", f"위반 {len(bad)}")
-    xr = [r[3] for r in ts if r[3] is not None]
-    rep("OK" if xr and min(xr) >= 0 and max(xr) <= 7 else "WARN", A, "xG 범위", f"{min(xr):.2f}~{max(xr):.2f}" if xr else "-")
-    poss = defaultdict(float)
-    for r in ts:
-        if r[7] is not None:
-            poss[r[0]] += r[7]
-    pbad = [e for e, v in poss.items() if abs(v - 100) > 1.5]
-    rep("OK" if not pbad else "WARN", A, "두 팀 점유율 합 ≈ 100", f"벗어남 {len(pbad)}")
-    # xG 와 실제 득점 상관(상식 점검)
-    sc = {e[0]: (e[1], e[3], e[4]) for e in fin}
-    pairs = [(r[3], sc[r[0]][1] if r[1] == sc[r[0]][0] else sc[r[0]][2]) for r in ts if r[3] is not None and r[0] in sc]
-    if len(pairs) > 10:
-        n = len(pairs); mx = sum(p[0] for p in pairs) / n; my = sum(p[1] for p in pairs) / n
-        cov = sum((x - mx) * (y - my) for x, y in pairs); vx = sum((x - mx) ** 2 for x, _ in pairs); vy = sum((y - my) ** 2 for _, y in pairs)
-        r_ = cov / (vx * vy) ** 0.5 if vx and vy else 0
-        rep("OK" if r_ >= 0.3 else "WARN", A, "경기 xG ↔ 득점 상관", f"r={r_:.2f} · 평균 xG {mx:.2f} vs 득점 {my:.2f}")
+    audit_team_xg(c, A, fin)
     # 선수 시즌 기록
     ps = c.execute("SELECT COUNT(*), SUM(minutes_played < 0), SUM(team_id NOT IN (SELECT id FROM teams)) FROM player_stats JOIN players ON players.id = player_stats.player_id").fetchone()
     rep("OK" if not (ps[1] or ps[2]) else "WARN", A, "선수 시즌 기록", f"{ps[0]}명 · 음수 출전 {ps[1]} · 팀 없음 {ps[2]}")
     c.close()
+
+# ── 전 해외 리그 팀 xG (J1 은 위에서) ─────────────────────────────────
+import glob  # noqa: E402
+for path in sorted(glob.glob(os.path.join(ROOT, "*.db"))):
+    code = os.path.basename(path)[:-3]
+    if code in ("players", "transfermarkt", "jleague1"):
+        continue
+    c = ro(code + ".db")
+    try:
+        if not c.execute("SELECT 1 FROM sqlite_master WHERE name='match_team_stats'").fetchone() or                 not c.execute("SELECT 1 FROM match_team_stats LIMIT 1").fetchone():
+            continue
+        fin = c.execute("""SELECT id, home_team_id, away_team_id, home_score, away_score FROM events
+                           WHERE home_score IS NOT NULL AND id IN (SELECT event_id FROM match_team_stats)""").fetchall()
+        audit_team_xg(c, code, fin)
+    finally:
+        c.close()
 
 # ── J2 ──────────────────────────────────────────────────────────────
 c = ro("jleague2.db")

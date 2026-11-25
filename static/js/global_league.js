@@ -825,8 +825,14 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   async function renderTeamXg(code, qs) {
     const content = document.getElementById('gl-content');
     const d = await (await fetch(`/api/league/${encodeURIComponent(code)}/team-xg${qs}`)).json();
-    const rows = (d.teams || []).filter(r => r.xg_games);
+    const rows = (d.teams || []).filter(r => r.xg_for != null);
     if (!rows.length) { content.innerHTML = noDataHtml('팀 xG', code); return; }
+    const cov = d.coverage || {};
+    const low = cov.pct != null && cov.pct < 60;
+    const covHtml = cov.games ? `<p class="gl-xg-cov${low ? ' gl-xg-cov-low' : ''}" ${low ? 'role="note"' : ''}>${low ? '⚠ ' : ''}xG 제공 <b>${cov.xg_games}/${cov.games}경기</b> (${cov.pct}%)`
+      + (low ? ' — 공급자가 이 리그 xG 를 일부 경기만 줘서 표본이 작습니다. 순위·결론은 참고만 하세요.' : '')
+      + (rows.length < (d.teams || []).length ? ` · xG 경기 ${d.min_games || 3}경기 미만 팀 ${(d.teams || []).length - rows.length}곳은 표에서 뺌` : '')
+      + `</p>` : '';
     const sgn = v => (v == null ? '-' : (v > 0 ? '+' : '') + v.toFixed(2));
     const cls = (v, goodPositive) => (v == null || Math.abs(v) < 0.05 ? '' : ((v > 0) === goodPositive ? ' gl-xg-pos' : ' gl-xg-neg'));
     const h = d.highlights || {};
@@ -842,7 +848,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         <td class="gl-num${cls(r.ga_minus_xga, false)}">${sgn(r.ga_minus_xga)}</td>
         <td class="gl-num">${r.shots_pg ?? '-'}</td><td class="gl-num">${r.box_share != null ? r.box_share + '%' : '-'}</td>
         <td class="gl-num">${r.possession != null ? r.possession + '%' : '-'}</td></tr>`).join('');
-    content.innerHTML = `<div class="gl-xg">${lead}
+    content.innerHTML = `<div class="gl-xg">${lead}${covHtml}
       <div class="gl-xg-scroll"><table class="gl-table gl-xg-table">
         <caption class="gl-muted">경기당 평균 · xG 차 큰 순 · 초록/빨강은 좋음/나쁨 방향(부호 함께 표시)</caption>
         <thead><tr><th scope="col">#</th><th scope="col">팀</th><th scope="col" title="xG 있는 경기 수">경기</th>

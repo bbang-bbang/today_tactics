@@ -56,5 +56,22 @@ check("xG 없는 팀 → None", (t[30]["xg_games"], t[30]["xg_for"]), (0, None))
 check("정렬: xG 차 큰 순", [r["team_id"] for r in team_xg_table(games)][:2], [10, 20])
 check("팀 기록 수집 = 경기별 기록 있는 모든 리그(J1만 아님)", {"epl", "laliga", "brasileirao", "championship", "jleague1", "liga3"} <= TEAM_STATS_LEAGUES, True)
 check("순위표만·지난 시즌 기록 리그는 제외", ("brasileiroc" in TEAM_STATS_LEAGUES, "jleague2" in TEAM_STATS_LEAGUES, "seriec_a" in TEAM_STATS_LEAGUES), (False, False, False))
+
+# 2026-11-25 감사 반영: 공급자 오류(슈팅 5개 이상인데 xG 0) → 없음 처리 · 표본 부족 팀 xG 숨김 · 제공률
+from team_xg import xg_coverage, XG_MIN_GAMES  # noqa: E402
+g2 = [  # 11번째 = 상대 슈팅
+    (1, 10, 1, 0.0, 8, 3, 50.0, 1, 0, 1.2, 9),      # 슈팅 8개인데 xG 0 → 오류 → 경기 제외
+    (1, 20, 0, 1.2, 9, 5, 50.0, 0, 1, 0.0, 8),      # 상대 xG 가 오류 → 이 경기도 제외
+    (2, 10, 1, 0.0, 2, 1, 50.0, 0, 0, 0.3, 4),      # 슈팅 2개 xG 0 → 정상(진짜 0)
+    (2, 20, 0, 0.3, 4, 2, 50.0, 0, 0, 0.0, 2),
+]
+t2 = {r["team_id"]: r for r in team_xg_table(g2)}
+check("xG 0·슈팅≥5 → 오류로 제외", (t2[10]["games"], t2[10]["xg_games"], t2[10]["xg_for"]), (2, 1, 0.0))
+check("최소 표본 상수", XG_MIN_GAMES, 3)
+t3 = {r["team_id"]: r for r in team_xg_table(g2, min_games=XG_MIN_GAMES)}
+check("표본 미만 → xG 지표 None(경기 수는 유지)", (t3[10]["xg_for"], t3[10]["xg_diff"], t3[10]["xg_games"]), (None, None, 1))
+check("제공률 = xG 정상 경기 / 전체 경기", xg_coverage(g2), {"games": 2, "xg_games": 1, "pct": 50.0})
+check("제공률 빈 입력", xg_coverage([]), {"games": 0, "xg_games": 0, "pct": None})
+check("10필드(상대 슈팅 없음)도 동작", xg_coverage(games)["games"], 3)
 print(f"\n{'OK' if not fails else 'FAIL'} — 실패 {fails}건")
 sys.exit(1 if fails else 0)

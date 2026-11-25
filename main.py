@@ -181,7 +181,7 @@ def invalidate_api_cache():
 
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from overseas_formation import player_formations as _os_player_formations, formation_family as _formation_family
-from team_xg import team_xg_table as _team_xg_table
+from team_xg import team_xg_table as _team_xg_table, xg_coverage as _xg_coverage, XG_MIN_GAMES as _XG_MIN_GAMES
 from squad_value import squad_value_table as _squad_value_table
 from authlib.integrations.flask_client import OAuth
 
@@ -15317,7 +15317,7 @@ def league_team_xg(code):
                 SELECT t.event_id, t.team_id, t.is_home, t.xg, t.shots, t.shots_inside, t.possession,
                        CASE WHEN t.is_home = 1 THEN e.home_score ELSE e.away_score END,
                        CASE WHEN t.is_home = 1 THEN e.away_score ELSE e.home_score END,
-                       o.xg
+                       o.xg, o.shots
                 FROM match_team_stats t
                 JOIN events e ON e.id = t.event_id
                 LEFT JOIN match_team_stats o ON o.event_id = t.event_id AND o.team_id != t.team_id
@@ -15326,15 +15326,18 @@ def league_team_xg(code):
             names = {r[0]: r[1] for r in conn.execute("SELECT id, name FROM teams")}
         except sqlite3.OperationalError:          # 테이블 없는 리그(수집 전)
             games, names = [], {}
-    rows = _team_xg_table(games)
+    rows = _team_xg_table(games, min_games=_XG_MIN_GAMES)
     for r in rows:
         r["name"] = names.get(r["team_id"]) or str(r["team_id"])
-    with_xg = [r for r in rows if r["xg_games"]]
+    with_xg = [r for r in rows if r["xg_for"] is not None]
+    cov = _xg_coverage(games)
     over = max(with_xg, key=lambda r: r["g_minus_xg"], default=None)
     under = min(with_xg, key=lambda r: r["g_minus_xg"], default=None)
     return jsonify({
         "teams": rows,
         "games": len({g[0] for g in games}),
+        "coverage": cov,
+        "min_games": _XG_MIN_GAMES,
         "highlights": {
             "best_xg_diff": with_xg[0]["name"] if with_xg else None,
             "over": {"name": over["name"], "value": over["g_minus_xg"]} if over else None,
@@ -15344,6 +15347,7 @@ def league_team_xg(code):
             "xG = API-Football 경기별 팀 기대득점(공급자 모델). 경기당 평균 — 표본이 적은 시즌 초반엔 득점−xG 가 운에 크게 흔들림",
             "득점−xG > 0 = 기대보다 많이 넣음(결정력 또는 운) · 실점−xGA < 0 = 기대보다 적게 먹음(골키퍼·수비 또는 운)",
             "박스 안 비율 = 전체 슈팅 중 페널티 박스 안 슈팅 비율",
+            f"xG 지표는 xG 가 있는 경기 {_XG_MIN_GAMES}경기 이상인 팀만 — 슈팅 5개 이상인데 xG 0 인 경기는 공급자 오류로 보고 제외",
         ],
     })
 
