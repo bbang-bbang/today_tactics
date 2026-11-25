@@ -47,12 +47,14 @@ def team_xg_table(games, min_games=1):
         _eid, tid, _h, xg, shots, inside, poss, gf, ga, oxg = _norm(g)
         a = acc.setdefault(tid, {"games": 0, "xg_games": 0, "xg": 0.0, "xga": 0.0, "gf_x": 0, "ga_x": 0,
                                  "shots": 0, "inside": 0, "poss": [], "gf": 0, "ga": 0,
-                                 "xpts": 0.0, "pts_x": 0})
+                                 "xpts": 0.0, "pts_x": 0, "inside_shots": 0})
         a["games"] += 1
         a["gf"] += gf or 0
         a["ga"] += ga or 0
         a["shots"] += shots or 0
-        a["inside"] += inside or 0
+        if inside is not None:                     # 박스 안 슈팅을 아는 경기의 전체 슈팅만 분모로
+            a["inside"] += inside
+            a["inside_shots"] += shots or 0
         if poss is not None:
             a["poss"].append(poss)
         if xg is not None and oxg is not None:
@@ -80,7 +82,7 @@ def team_xg_table(games, min_games=1):
             "pts_minus_xpts": _r(a["pts_x"] - a["xpts"]) if ok else None,
             "goals_for": a["gf"], "goals_against": a["ga"],
             "shots_pg": _r(a["shots"] / a["games"], 1) if a["games"] else None,
-            "box_share": _r(a["inside"] / a["shots"] * 100, 1) if a["shots"] else None,
+            "box_share": _r(a["inside"] / a["inside_shots"] * 100, 1) if a["inside_shots"] else None,
             "possession": _r(sum(a["poss"]) / len(a["poss"]), 1) if a["poss"] else None,
         })
     out.sort(key=lambda r: (r["xg_diff"] is None, -(r["xg_diff"] or 0)))

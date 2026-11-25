@@ -15517,6 +15517,13 @@ def league_team_xg(code):
     with get_league_db(code) as conn:
         games = _team_xg_games(conn, [t["id"] for t in cfg["tournaments"]], sid)
         names = {r[0]: r[1] for r in conn.execute("SELECT id, name FROM teams")}
+    return jsonify(_team_xg_payload(games, names, [
+        "xG = API-Football 경기별 팀 기대득점(공급자 모델). 경기당 평균 — 표본이 적은 시즌 초반엔 득점−xG 가 운에 크게 흔들림",
+        "박스 안 비율 = 전체 슈팅 중 페널티 박스 안 슈팅 비율"]))
+
+
+def _team_xg_payload(games, names, source_notes):
+    """팀 xG 응답 공통(해외 리그·K리그) — 표·제공률·예측력·하이라이트·기준."""
     rows = _team_xg_table(games, min_games=_XG_MIN_GAMES)
     for r in rows:
         r["name"] = names.get(r["team_id"]) or str(r["team_id"])
@@ -15526,7 +15533,7 @@ def league_team_xg(code):
     val.pop("samples", None)
     over = max(with_xg, key=lambda r: r["g_minus_xg"], default=None)
     under = min(with_xg, key=lambda r: r["g_minus_xg"], default=None)
-    return jsonify({
+    return {
         "teams": rows,
         "games": len({g[0] for g in games}),
         "coverage": cov,
@@ -15537,14 +15544,60 @@ def league_team_xg(code):
             "over": {"name": over["name"], "value": over["g_minus_xg"]} if over else None,
             "under": {"name": under["name"], "value": under["g_minus_xg"]} if under else None,
         },
-        "notes": [
-            "xG = API-Football 경기별 팀 기대득점(공급자 모델). 경기당 평균 — 표본이 적은 시즌 초반엔 득점−xG 가 운에 크게 흔들림",
+        "notes": list(source_notes) + [
             "득점−xG > 0 = 기대보다 많이 넣음(결정력 또는 운) · 실점−xGA < 0 = 기대보다 적게 먹음(골키퍼·수비 또는 운)",
-            "박스 안 비율 = 전체 슈팅 중 페널티 박스 안 슈팅 비율",
             "xPts(기대 승점) = 경기마다 양 팀 xG 로 승·무·패 확률(독립 포아송 근사)을 구해 3·P(승)+P(무) 합산 — 승점−xPts > 0 은 경기 내용보다 승점을 많이 챙김(운 또는 결정력)",
             f"xG 지표는 xG 가 있는 경기 {_XG_MIN_GAMES}경기 이상인 팀만 — 슈팅 5개 이상인데 xG 0 인 경기는 공급자 오류로 보고 제외",
         ],
-    })
+    }
+
+
+def _kleague_xg_games(conn, tid, ys, ye):
+    """K리그 팀-경기 xG 행(team_xg 12필드) — match_player_stats.expected_goals 선수 합(SofaScore 출처).
+    xG 값이 한 명도 없는 쪽은 None(경기는 포함 → 제공률 계산). 박스 안 슈팅·점유율은 없음(None)."""
+    rows = conn.execute("""SELECT e.id, e.home_team_id, e.away_team_id, e.home_score, e.away_score, e.date_ts,
+                                  m.is_home, SUM(m.expected_goals), COUNT(m.expected_goals), SUM(m.total_shots)
+                           FROM events e LEFT JOIN match_player_stats m ON m.event_id = e.id
+                           WHERE e.tournament_id = ? AND e.home_score IS NOT NULL AND e.date_ts >= ? AND e.date_ts < ?
+                           GROUP BY e.id, m.is_home""", (tid, ys, ye)).fetchall()
+    ev, side = {}, {}
+    for eid, h, a, hs, as_, ts, ih, xg, nxg, sh in rows:
+        ev[eid] = (h, a, hs, as_, ts)
+        if ih is not None:
+            side[(eid, int(ih))] = (xg if nxg else None, sh)
+    out = []
+    for eid, (h, a, hs, as_, ts) in ev.items():
+        hx, hsh = side.get((eid, 1), (None, None))
+        ax, ash = side.get((eid, 0), (None, None))
+        out.append((eid, h, 1, hx, hsh, None, None, hs, as_, ax, ash, ts))
+        out.append((eid, a, 0, ax, ash, None, None, as_, hs, hx, hsh, ts))
+    return out
+
+
+@app.route("/api/kleague-team-xg")
+@cached_response(ttl=1800)
+def kleague_team_xg():
+    """K리그 팀 xG 표 (2026-11-25) — 해외 '팀 xG' 와 같은 형식. ?league=k1|k2 · ?year= (기본 현재 시즌).
+    출처 = 경기별 선수 기록 expected_goals(SofaScore) 합 — SofaScore 차단 기간 경기는 xG 없음(제공률로 표시)."""
+    lg = (request.args.get("league") or "k1").strip().lower()
+    if lg not in ("k1", "k2"):
+        return jsonify({"error": "league=k1|k2"}), 400
+    try:
+        year = int(request.args.get("year") or _current_season())
+    except ValueError:
+        return jsonify({"error": "invalid year"}), 400
+    ys, ye = _year_range(year)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        games = _kleague_xg_games(conn, 410 if lg == "k1" else 777, ys, ye)
+    finally:
+        conn.close()
+    names = {t["sofascore_id"]: (t.get("short") or t["name"]) for t in TEAMS if t.get("sofascore_id")}
+    out = _team_xg_payload(games, names, [
+        "xG = 경기별 선수 기록의 기대득점(SofaScore 모델) 팀 합 — SofaScore 수집이 막힌 기간 경기는 xG 없음(위 제공률)",
+        "K리그는 박스 안 슈팅·점유율 미수집(-)"])
+    out.update({"league": lg, "year": year})
+    return jsonify(out)
 
 
 @app.route("/api/league/<code>/teams")

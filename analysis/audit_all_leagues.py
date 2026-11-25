@@ -258,6 +258,12 @@ def audit_api(base):
         sv = get(base, f"/api/squad-value?league={k}")
         vr = [r["value_rank"] for r in sv["teams"] if r["value_rank"]]
         rep("OK" if sorted(vr) == list(range(1, len(vr) + 1)) else "FAIL", k.upper(), "스쿼드 가치 순위 1..N", f"{len(vr)}팀 · 연결 {sv['coverage']}")
+    for k in ("k1", "k2"):
+        kx = get(base, f"/api/kleague-team-xg?league={k}")
+        t = [r for r in kx["teams"] if r.get("xpts") is not None]
+        bad = [r["name"] for r in t if not (0 <= r["xpts"] <= 3 * r["xg_games"] + 1e-6)]
+        avg = sum(r["xpts"] for r in t) / max(1, sum(r["xg_games"] for r in t))
+        rep("OK" if not bad and 1.0 <= avg <= 1.6 else "WARN", k.upper(), "K리그 팀 xG: xPts 범위·평균", f"{len(t)}팀 · 평균 {avg:.2f} · 제공 {kx['coverage']}")
     xv = get(base, "/api/overseas-xg-validation")
     rep("OK" if xv["pooled"]["n_teams"] == sum(l["n_teams"] for l in xv["leagues"]) else "FAIL", "xG검증", "합산 팀 수 = 리그별 합",
         f"{xv['pooled']['n_teams']}팀 · {xv['pooled']['n_leagues']}리그")

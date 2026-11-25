@@ -236,6 +236,39 @@ function ttSeason() { return (document.body && document.body.dataset.season) || 
         }).catch(() => {});
     }
 
+    // K리그 팀 xG (2026-11-25, xg_insight.js — 해외 '팀 xG' 와 같은 표·예측력) — 리그 총평
+    function loadKXg(id) {
+        const body = document.getElementById("sr-body");
+        if (!body) return;
+        const sec = document.createElement("section");
+        sec.className = "sr-card sv-card";
+        sec.innerHTML = `<h3>📈 팀 xG · 기대 승점 <span class="sr-muted">경기별 선수 xG 합</span></h3><div class="kxg-slot"><div class="rc-loading" role="status">불러오는 중…</div></div>`;
+        body.appendChild(sec);
+        fetch(`/api/kleague-team-xg?league=${encodeURIComponent(_lg)}&year=${encodeURIComponent(_year)}`).then(r => r.json()).then(d => {
+            if (id !== _req) return;
+            const slotId = "sr-xi-slot";
+            const h = window.ttXgInsight.tableHtml(d, slotId);
+            sec.querySelector(".kxg-slot").innerHTML = h || `<div class="rc-empty">이 시즌은 xG 가 있는 경기가 부족합니다.</div>`;
+            const s2 = document.getElementById(slotId);
+            if (s2) s2.innerHTML = window.ttXgInsight.validHtml(d.validation, null, _lg === "k1" ? "K리그1" : "K리그2");
+        }).catch(() => { if (id === _req) sec.querySelector(".kxg-slot").innerHTML = `<div class="rc-error" role="alert">팀 xG 를 불러오지 못했습니다.</div>`; });
+    }
+    // 팀 시즌 리뷰 — 이 팀 xG 한 줄
+    function loadTeamXg(id, league) {
+        const body = document.getElementById("sr-body");
+        const t = (_teams || []).find(x => x.id === _team);
+        if (!body || !t || !t.sofascore_id || (league !== "K1" && league !== "K2")) return;
+        fetch(`/api/kleague-team-xg?league=${league === "K1" ? "k1" : "k2"}&year=${encodeURIComponent(_year)}`).then(r => r.json()).then(d => {
+            if (id !== _req) return;
+            const h = window.ttXgInsight.teamLine(d, t.sofascore_id);
+            if (!h) return;
+            const sec = document.createElement("section");
+            sec.className = "sr-card sv-card";
+            sec.innerHTML = `<h3>📈 팀 xG · 기대 승점</h3>${h}`;
+            body.appendChild(sec);
+        }).catch(() => {});
+    }
+
     function load() {
         const body = document.getElementById("sr-body");
         if (!body || !_team) return;
@@ -249,6 +282,7 @@ function ttSeason() { return (document.body && document.body.dataset.season) || 
                     body.innerHTML = ok ? leagueBodyHtml(j)
                         : `<div class="rc-empty">${j.error === "no games" ? "이 시즌에는 이 리그의 경기 기록이 없습니다." : "리그 총평을 만들 수 없습니다."}</div>`;
                     if (ok && String(_year) === ttSeason() && window.ttSquadValue) loadSquadValue(id);
+                    if (ok && window.ttXgInsight) loadKXg(id);
                 })
                 .catch(err => {
                     console.error("[리그 총평 실패]", err);
@@ -263,6 +297,7 @@ function ttSeason() { return (document.body && document.body.dataset.season) || 
                 body.innerHTML = ok ? bodyHtml(j)
                     : `<div class="rc-empty">${j.error === "no games" ? "이 시즌에는 이 팀의 K리그 경기 기록이 없습니다." : "시즌 리뷰를 만들 수 없습니다."}</div>`;
                 if (ok && String(_year) === ttSeason() && window.ttSquadValue) loadTeamSquadValue(id, j.league);
+                if (ok && window.ttXgInsight) loadTeamXg(id, j.league);
             })
             .catch(err => {
                 console.error("[시즌 리뷰 실패]", err);

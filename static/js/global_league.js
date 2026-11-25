@@ -868,45 +868,9 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   async function renderTeamXg(code, qs) {
     const content = document.getElementById('gl-content');
     const d = await (await fetch(`/api/league/${encodeURIComponent(code)}/team-xg${qs}`)).json();
-    const rows = (d.teams || []).filter(r => r.xg_for != null);
-    if (!rows.length) { content.innerHTML = noDataHtml('팀 xG', code); return; }
-    const cov = d.coverage || {};
-    const low = cov.pct != null && cov.pct < 60;
-    const covHtml = cov.games ? `<p class="gl-xg-cov${low ? ' gl-xg-cov-low' : ''}" ${low ? 'role="note"' : ''}>${low ? '⚠ ' : ''}xG 제공 <b>${cov.xg_games}/${cov.games}경기</b> (${cov.pct}%)`
-      + (low ? ' — 공급자가 이 리그 xG 를 일부 경기만 줘서 표본이 작습니다. 순위·결론은 참고만 하세요.' : '')
-      + (rows.length < (d.teams || []).length ? ` · xG 경기 ${d.min_games || 3}경기 미만 팀 ${(d.teams || []).length - rows.length}곳은 표에서 뺌` : '')
-      + `</p>` : '';
-    const sgn = v => (v == null ? '-' : (v > 0 ? '+' : '') + v.toFixed(2));
-    const cls = (v, goodPositive) => (v == null || Math.abs(v) < 0.05 ? '' : ((v > 0) === goodPositive ? ' gl-xg-pos' : ' gl-xg-neg'));
-    const h = d.highlights || {};
-    const lead = `<p class="gl-xg-lead">경기 내용(xG 차) 1위 <b>${ttEsc(h.best_xg_diff || '-')}</b>`
-      + (h.over ? ` · 기대보다 많이 넣은 팀 <b>${ttEsc(h.over.name)}</b> (경기당 ${sgn(h.over.value)})` : '')
-      + (h.under ? ` · 기대보다 못 넣은 팀 <b>${ttEsc(h.under.name)}</b> (경기당 ${sgn(h.under.value)})` : '')
-      + ` <span class="gl-muted">— ${d.games || 0}경기 기준</span></p>`;
-    const body = rows.map((r, i) => `<tr>
-        <td class="gl-xg-rank">${i + 1}</td><td>${ttEsc(r.name)}</td><td class="gl-num">${r.xg_games}</td>
-        <td class="gl-num">${r.xg_for.toFixed(2)}</td><td class="gl-num">${r.xg_against.toFixed(2)}</td>
-        <td class="gl-num${cls(r.xg_diff, true)}"><b>${sgn(r.xg_diff)}</b></td>
-        <td class="gl-num${cls(r.g_minus_xg, true)}">${sgn(r.g_minus_xg)}</td>
-        <td class="gl-num${cls(r.ga_minus_xga, false)}">${sgn(r.ga_minus_xga)}</td>
-        <td class="gl-num">${r.xpts != null ? r.xpts.toFixed(1) : '-'} <span class="gl-muted">/ ${r.pts_x ?? '-'}</span></td>
-        <td class="gl-num${cls(r.pts_minus_xpts, true)}">${r.pts_minus_xpts != null ? (r.pts_minus_xpts > 0 ? '+' : '') + r.pts_minus_xpts.toFixed(1) : '-'}</td>
-        <td class="gl-num">${r.shots_pg ?? '-'}</td><td class="gl-num">${r.box_share != null ? r.box_share + '%' : '-'}</td>
-        <td class="gl-num">${r.possession != null ? r.possession + '%' : '-'}</td></tr>`).join('');
-    content.innerHTML = `<div class="gl-xg">${lead}${covHtml}
-      <div class="gl-xg-scroll"><table class="gl-table gl-xg-table">
-        <caption class="gl-muted">경기당 평균 · xG 차 큰 순 · 초록/빨강은 좋음/나쁨 방향(부호 함께 표시)</caption>
-        <thead><tr><th scope="col">#</th><th scope="col">팀</th><th scope="col" title="xG 있는 경기 수">경기</th>
-          <th scope="col" title="경기당 기대득점">xG</th><th scope="col" title="경기당 허용 기대득점">xGA</th>
-          <th scope="col" title="xG − xGA (경기당)">xG 차</th><th scope="col" title="득점 − xG (경기당): +면 기대보다 많이 넣음">득점−xG</th>
-          <th scope="col" title="실점 − xGA (경기당): −면 기대보다 적게 먹음">실점−xGA</th>
-          <th scope="col" title="기대 승점(xG 로 계산한 승·무·패 확률 합) / 실제 승점 — xG 있는 경기 합계">xPts / 승점</th>
-          <th scope="col" title="실제 승점 − 기대 승점: +면 경기 내용보다 승점을 많이 챙김(운 또는 결정력)">승점−xPts</th><th scope="col">슈팅/경기</th>
-          <th scope="col" title="전체 슈팅 중 박스 안 슈팅">박스 안</th><th scope="col">점유율</th></tr></thead>
-        <tbody>${body}</tbody></table></div>
-      <div id="gl-xi-slot"></div>
-      <details class="gl-xg-notes"><summary>기준</summary><ul>${(d.notes || []).map(n => `<li>${ttEsc(n)}</li>`).join('')}</ul></details>
-    </div>`;
+    const html = window.ttXgInsight ? window.ttXgInsight.tableHtml(d, 'gl-xi-slot') : '';
+    if (!html) { content.innerHTML = noDataHtml('팀 xG', code); return; }
+    content.innerHTML = html;
     // xG 예측력 검증 (2026-11-25) — 이 리그 + 전 리그 합산. 현재 시즌만(합산은 현재 시즌 기준)
     if (window.ttXgInsight) {
       const lg = GL.leagues.find(x => x.code === code);

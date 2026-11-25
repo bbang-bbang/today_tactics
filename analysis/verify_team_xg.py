@@ -100,6 +100,9 @@ check("예측력: 전반 xG 차 → 후반 승점 r = 1", round(pr["r_xgd"], 2),
 check("예측력: 전반 승점 → 후반 승점 r < 0 (이 합성에선 반대)", pr["r_pts"] < 0, True)
 check("예측력: 경기 수 부족 팀 제외", half_split_predictiveness(rows, min_games=7)["n_teams"], 0)
 check("예측력: 팀 3개 미만 → r None", half_split_predictiveness(rows[:12], min_games=6)["r_xgd"], None)
+# 박스 안 슈팅 데이터가 없는 리그(K리그) → box_share None (0% 로 보이면 안 됨)
+tk = team_xg_table([(1, 10, 1, 1.0, 10, None, None, 1, 0, 0.5), (1, 20, 0, 0.5, 6, None, None, 0, 1, 1.0)])
+check("박스 안 미수집 → box_share None", [r["box_share"] for r in tk], [None, None])
 # 상관계수 95% 신뢰구간 (Fisher z) — 전문가 평가 반영
 from team_xg import r_ci95  # noqa: E402
 lo, hi = r_ci95(0.45, 264)

@@ -290,6 +290,12 @@ qa('주발 필터(해외·국내): 왼발 = 왼발+양발만 · 모름 제외 �
     and isinstance(_d_fl['excluded_foot_unknown'], int)
     and all(c['foot'] in ('Right', 'Both') for n in get('/api/team-recruit?team=ulsan&max_value=0&foot=right')['needs'] for c in n['candidates'])
     and _brief_status('/api/overseas-recruit?pos=D&foot=middle') == 400 and _brief_status('/api/team-recruit?team=ulsan&foot=x') == 400))
+_kx = get('/api/kleague-team-xg?league=k2')
+qa('K리그 팀 xG: 해외와 같은 형식·xPts·제공률·잘못된 리그 400', lambda: assert_(
+    len([t for t in _kx['teams'] if t['xg_for'] is not None]) >= 10 and _kx['coverage']['pct'] > 50
+    and all(0 <= t['xpts'] <= 3 * t['xg_games'] for t in _kx['teams'] if t['xpts'] is not None)
+    and 'r_xgd' in _kx['validation'] and _brief_status('/api/kleague-team-xg?league=k9') == 400
+    and isinstance(get('/api/kleague-team-xg?league=k1')['coverage']['games'], int)))
 d_xv = get('/api/overseas-xg-validation')
 qa('xG 예측력 검증: 구조·r 범위 [-1,1]·합산 팀 수 = 리그별 합', lambda: assert_(
     isinstance(d_xv['leagues'], list) and d_xv['pooled']['n_teams'] == sum(l['n_teams'] for l in d_xv['leagues'])
