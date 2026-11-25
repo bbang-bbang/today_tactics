@@ -69,3 +69,11 @@ test("team_report_low_xg_coverage_warning", () => {
   const h = TR.html({ ...base, xg: { ...base.xg, coverage: { games: 100, xg_games: 20, pct: 20 } } });
   assert.match(h, /⚠/);
 });
+
+test("team_report_height_foot_column", () => {
+  const h = TR.html({ ...base, players: [{ ...base.players[0], height: 185, foot: "Left", phys_src: "TM" }, { ...base.players[0], id: 2, height: null, foot: null }] });
+  assert.match(h, /키·주발/);
+  assert.match(h, /185cm · 왼발/);
+  assert.match(h, /title="Transfermarkt 값으로 보완"/);
+  assert.match(h, /<td>-<\/td>/);
+});

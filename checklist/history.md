@@ -20,6 +20,12 @@
 - 발견·수정: 해외 섹션 탭이 375px에서 글자 단위로 세로 꺾임 → nowrap + 가로 스크롤.
 - ⛔ 운영 DB 사본 로컬 다운로드는 권한 분류기에서 거부 → 합성 데이터 + 로컬 EPL 사본 + 배포 후 터널 검사로 대체.
 
+### 4. xG 활용 (ce021b4)
+- `team_xg.xpts`(독립 포아송) · `half_split_predictiveness`(팀별 전/후반기 Pearson) · `validation_rows`. 테스트 verify_team_xg +13, JS xg_insight 4. 운영 실측 합산 r: 승점 .355 · 득실차 .411 · xG 차 .446 · xPts .446. 운영 브라우저 44/44.
+
+### 5. 키·주발 TM 보완
+- `_tm_values`/`_tm_attach` 확장(verify_tm_values +4), 해외 후보 응답 화이트리스트에 foot·phys_src 추가(누락 발견), 팀 리포트 '키·주발' 열(JS +1). qa 203/203, 브라우저 영입 24/24·팀 리포트 28/28.
+
 ### 1. 계약 만료 임박 (a440927)
 - TM `contract_expiration_date` → 전 리그 후보 배지·필터. `qa_check` 계약 필터 항목.
 

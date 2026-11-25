@@ -7,6 +7,8 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     const RES = { W: "승", D: "무", L: "패" };
     const mv = (v) => (v == null ? "-" : "€" + (v / 1e6 >= 100 ? Math.round(v / 1e6) : (v / 1e6).toFixed(1)) + "M");
     const sgn = (v, d = 2) => (v == null ? "-" : (v > 0 ? "+" : "") + Number(v).toFixed(d));
+    const FOOT = { Right: "오른발", Left: "왼발", Both: "양발" };
+    const phys = (p) => [p.height ? p.height + "cm" : "", p.foot ? (FOOT[p.foot] || p.foot) : ""].filter(Boolean).join(" · ") || "-";
     const empty = (msg) => `<p class="tr-empty">${msg}</p>`;
 
     function flowSvg(flow, n) {
@@ -65,12 +67,12 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const lead = [ld.goals && ld.goals.goals ? `득점 1위 <b>${ttEsc(ld.goals.name)}</b> ${ld.goals.goals}골` : "",
             ld.assists && ld.assists.assists ? `도움 1위 <b>${ttEsc(ld.assists.name)}</b> ${ld.assists.assists}` : "",
             ld.rating ? `평점 1위 <b>${ttEsc(ld.rating.name)}</b> ${ld.rating.rating}` : ""].filter(Boolean).join(" · ");
-        const rows = ps.map(p => `<tr><td>${ttEsc(p.name)}</td><td>${ttEsc(p.position || "-")}</td><td class="tr-num">${p.apps ?? "-"}</td>
+        const rows = ps.map(p => `<tr><td>${ttEsc(p.name)}</td><td>${ttEsc(p.position || "-")}</td><td${p.phys_src === "TM" ? ' title="Transfermarkt 값으로 보완"' : ""}>${ttEsc(phys(p))}</td><td class="tr-num">${p.apps ?? "-"}</td>
             <td class="tr-num">${p.minutes ?? "-"}</td><td class="tr-num">${p.goals}</td><td class="tr-num">${p.assists}</td>
             <td class="tr-num">${p.rating ?? "-"}</td><td class="tr-num">${mv(p.market_value)}</td></tr>`).join("");
         return `${lead ? `<p class="tr-lead">${lead}</p>` : ""}<div class="tr-scroll"><table class="tr-table">
             <caption class="tr-muted">출전 시간 상위 ${ps.length}명${d.stats_label ? " · " + ttEsc(d.stats_label) : ""}</caption>
-            <thead><tr><th scope="col">선수</th><th scope="col">포지션</th><th scope="col">경기</th><th scope="col">분</th><th scope="col">골</th>
+            <thead><tr><th scope="col">선수</th><th scope="col">포지션</th><th scope="col">키·주발</th><th scope="col">경기</th><th scope="col">분</th><th scope="col">골</th>
             <th scope="col">도움</th><th scope="col">평점</th><th scope="col">시장가치</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
 

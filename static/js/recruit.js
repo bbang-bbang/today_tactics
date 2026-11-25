@@ -116,6 +116,17 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         if (isNaN(d) || d < today || d > lim) return "";
         return ` · <span class="rc-ct" title="Transfermarkt 계약 만료일 ${ttEsc(cu)} (2026-06 무렵 기준, 이후 재계약 미반영)">⏳ 계약 ~${ttEsc(cu.slice(0, 7))}</span>`;
     }
+    // 키·주발 (2026-11-25) — 비어 있던 값을 Transfermarkt 로 채운 경우(phys_src='TM') 표시·툴팁
+    function physHtml(c) {
+        const parts = [];
+        if (c.height) parts.push(c.height + "cm");
+        if (c.foot) parts.push(ttEsc(({ Right: "오른발", Left: "왼발", Both: "양발" })[c.foot] || c.foot));
+        if (!parts.length) return "";
+        const txt = parts.join(" · ");
+        return c.phys_src === "TM"
+            ? ` · <span class="rc-phys" title="키·주발 일부를 Transfermarkt 값으로 보완">${txt}<sup aria-hidden="true">TM</sup></span>`
+            : " · " + txt;
+    }
     function mvHtml(c) {
         const t = mvText(c);
         if (!t) return ctHtml(c);
@@ -160,7 +171,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const rows = n.candidates.map((c, i) => `<tr>
                 <td class="rc-idx">${starBtn(tbl, i, ents[i])}${i + 1}</td>
                 <td><button type="button" class="rc-plink rc-name" data-rc-player="${c.player_id}">${ttEsc(c.name)}</button>
-                    <span class="rc-sub">${ttEsc(c.nationality || "")}${c.height ? " · " + c.height + "cm" : ""}${c.foot ? " · " + ttEsc(({ Right: "오른발", Left: "왼발", Both: "양발" })[c.foot] || c.foot) : ""}${c.detail_est ? " · 포지션 추정" : ""}${mvHtml(c)}</span></td>
+                    <span class="rc-sub">${ttEsc(c.nationality || "")}${physHtml(c)}${c.detail_est ? " · 포지션 추정" : ""}${mvHtml(c)}</span></td>
                 <td>${ttEsc(c.team || "")} <span class="rc-lg rc-lg-${ttEsc(c.league)}">${ttEsc(c.league)}</span>${k1EquivHtml(c)}</td>
                 <td class="rc-num">${c.age ?? "-"}</td>
                 <td class="rc-num">${c.mins.toLocaleString()}<span class="rc-muted">분</span></td>
@@ -212,7 +223,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         }));
         const rows = d.candidates.map((c, i) => `<tr>
             <td class="rc-idx">${starBtn(tbl, i, ents[i])}${i + 1}</td>
-            <td><span class="rc-name">${ttEsc(c.name)}</span><span class="rc-sub">${ttEsc(c.nationality || "")}${c.height ? " · " + c.height + "cm" : ""}${c.detail && OS_DETAIL[c.detail] ? ` · ${OS_DETAIL[c.detail]}${c.starts ? ` (선발 ${c.starts})` : ""}` : ""}${mvHtml(c)}</span>${osFormText(c)
+            <td><span class="rc-name">${ttEsc(c.name)}</span><span class="rc-sub">${ttEsc(c.nationality || "")}${physHtml(c)}${c.detail && OS_DETAIL[c.detail] ? ` · ${OS_DETAIL[c.detail]}${c.starts ? ` (선발 ${c.starts})` : ""}` : ""}${mvHtml(c)}</span>${osFormText(c)
                 ? `<span class="rc-sub rc-os-form${c.fam_match && !c.fam_match.n ? " is-miss" : ""}"${c.fam_match ? ` title="포메이션을 확인할 수 있는 선발 ${c.fam_match.tot}경기 중 ${ttEsc(c.fam_match.family)} 계열 ${c.fam_match.n}경기 — 세부 포지션 '선발 N'과는 집계 기준이 다를 수 있음"` : ""}>${ttEsc(osFormText(c))}</span>` : ""}</td>
             <td>${ttEsc(c.team || "")} <span class="rc-lg" title="${ttEsc(c.league)}">${ttEsc(c.country || "")} ${OS_TIER[c.tier] || ""}</span>
                 <span class="rc-sub">${ttEsc(c.league)}${c.season_label ? ` · <b class="rc-os-season">${ttEsc(c.season_label)}</b>` : ""}${c.team_rank ? ` · 팀 ${c.team_rank}/${c.team_n}위` : ""}</span></td>
@@ -265,7 +276,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const rows = cands.map((c, i) => `<tr>
             <td class="rc-idx">${starBtn(tbl, i, ents[i])}${i + 1}</td>
             <td><button type="button" class="rc-plink rc-name" data-rc-player="${c.player_id}">${ttEsc(c.name)}</button>
-                <span class="rc-sub">${ttEsc(c.pos || "")}${c.nationality ? " · " + ttEsc(c.nationality) : ""}${c.height ? " · " + c.height + "cm" : ""}${mvHtml(c)}</span></td>
+                <span class="rc-sub">${ttEsc(c.pos || "")}${c.nationality ? " · " + ttEsc(c.nationality) : ""}${physHtml(c)}${mvHtml(c)}</span></td>
             <td>${ttEsc(c.team || "")} <span class="rc-lg rc-lg-${ttEsc(c.league)}">${ttEsc(c.league)}</span>${k1EquivHtml(c)}</td>
             <td class="rc-num">${c.age ?? "-"}</td>
             <td class="rc-num">${c.mins.toLocaleString()}<span class="rc-muted">분</span></td>

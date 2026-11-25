@@ -280,6 +280,10 @@ qa('팀 리포트(해외 공통): 공식 1위 팀·순위 흐름 마지막 = 경
     d_tr['official']['rank'] == 1 and len(d_tr['flow']) == d_tr['official']['played']
     and all(1 <= p['rank'] <= p['n'] for p in d_tr['flow']) and len(d_tr['players']) >= 5
     and d_tr['squad_value'] and d_tr['squad_value']['team_id'] == _tr_tid and len(d_tr['form']) == 5))
+qa('키·주발 TM 보완: 해외 후보 주발 절반 이상 · 보완 표시(phys_src) · 팀 리포트 선수 주발', lambda: assert_(
+    (lambda c: c and sum(1 for x in c if x.get('foot')) >= len(c) / 2 and all(x.get('phys_src') in (None, 'TM') for x in c))(
+        get('/api/overseas-recruit?pos=D&limit=20')['candidates'])
+    and any(p.get('foot') for p in d_tr['players'])))
 d_xv = get('/api/overseas-xg-validation')
 qa('xG 예측력 검증: 구조·r 범위 [-1,1]·합산 팀 수 = 리그별 합', lambda: assert_(
     isinstance(d_xv['leagues'], list) and d_xv['pooled']['n_teams'] == sum(l['n_teams'] for l in d_xv['leagues'])

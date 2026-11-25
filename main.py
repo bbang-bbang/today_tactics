@@ -7610,6 +7610,9 @@ TM_DB_PATH = os.path.join(BASE_DIR, "transfermarkt.db")
 TM_FRESH_FROM = "2025-06-01"   # 이보다 오래된 시장가치(데이터셋 최신 2026-06-12 기준 1년+)는 '오래됨' — 표시·필터 제외(2026-11-25 감사)
 
 
+_TM_FOOT = {"left": "Left", "right": "Right", "both": "Both"}   # 우리 DB 표기(Left/Right/Both)에 맞춤
+
+
 def _tm_values(pairs):
     """[(league_code, player_id)] → {(code, pid): {market_value, mv_date, mv_peak, contract_until}}. DB 없으면 {}."""
     if not pairs or not os.path.exists(TM_DB_PATH):
@@ -7622,15 +7625,22 @@ def _tm_values(pairs):
     try:
         for code, pid in set(pairs):
             r = conn.execute("""SELECT p.market_value, p.highest_value, p.contract_until,
-                                       (SELECT MAX(v.date) FROM tm_valuations v WHERE v.player_id = p.player_id)
+                                       (SELECT MAX(v.date) FROM tm_valuations v WHERE v.player_id = p.player_id),
+                                       p.height, p.foot
                                 FROM tm_map m JOIN tm_players p ON p.player_id = m.tm_player_id
                                 WHERE m.league_code = ? AND m.player_id = ?""", (code, pid)).fetchone()
-            if r and r[0]:
-                if not r[3] or r[3] < TM_FRESH_FROM:
-                    # 데이터셋 바깥 리그로 옮겨 1년 넘게 갱신 안 된 값 — 현재 값처럼 보이지 않게 숨기고 필터에도 안 씀
-                    out[(code, pid)] = {"market_value": None, "mv_peak": r[1], "contract_until": None, "mv_date": r[3], "mv_stale": True}
-                else:
-                    out[(code, pid)] = {"market_value": r[0], "mv_peak": r[1], "contract_until": r[2], "mv_date": r[3]}
+            if not r:
+                continue
+            # 키·주발(2026-11-25) — 신체 정보는 시장가치처럼 낡지 않으므로 오래된 값이어도 쓴다. 표시 보완용.
+            phys = {"tm_height": r[4] if r[4] and 140 <= r[4] <= 215 else None,
+                    "tm_foot": _TM_FOOT.get((r[5] or "").strip().lower())}
+            if not r[0]:                                     # 연결은 됐지만 시장가치 없음
+                out[(code, pid)] = {"market_value": None, "mv_peak": r[1], "contract_until": None, "mv_date": r[3], **phys}
+            elif not r[3] or r[3] < TM_FRESH_FROM:
+                # 데이터셋 바깥 리그로 옮겨 1년 넘게 갱신 안 된 값 — 현재 값처럼 보이지 않게 숨기고 필터에도 안 씀
+                out[(code, pid)] = {"market_value": None, "mv_peak": r[1], "contract_until": None, "mv_date": r[3], "mv_stale": True, **phys}
+            else:
+                out[(code, pid)] = {"market_value": r[0], "mv_peak": r[1], "contract_until": r[2], "mv_date": r[3], **phys}
     except sqlite3.Error:
         return {}
     finally:
@@ -7645,6 +7655,14 @@ def _tm_attach(items, code_of, pid_of):
         v = vals.get((code_of(c), pid_of(c))) or {}
         c.update({"market_value": v.get("market_value"), "mv_date": v.get("mv_date"),
                   "mv_peak": v.get("mv_peak"), "contract_until": v.get("contract_until")})
+        # 키·주발: 우리 값이 비어 있을 때만 TM 값으로 채움(표시 보완, 점수·필터 미반영) — 출처 phys_src='TM'
+        filled = False
+        if not c.get("height") and v.get("tm_height"):
+            c["height"] = v["tm_height"]; filled = True
+        if not c.get("foot") and v.get("tm_foot"):
+            c["foot"] = v["tm_foot"]; filled = True
+        if filled:
+            c["phys_src"] = "TM"
     return items
 
 
@@ -8212,6 +8230,7 @@ def overseas_recruit():
         "candidates": [{
             "id": r["id"], "name": r["name"], "team": r["team"], "league": r["league"], "league_code": r["league_code"],
             "country": r["country"], "tier": r["tier"], "age": r["age"], "height": r["height"], "nationality": r["nationality"],
+            "foot": r.get("foot"), "phys_src": r.get("phys_src"),
             "detail": r.get("detail"), "starts": r.get("starts"),
             "apps": r["apps"], "mins": r["mins"], "goals": r["goals"], "assists": r["assists"],
             "team_rank": r.get("team_rank"), "team_n": r.get("team_n"),
@@ -15404,7 +15423,7 @@ def league_team_report(code):
             lu = []
         pss = _os_stats_season(code) if is_current else sid
         pl = conn.execute(f"""SELECT p.id, p.name, p.position, ps.appearances, ps.minutes_played, ps.goals, ps.assists,
-                                     ROUND(ps.rating, 2), ROUND(ps.expected_goals, 2)
+                                     ROUND(ps.rating, 2), ROUND(ps.expected_goals, 2), p.height, NULLIF(p.preferred_foot, '')
                               FROM player_stats ps JOIN players p ON p.id = ps.player_id
                               WHERE p.team_id = ? AND ps.tournament_id IN ({ph}) AND ps.season_id = ?
                               ORDER BY COALESCE(ps.minutes_played, 0) DESC""", (team_id, *tids, pss)).fetchall()
@@ -15420,7 +15439,7 @@ def league_team_report(code):
               "n_ranked": len(ranked), "coverage": _xg_coverage(xgg)}
     # 핵심 선수 — 출전 시간 상위 + 득점·도움·평점 1위
     players = [{"id": r[0], "name": r[1], "position": r[2], "apps": r[3], "minutes": r[4], "goals": r[5] or 0,
-                "assists": r[6] or 0, "rating": r[7], "xg": r[8]} for r in pl]
+                "assists": r[6] or 0, "rating": r[7], "xg": r[8], "height": r[9] or None, "foot": r[10]} for r in pl]
     _tm_attach(players, lambda _c: code, lambda c: c["id"])
     maxmin = max((p["minutes"] or 0 for p in players), default=0)
     regular = [p for p in players if (p["minutes"] or 0) >= maxmin * 0.4] or players
