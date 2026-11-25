@@ -7581,6 +7581,50 @@ def _recruit_by_play(mode, rows, meta, ss, league, scope, max_age, min_mins, pla
                       "같은 팀 선수 제외 · K2 선수는 K2 기준"]}, None
 
 
+# ── Transfermarkt 시장가치 (2026-11-25) — crawlers/import_transfermarkt.py 가 만든 transfermarkt.db ─────────
+# 공개 데이터셋(github.com/dcaribou/transfermarkt-datasets, CC0 배포) 1회 적재 — 사이트를 직접 긁지 않음.
+# 데이터셋 업데이트 중단(2026-07~)이라 시장가치는 '기준일'과 함께 표시. 연결(tm_map)은 생년월일+이름으로 확실할 때만.
+TM_DB_PATH = os.path.join(BASE_DIR, "transfermarkt.db")
+
+
+def _tm_values(pairs):
+    """[(league_code, player_id)] → {(code, pid): {market_value, mv_date, mv_peak, contract_until}}. DB 없으면 {}."""
+    if not pairs or not os.path.exists(TM_DB_PATH):
+        return {}
+    out = {}
+    try:
+        conn = sqlite3.connect(f"file:{TM_DB_PATH}?mode=ro", uri=True, timeout=10)
+    except sqlite3.Error:
+        return {}
+    try:
+        for code, pid in set(pairs):
+            r = conn.execute("""SELECT p.market_value, p.highest_value, p.contract_until,
+                                       (SELECT MAX(v.date) FROM tm_valuations v WHERE v.player_id = p.player_id)
+                                FROM tm_map m JOIN tm_players p ON p.player_id = m.tm_player_id
+                                WHERE m.league_code = ? AND m.player_id = ?""", (code, pid)).fetchone()
+            if r and r[0]:
+                out[(code, pid)] = {"market_value": r[0], "mv_peak": r[1], "contract_until": r[2], "mv_date": r[3]}
+    except sqlite3.Error:
+        return {}
+    finally:
+        conn.close()
+    return out
+
+
+def _tm_attach(items, code_of, pid_of):
+    """후보 dict 리스트에 시장가치 필드를 붙인다(연결 안 된 선수는 None)."""
+    vals = _tm_values([(code_of(c), pid_of(c)) for c in items])
+    for c in items:
+        v = vals.get((code_of(c), pid_of(c))) or {}
+        c.update({"market_value": v.get("market_value"), "mv_date": v.get("mv_date"),
+                  "mv_peak": v.get("mv_peak"), "contract_until": v.get("contract_until")})
+    return items
+
+
+_TM_NOTE = ("시장가치 = Transfermarkt 추정치(공개 데이터셋, 2026-06 무렵 기준 — 데이터셋 업데이트 중단). "
+            "생년월일·이름으로 확실히 연결된 선수만 표시, 부상 정보 없음")
+
+
 @app.route("/api/team-recruit")
 @cached_response(ttl=1800)
 def team_recruit():
@@ -7642,6 +7686,8 @@ def team_recruit():
         out.update({"team": {"slug": slug, "name": info.get("short") or info.get("name"), "league": league, "primary": info.get("primary")},
                     "year": year, "mode": mode, "squad": squad,
                     "filters": {"scope": scope, "max_age": max_age, "min_minutes": min_mins}})
+        _tm_attach(out.get("candidates") or [], lambda c: "kleague", lambda c: c.get("player_id"))
+        out.setdefault("notes", []).append(_TM_NOTE)
         return jsonify(out)
 
     # 포지션 보강은 GK도 판단 — 필드 플레이어 TOP 퍼포머 점수와 같은 형식(score·_pcts)의 GK 점수를 합류
@@ -7722,7 +7768,7 @@ def team_recruit():
                 "k1_equiv": _k1_equiv(r, k1_atk) if league == "K1" else None,
             })
         cands.sort(key=lambda c: -c["fit"])
-        n["candidates"] = cands[:_RC_CANDIDATES]
+        n["candidates"] = _tm_attach(cands[:_RC_CANDIDATES], lambda c: "kleague", lambda c: c["player_id"])
         n["pool_size"] = len(cands)
 
     return jsonify({
@@ -7736,7 +7782,7 @@ def team_recruit():
             "후보 적합도 = 종합 점수 50% + 이 팀이 그 포지션에서 약한 지표 2개의 백분위 50%",
             "백분위는 선수가 뛴 리그 안에서 계산 — K1 팀 추천의 K2 후보는 'K1 환산'(골+도움/90 ×0.68 → K1 같은 포지션 백분위)을 함께 표시. 수비 지표는 환산 근거가 없어 미보정",
             "골키퍼 점수 = 같은 리그 GK 중 백분위: 선방률 35 · 평점 25 · 선방/90 15 · 실점/90(낮을수록) 15 · 롱볼 정확도 10",
-            "몸값·계약·부상 정보 없음",
+            _TM_NOTE,
         ],
     })
 
@@ -8019,13 +8065,15 @@ def overseas_recruit():
             "apps": r["apps"], "mins": r["mins"], "goals": r["goals"], "assists": r["assists"],
             "team_rank": r.get("team_rank"), "team_n": r.get("team_n"),
             "season_label": r.get("season_label"),
+            "market_value": r.get("market_value"), "mv_date": r.get("mv_date"), "mv_peak": r.get("mv_peak"),
+            "contract_until": r.get("contract_until"),
             "formation_main": r.get("formation_main"), "fam_starts": r.get("fam_starts") or {},
             "fam_match": ({"n": (r.get("fam_starts") or {}).get(team_fam, 0), "tot": sum((r.get("fam_starts") or {}).values()),
                            "family": team_fam} if team_fam and r.get("fam_starts") else None),
             "raw": round(r["raw"], 1), "adj": round(r["adj"], 1), "factor": r["factor"],
             "pcts": {k: round(v) for k, v in r["pcts"].items()},
             "stats": {k: (round(v, 2) if v is not None else None) for k, v in r["m"].items() if k in weights},
-        } for r in cands[:limit]],
+        } for r in _tm_attach(cands[:limit], lambda c: c["league_code"], lambda c: int(str(c["id"]).split(":")[-1]))],
         "notes": [
             (f"포지션 = {DETAIL_POS_LABELS[detail]} — 경기 라인업(포메이션+grid)으로 라벨링한 선발 포지션(선발 {_OS_MIN_STARTS}회 이상·최빈 포지션 {int(_OS_MIN_SHARE * 100)}% 이상). "
              f"라벨 없는 같은 대분류 선수 {unlabeled}명은 제외"
@@ -8036,6 +8084,7 @@ def overseas_recruit():
              if detail else "점수(raw) = 같은 리그·같은 포지션(G/D/M/F) 선수 중 90분 환산 지표 백분위의 가중 합 — 리그 내 위치"),
             "보정(adj) = raw × 리그 수준 계수(1부 1.0 · 2부 0.85 · 3부 0.75, 브라질은 한 단계 낮게, 일본 J1 0.85 · J2 0.75) — 추정치이며 K리그 이적 실적으로 검증되지 않음. 참고용",
             "포메이션 = 선발로 나선 경기의 팀 포메이션(라인업 grid로 복원) — 사실 표시만, 점수·순위에 반영하지 않음. 3백 = 수비 줄 3·5명, 4백 = 4명",
+            _TM_NOTE,
             "API-Football 시즌 누적 기록 기반 — xG·몸값·걷어내기·제공권·크로스 없음. 평점은 SofaScore와 산출 방식이 달라 점수에서 제외",
             f"출전 {min_mins}분 이상(시즌 초반 리그는 그 리그 최다 출전의 50%로 하향) · 비교군 {min_c}명 미만이면 해당 지표 제외",
             ("현실적 후보만: 1·2부에서 소속 팀이 리그 순위 상위 1/3(5경기 이상 치른 리그)인 선수 " + str(excluded_top) + "명 제외 — 상위 구단 주전은 K리그 영입이 어렵다고 보는 근사(몸값·계약 정보 없음). 3부·순위 미수집 리그는 제외 없음")
