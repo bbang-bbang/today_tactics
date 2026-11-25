@@ -14,6 +14,12 @@
 - `team_xg.py`: 슈팅≥5인데 xG 0 → 오류 처리(브라질B 3행), `min_games`(API 3), `xg_coverage`. 화면에 제공률 표시·60% 미만 경고. 검증 `analysis/verify_team_xg.py` 신규 7건 RED→GREEN.
 - `analysis/audit_new_data.py`: 팀 xG 점검을 함수화해 전 해외 리그 DB 순회 + 오류 행 수 항목.
 
+### 3. 팀 리포트 — 전 리그 공통
+- 해외: `/api/league/<code>/team-report` + '🧾 팀 리포트' 섹션. K리그: 시즌 리뷰(팀)에 스쿼드 가치 한 줄.
+- 테스트: `verify_team_report.py` 14건(손계산 기대값 2건 교정 — R3 동점 득실, 미종료 경기), JS 7+2건, qa_check 201/201(신규 2), Chromium·Firefox × 1280·375 로컬 28/28 · K리그 카드 20/20.
+- 발견·수정: 해외 섹션 탭이 375px에서 글자 단위로 세로 꺾임 → nowrap + 가로 스크롤.
+- ⛔ 운영 DB 사본 로컬 다운로드는 권한 분류기에서 거부 → 합성 데이터 + 로컬 EPL 사본 + 배포 후 터널 검사로 대체.
+
 ### 1. 계약 만료 임박 (a440927)
 - TM `contract_expiration_date` → 전 리그 후보 배지·필터. `qa_check` 계약 필터 항목.
 

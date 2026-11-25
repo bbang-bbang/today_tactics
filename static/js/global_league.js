@@ -17,6 +17,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     activeSection:    'standings',
     activePerfMetric: 'goals', // TOP퍼포머 현재 선택 metric
     teams:            [],
+    trTeam:           {},     // 팀 리포트 — 리그별 마지막 선택 팀 id
     initialized:      false,
   };
 
@@ -132,7 +133,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   /* 섹션 탭 — '팀 슈팅·진형'은 SofaScore 슈팅맵이 있는 리그만(현재 J1, 2026-11-24) */
   function sectionsFor(code) {
     const l = GL.leagues.find(x => x.code === code);
-    return ['standings', 'team-rankings', 'top-performers', 'players']
+    return ['standings', 'team-report', 'team-rankings', 'top-performers', 'players']
       .concat(l && l.hasSquadValue ? ['squad-value'] : [])
       .concat(l && l.hasTeamXg ? ['team-xg'] : [])
       .concat(l && l.hasShotmap ? ['team-tactics'] : []);
@@ -168,7 +169,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
   function sectionLabel(s) {
     return { standings: '📋 순위표', 'team-rankings': '📊 팀 지표', 'top-performers': '⭐ TOP 퍼포머', players: '🔎 선수 탐색',
-             'squad-value': '💰 스쿼드 가치', 'team-xg': '📈 팀 xG', 'team-tactics': '🎯 팀 슈팅·진형' }[s] || s;
+             'team-report': '🧾 팀 리포트', 'squad-value': '💰 스쿼드 가치', 'team-xg': '📈 팀 xG', 'team-tactics': '🎯 팀 슈팅·진형' }[s] || s;
   }
 
   /* ── 리그 전환 ────────────────────────────────────── */
@@ -212,6 +213,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         case 'top-performers': await renderTopPerformers(code, qs);  break;
         case 'players':        await renderPlayerExplorer(code, qs); break;
         case 'team-xg':        await renderTeamXg(code, qs);         break;
+        case 'team-report':    await renderTeamReport(code, qs);     break;
         case 'squad-value': {
           const sv = await (await fetch(`/api/squad-value?league=${encodeURIComponent(code)}`)).json();
           document.getElementById('gl-content').innerHTML = window.ttSquadValue ? window.ttSquadValue.html(sv) : noDataHtml('스쿼드 가치', code);
@@ -822,6 +824,37 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   }
 
   /* ── 팀 xG (API-Football 경기별 팀 기록, 2026-11-25) ─────────────────── */
+  /* ── 팀 리포트 (2026-11-25) — 팀 하나의 순위 흐름·xG·포메이션·핵심 선수·스쿼드 가치 ── */
+  let _trReq = 0;
+  async function renderTeamReport(code, qs) {
+    const content = document.getElementById('gl-content');
+    const st = await (await fetch(`/api/league/${encodeURIComponent(code)}/standings${qs}`)).json();
+    const teams = (Array.isArray(st) ? st : []).filter(r => r.teamId != null);
+    if (!teams.length) { content.innerHTML = noDataHtml('팀 리포트', code); return; }
+    let sel = GL.trTeam[code];
+    if (!teams.some(t => String(t.teamId) === String(sel))) sel = teams[0].teamId;
+    content.innerHTML = `<div class="tr-pick"><label for="gl-tr-team">팀</label>
+        <select id="gl-tr-team">${teams.map(t => `<option value="${ttEsc(t.teamId)}"${String(t.teamId) === String(sel) ? ' selected' : ''}>${t.rank}. ${ttEsc(t.team)}</option>`).join('')}</select></div>
+      <div id="gl-tr-body" aria-live="polite"></div>`;
+    const load = async (tid) => {
+      GL.trTeam[code] = tid;
+      const id = ++_trReq;
+      const body = document.getElementById('gl-tr-body');
+      body.innerHTML = '<div class="gl-loading">불러오는 중…</div>';
+      try {
+        const r = await fetch(`/api/league/${encodeURIComponent(code)}/team-report${qs}&team_id=${encodeURIComponent(tid)}`);
+        const d = await r.json();
+        if (id !== _trReq || !body.isConnected) return;
+        body.innerHTML = r.ok && window.ttTeamReport ? window.ttTeamReport.html(d)
+          : `<div class="gl-error" role="alert">팀 리포트를 만들 수 없습니다.</div>`;
+      } catch (e) {
+        if (id === _trReq && body.isConnected) body.innerHTML = `<div class="gl-error" role="alert">팀 리포트를 불러오지 못했습니다.</div>`;
+      }
+    };
+    document.getElementById('gl-tr-team').addEventListener('change', e => load(e.target.value));
+    await load(sel);
+  }
+
   async function renderTeamXg(code, qs) {
     const content = document.getElementById('gl-content');
     const d = await (await fetch(`/api/league/${encodeURIComponent(code)}/team-xg${qs}`)).json();

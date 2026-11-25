@@ -30,3 +30,18 @@ test("squad_value_escapes", () => {
 test("squad_value_empty", () => {
   assert.match(SV.html({ teams: [{ rank: 1, name: "A", value: null }] }), /계산할 수 없습니다/);
 });
+
+// 2026-11-25 K리그 팀 시즌 리뷰용 — 리그 표에서 한 팀 카드
+test("squad_value_team_card", () => {
+  const dd = { ...d, teams: d.teams.map((t, i) => ({ ...t, team_id: 100 + i })) };
+  const h = SV.teamHtml(dd, 101);
+  assert.match(h, /€8\.1M/);
+  assert.match(h, /가치 11\/3위|가치 11위/);
+  assert.match(h, /\+7/);
+  assert.doesNotMatch(h, /<b>인천<\/b><\/span>/);
+});
+
+test("squad_value_team_card_missing", () => {
+  assert.equal(SV.teamHtml(d, 999), "");
+  assert.equal(SV.teamHtml(null, 1), "");
+});

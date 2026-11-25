@@ -220,6 +220,22 @@ function ttSeason() { return (document.body && document.body.dataset.season) || 
             .catch(() => { if (id === _req) sec.querySelector(".sv-slot").innerHTML = `<div class="rc-error" role="alert">스쿼드 가치를 불러오지 못했습니다.</div>`; });
     }
 
+    // 팀 시즌 리뷰 — 이 팀 스쿼드 가치 한 줄 (2026-11-25, 해외 팀 리포트와 같은 지표). 현재 시즌만.
+    function loadTeamSquadValue(id, league) {
+        const body = document.getElementById("sr-body");
+        const t = (_teams || []).find(x => x.id === _team);
+        if (!body || !t || !t.sofascore_id || (league !== "K1" && league !== "K2")) return;
+        fetch(`/api/squad-value?league=${league === "K1" ? "k1" : "k2"}`).then(r => r.json()).then(d => {
+            if (id !== _req) return;
+            const h = window.ttSquadValue.teamHtml(d, t.sofascore_id);
+            if (!h) return;
+            const sec = document.createElement("section");
+            sec.className = "sr-card sv-card";
+            sec.innerHTML = `<h3>💰 스쿼드 시장가치 vs 성적</h3>${h}`;
+            body.appendChild(sec);
+        }).catch(() => {});
+    }
+
     function load() {
         const body = document.getElementById("sr-body");
         if (!body || !_team) return;
@@ -246,6 +262,7 @@ function ttSeason() { return (document.body && document.body.dataset.season) || 
                 if (id !== _req) return;
                 body.innerHTML = ok ? bodyHtml(j)
                     : `<div class="rc-empty">${j.error === "no games" ? "이 시즌에는 이 팀의 K리그 경기 기록이 없습니다." : "시즌 리뷰를 만들 수 없습니다."}</div>`;
+                if (ok && String(_year) === ttSeason() && window.ttSquadValue) loadTeamSquadValue(id, j.league);
             })
             .catch(err => {
                 console.error("[시즌 리뷰 실패]", err);

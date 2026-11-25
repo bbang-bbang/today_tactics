@@ -8398,10 +8398,10 @@ body.match-strip-collapsed #league-schedule-wrap { display: none; }
 .gl-select { background: #1e2330; border: 1px solid #444; color: #bcc8e0; padding: 4px 8px; border-radius: 6px; font-size: 13px; }
 
 /* 섹션 탭 */
-.gl-section-tabs { display: flex; gap: 4px; border-bottom: 1px solid #2a3348; margin-bottom: 16px; }
+.gl-section-tabs { display: flex; gap: 4px; border-bottom: 1px solid #2a3348; margin-bottom: 16px; overflow-x: auto; scrollbar-width: thin; }   /* 탭 늘어남(2026-11-25) — 좁은 화면은 가로 스크롤 */
 .gl-sec-btn {
   padding: 8px 16px; background: none; border: none; border-bottom: 2px solid transparent;
-  color: #7a8ba8; font-size: 13px; cursor: pointer; transition: all .15s;
+  color: #7a8ba8; font-size: 13px; cursor: pointer; transition: all .15s; white-space: nowrap; flex: 0 0 auto;
 }
 .gl-sec-btn:hover { color: #bcc8e0; }
 .gl-sec-btn.active { color: #60a5fa; border-bottom-color: #2563eb; font-weight: 600; }
@@ -8995,6 +8995,53 @@ body.match-strip-collapsed .flow-section-head .flow-hint { display: none; }
 
 /* 해외리그 — 팀 xG (2026-11-25) */
 .gl-xg-lead { margin: 0 0 10px; font-size: 13px; color: var(--text-primary); line-height: 1.6; }
+/* 해외 팀 리포트 (2026-11-25, team_report.js) */
+.tr-pick { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; color: var(--text-secondary); }
+.tr-pick select { min-height: 32px; padding: 4px 8px; border-radius: 6px; background: var(--bg-deep); color: var(--text-primary); border: 1px solid var(--border-subtle); font-size: 13px; max-width: 100%; }
+.tr-pick select:hover { border-color: var(--team-a); }
+.tr-pick select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tr-wrap { display: flex; flex-direction: column; gap: 12px; }
+.tr-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; }
+.tr-name { margin: 0; font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.tr-rank { font-size: 15px; color: var(--text-primary); }
+.tr-rank b { font-size: 18px; }
+.tr-muted { color: var(--text-secondary); font-size: 12px; }
+.tr-form { display: inline-flex; gap: 4px; }
+.tr-form-chip { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 4px; font-size: 12px; font-weight: 700; color: #0b1020; }
+.tr-f-W { background: #4ade80; } .tr-f-D { background: #cbd5e1; } .tr-f-L { background: #f87171; }
+.tr-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+.tr-card h4 { margin: 0 0 8px; font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.tr-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .tr-grid3 { grid-template-columns: 1fr; } }
+.tr-big { margin: 0 0 6px; font-size: 15px; color: var(--text-primary); line-height: 1.5; }
+.tr-big b { font-size: 20px; }
+.tr-card p { margin: 0 0 4px; font-size: 13px; line-height: 1.5; color: var(--text-primary); }
+.tr-kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-size: 13px; }
+.tr-kv dt { color: var(--text-secondary); } .tr-kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.tr-pos { color: #4ade80; } .tr-neg { color: #f87171; }
+.tr-warn { margin-top: 6px !important; padding: 4px 8px; border-radius: 6px; background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-fg) !important; font-size: 12px !important; }
+.tr-empty { margin: 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.tr-forms { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tr-forms li { display: grid; grid-template-columns: 64px 1fr 24px; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); }
+.tr-bar { height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--team-a) var(--w), rgba(255,255,255,0.08) var(--w)); }
+.tr-flow { width: 100%; height: auto; max-height: 220px; display: block; }
+.tr-flow .tr-grid { stroke: rgba(255,255,255,0.10); stroke-width: 1; }
+.tr-flow .tr-axis { fill: var(--text-secondary); font-size: 11px; }
+.tr-flow .tr-line { fill: none; stroke: var(--team-a); stroke-width: 2; }
+.tr-flow .tr-dot { stroke: #0b1020; stroke-width: 1.5; }
+.tr-flow .tr-dot-W { fill: #4ade80; } .tr-flow .tr-dot-D { fill: #cbd5e1; } .tr-flow .tr-dot-L { fill: #f87171; }
+@media (max-width: 600px) { .tr-flow .tr-axis { font-size: 22px; } .tr-flow .tr-dot { r: 6px; } .tr-flow .tr-line { stroke-width: 3; } }
+.sv-team { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-primary); }
+.tr-lead { margin: 0 0 8px; font-size: 13px; color: var(--text-primary); }
+.tr-scroll { overflow-x: auto; }
+.tr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tr-table caption { text-align: left; padding-bottom: 6px; }
+.tr-table th, .tr-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); text-align: left; white-space: nowrap; color: var(--text-primary); }
+.tr-table th { color: var(--text-secondary); font-weight: 600; font-size: 12px; }
+.tr-table .tr-num { text-align: right; font-variant-numeric: tabular-nums; }
+.tr-notes { font-size: 12px; color: var(--text-secondary); }
+.tr-notes summary { cursor: pointer; }
+.tr-notes summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .gl-xg-cov { margin: -4px 0 10px; font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 .gl-xg-cov-low { padding: 6px 10px; border-radius: 6px; background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-fg); }
 .gl-xg-scroll { overflow-x: auto; }
@@ -9024,6 +9071,7 @@ body.match-strip-collapsed .flow-section-head .flow-hint { display: none; }
 .sv-table tbody tr:hover td { background: rgba(255,255,255,.03); }
 .sv-table td.sv-pos { color: #4ade80; }
 .sv-table td.sv-neg { color: #f87171; }
+.sv-team .sv-pos { color: #4ade80; } .sv-team .sv-neg { color: #f87171; }
 .sv-empty { color: var(--text-muted); font-size: 13px; }
 .sv-notes { margin-top: 10px; font-size: 12px; color: var(--text-muted); }
 .sv-notes summary { cursor: pointer; }

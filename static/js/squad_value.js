@@ -31,7 +31,18 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <tbody>${body}</tbody></table></div>
             <details class="sv-notes"><summary>기준</summary><ul>${((d && d.notes) || []).map(n => `<li>${ttEsc(n)}</li>`).join("")}</ul></details></div>`;
     }
-    const api = { html };
+    // 한 팀 카드 (K리그 팀 시즌 리뷰, 2026-11-25) — 리그 표 d 에서 teamId 행. 없거나 값 없으면 "".
+    function teamHtml(d, teamId) {
+        const rows = (d && d.teams) || [];
+        const r = rows.find(x => String(x.team_id) === String(teamId) && x.value);
+        if (!r) return "";
+        const n = rows.filter(x => x.value).length;
+        const cls = !r.diff ? "" : (r.diff > 0 ? "sv-pos" : "sv-neg");
+        const msg = r.diff > 0 ? "몸값보다 잘함" : r.diff < 0 ? "몸값만큼 못 함" : "몸값만큼";
+        return `<p class="sv-team">스쿼드 가치 <b>€${m(r.value)}M</b> · 가치 ${r.value_rank}위 / ${n}팀 · 실제 ${r.rank}위 · 차이 `
+            + `<b class="${cls}">${sgn(r.diff)}</b> <span class="sv-muted">(${msg} · 시장가치 ${r.n_valued}/${r.n_linked}명 합, Transfermarkt 추정치)</span></p>`;
+    }
+    const api = { html, teamHtml };
     if (root) root.ttSquadValue = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : null);

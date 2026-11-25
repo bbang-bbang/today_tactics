@@ -183,6 +183,7 @@ from flask import Flask, render_template, jsonify, request, session, redirect, u
 from overseas_formation import player_formations as _os_player_formations, formation_family as _formation_family
 from team_xg import team_xg_table as _team_xg_table, xg_coverage as _xg_coverage, XG_MIN_GAMES as _XG_MIN_GAMES
 from squad_value import squad_value_table as _squad_value_table
+from team_report import rank_flow as _rank_flow, recent_form as _recent_form, formation_summary as _formation_summary
 from authlib.integrations.flask_client import OAuth
 
 app = Flask(__name__)
@@ -7690,6 +7691,22 @@ _TM_NOTE = ("시장가치·계약 만료일 = Transfermarkt 추정치(공개 데
             "이후 재계약·이적 미반영). 생년월일·이름으로 확실히 연결된 선수만 표시, 부상 정보 없음")
 
 
+def _os_squad_inputs(conn, tids):
+    """해외 리그 스쿼드 가치 입력 — (공식 최신 순위 [{team_id, name, rank, pts, played, w, d, l, gf, ga}], [(선수 id, 팀 id)])."""
+    ph = ",".join("?" * len(tids))          # '?' 자리표시자만
+    st = conn.execute(f"""SELECT s.team_id, COALESCE(t.name, s.team_name), s.position, s.points, s.matches,
+                                 s.wins, s.draws, s.losses, s.gf, s.ga
+                          FROM league_standings s LEFT JOIN teams t ON t.id = s.team_id
+                          WHERE s.tournament_id IN ({ph})
+                            AND s.season_id = (SELECT MAX(season_id) FROM league_standings WHERE tournament_id IN ({ph}))
+                          ORDER BY s.position""", (*tids, *tids)).fetchall()
+    teams = [{"team_id": r[0], "name": r[1] or str(r[0]), "rank": r[2], "pts": r[3], "played": r[4],
+              "w": r[5], "d": r[6], "l": r[7], "gf": r[8], "ga": r[9]} for r in st]
+    tph = ",".join("?" * len(teams)) or "NULL"
+    prs = conn.execute(f"SELECT id, team_id FROM players WHERE team_id IN ({tph})", [t["team_id"] for t in teams]).fetchall()
+    return teams, prs
+
+
 @app.route("/api/squad-value")
 @cached_response(ttl=3600)
 def squad_value():
@@ -7727,17 +7744,8 @@ def squad_value():
             return err
         if code == "kleague":
             return jsonify({"error": "use league=k1|k2"}), 400
-        tids = [t["id"] for t in cfg["tournaments"]]
-        ph = ",".join("?" * len(tids))
         with get_league_db(code) as conn:
-            st = conn.execute(f"""SELECT s.team_id, COALESCE(t.name, s.team_name), s.position, s.points, s.matches
-                                  FROM league_standings s LEFT JOIN teams t ON t.id = s.team_id
-                                  WHERE s.tournament_id IN ({ph})
-                                    AND s.season_id = (SELECT MAX(season_id) FROM league_standings WHERE tournament_id IN ({ph}))
-                                  ORDER BY s.position""", (*tids, *tids)).fetchall()
-            teams = [{"team_id": r[0], "name": r[1] or str(r[0]), "rank": r[2], "pts": r[3], "played": r[4]} for r in st]
-            tph = ",".join("?" * len(teams)) or "NULL"
-            prs = conn.execute(f"SELECT id, team_id FROM players WHERE team_id IN ({tph})", [t["team_id"] for t in teams]).fetchall()
+            teams, prs = _os_squad_inputs(conn, [t["id"] for t in cfg["tournaments"]])
         lc, label = code, cfg["label"]
     vals = _tm_values([(lc, pid) for pid, _t in prs])
     linked = [(tid_, (vals[(lc, pid)] or {}).get("market_value")) for pid, tid_ in prs if (lc, pid) in vals]
@@ -15299,6 +15307,111 @@ def league_team_shotmap(code):
     })
 
 
+def _team_xg_games(conn, tids, sid):
+    """match_team_stats 경기별 팀 행(team_xg.team_xg_table 입력). 테이블 없는 리그(수집 전)는 []."""
+    ph = ",".join("?" * len(tids))          # '?' 자리표시자만, 값은 바인딩
+    season_cond = "AND e.season_id = ?" if sid is not None else ""
+    try:
+        return conn.execute(f"""
+            SELECT t.event_id, t.team_id, t.is_home, t.xg, t.shots, t.shots_inside, t.possession,
+                   CASE WHEN t.is_home = 1 THEN e.home_score ELSE e.away_score END,
+                   CASE WHEN t.is_home = 1 THEN e.away_score ELSE e.home_score END,
+                   o.xg, o.shots
+            FROM match_team_stats t
+            JOIN events e ON e.id = t.event_id
+            LEFT JOIN match_team_stats o ON o.event_id = t.event_id AND o.team_id != t.team_id
+            WHERE e.tournament_id IN ({ph}) AND e.home_score IS NOT NULL {season_cond}
+        """, (*tids, *([sid] if sid is not None else []))).fetchall()
+    except sqlite3.OperationalError:
+        return []
+
+
+@app.route("/api/league/<code>/team-report")
+@cached_response(ttl=1800)
+def league_team_report(code):
+    """팀 리포트 (2026-11-25) — 해외 리그 공통: 공식 순위·순위 흐름·최근 폼·팀 xG·포메이션·핵심 선수·스쿼드 가치.
+    시즌 = ?year= (없으면 현재 시즌). 스쿼드 가치는 현재 시즌에서만(시장가치·소속이 현재 기준). 데이터 없는 항목은 null."""
+    cfg, err = _validate_league(code)
+    if err:
+        return err
+    if code == "kleague":
+        return jsonify({"error": "K리그는 팀 탭 > 시즌 리뷰를 사용"}), 400
+    try:
+        team_id = int(request.args.get("team_id", ""))
+    except (TypeError, ValueError):
+        return jsonify({"error": "team_id required"}), 400
+    sids = cfg.get("season_ids") or {}
+    latest = sids[max(sids)] if sids else None
+    sid = _league_season_id(cfg, request.args.get("year")) or latest
+    is_current = sid == latest
+    tids = [t["id"] for t in cfg["tournaments"]]
+    ph = ",".join("?" * len(tids))          # '?' 자리표시자만
+    sc = "AND e.season_id = ?" if sid is not None else ""
+    sp = [sid] if sid is not None else []
+    with get_league_db(code) as conn:
+        names = {r[0]: r[1] for r in conn.execute("SELECT id, name FROM teams")}
+        if team_id not in names:
+            return jsonify({"error": "unknown team"}), 404
+        ev = conn.execute(f"""SELECT e.id, e.round, e.date_ts, e.home_team_id, e.away_team_id, e.home_score, e.away_score
+                              FROM events e WHERE e.tournament_id IN ({ph}) {sc}""", (*tids, *sp)).fetchall()
+        games = [(e[0], e[1] if isinstance(e[1], int) else None, *e[2:]) for e in ev]
+        xgg = _team_xg_games(conn, tids, sid)
+        try:
+            lu = conn.execute(f"""SELECT l.event_id, l.formation_slot FROM match_lineups l JOIN events e ON e.id = l.event_id
+                                  WHERE l.team_id = ? AND l.is_starter = 1 AND e.tournament_id IN ({ph}) {sc}""",
+                              (team_id, *tids, *sp)).fetchall()
+        except sqlite3.OperationalError:
+            lu = []
+        pss = _os_stats_season(code) if is_current else sid
+        pl = conn.execute(f"""SELECT p.id, p.name, p.position, ps.appearances, ps.minutes_played, ps.goals, ps.assists,
+                                     ROUND(ps.rating, 2), ROUND(ps.expected_goals, 2)
+                              FROM player_stats ps JOIN players p ON p.id = ps.player_id
+                              WHERE p.team_id = ? AND ps.tournament_id IN ({ph}) AND ps.season_id = ?
+                              ORDER BY COALESCE(ps.minutes_played, 0) DESC""", (team_id, *tids, pss)).fetchall()
+        teams, prs = _os_squad_inputs(conn, tids) if is_current else ([], [])
+    official = next((t for t in teams if t["team_id"] == team_id), None)
+    # 팀 xG — 리그 내 xG 차 순위
+    xrows = _team_xg_table(xgg, min_games=_XG_MIN_GAMES)
+    ranked = [r for r in xrows if r["xg_diff"] is not None]
+    xme = next((r for r in xrows if r["team_id"] == team_id), None)
+    xg = None
+    if xme and xme["xg_for"] is not None:
+        xg = {**xme, "xg_rank": next(i + 1 for i, r in enumerate(ranked) if r["team_id"] == team_id),
+              "n_ranked": len(ranked), "coverage": _xg_coverage(xgg)}
+    # 핵심 선수 — 출전 시간 상위 + 득점·도움·평점 1위
+    players = [{"id": r[0], "name": r[1], "position": r[2], "apps": r[3], "minutes": r[4], "goals": r[5] or 0,
+                "assists": r[6] or 0, "rating": r[7], "xg": r[8]} for r in pl]
+    _tm_attach(players, lambda _c: code, lambda c: c["id"])
+    maxmin = max((p["minutes"] or 0 for p in players), default=0)
+    regular = [p for p in players if (p["minutes"] or 0) >= maxmin * 0.4] or players
+    leaders = {
+        "goals": max(players, key=lambda p: (p["goals"], -(p["minutes"] or 0)), default=None),
+        "assists": max(players, key=lambda p: (p["assists"], -(p["minutes"] or 0)), default=None),
+        "rating": max((p for p in regular if p["rating"]), key=lambda p: p["rating"], default=None),
+    }
+    # 스쿼드 가치 — 리그 표에서 이 팀 행
+    sv = None
+    if teams:
+        vals = _tm_values([(code, pid) for pid, _t in prs])
+        linked = [(t_, (vals[(code, pid)] or {}).get("market_value")) for pid, t_ in prs if (code, pid) in vals]
+        svr = _squad_value_table(teams, linked)
+        sv = next((r for r in svr if r["team_id"] == team_id and r["value"]), None)
+        if sv:
+            sv = {**sv, "n_teams": sum(1 for r in svr if r["value"])}
+    flow = _rank_flow(games, team_id)
+    return jsonify({
+        "league": code, "label": cfg["label"], "team": {"id": team_id, "name": names[team_id]},
+        "official": official, "n_teams": len(teams) or (flow[0]["n"] if flow else None),
+        "flow": flow, "form": _recent_form(games, team_id, 5),
+        "xg": xg, "formations": _formation_summary(lu), "players": players[:8], "leaders": leaders,
+        "squad_value": sv, "is_current": is_current,
+        "stats_label": cfg.get("recruit_stats_label") if is_current and pss != latest else None,
+        "notes": ["순위 흐름 = 경기 결과로 계산(승점 → 득실차 → 다득점 근사) — 리그별 세부 동점 규정과 다를 수 있어 최종 순위는 공식 순위표 기준",
+                  "팀 xG = API-Football 경기별 기대득점(xG 3경기 이상 팀만 순위) · 포메이션 = 선발 위치(grid)로 복원",
+                  _TM_NOTE],
+    })
+
+
 @app.route("/api/league/<code>/team-xg")
 @cached_response(ttl=1800)
 def league_team_xg(code):
@@ -15308,24 +15421,9 @@ def league_team_xg(code):
     if err:
         return err
     sid = _league_season_id(cfg, request.args.get("year"))
-    season_cond = "AND e.season_id = ?" if sid is not None else ""
     with get_league_db(code) as conn:
-        tids = [t["id"] for t in cfg["tournaments"]]
-        ph = ",".join("?" * len(tids))          # '?' 자리표시자만, 값은 바인딩
-        try:
-            games = conn.execute(f"""
-                SELECT t.event_id, t.team_id, t.is_home, t.xg, t.shots, t.shots_inside, t.possession,
-                       CASE WHEN t.is_home = 1 THEN e.home_score ELSE e.away_score END,
-                       CASE WHEN t.is_home = 1 THEN e.away_score ELSE e.home_score END,
-                       o.xg, o.shots
-                FROM match_team_stats t
-                JOIN events e ON e.id = t.event_id
-                LEFT JOIN match_team_stats o ON o.event_id = t.event_id AND o.team_id != t.team_id
-                WHERE e.tournament_id IN ({ph}) AND e.home_score IS NOT NULL {season_cond}
-            """, (*tids, *([sid] if sid is not None else []))).fetchall()
-            names = {r[0]: r[1] for r in conn.execute("SELECT id, name FROM teams")}
-        except sqlite3.OperationalError:          # 테이블 없는 리그(수집 전)
-            games, names = [], {}
+        games = _team_xg_games(conn, [t["id"] for t in cfg["tournaments"]], sid)
+        names = {r[0]: r[1] for r in conn.execute("SELECT id, name FROM teams")}
     rows = _team_xg_table(games, min_games=_XG_MIN_GAMES)
     for r in rows:
         r["name"] = names.get(r["team_id"]) or str(r["team_id"])

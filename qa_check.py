@@ -274,6 +274,16 @@ qa('스쿼드 가치(K1): 12팀·실제 순위 순·연결 선수 있음·차이
     and all(t['diff'] == t['value_rank'] - t['rank'] for t in d_sv['teams'] if t['diff'] is not None)
     and _brief_status('/api/squad-value?league=zz') == 400 and len(get('/api/squad-value?league=k2')['teams']) >= 10))
 qa('스쿼드 가치(해외 리그 공통)', lambda: assert_(len(get('/api/squad-value?league=epl')['teams']) == 20))
+_tr_tid = get('/api/league/epl/standings')[0]['teamId']
+d_tr = get(f'/api/league/epl/team-report?team_id={_tr_tid}')
+qa('팀 리포트(해외 공통): 공식 1위 팀·순위 흐름 마지막 = 경기 수·핵심 선수·스쿼드 가치 행', lambda: assert_(
+    d_tr['official']['rank'] == 1 and len(d_tr['flow']) == d_tr['official']['played']
+    and all(1 <= p['rank'] <= p['n'] for p in d_tr['flow']) and len(d_tr['players']) >= 5
+    and d_tr['squad_value'] and d_tr['squad_value']['team_id'] == _tr_tid and len(d_tr['form']) == 5))
+qa('팀 리포트 입력 검증: 숫자 아님 400 · 없는 팀 404 · K리그 400', lambda: assert_(
+    _brief_status('/api/league/epl/team-report?team_id=abc') == 400
+    and _brief_status('/api/league/epl/team-report?team_id=99999999') == 404
+    and _brief_status('/api/league/kleague/team-report?team_id=1') == 400))
 d_mvk = get('/api/team-recruit?team=suwon&max_value=1000000')
 qa('국내 후보 시장가치 상한', lambda: assert_(
     all(c['market_value'] is None or c['market_value'] <= 1000000 for n in d_mvk['needs'] for c in n['candidates'])
