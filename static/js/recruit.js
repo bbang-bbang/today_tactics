@@ -7,7 +7,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     "use strict";
     const root = () => document.getElementById("ws-team-recruit");
     let _teams = null, _team = null, _req = 0;
-    const _f = { scope: "all", max_age: "", min_minutes: "900", real: "1", max_value: "5000000" };   // real: 해외 후보 현실성 필터(1=상위 구단 제외) · max_value: 시장가치 상한(유로, ""=제한 없음)
+    const _f = { scope: "all", max_age: "", min_minutes: "900", real: "1", max_value: "5000000", contract_within: "" };   // real: 해외 후보 현실성 필터(1=상위 구단 제외) · max_value: 시장가치 상한(유로, ""=제한 없음)
     // 추천 방식: position(약한 포지션 보강) · style(약한 플레이 지표 보강, 포지션 무관) · similar(고른 선수와 비슷한 플레이)
     let _mode = "position", _player = null, _squad = [];
     const MODES = [["position", "포지션 보강"], ["style", "플레이 보강"], ["similar", "비슷한 선수"]];
@@ -71,6 +71,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
                 ${sel("rc-age", "최대 나이", _f.max_age, [["", "제한 없음"], ["23", "23세 이하"], ["25", "25세 이하"], ["28", "28세 이하"], ["31", "31세 이하"]])}
                 ${sel("rc-mins", "최소 출전", _f.min_minutes, [["900", "900분+"], ["1350", "1350분+"], ["1800", "1800분+"]])}
                 ${sel("rc-real", "해외 후보", _f.real, [["1", "현실적 후보만"], ["0", "상위 구단 포함"]])}
+                ${sel("rc-ct", "계약", _f.contract_within, [["", "전체"], ["12", "1년 내 만료"], ["6", "6개월 내 만료"]])}
                 ${sel("rc-mvcap", "시장가치", _f.max_value, [["1000000", "€1M 이하"], ["3000000", "€3M 이하"], ["5000000", "€5M 이하"], ["10000000", "€10M 이하"], ["", "제한 없음"]])}
             </div>
         </div>
@@ -106,11 +107,20 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const t = v >= 1e6 ? `€${(v / 1e6).toFixed(v >= 1e7 ? 0 : 1)}M` : `€${Math.round(v / 1e3)}K`;
         return t;
     }
+    // 계약 만료 1년 이내 배지 — 이적료가 낮거나 없을 수 있는 후보(2026-06 기준 데이터, 이후 재계약 미반영)
+    function ctHtml(c) {
+        const cu = c && c.contract_until;
+        if (!cu) return "";
+        const today = new Date(), lim = new Date(); lim.setFullYear(lim.getFullYear() + 1);
+        const d = new Date(cu + "T00:00:00");
+        if (isNaN(d) || d < today || d > lim) return "";
+        return ` · <span class="rc-ct" title="Transfermarkt 계약 만료일 ${ttEsc(cu)} (2026-06 무렵 기준, 이후 재계약 미반영)">⏳ 계약 ~${ttEsc(cu.slice(0, 7))}</span>`;
+    }
     function mvHtml(c) {
         const t = mvText(c);
-        if (!t) return "";
+        if (!t) return ctHtml(c);
         const tip = `Transfermarkt 추정 시장가치 ${t}${c.mv_date ? " (" + c.mv_date + " 기준)" : ""}${c.mv_peak ? " · 최고 €" + (c.mv_peak / 1e6).toFixed(1) + "M" : ""}${c.contract_until ? " · 계약 ~" + c.contract_until : ""}`;
-        return ` · <span class="rc-mv" title="${ttEsc(tip)}">💶 ${ttEsc(t)}</span>`;
+        return ` · <span class="rc-mv" title="${ttEsc(tip)}">💶 ${ttEsc(t)}</span>` + ctHtml(c);
     }
 
     function bar(p) {
@@ -236,6 +246,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const q = new URLSearchParams({ pos: btn.dataset.rcOs, min_minutes: _f.min_minutes, limit: "10", realistic: _f.real });
         if (_team) q.set("team", _team);      // 팀 미선택이면 team=null 문자열을 보내지 않음(캐시 키 낭비)
         if (_f.max_value) q.set("max_value", _f.max_value);
+        if (_f.contract_within) q.set("contract_within", _f.contract_within);
         if (_f.max_age) q.set("max_age", _f.max_age);
         if (btn.dataset.rcFocus) q.set("focus", btn.dataset.rcFocus);
         fetch(`/api/overseas-recruit?${q}`).then(r => r.json().then(j => ({ ok: r.ok, j })))
@@ -309,6 +320,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const q = new URLSearchParams({ team: _team, scope: _f.scope, min_minutes: _f.min_minutes, mode: _mode });
         if (_f.max_age) q.set("max_age", _f.max_age);
         if (_f.max_value) q.set("max_value", _f.max_value);
+        if (_f.contract_within) q.set("contract_within", _f.contract_within);
         // '비슷한 선수'는 기준 선수가 필요 — 스쿼드를 아직 모르면 포지션 응답으로 스쿼드부터 받는다
         const needSquad = _mode === "similar" && !_player;
         if (needSquad) q.set("mode", "position");
@@ -343,6 +355,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             else if (t.id === "rc-scope") _f.scope = t.value;
             else if (t.id === "rc-age") _f.max_age = t.value;
             else if (t.id === "rc-mins") _f.min_minutes = t.value;
+            else if (t.id === "rc-ct") _f.contract_within = t.value;
             else if (t.id === "rc-mvcap") {     // 국내 추천 다시 조회 + 열려 있는 해외 표도 다시
                 _f.max_value = t.value;
                 el.querySelectorAll('[data-rc-os][aria-expanded="true"]').forEach(b => { b.setAttribute("aria-expanded", "false"); });

@@ -7467,7 +7467,7 @@ def _gk_rows(year):
     return rows
 
 
-def _recruit_by_play(mode, rows, meta, ss, league, scope, max_age, min_mins, player_raw, mv_cap=None):
+def _recruit_by_play(mode, rows, meta, ss, league, scope, max_age, min_mins, player_raw, mv_cap=None, ct_months=None):
     """포지션 무관 '플레이 기준' 추천 (2026-11-11).
     백분위는 같은 리그 전체 필드 플레이어 안에서(포지션 무관) — 포지션이 달라도 플레이 성향을 비교할 수 있게.
       style  : 팀 스쿼드(출전 가중)의 지표별 백분위를 같은 리그 팀들과 비교 → 가장 약한 지표 2개 → 그 지표가 강한 선수(포지션 무관)
@@ -7546,6 +7546,7 @@ def _recruit_by_play(mode, rows, meta, ss, league, scope, max_age, min_mins, pla
             fit = 0.7 * sum(ps.values()) / len(ps) + 0.3 * (r.get("score") or 0)
             cands.append(cand(r, fit=round(fit, 1), focus_pcts={m: round(v) for m, v in ps.items()}))
         cands, exc = _mv_cap(cands, lambda c: "kleague", lambda c: c["player_id"], mv_cap)
+        cands = _ct_filter(cands, ct_months)
         cands.sort(key=lambda c: -c["fit"])
         return {"team_metrics": metrics, "weak_metrics": weak, "candidates": cands[:10], "pool_size": len(cands),
                 "excluded_over_value": exc,
@@ -7576,6 +7577,7 @@ def _recruit_by_play(mode, rows, meta, ss, league, scope, max_age, min_mins, pla
         cands.append(cand(r, similarity=round(100 - rms, 1),
                           profile={m: round(pct(r, m)) for m in tp if pct(r, m) is not None}))
     cands, exc = _mv_cap(cands, lambda c: "kleague", lambda c: c["player_id"], mv_cap)
+    cands = _ct_filter(cands, ct_months)
     cands.sort(key=lambda c: -c["similarity"])
     return {"target": cand(target, profile={m: round(v) for m, v in tp.items()}), "candidates": cands[:10],
             "pool_size": len(cands), "excluded_over_value": exc, "metric_labels": labels,
@@ -7639,6 +7641,26 @@ def _mv_cap(items, code_of, pid_of, cap):
     return keep, len(items) - len(keep)
 
 
+def _parse_ct(raw):
+    """?contract_within= 개월(6/12/18) → int, 빈 값 = 필터 없음. 잘못된 값은 ValueError."""
+    if raw in (None, "", "0"):
+        return None
+    v = int(raw)
+    if v not in (6, 12, 18):
+        raise ValueError("contract_within")
+    return v
+
+
+def _ct_filter(items, months):
+    """계약 만료일이 오늘~months 개월 안인 후보만(만료일 모르면 제외). 시장가치 필드가 붙은 뒤 호출."""
+    if not months:
+        return items
+    today = datetime.now().date()
+    lim = (today + timedelta(days=round(months * 30.5))).isoformat()
+    t0 = today.isoformat()
+    return [c for c in items if c.get("contract_until") and t0 <= c["contract_until"] <= lim]
+
+
 def _parse_mv_cap(raw):
     """?max_value= → 유로 정수(0/빈 값 = 제한 없음). 잘못된 값은 ValueError."""
     if raw in (None, "", "0"):
@@ -7649,8 +7671,8 @@ def _parse_mv_cap(raw):
     return v
 
 
-_TM_NOTE = ("시장가치 = Transfermarkt 추정치(공개 데이터셋, 2026-06 무렵 기준 — 데이터셋 업데이트 중단). "
-            "생년월일·이름으로 확실히 연결된 선수만 표시, 부상 정보 없음")
+_TM_NOTE = ("시장가치·계약 만료일 = Transfermarkt 추정치(공개 데이터셋, 2026-06 무렵 기준 — 데이터셋 업데이트 중단, "
+            "이후 재계약·이적 미반영). 생년월일·이름으로 확실히 연결된 선수만 표시, 부상 정보 없음")
 
 
 @app.route("/api/team-recruit")
@@ -7671,6 +7693,7 @@ def team_recruit():
         max_age = int(request.args.get("max_age")) if request.args.get("max_age") else None
         min_mins = int(request.args.get("min_minutes") or 900)
         mv_cap = _parse_mv_cap(request.args.get("max_value"))
+        ct_months = _parse_ct(request.args.get("contract_within"))
     except ValueError:
         return jsonify({"error": "invalid filter"}), 400
     min_mins = max(450, min(min_mins, 3000))
@@ -7709,12 +7732,13 @@ def team_recruit():
     squad = [{"player_id": r["player_id"], "name": r["name"], "pos": r.get("detail_label") or r.get("pos"), "mins": r["mins"]}
              for r in sorted((r for r in scored if r.get("team_id") == ss), key=lambda r: -(r["mins"] or 0))]
     if mode in ("style", "similar"):
-        out, err = _recruit_by_play(mode, scored, meta, ss, league, scope, max_age, min_mins, request.args.get("player"), mv_cap)
+        out, err = _recruit_by_play(mode, scored, meta, ss, league, scope, max_age, min_mins, request.args.get("player"), mv_cap, ct_months)
         if err:
             return jsonify({"error": err}), 400
         out.update({"team": {"slug": slug, "name": info.get("short") or info.get("name"), "league": league, "primary": info.get("primary")},
                     "year": year, "mode": mode, "squad": squad,
-                    "filters": {"scope": scope, "max_age": max_age, "min_minutes": min_mins, "max_value": mv_cap}})
+                    "filters": {"scope": scope, "max_age": max_age, "min_minutes": min_mins, "max_value": mv_cap,
+                                "contract_within": ct_months}})
         out.setdefault("notes", []).append(_TM_NOTE)
         return jsonify(out)
 
@@ -7796,6 +7820,7 @@ def team_recruit():
                 "k1_equiv": _k1_equiv(r, k1_atk) if league == "K1" else None,
             })
         cands, n["excluded_over_value"] = _mv_cap(cands, lambda c: "kleague", lambda c: c["player_id"], mv_cap)
+        cands = _ct_filter(cands, ct_months)
         cands.sort(key=lambda c: -c["fit"])
         n["candidates"] = cands[:_RC_CANDIDATES]
         n["pool_size"] = len(cands)
@@ -7803,7 +7828,8 @@ def team_recruit():
     return jsonify({
         "team": {"slug": slug, "name": info.get("short") or info.get("name"), "league": league, "primary": info.get("primary")},
         "year": year, "mode": "position", "squad": squad,
-        "filters": {"scope": scope, "max_age": max_age, "min_minutes": min_mins, "max_value": mv_cap},
+        "filters": {"scope": scope, "max_age": max_age, "min_minutes": min_mins, "max_value": mv_cap,
+                    "contract_within": ct_months},
         "needs": picked, "all_groups": needs,
         "metric_labels": _TP_METRIC_LABEL, "group_labels": {g: DETAIL_POS_LABELS.get(g, g) for g in _RC_GROUPS},
         "notes": [
@@ -8008,6 +8034,7 @@ def overseas_recruit():
         tier = int(request.args.get("tier")) if request.args.get("tier") else None
         limit = max(1, min(int(request.args.get("limit") or 10), 30))
         mv_cap = _parse_mv_cap(request.args.get("max_value"))
+        ct_months = _parse_ct(request.args.get("contract_within"))
     except ValueError:
         return jsonify({"error": "invalid filter"}), 400
     realistic = request.args.get("realistic", "1") != "0"     # 기본 ON — 상위권 구단 주전 제외
@@ -8077,6 +8104,7 @@ def overseas_recruit():
                 keep.append(r)
         cands = keep
     cands, excluded_mv = _mv_cap(cands, lambda c: c["league_code"], lambda c: int(str(c["id"]).split(":")[-1]), mv_cap)
+    cands = _ct_filter(cands, ct_months)
     for r in cands:
         fv = [r["pcts"][k] for k in focus if k in r["pcts"]]
         base = 0.5 * r["raw"] + 0.5 * (sum(fv) / len(fv)) if fv else r["raw"]
@@ -8087,7 +8115,7 @@ def overseas_recruit():
         "pool_size": len(cands), "leagues": sorted({r["league_code"] for r in rows}), "unlabeled": unlabeled,
         "metric_labels": {k: _OS_METRICS[k] for k in weights},
         "filters": {"min_minutes": min_mins, "max_age": max_age, "tier": tier, "focus": focus, "realistic": realistic,
-                    "max_value": mv_cap},
+                    "max_value": mv_cap, "contract_within": ct_months},
         "excluded_top_clubs": excluded_top,
         "excluded_over_value": excluded_mv,
         "team_formation": team_formation,

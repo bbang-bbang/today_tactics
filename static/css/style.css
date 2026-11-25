@@ -9007,3 +9007,4 @@ body.match-strip-collapsed .flow-section-head .flow-hint { display: none; }
 .gl-xg-notes summary:hover { color: var(--text-primary); }
 .gl-xg-notes summary:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
 .rc-mv { color: #fde68a; white-space: nowrap; }   /* Transfermarkt 추정 시장가치 (2026-11-25) */
+.rc-ct { color: #fca5a5; white-space: nowrap; }   /* 계약 만료 1년 이내 (2026-11-25) */

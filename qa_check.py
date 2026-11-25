@@ -258,6 +258,15 @@ qa('해외 후보 시장가치 상한: 초과 선수 제외·제외 수 표시',
 qa('시장가치는 기준일 2025-06 이후 값만(오래된 값은 표시·필터 제외)', lambda: assert_(
     all(c['mv_date'] >= '2025-06-01' for c in get('/api/overseas-recruit?pos=W&realistic=0&max_value=0&limit=30')['candidates'] if c['market_value'])
     and all(c['mv_date'] >= '2025-06-01' for n in get('/api/team-recruit?team=ulsan')['needs'] for c in n['candidates'] if c['market_value'])))
+def _ct_ok(d_list):
+    import datetime as _dt
+    today = _dt.date.today().isoformat(); lim = (_dt.date.today() + _dt.timedelta(days=366)).isoformat()
+    return all(c.get('contract_until') and today <= c['contract_until'] <= lim for c in d_list)
+d_ct = get('/api/overseas-recruit?pos=W&realistic=0&max_value=0&contract_within=12&limit=30')
+qa('계약 1년 내 만료 필터(해외·국내): 만료일이 오늘~12개월 안인 후보만', lambda: assert_(
+    _ct_ok(d_ct['candidates']) and d_ct['filters']['contract_within'] == 12
+    and _ct_ok([c for n in get('/api/team-recruit?team=ulsan&max_value=0&contract_within=12')['needs'] for c in n['candidates']])
+    and _brief_status('/api/overseas-recruit?pos=W&contract_within=x') == 400))
 d_mvk = get('/api/team-recruit?team=suwon&max_value=1000000')
 qa('국내 후보 시장가치 상한', lambda: assert_(
     all(c['market_value'] is None or c['market_value'] <= 1000000 for n in d_mvk['needs'] for c in n['candidates'])
