@@ -91,3 +91,38 @@ test("team_report_flow_text_summary_and_table", () => {
   assert.match(h, /<details class="tr-flow-tbl">/);
   assert.equal((h.match(/<tr class="tr-fr">/g) || []).length, 3);
 });
+
+// 2026-11-25 두 팀 비교 — 같은 리그 두 리포트를 나란히
+const other = {
+  ...base, team: { id: 50, name: "Chelsea" },
+  official: { rank: 8, pts: 16, played: 10, w: 4, d: 4, l: 2, gf: 14, ga: 10 },
+  flow: [{ round: 1, rank: 9, pts: 1, n: 20, res: "D", gf: 1, ga: 1 }, { round: 2, rank: 3, pts: 4, n: 20, res: "W", gf: 2, ga: 0 }, { round: 3, rank: 8, pts: 4, n: 20, res: "L", gf: 0, ga: 2 }],
+  form: ["L", "W", "D"],
+  xg: { ...base.xg, xg_diff: -0.3, xg_rank: 13, xpts: 13.2, pts_x: 16 },
+  formations: { list: [{ formation: "3-4-2-1", n: 6 }], family: { "3백": 6 }, n: 6 },
+  squad_value: { value: 900000000, value_rank: 3, rank: 8, diff: -5, n_teams: 20 },
+};
+
+test("team_compare_two_lines_and_rows", () => {
+  const h = TR.compareHtml(base, other);
+  assert.equal((h.match(/<polyline /g) || []).length, 2);
+  assert.match(h, /&lt;i&gt;Arsenal/);
+  assert.match(h, /Chelsea/);
+  assert.match(h, /3-4-2-1/);
+  assert.match(h, /4-3-3/);
+  assert.equal((h.match(/class="trc-row"/g) || []).length >= 7, true);
+});
+
+test("team_compare_better_side_marked", () => {
+  const h = TR.compareHtml(base, other);
+  // 순위: 1위가 더 좋음 → 왼쪽 강조
+  assert.match(h, /<td class="trc-a trc-win">1위<\/td>/);
+  // xG 차: +1.10 > -0.30 → 왼쪽 강조
+  assert.match(h, /<td class="trc-a trc-win">\+1\.10<\/td>/);
+});
+
+test("team_compare_missing_data", () => {
+  const h = TR.compareHtml({ ...base, xg: null, squad_value: null }, other);
+  assert.match(h, /<td class="trc-a">-<\/td>/);
+  assert.doesNotMatch(h, /<i>Arsenal<\/i>/);
+});

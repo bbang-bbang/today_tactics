@@ -18,6 +18,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     activePerfMetric: 'goals', // TOP퍼포머 현재 선택 metric
     teams:            [],
     trTeam:           {},     // 팀 리포트 — 리그별 마지막 선택 팀 id
+    trCmp:            {},     // 팀 리포트 비교 팀 id ('' = 비교 안 함)
     initialized:      false,
   };
 
@@ -833,26 +834,35 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     if (!teams.length) { content.innerHTML = noDataHtml('팀 리포트', code); return; }
     let sel = GL.trTeam[code];
     if (!teams.some(t => String(t.teamId) === String(sel))) sel = teams[0].teamId;
-    content.innerHTML = `<div class="tr-pick"><label for="gl-tr-team">팀</label>
-        <select id="gl-tr-team">${teams.map(t => `<option value="${ttEsc(t.teamId)}"${String(t.teamId) === String(sel) ? ' selected' : ''}>${t.rank}. ${ttEsc(t.team)}</option>`).join('')}</select></div>
+    let cmp = GL.trCmp[code] || '';
+    if (cmp && (!teams.some(t => String(t.teamId) === String(cmp)) || String(cmp) === String(sel))) cmp = '';
+    const opts = (cur, none) => (none ? `<option value="">비교 안 함</option>` : '')
+      + teams.map(t => `<option value="${ttEsc(t.teamId)}"${String(t.teamId) === String(cur) ? ' selected' : ''}>${t.rank}. ${ttEsc(t.team)}</option>`).join('');
+    content.innerHTML = `<div class="tr-pick"><label for="gl-tr-team">팀</label><select id="gl-tr-team">${opts(sel)}</select>
+        <label for="gl-tr-cmp">비교</label><select id="gl-tr-cmp">${opts(cmp, true)}</select></div>
       <div id="gl-tr-body" aria-live="polite"></div>`;
-    const load = async (tid) => {
-      GL.trTeam[code] = tid;
+    const fetchReport = async (tid) => {
+      const r = await fetch(`/api/league/${encodeURIComponent(code)}/team-report${qs}&team_id=${encodeURIComponent(tid)}`);
+      return r.ok ? r.json() : null;
+    };
+    const load = async () => {
+      const tid = document.getElementById('gl-tr-team').value, cid = document.getElementById('gl-tr-cmp').value;
+      GL.trTeam[code] = tid; GL.trCmp[code] = cid;
       const id = ++_trReq;
       const body = document.getElementById('gl-tr-body');
       body.innerHTML = '<div class="gl-loading">불러오는 중…</div>';
       try {
-        const r = await fetch(`/api/league/${encodeURIComponent(code)}/team-report${qs}&team_id=${encodeURIComponent(tid)}`);
-        const d = await r.json();
+        const [a, b] = await Promise.all([fetchReport(tid), cid && cid !== tid ? fetchReport(cid) : Promise.resolve(null)]);
         if (id !== _trReq || !body.isConnected) return;
-        body.innerHTML = r.ok && window.ttTeamReport ? window.ttTeamReport.html(d)
-          : `<div class="gl-error" role="alert">팀 리포트를 만들 수 없습니다.</div>`;
+        if (!a || !window.ttTeamReport) { body.innerHTML = `<div class="gl-error" role="alert">팀 리포트를 만들 수 없습니다.</div>`; return; }
+        body.innerHTML = b ? window.ttTeamReport.compareHtml(a, b) : window.ttTeamReport.html(a);
       } catch (e) {
         if (id === _trReq && body.isConnected) body.innerHTML = `<div class="gl-error" role="alert">팀 리포트를 불러오지 못했습니다.</div>`;
       }
     };
-    document.getElementById('gl-tr-team').addEventListener('change', e => load(e.target.value));
-    await load(sel);
+    document.getElementById('gl-tr-team').addEventListener('change', load);
+    document.getElementById('gl-tr-cmp').addEventListener('change', load);
+    await load();
   }
 
   async function renderTeamXg(code, qs) {

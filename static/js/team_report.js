@@ -101,7 +101,69 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             <details class="tr-notes"><summary>기준</summary><ul>${(d.notes || []).map(n => `<li>${ttEsc(n)}</li>`).join("")}</ul></details></div>`;
     }
 
-    const api = { html };
+    // ── 두 팀 비교 (2026-11-25) — 같은 리그 두 리포트 나란히 ──────────────
+    function compareFlowSvg(a, b, n) {
+        const fa = a.flow || [], fb = b.flow || [];
+        if (!fa.length && !fb.length) return empty("종료된 경기가 없습니다.");
+        const W = 640, H = 180, L = 30, R = 10, T = 12, B = 22;
+        const N = Math.max(n || 0, ...fa.map(p => p.rank), ...fb.map(p => p.rank));
+        const len = Math.max(fa.length, fb.length);
+        const x = (i) => L + (len <= 1 ? (W - L - R) / 2 : i * (W - L - R) / (len - 1));
+        const y = (r) => T + (N <= 1 ? 0 : (r - 1) * (H - T - B) / (N - 1));
+        const line = (f, cls) => f.length ? `<polyline points="${f.map((p, i) => `${x(i).toFixed(1)},${y(p.rank).toFixed(1)}`).join(" ")}" class="${cls}"/>` : "";
+        const grid = [1, Math.ceil(N / 2), N].filter((v, i, arr) => arr.indexOf(v) === i)
+            .map(r => `<line x1="${L}" x2="${W - R}" y1="${y(r).toFixed(1)}" y2="${y(r).toFixed(1)}" class="tr-grid"/>`
+                + `<text x="${L - 6}" y="${(y(r) + 4).toFixed(1)}" class="tr-axis" text-anchor="end">${r}</text>`).join("");
+        const la = fa.length ? fa[fa.length - 1].rank : "-", lb = fb.length ? fb[fb.length - 1].rank : "-";
+        return `<svg class="tr-flow" viewBox="0 0 ${W} ${H}" role="img" aria-label="순위 흐름 비교: ${ttEsc(a.team.name)} 마지막 ${la}위, ${ttEsc(b.team.name)} 마지막 ${lb}위">${grid}`
+            + `${line(fa, "trc-line-a")}${line(fb, "trc-line-b")}</svg>`;
+    }
+
+    function compareHtml(a, b) {
+        const num = (v, d = 2) => (v == null ? null : Number(v));
+        const xa = a.xg || {}, xb = b.xg || {}, sa = a.squad_value || {}, sb = b.squad_value || {};
+        const oa = a.official || {}, ob = b.official || {};
+        const fm = (f) => (f && f.n ? `${f.list[0].formation} (${f.list[0].n}/${f.n})` : null);
+        const fam = (f) => (f && f.n ? Object.entries(f.family || {}).map(([k, v]) => `${k} ${v}`).join(" · ") : null);
+        const top = (d) => (d.leaders && d.leaders.goals && d.leaders.goals.goals ? `${d.leaders.goals.name} ${d.leaders.goals.goals}골` : null);
+        const form = (d) => ((d.form || []).length ? (d.form || []).slice().reverse().map(r => RES[r] || "?").join(" ") : null);
+        // [라벨, A 표시, B 표시, A 값, B 값, 좋은 방향('high'|'low'|null)]
+        const rows = [
+            ["순위", oa.rank != null ? oa.rank + "위" : null, ob.rank != null ? ob.rank + "위" : null, oa.rank, ob.rank, "low"],
+            ["승점", oa.pts, ob.pts, oa.pts, ob.pts, "high"],
+            ["전적", oa.w != null ? `${oa.w}승 ${oa.d}무 ${oa.l}패` : null, ob.w != null ? `${ob.w}승 ${ob.d}무 ${ob.l}패` : null, null, null, null],
+            ["득실", oa.gf != null ? `${oa.gf}-${oa.ga}` : null, ob.gf != null ? `${ob.gf}-${ob.ga}` : null,
+                oa.gf != null ? oa.gf - oa.ga : null, ob.gf != null ? ob.gf - ob.ga : null, "high"],
+            ["최근 경기(오래된→최근)", form(a), form(b), null, null, null],
+            ["xG 차 / 경기", xa.xg_diff != null ? sgn(xa.xg_diff) : null, xb.xg_diff != null ? sgn(xb.xg_diff) : null, num(xa.xg_diff), num(xb.xg_diff), "high"],
+            ["xG / 경기", xa.xg_for != null ? Number(xa.xg_for).toFixed(2) : null, xb.xg_for != null ? Number(xb.xg_for).toFixed(2) : null, num(xa.xg_for), num(xb.xg_for), "high"],
+            ["xGA / 경기", xa.xg_against != null ? Number(xa.xg_against).toFixed(2) : null, xb.xg_against != null ? Number(xb.xg_against).toFixed(2) : null, num(xa.xg_against), num(xb.xg_against), "low"],
+            ["승점 − xPts", xa.pts_minus_xpts != null ? sgn(xa.pts_minus_xpts, 1) : null, xb.pts_minus_xpts != null ? sgn(xb.pts_minus_xpts, 1) : null, null, null, null],
+            ["주 포메이션", fm(a.formations), fm(b.formations), null, null, null],
+            ["3백 / 4백", fam(a.formations), fam(b.formations), null, null, null],
+            ["스쿼드 가치", sa.value ? mv(sa.value) : null, sb.value ? mv(sb.value) : null, sa.value || null, sb.value || null, "high"],
+            ["가치 순위 → 실제", sa.value_rank ? `${sa.value_rank}위 → ${sa.rank}위` : null, sb.value_rank ? `${sb.value_rank}위 → ${sb.rank}위` : null, null, null, null],
+            ["득점 1위", top(a), top(b), null, null, null],
+        ];
+        const body = rows.map(([lab, da, db, va, vb, dir]) => {
+            let wa = "", wb = "";
+            if (dir && va != null && vb != null && va !== vb) {
+                const aBetter = dir === "high" ? va > vb : va < vb;
+                (aBetter ? (wa = " trc-win") : (wb = " trc-win"));
+            }
+            return `<tr class="trc-row"><td class="trc-a${wa}">${da == null ? "-" : ttEsc(da)}</td><th scope="row">${lab}</th><td class="trc-b${wb}">${db == null ? "-" : ttEsc(db)}</td></tr>`;
+        }).join("");
+        return `<div class="tr-wrap trc">
+            <div class="trc-head"><span class="trc-name trc-name-a"><span class="trc-key" aria-hidden="true"></span>${ttEsc(a.team.name)}</span>
+              <span class="tr-muted">vs</span><span class="trc-name trc-name-b"><span class="trc-key" aria-hidden="true"></span>${ttEsc(b.team.name)}</span></div>
+            <section class="tr-card tr-card-wide"><h4>📈 순위 흐름 <span class="tr-muted">실선 = ${ttEsc(a.team.name)} · 점선 = ${ttEsc(b.team.name)}</span></h4>${compareFlowSvg(a, b, a.n_teams || b.n_teams)}</section>
+            <section class="tr-card tr-card-wide"><h4>⚖️ 지표 비교 <span class="tr-muted">굵은 초록 = 더 나은 쪽</span></h4>
+              <div class="tr-scroll"><table class="trc-table"><thead><tr><th scope="col" class="trc-a">${ttEsc(a.team.name)}</th><th scope="col">항목</th><th scope="col" class="trc-b">${ttEsc(b.team.name)}</th></tr></thead>
+              <tbody>${body}</tbody></table></div></section>
+            <details class="tr-notes"><summary>기준</summary><ul>${(a.notes || []).map(n => `<li>${ttEsc(n)}</li>`).join("")}</ul></details></div>`;
+    }
+
+    const api = { html, compareHtml };
     if (root) root.ttTeamReport = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : null);

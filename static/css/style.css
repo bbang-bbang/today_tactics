@@ -8996,7 +8996,7 @@ body.match-strip-collapsed .flow-section-head .flow-hint { display: none; }
 /* 해외리그 — 팀 xG (2026-11-25) */
 .gl-xg-lead { margin: 0 0 10px; font-size: 13px; color: var(--text-primary); line-height: 1.6; }
 /* 해외 팀 리포트 (2026-11-25, team_report.js) */
-.tr-pick { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; color: var(--text-secondary); }
+.tr-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; color: var(--text-secondary); }
 .tr-pick select { min-height: 32px; padding: 4px 8px; border-radius: 6px; background: var(--bg-deep); color: var(--text-primary); border: 1px solid var(--border-subtle); font-size: 13px; max-width: 100%; }
 .tr-pick select:hover { border-color: var(--team-a); }
 .tr-pick select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -9038,6 +9038,21 @@ body.match-strip-collapsed .flow-section-head .flow-hint { display: none; }
 .tr-flow-tbl summary:hover { color: var(--text-primary); }
 .tr-flow-tbl summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .tr-flow-tbl .tr-table { max-width: 360px; margin-top: 6px; }
+/* 팀 리포트 두 팀 비교 (2026-11-25) — A 파랑 실선 · B 주황 점선(색만으로 구분하지 않음) */
+.trc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.trc-name { display: inline-flex; align-items: center; gap: 6px; font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.trc-key { display: inline-block; width: 22px; height: 0; border-top: 3px solid var(--team-a); }
+.trc-name-b .trc-key { border-top: 3px dashed #f59e0b; }
+.tr-flow .trc-line-a { fill: none; stroke: var(--team-a); stroke-width: 2.5; }
+.tr-flow .trc-line-b { fill: none; stroke: #f59e0b; stroke-width: 2.5; stroke-dasharray: 6 4; }
+.trc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.trc-table th, .trc-table td { padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); color: var(--text-primary); }
+.trc-table thead th { color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+.trc-table tbody th { color: var(--text-secondary); font-weight: 500; text-align: center; white-space: nowrap; font-size: 12px; }
+.trc-table .trc-a { text-align: right; width: 42%; font-variant-numeric: tabular-nums; }
+.trc-table .trc-b { text-align: left; width: 42%; font-variant-numeric: tabular-nums; }
+.trc-table td.trc-win { color: #4ade80; font-weight: 700; }
+@media (max-width: 600px) { .trc-table th, .trc-table td { padding: 6px 4px; } .trc-name { font-size: 15px; } }
 .tr-lead { margin: 0 0 8px; font-size: 13px; color: var(--text-primary); }
 .tr-scroll { overflow-x: auto; }
 .tr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
