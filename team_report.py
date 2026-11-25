@@ -33,6 +33,10 @@ def rank_flow(games, team_id):
     """games = [(event_id, round, date_ts, home, away, hs, as)] → 팀이 뛴 라운드(또는 경기일)마다
     {round, date_ts, rank, pts, n, res('W'|'D'|'L'), gf, ga}."""
     fin = _finished(games)
+    # 라운드 값이 과반이면 라운드 없는 경기(플레이오프·승격 PO 등 리그 밖 경기)는 순위 흐름에서 뺀다
+    with_round = [g for g in fin if g[1] is not None]
+    if fin and len(with_round) > len(fin) / 2:
+        fin = with_round
     mine = sorted((g for g in fin if team_id in (g[3], g[4])), key=lambda g: (g[1] if g[1] is not None else 0, g[2] or 0))
     if not mine:
         return []

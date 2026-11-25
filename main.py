@@ -15341,6 +15341,9 @@ def _team_xg_games(conn, tids, sid):
             JOIN events e ON e.id = t.event_id
             LEFT JOIN match_team_stats o ON o.event_id = t.event_id AND o.team_id != t.team_id
             WHERE e.tournament_id IN ({ph}) AND e.home_score IS NOT NULL {season_cond}
+              -- 라운드 없는 경기(승격 PO 등 리그 밖 경기)는 제외 — 단, 리그 전체에 라운드 값이 없으면 그대로 사용 (2026-11-25 감사)
+              AND (e.round IS NOT NULL OR NOT EXISTS (SELECT 1 FROM events r WHERE r.season_id IS e.season_id
+                                                       AND r.tournament_id = e.tournament_id AND r.round IS NOT NULL))
         """, (*tids, *([sid] if sid is not None else []))).fetchall()
     except sqlite3.OperationalError:
         return []

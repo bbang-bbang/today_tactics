@@ -68,7 +68,15 @@ def audit_overseas(path):
             return
         sid = max(e[6] for e in ev_all if e[6] is not None)
         ev = [e for e in ev_all if e[6] == sid]
+        # 라운드 없는 경기(승격 PO 등)는 리그 경기에서 뺌 — 라운드 값이 과반인 리그만
+        rd = dict(c.execute("SELECT id, round FROM events WHERE season_id = ?", (sid,)).fetchall())
+        if sum(1 for e in ev if rd.get(e[0]) is not None) > len(ev) / 2:
+            po = [e for e in ev if rd.get(e[0]) is None]
+            if po:
+                rep("OK", code, "라운드 없는 경기(PO 등) — 리그 집계 제외", f"{len(po)}경기")
+            ev = [e for e in ev if rd.get(e[0]) is not None]
         fin = [e[:5] for e in ev if e[3] is not None and e[4] is not None]
+        dates = {e[0]: e[5] for e in ev}
         now = time.time()
         half = [e for e in ev if (e[3] is None) != (e[4] is None)]
         neg = [e for e in fin if e[3] < 0 or e[4] < 0 or e[3] > 15 or e[4] > 15]
@@ -86,9 +94,14 @@ def audit_overseas(path):
         rep("OK" if not orphan_ev else "FAIL", code, "경기의 팀이 teams 에 있음", f"없음 {len(orphan_ev)}")
         if st_sid is not None:
             st = c.execute("SELECT team_id, matches, wins, draws, losses, gf, ga, points FROM league_standings WHERE season_id = ?", (st_sid,)).fetchall()
-            mism = standings_vs_events(fin, st)
-            # 순위표가 경기 수집보다 앞서거나(당일) 늦을 수 있어 1경기 차이는 WARN
-            rep("OK" if not mism else "WARN", code, "공식 순위표 = 경기 결과 합산", f"불일치 {len(mism)}/{len(st)}팀" + (f" 예: {mism[0]}" if mism else ""))
+            up = c.execute("SELECT MAX(updated_at) FROM league_standings WHERE season_id = ?", (st_sid,)).fetchone()[0] or 0
+            # 순위표 갱신 시각 이전에 '시작'한 경기 중 2시간 안 지난 경기는 갱신 당시 진행 중 → 순위표에 없는 게 정상
+            before = [e for e in fin if (dates[e[0]] or 0) + 2 * 3600 <= up]
+            late = len(fin) - len(before)
+            mism = standings_vs_events(before, st)
+            rep("OK" if not mism else "FAIL", code, "공식 순위표 = (순위표 갱신 전 끝난) 경기 결과 합산",
+                f"불일치 {len(mism)}/{len(st)}팀" + (f" 예: {mism[0]}" if mism else ""))
+            rep("OK" if late == 0 else "WARN", code, "순위표 갱신 뒤 끝난 경기(순위표가 늦음 — 크론 순서)", f"{late}경기")
             bp = [t for t, m, w, d, l, gf, ga, p in st if p != 3 * w + d]
             rep("OK" if not bp else "WARN", code, "승점 = 3승+무", f"불일치 {len(bp)} (감점이면 정상)")
             so = [t for t, *_ in st if t not in teams]

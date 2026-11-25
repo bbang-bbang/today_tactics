@@ -43,6 +43,10 @@ check("경기 없는 팀 → 빈 목록", rank_flow(games, 99), [])
 # 라운드 값이 없으면 날짜순(팀 경기 기준)으로
 g2 = [(e, None, d, h, a, hs, as_) for e, _r, d, h, a, hs, as_ in games]
 check("라운드 없음 → 날짜 기준 동일 결과", [(p["rank"], p["pts"]) for p in rank_flow(g2, 10)], [(1, 3), (1, 4), (1, 4)])
+# 라운드 없는 경기(플레이오프 등, 예: 브라질 세리에B 승격 PO)가 섞여도 정규 라운드 기준 흐름 유지 (2026-11-25 감사)
+g3 = games + [(7, None, 400, 10, 20, 0, 3)]
+check("라운드 없는 PO 경기 → 흐름에서 제외·라운드 기준 유지", [(p["round"], p["rank"], p["pts"]) for p in rank_flow(g3, 10)], [(1, 1, 3), (2, 1, 4), (3, 1, 4)])
+check("PO 경기도 최근 폼에는 포함", recent_form(g3, 10, n=1), ["L"])
 check("최근 폼(최신 먼저)", recent_form(games, 10, n=2), ["L", "D"])
 check("최근 폼 개수 제한", len(recent_form(games, 10, n=5)), 3)
 
