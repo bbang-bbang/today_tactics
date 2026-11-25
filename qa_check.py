@@ -250,6 +250,15 @@ qa('스카우팅 요약: 시간대·선제골 결론은 리그 평균 근거 동
 qa('영입 추천 나이 필터·잘못된 입력', lambda: assert_(
     all((c['age'] or 99) <= 25 for n in get('/api/team-recruit?team=gwangju&max_age=25')['needs'] for c in n['candidates'])
     and _brief_status('/api/team-recruit?team=nope') == 404 and _brief_status('/api/team-recruit?team=suwon&scope=x') == 400))
+d_mv = get('/api/overseas-recruit?pos=W&team=suwon&max_value=3000000&realistic=0&limit=30')
+qa('해외 후보 시장가치 상한: 초과 선수 제외·제외 수 표시', lambda: assert_(
+    all(c['market_value'] is None or c['market_value'] <= 3000000 for c in d_mv['candidates'])
+    and d_mv['filters']['max_value'] == 3000000 and isinstance(d_mv.get('excluded_over_value'), int)
+    and _brief_status('/api/overseas-recruit?pos=W&max_value=abc') == 400))
+d_mvk = get('/api/team-recruit?team=suwon&max_value=1000000')
+qa('국내 후보 시장가치 상한', lambda: assert_(
+    all(c['market_value'] is None or c['market_value'] <= 1000000 for n in d_mvk['needs'] for c in n['candidates'])
+    and d_mvk['filters']['max_value'] == 1000000))
 d_osf = get('/api/overseas-recruit?pos=W&team=suwon')
 qa('해외 후보 포메이션: 우리 팀 계열·후보 fam_match 는 사실 표시(점수 불변)', lambda: assert_(
     'team_formation' in d_osf
