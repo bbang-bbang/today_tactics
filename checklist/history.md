@@ -44,6 +44,9 @@
 ### 8. J1 경기별 팀 xG (9f74048, 11/25)
 - API-Football `/fixtures/statistics` → `match_team_stats`(가산 테이블), `team_xg.py` 집계, 해외리그 탭 '팀 xG'. 운영 150경기 수집, xG 차 상위 = 실제 순위 상위로 상식 일치. 주간 크론은 사용자 등록 필요.
 
+### 9. Transfermarkt 시장가치 (f53f7eb, 11/25)
+- 공개 데이터셋 1회 적재(사이트 수집 아님) → transfermarkt.db, 전 리그 선수 연결 7,017명(생년월일+이름, 로마자 변형은 유일할 때만 — 표본 15건 모두 동일인). 영입 추천 후보에 시장가치·기준일. felipeall/transfermarkt-api(실시간 스크래퍼)는 약관상 사용 안 함.
+
 ### 검증
 - node 141/141 · qa_check 193/193 · 브라우저(Chromium·Firefox × 1280·375) 76/76 · 20/20 · 4/4 · 운영 HEAD 동기화.
 
