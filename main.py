@@ -7588,6 +7588,7 @@ def _recruit_by_play(mode, rows, meta, ss, league, scope, max_age, min_mins, pla
 # 공개 데이터셋(github.com/dcaribou/transfermarkt-datasets, CC0 배포) 1회 적재 — 사이트를 직접 긁지 않음.
 # 데이터셋 업데이트 중단(2026-07~)이라 시장가치는 '기준일'과 함께 표시. 연결(tm_map)은 생년월일+이름으로 확실할 때만.
 TM_DB_PATH = os.path.join(BASE_DIR, "transfermarkt.db")
+TM_FRESH_FROM = "2025-06-01"   # 이보다 오래된 시장가치(데이터셋 최신 2026-06-12 기준 1년+)는 '오래됨' — 표시·필터 제외(2026-11-25 감사)
 
 
 def _tm_values(pairs):
@@ -7606,7 +7607,11 @@ def _tm_values(pairs):
                                 FROM tm_map m JOIN tm_players p ON p.player_id = m.tm_player_id
                                 WHERE m.league_code = ? AND m.player_id = ?""", (code, pid)).fetchone()
             if r and r[0]:
-                out[(code, pid)] = {"market_value": r[0], "mv_peak": r[1], "contract_until": r[2], "mv_date": r[3]}
+                if not r[3] or r[3] < TM_FRESH_FROM:
+                    # 데이터셋 바깥 리그로 옮겨 1년 넘게 갱신 안 된 값 — 현재 값처럼 보이지 않게 숨기고 필터에도 안 씀
+                    out[(code, pid)] = {"market_value": None, "mv_peak": r[1], "contract_until": None, "mv_date": r[3], "mv_stale": True}
+                else:
+                    out[(code, pid)] = {"market_value": r[0], "mv_peak": r[1], "contract_until": r[2], "mv_date": r[3]}
     except sqlite3.Error:
         return {}
     finally:

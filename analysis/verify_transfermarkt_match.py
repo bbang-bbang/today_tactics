@@ -39,6 +39,13 @@ check("성·이름 순서 바뀜", name_match("Lee Tae Hui", "Tae-heui Lee"), Tr
 check("아이슬란드 문자 ð", name_match("Hólmbert Aron Friðjónsson", "Hólmbert Aron Fridjónsson"), True)
 check("전혀 다른 이름", name_match("Tae-jun Park", "Sven Sonnenberg"), False)
 check("같은 성·다른 이름", name_match("Min-jae Kim", "Seung-gyu Kim"), False)
+check("한 음절만 다른 한국 이름(재준/재민) — 다른 사람", name_match("Jae-jun Ahn", "Jae-min Ahn"), False)
+check("한 음절만 다른 한국 이름(태준/태훈)", name_match("Tae-jun Kim", "Tae-hun Kim"), False)
+check("로마자 변형(myeong/myung)", name_match("Myeong-jae Lee", "Myung-jae Lee"), True)
+check("로마자 변형(kyu/gyu)", name_match("Kyu-hyeong Kim", "Gyu-hyeong Kim"), True)
+check("로마자 변형(choi/choe)", name_match("Byeong-chan Choi", "Byeong-chan Choe"), True)
+check("로마자 변형(deok/duk)", name_match("Min-deok Kim", "Min-duk Kim"), True)
+check("외국 이름 철자 변형(Iskandarov)", name_match("Jamshid Iskandarov", "Jamshid Iskanderov"), True)
 
 tm = {"1987-03-18": [(1, "Kwang-hoon Shin"), (2, "Min-jae Kim")],
       "1990-01-01": [(3, "Takuro Kaneko"), (4, "Takuya Kaneko")]}

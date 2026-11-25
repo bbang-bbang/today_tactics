@@ -66,6 +66,17 @@ def _tokens(name):
     return [t for t in re.split(r"[^a-z0-9]+", s) if t]
 
 
+_KO_RULES = (("eui", "ui"), ("eo", "u"), ("oo", "u"), ("wu", "u"), ("ou", "u"), ("oe", "oi"), ("ahn", "an"),
+             ("ch", "j"), ("k", "g"), ("t", "d"), ("p", "b"), ("sh", "s"))
+
+
+def _ko_canon(s):
+    """한국어 이름 로마자 표기 흔들림 정규화(양쪽에 같게 적용). 예: 'seungkyeom'·'seungkyum' → 같은 값."""
+    for a, b in _KO_RULES:
+        s = s.replace(a, b)
+    return s
+
+
 def name_score(ours, theirs):
     """2 = 확실(이니셜+성 / 토큰 포함 / 처음·끝 일치) · 1 = 느슨(표기 변형) · 0 = 아님."""
     a, b = _tokens(ours), _tokens(theirs)
@@ -78,13 +89,19 @@ def name_score(ours, theirs):
         return 2
     if a[0] == b[0] and a[-1] == b[-1]:
         return 2
-    # 로마자 표기 변형(kyeom/kyum, un/woon)·성 이름 순서 바뀜 — 생년월일이 같다는 전제에서만 쓰는 느슨한 규칙:
-    # 공통 토큰(성)이 하나 이상 있고, 나머지 이름 철자 유사도 ≥ 0.6
+    # 로마자 표기 변형·성 이름 순서 바뀜 — 생년월일이 같다는 전제에서만 쓰는 느슨한 규칙(공통 토큰 = 성이 있어야 함):
+    #  ① 한국어 로마자 정규화(eo→u, oo→u, eui→ui, oe→oi, k→g, t→d, p→b, ch→j …) 후 나머지 이름이 같음
+    #     (kyeom/kyum · myeong/myung · kyu/gyu · choi/choe — 재준/재민처럼 한 음절이 다른 이름은 다른 사람)
+    #  ② 외국 이름 철자 변형(Iskandarov/Iskanderov) — 철자 유사도 ≥ 0.85
     common = sa & sb
     if not common:
         return 0
     ra, rb = "".join(t for t in a if t not in common), "".join(t for t in b if t not in common)
-    return 1 if ra and rb and SequenceMatcher(None, ra, rb).ratio() >= 0.6 else 0
+    if not ra or not rb:
+        return 0
+    if _ko_canon(ra) == _ko_canon(rb):
+        return 1
+    return 1 if SequenceMatcher(None, ra, rb).ratio() >= 0.85 else 0
 
 
 def name_match(ours, theirs):

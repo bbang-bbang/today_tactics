@@ -255,6 +255,9 @@ qa('해외 후보 시장가치 상한: 초과 선수 제외·제외 수 표시',
     all(c['market_value'] is None or c['market_value'] <= 3000000 for c in d_mv['candidates'])
     and d_mv['filters']['max_value'] == 3000000 and isinstance(d_mv.get('excluded_over_value'), int)
     and _brief_status('/api/overseas-recruit?pos=W&max_value=abc') == 400))
+qa('시장가치는 기준일 2025-06 이후 값만(오래된 값은 표시·필터 제외)', lambda: assert_(
+    all(c['mv_date'] >= '2025-06-01' for c in get('/api/overseas-recruit?pos=W&realistic=0&max_value=0&limit=30')['candidates'] if c['market_value'])
+    and all(c['mv_date'] >= '2025-06-01' for n in get('/api/team-recruit?team=ulsan')['needs'] for c in n['candidates'] if c['market_value'])))
 d_mvk = get('/api/team-recruit?team=suwon&max_value=1000000')
 qa('국내 후보 시장가치 상한', lambda: assert_(
     all(c['market_value'] is None or c['market_value'] <= 1000000 for n in d_mvk['needs'] for c in n['candidates'])
