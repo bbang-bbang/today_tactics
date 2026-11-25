@@ -95,13 +95,13 @@ def audit_overseas(path):
         if st_sid is not None:
             st = c.execute("SELECT team_id, matches, wins, draws, losses, gf, ga, points FROM league_standings WHERE season_id = ?", (st_sid,)).fetchall()
             up = c.execute("SELECT MAX(updated_at) FROM league_standings WHERE season_id = ?", (st_sid,)).fetchone()[0] or 0
-            # 순위표 갱신 시각 이전에 '시작'한 경기 중 2시간 안 지난 경기는 갱신 당시 진행 중 → 순위표에 없는 게 정상
-            before = [e for e in fin if (dates[e[0]] or 0) + 2 * 3600 <= up]
+            # 순위표 갱신 6시간 안에 시작한 경기는 갱신 당시 진행 중이거나 공급자 순위표에 아직 반영 전(실측 11/23: 종료 30분~1시간 뒤에도 미반영)
+            before = [e for e in fin if (dates[e[0]] or 0) + 6 * 3600 <= up]
             late = len(fin) - len(before)
             mism = standings_vs_events(before, st)
             rep("OK" if not mism else "FAIL", code, "공식 순위표 = (순위표 갱신 전 끝난) 경기 결과 합산",
                 f"불일치 {len(mism)}/{len(st)}팀" + (f" 예: {mism[0]}" if mism else ""))
-            rep("OK" if late == 0 else "WARN", code, "순위표 갱신 뒤 끝난 경기(순위표가 늦음 — 크론 순서)", f"{late}경기")
+            rep("OK" if late == 0 else "WARN", code, "순위표 갱신 6시간 안·뒤에 열린 경기(순위표가 늦음 — 크론 순서·공급자 반영 지연)", f"{late}경기")
             bp = [t for t, m, w, d, l, gf, ga, p in st if p != 3 * w + d]
             rep("OK" if not bp else "WARN", code, "승점 = 3승+무", f"불일치 {len(bp)} (감점이면 정상)")
             so = [t for t, *_ in st if t not in teams]
