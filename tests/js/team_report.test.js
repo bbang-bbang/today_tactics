@@ -77,3 +77,17 @@ test("team_report_height_foot_column", () => {
   assert.match(h, /title="Transfermarkt 값으로 보완"/);
   assert.match(h, /<td>-<\/td>/);
 });
+
+// 2026-11-25 전문가 평가 반영: 평점 소수 2자리 통일 · 순위 흐름 텍스트 요약/표(키보드·화면낭독기·모바일)
+test("team_report_rating_two_decimals", () => {
+  const h = TR.html({ ...base, players: [{ ...base.players[0], rating: 7 }] });
+  assert.match(h, /<td class="tr-num">7\.00<\/td>/);
+});
+
+test("team_report_flow_text_summary_and_table", () => {
+  const h = TR.html(base);
+  assert.match(h, /최고 <b>1위<\/b> \(R3\)/);
+  assert.match(h, /최저 <b>5위<\/b> \(R2\)/);
+  assert.match(h, /<details class="tr-flow-tbl">/);
+  assert.equal((h.match(/<tr class="tr-fr">/g) || []).length, 3);
+});

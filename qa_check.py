@@ -284,6 +284,12 @@ qa('키·주발 TM 보완: 해외 후보 주발 절반 이상 · 보완 표시(p
     (lambda c: c and sum(1 for x in c if x.get('foot')) >= len(c) / 2 and all(x.get('phys_src') in (None, 'TM') for x in c))(
         get('/api/overseas-recruit?pos=D&limit=20')['candidates'])
     and any(p.get('foot') for p in d_tr['players'])))
+_d_fl = get('/api/overseas-recruit?pos=D&realistic=0&max_value=0&foot=left&limit=30')
+qa('주발 필터(해외·국내): 왼발 = 왼발+양발만 · 모름 제외 수 · 잘못된 값 400', lambda: assert_(
+    _d_fl['candidates'] and all(c['foot'] in ('Left', 'Both') for c in _d_fl['candidates']) and _d_fl['filters']['foot'] == 'Left'
+    and isinstance(_d_fl['excluded_foot_unknown'], int)
+    and all(c['foot'] in ('Right', 'Both') for n in get('/api/team-recruit?team=ulsan&max_value=0&foot=right')['needs'] for c in n['candidates'])
+    and _brief_status('/api/overseas-recruit?pos=D&foot=middle') == 400 and _brief_status('/api/team-recruit?team=ulsan&foot=x') == 400))
 d_xv = get('/api/overseas-xg-validation')
 qa('xG 예측력 검증: 구조·r 범위 [-1,1]·합산 팀 수 = 리그별 합', lambda: assert_(
     isinstance(d_xv['leagues'], list) and d_xv['pooled']['n_teams'] == sum(l['n_teams'] for l in d_xv['leagues'])

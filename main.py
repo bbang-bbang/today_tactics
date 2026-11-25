@@ -182,7 +182,7 @@ def invalidate_api_cache():
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from overseas_formation import player_formations as _os_player_formations, formation_family as _formation_family
 from team_xg import team_xg_table as _team_xg_table, xg_coverage as _xg_coverage, XG_MIN_GAMES as _XG_MIN_GAMES
-from team_xg import half_split_predictiveness as _xg_predictiveness, validation_rows as _xg_validation_rows, _pearson as _xg_pearson
+from team_xg import half_split_predictiveness as _xg_predictiveness, validation_rows as _xg_validation_rows, _pearson as _xg_pearson, r_ci95 as _xg_r_ci95
 from squad_value import squad_value_table as _squad_value_table
 from team_report import rank_flow as _rank_flow, recent_form as _recent_form, formation_summary as _formation_summary
 from authlib.integrations.flask_client import OAuth
@@ -348,8 +348,10 @@ def get_db(row_factory=True):
 
 @contextmanager
 def get_league_db(league_code: str, row_factory=True):
-    """리그 코드 기반 SQLite 연결 context manager."""
-    conn = sqlite3.connect(_league_db_path(league_code))
+    """리그 코드 기반 SQLite 연결 context manager.
+    mode=rw — 파일이 없으면 새로 만들지 않고 OperationalError (2026-11-25: 없는 리그를 열 때 0바이트 DB 가 생기던 것 방지)."""
+    from pathlib import Path
+    conn = sqlite3.connect(Path(_league_db_path(league_code)).resolve().as_uri() + "?mode=rw", uri=True)
     if row_factory:
         conn.row_factory = sqlite3.Row
     try:
@@ -7484,7 +7486,7 @@ def _gk_rows(year):
     return rows
 
 
-def _recruit_by_play(mode, rows, meta, ss, league, scope, max_age, min_mins, player_raw, mv_cap=None, ct_months=None):
+def _recruit_by_play(mode, rows, meta, ss, league, scope, max_age, min_mins, player_raw, mv_cap=None, ct_months=None, foot=None):
     """포지션 무관 '플레이 기준' 추천 (2026-11-11).
     백분위는 같은 리그 전체 필드 플레이어 안에서(포지션 무관) — 포지션이 달라도 플레이 성향을 비교할 수 있게.
       style  : 팀 스쿼드(출전 가중)의 지표별 백분위를 같은 리그 팀들과 비교 → 가장 약한 지표 2개 → 그 지표가 강한 선수(포지션 무관)
@@ -7564,9 +7566,10 @@ def _recruit_by_play(mode, rows, meta, ss, league, scope, max_age, min_mins, pla
             cands.append(cand(r, fit=round(fit, 1), focus_pcts={m: round(v) for m, v in ps.items()}))
         cands, exc = _mv_cap(cands, lambda c: "kleague", lambda c: c["player_id"], mv_cap)
         cands = _ct_filter(cands, ct_months)
+        cands, fx = _foot_filter(cands, foot)
         cands.sort(key=lambda c: -c["fit"])
         return {"team_metrics": metrics, "weak_metrics": weak, "candidates": cands[:10], "pool_size": len(cands),
-                "excluded_over_value": exc,
+                "excluded_over_value": exc, "excluded_foot_unknown": fx,
                 "metric_labels": labels,
                 "notes": ["백분위 = 같은 리그 필드 플레이어 전체(포지션 무관) 중 위치 — 플레이 성향 비교용",
                           "팀 지표 = 스쿼드 선수 백분위의 출전 시간 가중 평균, 같은 리그 팀들과 순위 비교",
@@ -7595,9 +7598,10 @@ def _recruit_by_play(mode, rows, meta, ss, league, scope, max_age, min_mins, pla
                           profile={m: round(pct(r, m)) for m in tp if pct(r, m) is not None}))
     cands, exc = _mv_cap(cands, lambda c: "kleague", lambda c: c["player_id"], mv_cap)
     cands = _ct_filter(cands, ct_months)
+    cands, fx = _foot_filter(cands, foot)
     cands.sort(key=lambda c: -c["similarity"])
     return {"target": cand(target, profile={m: round(v) for m, v in tp.items()}), "candidates": cands[:10],
-            "pool_size": len(cands), "excluded_over_value": exc, "metric_labels": labels,
+            "pool_size": len(cands), "excluded_over_value": exc, "excluded_foot_unknown": fx, "metric_labels": labels,
             "notes": ["유사도 = 100 − 지표 백분위 차이의 RMS (지표: " + " · ".join(labels[m] for m in tp) + ")",
                       "백분위는 각자 리그 필드 플레이어 전체 기준(포지션 무관) — 같은 스타일이면 포지션이 달라도 나온다",
                       "같은 팀 선수 제외 · K2 선수는 K2 기준"]}, None
@@ -7694,6 +7698,26 @@ def _ct_filter(items, months):
     lim = (today + timedelta(days=round(months * 30.5))).isoformat()
     t0 = today.isoformat()
     return [c for c in items if c.get("contract_until") and t0 <= c["contract_until"] <= lim]
+
+
+def _parse_foot(raw):
+    """?foot=left|right → 'Left'|'Right' (우리 DB 표기), 빈 값 = 필터 없음. 잘못된 값은 ValueError."""
+    if raw in (None, ""):
+        return None
+    v = {"left": "Left", "right": "Right"}.get(str(raw).strip().lower())
+    if not v:
+        raise ValueError("foot")
+    return v
+
+
+def _foot_filter(items, foot):
+    """주발 필터 (2026-11-25) — 해당 발 + 양발. 주발 모르는 후보는 제외하고 그 수를 돌려준다. (남은 후보, 모름 제외 수).
+    주발은 우리 DB 값, 비어 있으면 Transfermarkt 보완값(_tm_attach) — 시장가치 필드가 붙은 뒤 호출."""
+    if not foot:
+        return items, 0
+    keep = [c for c in items if c.get("foot") in (foot, "Both")]
+    unknown = sum(1 for c in items if not c.get("foot"))
+    return keep, unknown
 
 
 def _parse_mv_cap(raw):
@@ -7802,6 +7826,7 @@ def team_recruit():
         min_mins = int(request.args.get("min_minutes") or 900)
         mv_cap = _parse_mv_cap(request.args.get("max_value"))
         ct_months = _parse_ct(request.args.get("contract_within"))
+        foot_f = _parse_foot(request.args.get("foot"))   # 아래 meta 루프의 foot 와 이름 분리
     except ValueError:
         return jsonify({"error": "invalid filter"}), 400
     min_mins = max(450, min(min_mins, 3000))
@@ -7840,13 +7865,13 @@ def team_recruit():
     squad = [{"player_id": r["player_id"], "name": r["name"], "pos": r.get("detail_label") or r.get("pos"), "mins": r["mins"]}
              for r in sorted((r for r in scored if r.get("team_id") == ss), key=lambda r: -(r["mins"] or 0))]
     if mode in ("style", "similar"):
-        out, err = _recruit_by_play(mode, scored, meta, ss, league, scope, max_age, min_mins, request.args.get("player"), mv_cap, ct_months)
+        out, err = _recruit_by_play(mode, scored, meta, ss, league, scope, max_age, min_mins, request.args.get("player"), mv_cap, ct_months, foot_f)
         if err:
             return jsonify({"error": err}), 400
         out.update({"team": {"slug": slug, "name": info.get("short") or info.get("name"), "league": league, "primary": info.get("primary")},
                     "year": year, "mode": mode, "squad": squad,
                     "filters": {"scope": scope, "max_age": max_age, "min_minutes": min_mins, "max_value": mv_cap,
-                                "contract_within": ct_months}})
+                                "contract_within": ct_months, "foot": foot_f}})
         out.setdefault("notes", []).append(_TM_NOTE)
         return jsonify(out)
 
@@ -7929,6 +7954,7 @@ def team_recruit():
             })
         cands, n["excluded_over_value"] = _mv_cap(cands, lambda c: "kleague", lambda c: c["player_id"], mv_cap)
         cands = _ct_filter(cands, ct_months)
+        cands, n["excluded_foot_unknown"] = _foot_filter(cands, foot_f)
         cands.sort(key=lambda c: -c["fit"])
         n["candidates"] = cands[:_RC_CANDIDATES]
         n["pool_size"] = len(cands)
@@ -7937,7 +7963,7 @@ def team_recruit():
         "team": {"slug": slug, "name": info.get("short") or info.get("name"), "league": league, "primary": info.get("primary")},
         "year": year, "mode": "position", "squad": squad,
         "filters": {"scope": scope, "max_age": max_age, "min_minutes": min_mins, "max_value": mv_cap,
-                    "contract_within": ct_months},
+                    "contract_within": ct_months, "foot": foot_f},
         "needs": picked, "all_groups": needs,
         "metric_labels": _TP_METRIC_LABEL, "group_labels": {g: DETAIL_POS_LABELS.get(g, g) for g in _RC_GROUPS},
         "notes": [
@@ -8143,6 +8169,7 @@ def overseas_recruit():
         limit = max(1, min(int(request.args.get("limit") or 10), 30))
         mv_cap = _parse_mv_cap(request.args.get("max_value"))
         ct_months = _parse_ct(request.args.get("contract_within"))
+        foot = _parse_foot(request.args.get("foot"))
     except ValueError:
         return jsonify({"error": "invalid filter"}), 400
     realistic = request.args.get("realistic", "1") != "0"     # 기본 ON — 상위권 구단 주전 제외
@@ -8213,6 +8240,7 @@ def overseas_recruit():
         cands = keep
     cands, excluded_mv = _mv_cap(cands, lambda c: c["league_code"], lambda c: int(str(c["id"]).split(":")[-1]), mv_cap)
     cands = _ct_filter(cands, ct_months)
+    cands, excluded_foot = _foot_filter(cands, foot)
     for r in cands:
         fv = [r["pcts"][k] for k in focus if k in r["pcts"]]
         base = 0.5 * r["raw"] + 0.5 * (sum(fv) / len(fv)) if fv else r["raw"]
@@ -8223,9 +8251,10 @@ def overseas_recruit():
         "pool_size": len(cands), "leagues": sorted({r["league_code"] for r in rows}), "unlabeled": unlabeled,
         "metric_labels": {k: _OS_METRICS[k] for k in weights},
         "filters": {"min_minutes": min_mins, "max_age": max_age, "tier": tier, "focus": focus, "realistic": realistic,
-                    "max_value": mv_cap, "contract_within": ct_months},
+                    "max_value": mv_cap, "contract_within": ct_months, "foot": foot},
         "excluded_top_clubs": excluded_top,
         "excluded_over_value": excluded_mv,
+        "excluded_foot_unknown": excluded_foot,
         "team_formation": team_formation,
         "candidates": [{
             "id": r["id"], "name": r["name"], "team": r["team"], "league": r["league"], "league_code": r["league_code"],
@@ -15382,6 +15411,8 @@ def overseas_xg_validation():
     for k in ("pts", "gd", "xgd", "xpts"):
         r = _xg_pearson([x[k] for x in pooled], [x["ppg2"] for x in pooled])
         pool["r_" + k] = round(r, 3) if r is not None else None
+        ci = _xg_r_ci95(r, len(pooled))
+        pool["ci_" + k] = [round(ci[0], 3), round(ci[1], 3)] if ci else None
     return jsonify({"leagues": per, "pooled": pool, "min_games": _XG_VALID_MIN_GAMES,
                     "notes": ["팀마다 이번 시즌 경기를 날짜순 반으로 나눠, 전반기 경기당 지표가 후반기 경기당 승점과 얼마나 같이 움직이는지(Pearson r, 1 = 완벽)",
                               f"경기 {_XG_VALID_MIN_GAMES}경기 이상·전반기 xG 3경기 이상 팀만 · 시즌 중반이라 표본이 작아 리그별 r 은 크게 흔들림 — 전 리그 합산을 기준으로 볼 것",

@@ -41,5 +41,16 @@ check("라운드 있는 리그: 라운드 없는 PO 경기 제외", sorted({r[0]
 g = main._team_xg_games(mk([None, None]), [1], 2026)
 check("라운드 값이 전혀 없는 리그: 전부 사용", sorted({r[0] for r in g}), [1, 2])
 check("12필드(마지막 date_ts)", len(g[0]), 12)
+# get_league_db: 없는 리그 DB 파일을 새로 만들지 않는다 (2026-11-25 감사 — 로컬에서 0바이트 DB 13개 생성됨)
+import tempfile  # noqa: E402
+missing = os.path.join(tempfile.mkdtemp(), "zz_missing.db")
+main.LEAGUE_REGISTRY["zz_test"] = {"db": missing, "tournaments": [], "label": "t"}
+try:
+    with main.get_league_db("zz_test") as c:
+        c.execute("SELECT 1")
+    opened = True
+except sqlite3.OperationalError:
+    opened = False
+check("없는 DB → 오류(빈 파일 생성 안 함)", (opened, os.path.exists(missing)), (False, False))
 print(f"\n{'OK' if not fails else 'FAIL'} — 실패 {fails}건")
 sys.exit(1 if fails else 0)

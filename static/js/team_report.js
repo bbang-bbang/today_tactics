@@ -28,8 +28,17 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         const first = flow[0], last = flow[flow.length - 1];
         const xl = `<text x="${L}" y="${H - 4}" class="tr-axis">${first.round != null ? "R" + first.round : "1경기"}</text>`
             + `<text x="${W - R}" y="${H - 4}" class="tr-axis" text-anchor="end">${last.round != null ? "R" + last.round : flow.length + "경기"}</text>`;
+        // 텍스트 요약 + 라운드별 표(키보드·화면낭독기·모바일 — SVG 툴팁은 마우스에서만 보임)
+        const rl = (p, i) => (p.round != null ? "R" + p.round : (i + 1) + "경기");
+        let bi = 0, wi = 0;
+        flow.forEach((p, i) => { if (p.rank < flow[bi].rank) bi = i; if (p.rank > flow[wi].rank) wi = i; });
+        const summary = `<p class="tr-flow-sum">최고 <b>${flow[bi].rank}위</b> (${rl(flow[bi], bi)}) · 최저 <b>${flow[wi].rank}위</b> (${rl(flow[wi], wi)}) · 마지막 <b>${last.rank}위</b> (${rl(last, flow.length - 1)})</p>`;
+        const tbl = `<details class="tr-flow-tbl"><summary>라운드별 표</summary><div class="tr-scroll"><table class="tr-table">
+            <thead><tr><th scope="col">라운드</th><th scope="col">결과</th><th scope="col">순위</th><th scope="col">승점</th></tr></thead><tbody>
+            ${flow.map((p, i) => `<tr class="tr-fr"><td>${rl(p, i)}</td><td>${RES[p.res] || "-"} ${p.gf}-${p.ga}</td><td class="tr-num">${p.rank}</td><td class="tr-num">${p.pts}</td></tr>`).join("")}
+            </tbody></table></div></details>`;
         return `<svg class="tr-flow" viewBox="0 0 ${W} ${H}" role="img" aria-label="라운드별 순위 흐름: ${first.rank}위에서 ${last.rank}위">${grid}`
-            + `<polyline points="${pts}" class="tr-line"/>${dots}${xl}</svg>`;
+            + `<polyline points="${pts}" class="tr-line"/>${dots}${xl}</svg>${summary}${tbl}`;
     }
 
     function xgCard(x) {
@@ -69,7 +78,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             ld.rating ? `평점 1위 <b>${ttEsc(ld.rating.name)}</b> ${ld.rating.rating}` : ""].filter(Boolean).join(" · ");
         const rows = ps.map(p => `<tr><td>${ttEsc(p.name)}</td><td>${ttEsc(p.position || "-")}</td><td${p.phys_src === "TM" ? ' title="Transfermarkt 값으로 보완"' : ""}>${ttEsc(phys(p))}</td><td class="tr-num">${p.apps ?? "-"}</td>
             <td class="tr-num">${p.minutes ?? "-"}</td><td class="tr-num">${p.goals}</td><td class="tr-num">${p.assists}</td>
-            <td class="tr-num">${p.rating ?? "-"}</td><td class="tr-num">${mv(p.market_value)}</td></tr>`).join("");
+            <td class="tr-num">${p.rating != null ? Number(p.rating).toFixed(2) : "-"}</td><td class="tr-num">${mv(p.market_value)}</td></tr>`).join("");
         return `${lead ? `<p class="tr-lead">${lead}</p>` : ""}<div class="tr-scroll"><table class="tr-table">
             <caption class="tr-muted">출전 시간 상위 ${ps.length}명${d.stats_label ? " · " + ttEsc(d.stats_label) : ""}</caption>
             <thead><tr><th scope="col">선수</th><th scope="col">포지션</th><th scope="col">키·주발</th><th scope="col">경기</th><th scope="col">분</th><th scope="col">골</th>

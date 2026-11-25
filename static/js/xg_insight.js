@@ -7,6 +7,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
     "use strict";
     const METRICS = [["pts", "승점"], ["gd", "득실차"], ["xgd", "xG 차"], ["xpts", "xPts(기대 승점)"]];
     const fmt = (r) => (r == null ? "-" : (r > 0 ? "" : "") + Number(r).toFixed(2));
+    const ciTxt = (v, k) => { const c = v["ci_" + k]; return c ? `${Number(c[0]).toFixed(2)}~${Number(c[1]).toFixed(2)}` : ""; };
     const ok = (v) => v && v.n_teams >= 3 && METRICS.some(([k]) => v["r_" + k] != null);
 
     function block(v, title) {
@@ -15,10 +16,10 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
             const r = v["r_" + k];
             const w = r == null ? 0 : Math.max(0, Math.min(1, r)) * 100;
             return `<div class="xi-row"${best && best[0] === k ? ' data-best="1"' : ""}><span class="xi-lab">${lab}</span>`
-                + `<span class="xi-bar" style="--w:${w.toFixed(0)}%" aria-hidden="true"></span><span class="xi-val">${fmt(r)}</span></div>`;
+                + `<span class="xi-bar" style="--w:${w.toFixed(0)}%" aria-hidden="true"></span><span class="xi-val"${ciTxt(v, k) ? ` title="95% 신뢰구간 ${ciTxt(v, k)}"` : ""}>${fmt(r)}</span></div>`;
         }).join("");
         return `<div class="xi-block"><h5>${title} <span class="xi-muted">팀 ${v.n_teams}${v.n_leagues ? " · " + v.n_leagues + "개 리그" : ""}</span></h5>${rows}
-            ${best ? `<p class="xi-muted">가장 잘 맞힌 지표: <b>${best[1]}</b></p>` : ""}</div>`;
+            ${best ? `<p class="xi-muted">가장 잘 맞힌 지표: <b>${best[1]}</b>${ciTxt(v, best[0]) ? ` (95% 구간 ${ciTxt(v, best[0])})` : ""}</p>` : ""}</div>`;
     }
 
     function validHtml(league, pooled, label) {

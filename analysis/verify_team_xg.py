@@ -100,6 +100,15 @@ check("예측력: 전반 xG 차 → 후반 승점 r = 1", round(pr["r_xgd"], 2),
 check("예측력: 전반 승점 → 후반 승점 r < 0 (이 합성에선 반대)", pr["r_pts"] < 0, True)
 check("예측력: 경기 수 부족 팀 제외", half_split_predictiveness(rows, min_games=7)["n_teams"], 0)
 check("예측력: 팀 3개 미만 → r None", half_split_predictiveness(rows[:12], min_games=6)["r_xgd"], None)
+# 상관계수 95% 신뢰구간 (Fisher z) — 전문가 평가 반영
+from team_xg import r_ci95  # noqa: E402
+lo, hi = r_ci95(0.45, 264)
+check("r=0.45, n=264 → 약 0.35~0.54", (round(lo, 2), round(hi, 2)), (0.35, 0.54))
+lo, hi = r_ci95(0.1, 20)
+check("r=0.10, n=20 → 0 을 포함(넓음)", lo < 0 < hi, True)
+check("n ≤ 3 또는 r None → None", (r_ci95(0.5, 3), r_ci95(None, 50)), (None, None))
+check("|r| = 1 → 경계 유지", r_ci95(1.0, 10), (1.0, 1.0))
+check("예측력 결과에 ci_ 키", "ci_xgd" in pr and pr["ci_xgd"] is not None, True)
 # 팀 표에 기대 승점: xG 있는 경기 실제 승점 vs xPts
 tx = {r["team_id"]: r for r in team_xg_table(games)}
 check("팀 10 실제 승점(xG 경기)", tx[10]["pts_x"], 3)                  # 3-0 승, 0-2 패

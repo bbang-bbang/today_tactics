@@ -30,3 +30,10 @@ test("xg_insight_negative_r_bar_width_zero", () => {
   assert.match(h, /--w:0%/);
   assert.match(h, /-0\.20/);
 });
+
+test("xg_insight_ci_shown", () => {
+  const p2 = { ...pooled, ci_xgd: [0.46, 0.63], ci_pts: [0.24, 0.45] };
+  const h = XI.validHtml(league, p2, "L");
+  assert.match(h, /95% 구간 0\.46~0\.63/);
+  assert.match(h, /title="95% 신뢰구간 0\.24~0\.45"/);
+});

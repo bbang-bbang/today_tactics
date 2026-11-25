@@ -158,6 +158,8 @@ def half_split_predictiveness(rows, min_games=10):
     for k in xs:
         r = _pearson(xs[k], ys)
         out["r_" + k] = round(r, 3) if r is not None else None
+        ci = r_ci95(r, len(ys))
+        out["ci_" + k] = [round(ci[0], 3), round(ci[1], 3)] if ci else None
     return out
 
 
@@ -168,3 +170,14 @@ def validation_rows(games):
         n = _norm(g)
         out.append((n[1], g[11] if len(g) > 11 else 0, n[7] or 0, n[8] or 0, n[3], n[9]))
     return out
+
+
+def r_ci95(r, n):
+    """Pearson r 의 95% 신뢰구간 (Fisher z 근사). n ≤ 3 이거나 r 없음 → None. |r| = 1 이면 (r, r)."""
+    import math
+    if r is None or n is None or n <= 3:
+        return None
+    if abs(r) >= 1:
+        return (float(r), float(r))
+    z, se = math.atanh(r), 1 / math.sqrt(n - 3)
+    return (math.tanh(z - 1.96 * se), math.tanh(z + 1.96 * se))
