@@ -140,7 +140,7 @@
             if (ana) ana.classList.add("hidden");
             if (cmp) cmp.classList.add("hidden");
             const sel = $("ta-team-select");
-            lazyLoadSeq(["season_review"]).then(() => {
+            lazyLoadSeq(["squad_value", "season_review"]).then(() => {
                 if (_current === "team" && _teamMode === "review" && window.ttSeasonReview) window.ttSeasonReview.show(sel && sel.value);
             }).catch(lazyFail);
         } else if (mode === "recruit") {

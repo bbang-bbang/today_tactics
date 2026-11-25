@@ -133,6 +133,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
   function sectionsFor(code) {
     const l = GL.leagues.find(x => x.code === code);
     return ['standings', 'team-rankings', 'top-performers', 'players']
+      .concat(l && l.hasSquadValue ? ['squad-value'] : [])
       .concat(l && l.hasTeamXg ? ['team-xg'] : [])
       .concat(l && l.hasShotmap ? ['team-tactics'] : []);
   }
@@ -167,7 +168,7 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
 
   function sectionLabel(s) {
     return { standings: '📋 순위표', 'team-rankings': '📊 팀 지표', 'top-performers': '⭐ TOP 퍼포머', players: '🔎 선수 탐색',
-             'team-xg': '📈 팀 xG', 'team-tactics': '🎯 팀 슈팅·진형' }[s] || s;
+             'squad-value': '💰 스쿼드 가치', 'team-xg': '📈 팀 xG', 'team-tactics': '🎯 팀 슈팅·진형' }[s] || s;
   }
 
   /* ── 리그 전환 ────────────────────────────────────── */
@@ -211,6 +212,11 @@ function ttEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
         case 'top-performers': await renderTopPerformers(code, qs);  break;
         case 'players':        await renderPlayerExplorer(code, qs); break;
         case 'team-xg':        await renderTeamXg(code, qs);         break;
+        case 'squad-value': {
+          const sv = await (await fetch(`/api/squad-value?league=${encodeURIComponent(code)}`)).json();
+          document.getElementById('gl-content').innerHTML = window.ttSquadValue ? window.ttSquadValue.html(sv) : noDataHtml('스쿼드 가치', code);
+          break;
+        }
         case 'team-tactics':   await renderTeamTactics(code, qs);    break;
       }
     } catch (e) {

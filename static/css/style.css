@@ -9008,3 +9008,23 @@ body.match-strip-collapsed .flow-section-head .flow-hint { display: none; }
 .gl-xg-notes summary:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
 .rc-mv { color: #fde68a; white-space: nowrap; }   /* Transfermarkt 추정 시장가치 (2026-11-25) */
 .rc-ct { color: #fca5a5; white-space: nowrap; }   /* 계약 만료 1년 이내 (2026-11-25) */
+
+/* 스쿼드 시장가치 vs 성적 (2026-11-25, squad_value.js) — 시즌 리뷰 리그 총평 · 해외리그 탭 공통 */
+.sv-lead { margin: 0 0 10px; font-size: 13px; color: var(--text-primary); line-height: 1.6; }
+.sv-muted { color: var(--text-muted); font-size: 12px; font-weight: 400; }
+.sv-scroll { overflow-x: auto; }
+.sv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sv-table caption { caption-side: bottom; text-align: left; padding-top: 6px; }
+.sv-table th { color: var(--text-muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.1); text-align: right; white-space: nowrap; }
+.sv-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.06); color: var(--text-primary); }
+.sv-table th:nth-child(2), .sv-table td:nth-child(2) { text-align: left; }
+.sv-table td.sv-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sv-table tbody tr:hover td { background: rgba(255,255,255,.03); }
+.sv-table td.sv-pos { color: #4ade80; }
+.sv-table td.sv-neg { color: #f87171; }
+.sv-empty { color: var(--text-muted); font-size: 13px; }
+.sv-notes { margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+.sv-notes summary { cursor: pointer; }
+.sv-notes summary:hover { color: var(--text-primary); }
+.sv-notes summary:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.sv-card { margin-top: 12px; }

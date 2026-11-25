@@ -207,6 +207,19 @@ function ttSeason() { return (document.body && document.body.dataset.season) || 
         </section>`;
     }
 
+    // 스쿼드 시장가치 vs 성적 (2026-11-25, squad_value.js) — 현재 시즌만(시장가치·소속이 현재 기준)
+    function loadSquadValue(id) {
+        const body = document.getElementById("sr-body");
+        if (!body) return;
+        const sec = document.createElement("section");
+        sec.className = "sr-card sv-card";
+        sec.innerHTML = `<h3>💰 스쿼드 시장가치 vs 성적 <span class="sr-muted">Transfermarkt 추정치</span></h3><div class="sv-slot"><div class="rc-loading" role="status">불러오는 중…</div></div>`;
+        body.appendChild(sec);
+        fetch(`/api/squad-value?league=${encodeURIComponent(_lg)}`).then(r => r.json())
+            .then(d => { if (id === _req) sec.querySelector(".sv-slot").innerHTML = window.ttSquadValue.html(d); })
+            .catch(() => { if (id === _req) sec.querySelector(".sv-slot").innerHTML = `<div class="rc-error" role="alert">스쿼드 가치를 불러오지 못했습니다.</div>`; });
+    }
+
     function load() {
         const body = document.getElementById("sr-body");
         if (!body || !_team) return;
@@ -219,6 +232,7 @@ function ttSeason() { return (document.body && document.body.dataset.season) || 
                     if (id !== _req) return;
                     body.innerHTML = ok ? leagueBodyHtml(j)
                         : `<div class="rc-empty">${j.error === "no games" ? "이 시즌에는 이 리그의 경기 기록이 없습니다." : "리그 총평을 만들 수 없습니다."}</div>`;
+                    if (ok && String(_year) === ttSeason() && window.ttSquadValue) loadSquadValue(id);
                 })
                 .catch(err => {
                     console.error("[리그 총평 실패]", err);

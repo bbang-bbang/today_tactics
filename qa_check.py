@@ -267,6 +267,13 @@ qa('계약 1년 내 만료 필터(해외·국내): 만료일이 오늘~12개월 
     _ct_ok(d_ct['candidates']) and d_ct['filters']['contract_within'] == 12
     and _ct_ok([c for n in get('/api/team-recruit?team=ulsan&max_value=0&contract_within=12')['needs'] for c in n['candidates']])
     and _brief_status('/api/overseas-recruit?pos=W&contract_within=x') == 400))
+d_sv = get('/api/squad-value?league=k1')
+qa('스쿼드 가치(K1): 12팀·실제 순위 순·연결 선수 있음·차이 = 가치 순위 − 순위', lambda: assert_(
+    len(d_sv['teams']) == 12 and [t['rank'] for t in d_sv['teams']] == list(range(1, 13))
+    and d_sv['coverage']['linked'] > 0
+    and all(t['diff'] == t['value_rank'] - t['rank'] for t in d_sv['teams'] if t['diff'] is not None)
+    and _brief_status('/api/squad-value?league=zz') == 400 and len(get('/api/squad-value?league=k2')['teams']) >= 10))
+qa('스쿼드 가치(해외 리그 공통)', lambda: assert_(len(get('/api/squad-value?league=epl')['teams']) == 20))
 d_mvk = get('/api/team-recruit?team=suwon&max_value=1000000')
 qa('국내 후보 시장가치 상한', lambda: assert_(
     all(c['market_value'] is None or c['market_value'] <= 1000000 for n in d_mvk['needs'] for c in n['candidates'])

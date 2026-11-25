@@ -182,6 +182,7 @@ def invalidate_api_cache():
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from overseas_formation import player_formations as _os_player_formations, formation_family as _formation_family
 from team_xg import team_xg_table as _team_xg_table
+from squad_value import squad_value_table as _squad_value_table
 from authlib.integrations.flask_client import OAuth
 
 app = Flask(__name__)
@@ -723,6 +724,19 @@ def get_leagues():
         except sqlite3.Error:
             return False
 
+    def has_squad_value(code):
+        """Transfermarkt 연결 선수가 있는 리그 — '스쿼드 가치' 섹션 노출."""
+        if code == "kleague" or not os.path.exists(TM_DB_PATH):
+            return False
+        try:
+            c = sqlite3.connect(f"file:{TM_DB_PATH}?mode=ro", uri=True)
+            try:
+                return c.execute("SELECT 1 FROM tm_map WHERE league_code = ? LIMIT 1", (code,)).fetchone() is not None
+            finally:
+                c.close()
+        except sqlite3.Error:
+            return False
+
     def has_team_xg(code):
         """경기별 팀 xG(API-Football /fixtures/statistics, match_team_stats)가 있는 해외 리그 — '팀 xG' 섹션 노출."""
         if code == "kleague":
@@ -767,6 +781,7 @@ def get_leagues():
             "standingsOnly": bool(cfg.get("standings_only")),
             "hasShotmap": has_shotmap(code),
             "hasTeamXg": has_team_xg(code),
+            "hasSquadValue": has_squad_value(code),
         }
         for code, cfg in LEAGUE_REGISTRY.items() if has_data(code)
     ])
@@ -7673,6 +7688,72 @@ def _parse_mv_cap(raw):
 
 _TM_NOTE = ("시장가치·계약 만료일 = Transfermarkt 추정치(공개 데이터셋, 2026-06 무렵 기준 — 데이터셋 업데이트 중단, "
             "이후 재계약·이적 미반영). 생년월일·이름으로 확실히 연결된 선수만 표시, 부상 정보 없음")
+
+
+@app.route("/api/squad-value")
+@cached_response(ttl=3600)
+def squad_value():
+    """스쿼드 시장가치 vs 성적 (2026-11-25) — K1·K2(?league=k1|k2) 와 해외 리그(?league=<code>) 공통.
+    시장가치 = Transfermarkt 추정치(기준일 2025-06 이후 값만), 선수 소속 = 우리 DB 현재 소속."""
+    code = (request.args.get("league") or "k1").strip().lower()
+    if code in ("k1", "k2"):
+        tid = 410 if code == "k1" else 777
+        year = _current_season()
+        ys, ye = _year_range(year)
+        conn = sqlite3.connect(DB_PATH)
+        try:
+            games = conn.execute("""SELECT home_team_id, away_team_id, home_score, away_score FROM events
+                                    WHERE tournament_id=? AND date_ts >= ? AND date_ts < ? AND home_score IS NOT NULL""",
+                                 (tid, ys, ye)).fetchall()
+            tb = {}
+            for h, a, hs, as_ in games:
+                for t, gf, ga in ((h, hs, as_), (a, as_, hs)):
+                    r = tb.setdefault(t, {"pts": 0, "gf": 0, "ga": 0, "played": 0})
+                    r["played"] += 1; r["gf"] += gf; r["ga"] += ga
+                    r["pts"] += 3 if gf > ga else 1 if gf == ga else 0
+            # K리그 규정: 승점 → 다득점 → 득실차
+            order = sorted(tb, key=lambda t: (-tb[t]["pts"], -tb[t]["gf"], -(tb[t]["gf"] - tb[t]["ga"])))
+            names = {t["sofascore_id"]: (t.get("short") or t["name"]) for t in TEAMS if t.get("sofascore_id")}
+            teams = [{"team_id": t, "name": names.get(t, str(t)), "rank": i + 1, "pts": tb[t]["pts"], "played": tb[t]["played"]}
+                     for i, t in enumerate(order)]
+            ph = ",".join("?" * len(order)) or "NULL"
+            prs = conn.execute(f"SELECT id, team_id FROM players WHERE team_id IN ({ph})", order).fetchall()   # ph 는 '?' 만
+        finally:
+            conn.close()
+        lc, label = "kleague", ("K리그1" if code == "k1" else "K리그2")
+    else:
+        cfg, err = _validate_league(code)
+        if err:
+            return err
+        if code == "kleague":
+            return jsonify({"error": "use league=k1|k2"}), 400
+        tids = [t["id"] for t in cfg["tournaments"]]
+        ph = ",".join("?" * len(tids))
+        with get_league_db(code) as conn:
+            st = conn.execute(f"""SELECT s.team_id, COALESCE(t.name, s.team_name), s.position, s.points, s.matches
+                                  FROM league_standings s LEFT JOIN teams t ON t.id = s.team_id
+                                  WHERE s.tournament_id IN ({ph})
+                                    AND s.season_id = (SELECT MAX(season_id) FROM league_standings WHERE tournament_id IN ({ph}))
+                                  ORDER BY s.position""", (*tids, *tids)).fetchall()
+            teams = [{"team_id": r[0], "name": r[1] or str(r[0]), "rank": r[2], "pts": r[3], "played": r[4]} for r in st]
+            tph = ",".join("?" * len(teams)) or "NULL"
+            prs = conn.execute(f"SELECT id, team_id FROM players WHERE team_id IN ({tph})", [t["team_id"] for t in teams]).fetchall()
+        lc, label = code, cfg["label"]
+    vals = _tm_values([(lc, pid) for pid, _t in prs])
+    linked = [(tid_, (vals[(lc, pid)] or {}).get("market_value")) for pid, tid_ in prs if (lc, pid) in vals]
+    rows = _squad_value_table(teams, linked)
+    have = [r for r in rows if r["diff"] is not None]
+    return jsonify({
+        "league": code, "label": label, "teams": rows,
+        "highlights": {"over": max(have, key=lambda r: r["diff"], default=None) and
+                       {"name": max(have, key=lambda r: r["diff"])["name"], "diff": max(have, key=lambda r: r["diff"])["diff"]},
+                       "under": min(have, key=lambda r: r["diff"], default=None) and
+                       {"name": min(have, key=lambda r: r["diff"])["name"], "diff": min(have, key=lambda r: r["diff"])["diff"]}},
+        "coverage": {"players": len(prs), "linked": len(linked), "valued": sum(1 for _t, v in linked if v)},
+        "notes": [_TM_NOTE,
+                  "스쿼드 가치 = 우리 DB 현재 소속 선수 중 시장가치가 연결된 선수 합 — 연결 안 된 선수(특히 K리그2·하위 리그)는 빠져 실제보다 낮을 수 있음",
+                  "차이 = 가치 순위 − 실제 순위: + 는 몸값보다 성적이 좋음, − 는 몸값만큼 못 함"],
+    })
 
 
 @app.route("/api/team-recruit")
