@@ -97,8 +97,18 @@ def audit_overseas(path):
             up = c.execute("SELECT MAX(updated_at) FROM league_standings WHERE season_id = ?", (st_sid,)).fetchone()[0] or 0
             # 순위표 갱신 6시간 안에 시작한 경기는 갱신 당시 진행 중이거나 공급자 순위표에 아직 반영 전(실측 11/23: 종료 30분~1시간 뒤에도 미반영)
             before = [e for e in fin if (dates[e[0]] or 0) + 6 * 3600 <= up]
-            late = len(fin) - len(before)
-            mism = standings_vs_events(before, st)
+            window = [e for e in fin if (dates[e[0]] or 0) + 6 * 3600 > up]
+            late = len(window)
+            # 팀마다 '갱신 전 경기 + 6시간 창 경기 중 일부(반영된 것)' 조합 중 하나라도 순위표와 같으면 일치로 본다
+            from itertools import combinations
+            mism = []
+            for row in st:
+                t = row[0]
+                base = [e for e in before if t in (e[1], e[2])]
+                wt = [e for e in window if t in (e[1], e[2])]
+                if not any(not standings_vs_events(base + list(sub), [row])
+                           for k in range(len(wt) + 1) for sub in combinations(wt, k)):
+                    mism.append(standings_vs_events(base, [row])[0])
             rep("OK" if not mism else "FAIL", code, "공식 순위표 = (순위표 갱신 전 끝난) 경기 결과 합산",
                 f"불일치 {len(mism)}/{len(st)}팀" + (f" 예: {mism[0]}" if mism else ""))
             rep("OK" if late == 0 else "WARN", code, "순위표 갱신 6시간 안·뒤에 열린 경기(순위표가 늦음 — 크론 순서·공급자 반영 지연)", f"{late}경기")
